@@ -904,6 +904,71 @@
     100% { box-shadow: 0 0 0 3px rgba(66,133,244,0); }
   }
   .widget-flash { animation: widgetFlashPulse 0.9s ease-out; border-radius: 6px; }
+
+  /* Vocabulary "+" setup flow: Language -> Frequency -> Words/Phrases per day. */
+  .vocab-setup-overlay { position: fixed; inset: 0; z-index: 4000; background: transparent; }
+  .vocab-setup-popup {
+    position: fixed; top: 44px; right: 12px; z-index: 4001;
+    background: #ffffff; border: 1px solid #000000; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+    padding: 14px; width: 260px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  .vocab-setup-popup[hidden], .vocab-setup-overlay[hidden] { display: none; }
+  .vocab-setup-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  }
+  .vocab-setup-back {
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; background: transparent;
+    border: none; border-radius: 5px; color: #000000; cursor: pointer; flex: 0 0 auto;
+  }
+  .vocab-setup-back:hover { background: #f2f2f2; }
+  .vocab-setup-back[hidden] { visibility: hidden; }
+  .vocab-setup-title { font-size: 13px; font-weight: 700; color: #000000; }
+  .vocab-lang-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px;
+  }
+  .vocab-lang-tile, .vocab-freq-option {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 12px 8px; border: 1.5px solid #e5e5e5; border-radius: 8px;
+    background: #fafafa; cursor: pointer; font-family: inherit;
+    color: #000000; text-align: center;
+  }
+  .vocab-lang-tile:hover, .vocab-freq-option:hover { background: #f0f0f0; border-color: #cccccc; }
+  .vocab-lang-tile.selected, .vocab-freq-option.selected {
+    border-color: #000000; background: #f5f5f5;
+  }
+  .vocab-lang-icon {
+    width: 36px; height: 36px; border-radius: 8px; background: #ffffff;
+    border: 1px solid #e5e5e5; display: flex; align-items: center; justify-content: center;
+    color: #000000; font-size: 15px; font-weight: 700;
+  }
+  .vocab-lang-label, .vocab-freq-label { font-size: 12px; font-weight: 600; }
+  .vocab-freq-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .vocab-freq-option { flex-direction: row; justify-content: space-between; padding: 10px 12px; }
+  .vocab-stepper-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .vocab-stepper-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 8px 10px; border: 1px solid #e5e5e5; border-radius: 8px;
+  }
+  .vocab-stepper-lang { font-size: 12px; font-weight: 600; color: #000000; }
+  .vocab-stepper-control { display: flex; align-items: center; gap: 8px; }
+  .vocab-stepper-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; border-radius: 5px;
+    border: 1px solid #cccccc; background: #ffffff; color: #000000;
+    font-size: 14px; line-height: 1; cursor: pointer;
+  }
+  .vocab-stepper-btn:hover:not(:disabled) { background: #f2f2f2; }
+  .vocab-stepper-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .vocab-stepper-value { font-size: 13px; font-weight: 700; min-width: 20px; text-align: center; }
+  .vocab-setup-next {
+    display: block; width: 100%; padding: 9px; border: none; border-radius: 7px;
+    background: #000000; color: #ffffff; font-size: 13px; font-weight: 700;
+    font-family: inherit; cursor: pointer;
+  }
+  .vocab-setup-next:disabled { opacity: 0.35; cursor: not-allowed; }
 </style>
 
 <div class="page-title"><span class="pt-prefix">my</span><span class="pt-main">Productivity</span><span class="pt-accent">Space</span></div>
@@ -981,6 +1046,26 @@
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg></span>
       <span class="add-widget-label">Page</span>
     </button>
+  </div>
+</div>
+
+<div id="vocabSetupOverlay" class="vocab-setup-overlay" hidden></div>
+<div id="vocabSetupPopup" class="vocab-setup-popup" hidden>
+  <div class="vocab-setup-header">
+    <button type="button" id="vocabSetupBackBtn" class="vocab-setup-back" title="Back"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+    <span class="vocab-setup-title" id="vocabSetupTitle">Language</span>
+  </div>
+  <div id="vocabSetupStep1">
+    <div class="vocab-lang-grid" id="vocabLangGrid"></div>
+    <button type="button" class="vocab-setup-next" id="vocabStep1Next" disabled>Next</button>
+  </div>
+  <div id="vocabSetupStep2" hidden>
+    <div class="vocab-freq-list" id="vocabFreqList"></div>
+    <button type="button" class="vocab-setup-next" id="vocabStep2Next" disabled>Next</button>
+  </div>
+  <div id="vocabSetupStep3" hidden>
+    <div class="vocab-stepper-list" id="vocabStepperList"></div>
+    <button type="button" class="vocab-setup-next" id="vocabStep3Add">Add</button>
   </div>
 </div>
 
@@ -4752,7 +4837,7 @@
       if (dynamicList) {
         dynamicList.forEach(function (entry) {
           if (entry && typeof entry.id === "string" && entry.id && entry.id !== "readingList" && entry.id !== "vocab") {
-            registerDynamicWidget(entry.id, entry.type || "page", { skipPersist: true });
+            registerDynamicWidget(entry.id, entry.type || "page", { skipPersist: true, vocabSettings: entry.vocabSettings });
           }
         });
       }
@@ -5229,7 +5314,11 @@
     function persistDynamicWidgets() {
       const list = WIDGET_IDS
         .filter(function (id) { return !!dynamicWidgets[id]; })
-        .map(function (id) { return { id: id, type: dynamicWidgets[id].type }; });
+        .map(function (id) {
+          const entry = { id: id, type: dynamicWidgets[id].type };
+          if (dynamicWidgets[id].vocabSettings) entry.vocabSettings = dynamicWidgets[id].vocabSettings;
+          return entry;
+        });
       storageSet("dynamic-widgets", JSON.stringify(list));
     }
 
@@ -5277,6 +5366,7 @@
     function registerDynamicWidget(id, type, opts) {
       opts = opts || {};
       dynamicWidgets[id] = { type: type };
+      if (opts.vocabSettings) dynamicWidgets[id].vocabSettings = opts.vocabSettings;
       if (WIDGET_IDS.indexOf(id) === -1) WIDGET_IDS.push(id);
       if (DEFAULT_WIDTH[id] == null) DEFAULT_WIDTH[id] = type === "vocab" ? 420 : (type === "readingList" ? 240 : (type === "calView" ? 320 : 280));
       if (DEFAULT_HEIGHT[id] == null) DEFAULT_HEIGHT[id] = type === "vocab" ? 260 : (type === "readingList" ? 220 : (type === "calView" ? 300 : 320));
@@ -5320,9 +5410,9 @@
       return el;
     }
 
-    function createDynamicWidgetInstance(type) {
+    function createDynamicWidgetInstance(type, extraOpts) {
       const id = nextDynamicWidgetId(type);
-      registerDynamicWidget(id, type);
+      registerDynamicWidget(id, type, extraOpts);
       layout.push([id]);
       persistLayout();
       render();
@@ -5433,9 +5523,14 @@
         return;
       }
 
-      if (type === "readingList" || type === "vocab") {
+      if (type === "readingList") {
         const id = createDynamicWidgetInstance(type);
         flashWidget(id);
+        return;
+      }
+
+      if (type === "vocab") {
+        openVocabSetupPopup();
         return;
       }
 
@@ -5459,6 +5554,166 @@
           flashWidget(id);
         }
       }
+    });
+
+    // ---- Vocabulary "+" setup flow: Language -> Frequency -> Words/Phrases per day ----
+    // VOCAB_LANGUAGES is the single source of truth for the language grid in
+    // step 1 and the per-language steppers in step 3 — adding a new language
+    // later only means appending an entry here, nothing else needs to change.
+    const VOCAB_LANGUAGES = [
+      { id: "english", label: "English" },
+      { id: "chinese", label: "Chinese" }
+    ];
+    const VOCAB_FREQUENCIES = [
+      { id: "daily", label: "Daily" },
+      { id: "3days", label: "Every 3 days" },
+      { id: "weekly", label: "Weekly" }
+    ];
+
+    const vocabSetupOverlay = document.getElementById("vocabSetupOverlay");
+    const vocabSetupPopup = document.getElementById("vocabSetupPopup");
+    const vocabSetupBackBtn = document.getElementById("vocabSetupBackBtn");
+    const vocabSetupTitle = document.getElementById("vocabSetupTitle");
+    const vocabSetupStep1 = document.getElementById("vocabSetupStep1");
+    const vocabSetupStep2 = document.getElementById("vocabSetupStep2");
+    const vocabSetupStep3 = document.getElementById("vocabSetupStep3");
+    const vocabLangGrid = document.getElementById("vocabLangGrid");
+    const vocabFreqList = document.getElementById("vocabFreqList");
+    const vocabStepperList = document.getElementById("vocabStepperList");
+    const vocabStep1Next = document.getElementById("vocabStep1Next");
+    const vocabStep2Next = document.getElementById("vocabStep2Next");
+    const vocabStep3Add = document.getElementById("vocabStep3Add");
+
+    let vocabSetup = null; // { step, languages: [id...], frequency, counts: {langId: n} }
+
+    function resetVocabSetup() {
+      vocabSetup = { step: 1, languages: [], frequency: null, counts: {} };
+    }
+
+    function vocabStepTitle(step) {
+      if (step === 1) return "Language";
+      if (step === 2) return "Frequency";
+      return "Words/Phrases per day";
+    }
+
+    function renderVocabLangGrid() {
+      vocabLangGrid.innerHTML = "";
+      VOCAB_LANGUAGES.forEach(function (lang) {
+        const tile = document.createElement("button");
+        tile.type = "button";
+        tile.className = "vocab-lang-tile" + (vocabSetup.languages.indexOf(lang.id) !== -1 ? " selected" : "");
+        tile.setAttribute("data-lang-id", lang.id);
+        tile.innerHTML =
+          '<span class="vocab-lang-icon">' + esc(lang.label.charAt(0)) + '</span>' +
+          '<span class="vocab-lang-label">' + esc(lang.label) + '</span>';
+        tile.addEventListener("click", function () {
+          const idx = vocabSetup.languages.indexOf(lang.id);
+          if (idx === -1) vocabSetup.languages.push(lang.id);
+          else vocabSetup.languages.splice(idx, 1);
+          renderVocabLangGrid();
+          vocabStep1Next.disabled = vocabSetup.languages.length === 0;
+        });
+        vocabLangGrid.appendChild(tile);
+      });
+      vocabStep1Next.disabled = vocabSetup.languages.length === 0;
+    }
+
+    function renderVocabFreqList() {
+      vocabFreqList.innerHTML = "";
+      VOCAB_FREQUENCIES.forEach(function (freq) {
+        const opt = document.createElement("button");
+        opt.type = "button";
+        opt.className = "vocab-freq-option" + (vocabSetup.frequency === freq.id ? " selected" : "");
+        opt.setAttribute("data-freq-id", freq.id);
+        opt.innerHTML = '<span class="vocab-freq-label">' + esc(freq.label) + '</span>';
+        opt.addEventListener("click", function () {
+          vocabSetup.frequency = freq.id;
+          renderVocabFreqList();
+          vocabStep2Next.disabled = false;
+        });
+        vocabFreqList.appendChild(opt);
+      });
+      vocabStep2Next.disabled = !vocabSetup.frequency;
+    }
+
+    function renderVocabSteppers() {
+      vocabStepperList.innerHTML = "";
+      vocabSetup.languages.forEach(function (langId) {
+        const lang = VOCAB_LANGUAGES.filter(function (l) { return l.id === langId; })[0];
+        if (!lang) return;
+        if (vocabSetup.counts[langId] == null) vocabSetup.counts[langId] = 1;
+        const row = document.createElement("div");
+        row.className = "vocab-stepper-row";
+        row.innerHTML =
+          '<span class="vocab-stepper-lang">' + esc(lang.label) + '</span>' +
+          '<span class="vocab-stepper-control">' +
+            '<button type="button" class="vocab-stepper-btn" data-stepper-minus="' + esc(langId) + '">−</button>' +
+            '<span class="vocab-stepper-value" id="vocabStepperValue-' + esc(langId) + '">' + vocabSetup.counts[langId] + '</span>' +
+            '<button type="button" class="vocab-stepper-btn" data-stepper-plus="' + esc(langId) + '">+</button>' +
+          '</span>';
+        vocabStepperList.appendChild(row);
+      });
+
+      Array.prototype.forEach.call(vocabStepperList.querySelectorAll("[data-stepper-minus]"), function (btn) {
+        const langId = btn.getAttribute("data-stepper-minus");
+        btn.disabled = vocabSetup.counts[langId] <= 1;
+        btn.addEventListener("click", function () {
+          if (vocabSetup.counts[langId] > 1) vocabSetup.counts[langId] -= 1;
+          renderVocabSteppers();
+        });
+      });
+      Array.prototype.forEach.call(vocabStepperList.querySelectorAll("[data-stepper-plus]"), function (btn) {
+        const langId = btn.getAttribute("data-stepper-plus");
+        btn.addEventListener("click", function () {
+          vocabSetup.counts[langId] += 1;
+          renderVocabSteppers();
+        });
+      });
+    }
+
+    function showVocabStep(step) {
+      vocabSetup.step = step;
+      vocabSetupTitle.textContent = vocabStepTitle(step);
+      vocabSetupBackBtn.hidden = step === 1;
+      vocabSetupStep1.hidden = step !== 1;
+      vocabSetupStep2.hidden = step !== 2;
+      vocabSetupStep3.hidden = step !== 3;
+      if (step === 1) renderVocabLangGrid();
+      else if (step === 2) renderVocabFreqList();
+      else renderVocabSteppers();
+    }
+
+    function openVocabSetupPopup() {
+      resetVocabSetup();
+      showVocabStep(1);
+      vocabSetupPopup.hidden = false;
+      vocabSetupOverlay.hidden = false;
+    }
+
+    function closeVocabSetupPopup() {
+      vocabSetupPopup.hidden = true;
+      vocabSetupOverlay.hidden = true;
+    }
+
+    vocabSetupOverlay.addEventListener("click", closeVocabSetupPopup);
+    vocabSetupBackBtn.addEventListener("click", function () {
+      if (vocabSetup && vocabSetup.step > 1) showVocabStep(vocabSetup.step - 1);
+    });
+    vocabStep1Next.addEventListener("click", function () {
+      if (vocabSetup.languages.length > 0) showVocabStep(2);
+    });
+    vocabStep2Next.addEventListener("click", function () {
+      if (vocabSetup.frequency) showVocabStep(3);
+    });
+    vocabStep3Add.addEventListener("click", function () {
+      const settings = {
+        languages: vocabSetup.languages.slice(),
+        frequency: vocabSetup.frequency,
+        counts: Object.assign({}, vocabSetup.counts)
+      };
+      closeVocabSetupPopup();
+      const id = createDynamicWidgetInstance("vocab", { vocabSettings: settings });
+      flashWidget(id);
     });
   })();
 
