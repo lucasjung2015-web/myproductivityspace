@@ -138,7 +138,7 @@
      each) once widgets have been dropped on top of one another. */
   .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s ease; }
   .widget.dragging-col .col-slot { transition: none; }
-  .col.collapsible-col-wrap { transition: flex 0.15s ease; }
+  .col.collapsible-col-wrap { flex: 1 1 auto; min-height: 0; transition: flex 0.15s ease; }
   .widget.dragging-col .col.collapsible-col-wrap { transition: none; }
   .col-resizer.disabled { pointer-events: none; cursor: default; }
   .col-resizer.disabled::after { opacity: 0; }
@@ -192,6 +192,7 @@
      currently arranged. */
   .col.collapsible-col-wrap.note-widget .section-header { margin-bottom: 0; min-height: 0; }
   .col.collapsible-col-wrap.note-widget .section-header-title { display: none; }
+  .col.collapsible-col-wrap.note-widget .sticky-note { flex: 1 1 auto; margin-top: 0; }
 
   .collapsed-tabs-bar {
     display: none; flex-direction: row; flex-wrap: wrap; gap: 8px;
@@ -249,6 +250,7 @@
     font-size: 15px; color: #000000; line-height: 1.4;
     white-space: pre-wrap; overflow-wrap: break-word;
   }
+  .col.collapsible-col-wrap.note-widget .note-editor { flex: 1 1 auto; overflow-y: auto; }
   .note-editor:empty::before {
     content: attr(data-placeholder); color: #999999; font-weight: 700; pointer-events: none;
   }
@@ -4644,6 +4646,7 @@
     };
     const MIN_COL = 200;
     const MIN_ROW = 80;
+    const MANUALLY_RESIZED = {}; // Track which page ids have been manually row-dragged
 
     function widgetEl(id) { return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]'); }
     function isCollapsed(id) { const el = widgetEl(id); return !!el && el.classList.contains("collapsed"); }
@@ -4695,6 +4698,25 @@
       if (!el) return;
       const slot = slotOf(id);
       if (!slot || slot.length === 1) { el.style.flex = "1 1 auto"; return; }
+
+      // Check if this widget is a page and if the slot has any pages
+      const isPage = NOTE_WIDGETS[id];
+      const slotHasPages = slot.some(mid => NOTE_WIDGETS[mid]);
+
+      if (slotHasPages && isPage) {
+        // For pages in a multi-page slot, check if manually resized
+        const isManuallySet = MANUALLY_RESIZED[id];
+        if (isManuallySet) {
+          // User manually dragged the row-resizer, respect the fixed pixel height
+          el.style.flex = "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
+        } else {
+          // Default: split evenly with sibling pages using flex-basis 0
+          el.style.flex = "1 1 0%";
+        }
+        return;
+      }
+
+      // Fallback: old behavior for non-page widgets or mixed slots
       const isLast = slot.indexOf(id) === slot.length - 1;
       el.style.flex = isLast ? "1 1 auto" : "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
     }
@@ -4863,6 +4885,10 @@
         if (!isNaN(w)) widths[id] = w;
         const h = parseInt(await storageGet(HEIGHT_STORAGE_KEY[id]), 10);
         if (!isNaN(h)) heights[id] = h;
+        if (NOTE_WIDGETS[id]) {
+          const manual = await storageGet("manuallyResized-" + id);
+          if (manual === "1") MANUALLY_RESIZED[id] = true;
+        }
       }
       render();
     })();
@@ -5051,6 +5077,10 @@
           document.removeEventListener("touchmove", onMoveInner);
           document.removeEventListener("touchend", onUp);
           storageSet(HEIGHT_STORAGE_KEY[aboveId], String(Math.round(heights[aboveId])));
+          if (NOTE_WIDGETS[aboveId]) {
+            MANUALLY_RESIZED[aboveId] = true;
+            storageSet("manuallyResized-" + aboveId, "1");
+          }
         }
 
         document.addEventListener("mousemove", onMoveInner);
@@ -5374,7 +5404,10 @@
       if (!HEIGHT_STORAGE_KEY[id]) HEIGHT_STORAGE_KEY[id] = "col" + id + "-height";
       if (!COLLAPSE_STORAGE_KEY[id]) COLLAPSE_STORAGE_KEY[id] = id + "-collapsed";
       if (!MINI_COLLAPSE_STORAGE_KEY[id]) MINI_COLLAPSE_STORAGE_KEY[id] = id + "-mini-collapsed";
-      if (type === "page") NOTE_WIDGETS[id] = true;
+      if (type === "page") {
+        NOTE_WIDGETS[id] = true;
+        if (MANUALLY_RESIZED[id] == null) MANUALLY_RESIZED[id] = false;
+      }
       if (widths[id] == null) widths[id] = DEFAULT_WIDTH[id];
       if (heights[id] == null) heights[id] = DEFAULT_HEIGHT[id];
 
