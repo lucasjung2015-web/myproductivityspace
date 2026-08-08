@@ -329,6 +329,24 @@
   .section-header-title[contenteditable]:hover { background: #f7f7f7; }
   .section-header-title[contenteditable]:focus { background: #f7f7f7; box-shadow: 0 0 0 2px rgba(66,133,244,0.35); }
   .widget-header-controls { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+  .section-header-title-group { display: flex; align-items: center; gap: 4px; min-width: 0; }
+
+  /* The icon button stays invisible (like an empty Notion page icon) until
+     the widget is hovered or an icon has actually been set — otherwise every
+     widget without a chosen icon would show a permanent gray blob next to
+     its title. */
+  .widget-icon-btn {
+    flex: 0 0 auto; width: 22px; height: 22px; padding: 0; margin: 0 -2px 0 0;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 5px; background: transparent; cursor: pointer;
+    color: #9099a8; font-size: 16px; line-height: 1; opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease;
+  }
+  .widget-icon-btn:hover { background: #f2f2f2; color: #000000; }
+  .col.collapsible-col-wrap:hover .widget-icon-btn,
+  .widget-icon-btn.has-icon,
+  .widget-icon-btn:focus { opacity: 1; }
+  .widget-icon-display { display: flex; align-items: center; justify-content: center; }
   .widget-body { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
   .collapse-btn {
     flex: 0 0 auto; width: 24px; height: 24px; padding: 0;
@@ -365,6 +383,33 @@
   .color-swatch.default-swatch::after {
     content: ""; position: absolute; inset: 5px; border-radius: 3px; border: 1px dashed #999999;
   }
+
+  .icon-popover {
+    position: fixed; z-index: 60; background: #ffffff; border-radius: 8px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2); padding: 10px; width: 260px; display: none;
+  }
+  .icon-popover.open { display: block; }
+  .icon-popover-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .icon-search {
+    flex: 1 1 auto; min-width: 0; border: 1px solid #dddddd; border-radius: 5px;
+    padding: 5px 8px; font-size: 12.5px; font-family: inherit; color: #000000; outline: none;
+  }
+  .icon-search:focus { border-color: #4285F4; }
+  .icon-remove-btn {
+    flex: 0 0 auto; border: none; background: transparent; color: #777777; cursor: pointer;
+    font-size: 12px; font-weight: 600; padding: 4px 2px;
+  }
+  .icon-remove-btn:hover { color: #e03131; }
+  .icon-popover-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+    max-height: 210px; overflow-y: auto;
+  }
+  .icon-emoji-btn {
+    border: none; background: transparent; border-radius: 5px; cursor: pointer;
+    font-size: 18px; line-height: 1; padding: 4px 0; display: flex; align-items: center; justify-content: center;
+  }
+  .icon-emoji-btn:hover { background: #f2f2f2; }
+  .icon-popover-empty { font-size: 12px; color: #999999; text-align: center; padding: 12px 0; grid-column: 1 / -1; }
 
   .collapsible-strip {
     display: none;
@@ -1102,7 +1147,10 @@
   <div class="col collapsible-col-wrap" id="calColWrap" data-col-id="cal">
     <div class="collapsible-body" id="calBody">
       <div class="section-header">
-        <span class="section-header-title">Calendar</span>
+        <div class="section-header-title-group">
+          <button type="button" class="widget-icon-btn" data-icon-btn="cal" title="Add icon"><span class="widget-icon-display" data-icon-display="cal"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
+          <span class="section-header-title">Calendar</span>
+        </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="cal" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="cal" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
@@ -1152,7 +1200,10 @@
   <div class="col collapsible-col-wrap" id="unschedTasksColWrap" data-col-id="unschedTasks">
     <div class="collapsible-body" id="unschedTasksBody">
       <div class="section-header">
-        <span class="section-header-title" title="Tasks with no due date — everything dated appears on the calendar above">Unscheduled Tasks</span>
+        <div class="section-header-title-group">
+          <button type="button" class="widget-icon-btn" data-icon-btn="unschedTasks" title="Add icon"><span class="widget-icon-display" data-icon-display="unschedTasks"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
+          <span class="section-header-title" title="Tasks with no due date — everything dated appears on the calendar above">Unscheduled Tasks</span>
+        </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="unschedTasks" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="unschedTasks" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
@@ -1175,7 +1226,10 @@
   <div class="col collapsible-col-wrap" id="readingListColWrap" data-col-id="readingList">
     <div class="collapsible-body" id="readingListColBody">
       <div class="section-header">
-        <span class="section-header-title">Reading List</span>
+        <div class="section-header-title-group">
+          <button type="button" class="widget-icon-btn" data-icon-btn="readingList" title="Add icon"><span class="widget-icon-display" data-icon-display="readingList"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
+          <span class="section-header-title">Reading List</span>
+        </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="readingList" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="readingList" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
@@ -1201,7 +1255,10 @@
   <div class="col collapsible-col-wrap" id="atomicHabitsColWrap" data-col-id="atomicHabits">
     <div class="collapsible-body" id="atomicHabitsBody">
       <div class="section-header">
-        <span class="section-header-title">Atomic Habits</span>
+        <div class="section-header-title-group">
+          <button type="button" class="widget-icon-btn" data-icon-btn="atomicHabits" title="Add icon"><span class="widget-icon-display" data-icon-display="atomicHabits"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
+          <span class="section-header-title">Atomic Habits</span>
+        </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="atomicHabits" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="atomicHabits" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
@@ -1226,7 +1283,10 @@
   <div class="col collapsible-col-wrap" id="affirmationsColWrap" data-col-id="affirmations">
     <div class="collapsible-body" id="affirmationsBody">
       <div class="section-header">
-        <span class="section-header-title">Affirmations</span>
+        <div class="section-header-title-group">
+          <button type="button" class="widget-icon-btn" data-icon-btn="affirmations" title="Add icon"><span class="widget-icon-display" data-icon-display="affirmations"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
+          <span class="section-header-title">Affirmations</span>
+        </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="affirmations" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="affirmations" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
@@ -1251,7 +1311,10 @@
   <div class="col collapsible-col-wrap" id="vocabColWrap" data-col-id="vocab">
     <div class="collapsible-body" id="vocabBody">
       <div class="section-header">
-        <span class="section-header-title">Vocabulary</span>
+        <div class="section-header-title-group">
+          <button type="button" class="widget-icon-btn" data-icon-btn="vocab" title="Add icon"><span class="widget-icon-display" data-icon-display="vocab"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
+          <span class="section-header-title">Vocabulary</span>
+        </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="vocab" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
@@ -4932,8 +4995,17 @@
         } catch (e) {}
       }
 
+      const iconsRaw = await storageGet(WIDGET_ICON_STORAGE_KEY);
+      if (iconsRaw) {
+        try {
+          const parsed = JSON.parse(iconsRaw);
+          if (parsed && typeof parsed === "object") Object.assign(WIDGET_ICONS, parsed);
+        } catch (e) {}
+      }
+
       render();
       WIDGET_IDS.forEach(applyWidgetColor);
+      WIDGET_IDS.forEach(applyWidgetIcon);
     })();
 
     // ---- collapse toggles ----
@@ -5408,7 +5480,10 @@
       wrap.innerHTML =
         '<div class="collapsible-body" id="' + id + 'Body">' +
           '<div class="section-header">' +
-            '<span class="section-header-title"></span>' +
+            '<div class="section-header-title-group">' +
+              '<button type="button" class="widget-icon-btn" data-icon-btn="' + id + '" title="Add icon"><span class="widget-icon-display" data-icon-display="' + id + '"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>' +
+              '<span class="section-header-title"></span>' +
+            '</div>' +
             '<div class="widget-header-controls">' +
               '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
               '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
@@ -5480,9 +5555,11 @@
           wireDragHandle(el.querySelector(".col-drag-handle"));
           wireDeleteButton(el.querySelector("[data-delete-col]"));
           wireColorButton(el.querySelector("[data-color-btn]"));
+          wireIconButton(el.querySelector("[data-icon-btn]"));
         }
         if (type === "page") wireNoteEditor(id, {});
         applyWidgetColor(id);
+        applyWidgetIcon(id);
       }
 
       if (!opts.skipPersist) persistDynamicWidgets();
@@ -5575,12 +5652,22 @@
       const el = widgetEl(id);
       if (!el) return;
       const color = WIDGET_COLORS[id];
-      if (color && color.toUpperCase() !== "#FFFFFF") {
+      const customColor = color && color.toUpperCase() !== "#FFFFFF";
+      // Note widgets (Page/Atomic Habits/Affirmations) render their text —
+      // including the "Untitled"/empty placeholder — inside a separate
+      // .sticky-note surface that otherwise stays hardcoded white, so a
+      // custom widget color would only tint the outer margin around it.
+      // Tinting the sticky note itself to match keeps the whole widget one
+      // consistent color instead of a white patch floating on a colored one.
+      const note = el.querySelector(".sticky-note");
+      if (customColor) {
         el.classList.add("widget-colored");
         el.style.backgroundColor = color;
+        if (note) note.style.backgroundColor = color;
       } else {
         el.classList.remove("widget-colored");
         el.style.backgroundColor = "";
+        if (note) note.style.backgroundColor = "";
       }
     }
 
@@ -5657,6 +5744,219 @@
     }
 
     Array.prototype.forEach.call(document.querySelectorAll("[data-color-btn]"), wireColorButton);
+
+    // ---- widget icon (Notion-style "add icon before the title") ----
+    const WIDGET_ICON_STORAGE_KEY = "widget-icons";
+    const WIDGET_ICONS = {};
+    const DEFAULT_ICON_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>';
+
+    // A curated (not exhaustive) emoji set, each tagged with search keywords —
+    // enough to make the filter box useful without trying to ship a full
+    // Unicode emoji database in a single-file app.
+    const EMOJI_LIST = [
+      ["😀", "grinning face smile happy"], ["😃", "smile happy joy"], ["😄", "smile happy laugh"],
+      ["😁", "grin happy"], ["😆", "laugh happy squint"], ["😅", "sweat smile relief"],
+      ["🤣", "rofl laugh funny"], ["😂", "joy laugh tears funny"], ["🙂", "smile slight"],
+      ["🙃", "upside down silly"], ["😉", "wink"], ["😊", "blush smile happy"],
+      ["😇", "angel innocent halo"], ["😍", "heart eyes love"], ["🥰", "love hearts smile"],
+      ["😘", "kiss love"], ["😋", "yum tasty tongue"], ["😛", "tongue playful"],
+      ["😜", "wink tongue silly"], ["🤪", "zany crazy silly"], ["🤩", "star struck excited"],
+      ["🥳", "party celebrate birthday"], ["😎", "cool sunglasses"], ["🤓", "nerd glasses"],
+      ["🧐", "monocle curious"], ["😏", "smirk"], ["😒", "unamused annoyed"],
+      ["😞", "disappointed sad"], ["😔", "pensive sad"], ["😟", "worried"],
+      ["😕", "confused"], ["🙁", "frown sad"], ["😣", "persevere struggle"],
+      ["😖", "confounded frustrated"], ["😫", "tired exhausted"], ["😩", "weary tired"],
+      ["🥺", "pleading puppy eyes"], ["😢", "cry sad tear"], ["😭", "sob cry"],
+      ["😤", "triumph angry huff"], ["😠", "angry mad"], ["😡", "rage angry mad"],
+      ["🤯", "mind blown shocked"], ["😳", "flushed embarrassed"], ["🥵", "hot sweat"],
+      ["🥶", "cold freezing"], ["😱", "scream fear shocked"], ["😨", "fearful scared"],
+      ["😰", "anxious sweat"], ["😥", "sad relief tear"], ["😓", "sweat downcast"],
+      ["🤗", "hug"], ["🤔", "thinking"], ["🤭", "giggle oops"],
+      ["🤫", "shh quiet secret"], ["🤥", "lying pinocchio"], ["😶", "no mouth blank"],
+      ["😐", "neutral"], ["😑", "expressionless"], ["😬", "grimace awkward"],
+      ["🙄", "eye roll"], ["😴", "sleep tired zzz"], ["🤤", "drool"],
+      ["😷", "mask sick"], ["🤒", "sick thermometer fever"], ["🤕", "hurt bandage injured"],
+      ["🥴", "woozy dizzy"], ["🤢", "nauseated sick"], ["🤮", "vomit sick"],
+      ["🥱", "yawn tired bored"], ["😈", "devil smile mischief"], ["👿", "devil angry"],
+      ["💀", "skull dead"], ["👻", "ghost halloween"], ["👽", "alien"],
+      ["🤖", "robot"], ["🎃", "pumpkin halloween"], ["😺", "cat smile"],
+      ["😻", "cat heart eyes love"], ["🙈", "see no evil monkey"], ["🙉", "hear no evil monkey"],
+      ["🙊", "speak no evil monkey"],
+      ["👍", "thumbs up like good"], ["👎", "thumbs down dislike bad"], ["👏", "clap applause"],
+      ["🙌", "raise hands celebrate"], ["🙏", "pray thanks please"], ["🤝", "handshake deal"],
+      ["💪", "muscle strong flex"], ["🤞", "fingers crossed luck"], ["✌️", "peace victory"],
+      ["👋", "wave hello bye"], ["👌", "ok okay perfect"], ["✍️", "writing"],
+      ["❤️", "heart love red"], ["🧡", "heart orange love"], ["💛", "heart yellow love"],
+      ["💚", "heart green love"], ["💙", "heart blue love"], ["💜", "heart purple love"],
+      ["🖤", "heart black love"], ["🤍", "heart white love"], ["💔", "broken heart sad"],
+      ["💯", "hundred perfect score"], ["🔥", "fire hot lit"], ["✨", "sparkles shiny magic"],
+      ["⭐", "star favorite"], ["🌟", "star glowing"], ["⚡", "lightning bolt energy"],
+      ["🌈", "rainbow"], ["☀️", "sun sunny weather"], ["🌙", "moon night"],
+      ["☁️", "cloud weather"], ["❄️", "snowflake cold winter"], ["🌊", "wave ocean water"],
+      ["🌸", "blossom flower spring"], ["🌻", "sunflower"], ["🌵", "cactus plant"],
+      ["🍀", "clover luck"], ["🌴", "palm tree tropical"], ["🍁", "maple leaf autumn"],
+      ["🐶", "dog puppy animal"], ["🐱", "cat kitten animal"], ["🦊", "fox animal"],
+      ["🐼", "panda animal"], ["🐸", "frog animal"], ["🐢", "turtle animal"],
+      ["🦋", "butterfly"], ["🐝", "bee insect"], ["🐳", "whale animal"],
+      ["🍎", "apple fruit food"], ["🍊", "orange fruit food"], ["🍋", "lemon fruit food"],
+      ["🍇", "grapes fruit food"], ["🍓", "strawberry fruit food"], ["🍑", "peach fruit food"],
+      ["🍕", "pizza food"], ["🍔", "burger food"], ["🍟", "fries food"],
+      ["🍩", "donut food sweet"], ["🍪", "cookie food sweet"], ["🎂", "cake birthday"],
+      ["☕", "coffee drink"], ["🍵", "tea drink"], ["🍺", "beer drink"],
+      ["📚", "books reading study"], ["📖", "book open reading"], ["📝", "note memo write"],
+      ["✏️", "pencil write"], ["📌", "pin"], ["📍", "location pin"],
+      ["📅", "calendar date"], ["⏰", "alarm clock time"], ["⏳", "hourglass time"],
+      ["✅", "check done complete"], ["☑️", "checkbox done"], ["❌", "cross no wrong"],
+      ["❗", "exclamation important"], ["❓", "question mark"], ["💡", "idea lightbulb"],
+      ["🎯", "target goal"], ["🏆", "trophy win"], ["🎁", "gift present"],
+      ["🎉", "party celebrate confetti"], ["🎈", "balloon party"], ["💰", "money dollar"],
+      ["💵", "money cash dollar"], ["💳", "credit card money"], ["📈", "chart growth up"],
+      ["📉", "chart decline down"], ["💻", "laptop computer work"], ["🖥️", "computer desktop"],
+      ["📱", "phone mobile"], ["📷", "camera photo"], ["🎵", "music note"],
+      ["🎧", "headphones music"], ["🎮", "game controller"], ["⚽", "soccer ball sport"],
+      ["🏀", "basketball sport"], ["🏋️", "gym workout exercise"], ["🧘", "meditate yoga calm"],
+      ["🏃", "run exercise"], ["🚴", "bike cycling"], ["✈️", "airplane travel flight"],
+      ["🚗", "car travel drive"], ["🏠", "house home"], ["🏢", "office building work"],
+      ["🌍", "earth world globe"], ["🗺️", "map travel"], ["🧭", "compass direction"],
+      ["🔑", "key unlock"], ["🔒", "lock secure"], ["📦", "box package"]
+    ];
+
+    function persistWidgetIcons() { storageSet(WIDGET_ICON_STORAGE_KEY, JSON.stringify(WIDGET_ICONS)); }
+
+    function applyWidgetIcon(id) {
+      const display = document.querySelector('[data-icon-display="' + id + '"]');
+      const btn = document.querySelector('[data-icon-btn="' + id + '"]');
+      if (!display || !btn) return;
+      const emoji = WIDGET_ICONS[id];
+      if (emoji) {
+        display.textContent = emoji;
+        btn.classList.add("has-icon");
+      } else {
+        display.innerHTML = DEFAULT_ICON_SVG;
+        btn.classList.remove("has-icon");
+      }
+    }
+
+    function setWidgetIcon(id, emoji) {
+      if (emoji) WIDGET_ICONS[id] = emoji;
+      else delete WIDGET_ICONS[id];
+      applyWidgetIcon(id);
+      persistWidgetIcons();
+    }
+
+    let iconPopoverEl = null;
+    let iconPopoverTargetId = null;
+    let iconPopoverGridEl = null;
+    let iconPopoverSearchEl = null;
+
+    function renderIconPopoverGrid(filterText) {
+      const q = (filterText || "").trim().toLowerCase();
+      iconPopoverGridEl.innerHTML = "";
+      const matches = q
+        ? EMOJI_LIST.filter(function (e) { return e[1].indexOf(q) !== -1; })
+        : EMOJI_LIST;
+      if (!matches.length) {
+        const empty = document.createElement("div");
+        empty.className = "icon-popover-empty";
+        empty.textContent = "No matching emoji";
+        iconPopoverGridEl.appendChild(empty);
+        return;
+      }
+      matches.forEach(function (entry) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "icon-emoji-btn";
+        btn.textContent = entry[0];
+        btn.title = entry[1].split(" ")[0];
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (iconPopoverTargetId) setWidgetIcon(iconPopoverTargetId, entry[0]);
+          closeIconPopover();
+        });
+        iconPopoverGridEl.appendChild(btn);
+      });
+    }
+
+    function ensureIconPopover() {
+      if (iconPopoverEl) return iconPopoverEl;
+      const pop = document.createElement("div");
+      pop.className = "icon-popover";
+
+      const header = document.createElement("div");
+      header.className = "icon-popover-header";
+
+      const search = document.createElement("input");
+      search.type = "text";
+      search.className = "icon-search";
+      search.placeholder = "Filter...";
+      search.addEventListener("click", function (e) { e.stopPropagation(); });
+      search.addEventListener("input", function () { renderIconPopoverGrid(search.value); });
+      iconPopoverSearchEl = search;
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "icon-remove-btn";
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (iconPopoverTargetId) setWidgetIcon(iconPopoverTargetId, null);
+        closeIconPopover();
+      });
+
+      header.appendChild(search);
+      header.appendChild(removeBtn);
+
+      const grid = document.createElement("div");
+      grid.className = "icon-popover-grid";
+      iconPopoverGridEl = grid;
+
+      pop.appendChild(header);
+      pop.appendChild(grid);
+      document.body.appendChild(pop);
+      iconPopoverEl = pop;
+      return pop;
+    }
+
+    function closeIconPopover() {
+      if (iconPopoverEl) iconPopoverEl.classList.remove("open");
+      iconPopoverTargetId = null;
+    }
+
+    function openIconPopoverFor(id, btn) {
+      const pop = ensureIconPopover();
+      iconPopoverTargetId = id;
+      iconPopoverSearchEl.value = "";
+      renderIconPopoverGrid("");
+      pop.classList.add("open");
+      const popRect = pop.getBoundingClientRect();
+      const r = btn.getBoundingClientRect();
+      const left = Math.min(Math.max(4, r.left), window.innerWidth - popRect.width - 4);
+      pop.style.top = (r.bottom + 6) + "px";
+      pop.style.left = left + "px";
+      iconPopoverSearchEl.focus();
+    }
+
+    document.addEventListener("click", function (e) {
+      if (!iconPopoverEl || !iconPopoverEl.classList.contains("open")) return;
+      if (iconPopoverEl.contains(e.target)) return;
+      if (e.target.closest && e.target.closest("[data-icon-btn]")) return;
+      closeIconPopover();
+    });
+
+    function wireIconButton(btn) {
+      if (!btn) return;
+      const id = btn.getAttribute("data-icon-btn");
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (iconPopoverEl && iconPopoverEl.classList.contains("open") && iconPopoverTargetId === id) {
+          closeIconPopover();
+        } else {
+          openIconPopoverFor(id, btn);
+        }
+      });
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-icon-btn]"), wireIconButton);
 
     // ---- "+" add-a-section popup ----
     const addWidgetBtn = document.getElementById("addWidgetBtn");
@@ -6031,7 +6331,10 @@
     wrap.innerHTML =
       '<div class="collapsible-body" id="' + id + 'Body">' +
         '<div class="section-header">' +
-          '<span class="section-header-title"></span>' +
+          '<div class="section-header-title-group">' +
+            '<button type="button" class="widget-icon-btn" data-icon-btn="' + id + '" title="Add icon"><span class="widget-icon-display" data-icon-display="' + id + '"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>' +
+            '<span class="section-header-title"></span>' +
+          '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
@@ -6990,7 +7293,10 @@
     wrap.innerHTML =
       '<div class="collapsible-body" id="' + id + 'Body">' +
         '<div class="section-header">' +
-          '<span class="section-header-title"></span>' +
+          '<div class="section-header-title-group">' +
+            '<button type="button" class="widget-icon-btn" data-icon-btn="' + id + '" title="Add icon"><span class="widget-icon-display" data-icon-display="' + id + '"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>' +
+            '<span class="section-header-title"></span>' +
+          '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
@@ -9038,7 +9344,10 @@
     wrap.innerHTML =
       '<div class="collapsible-body" id="' + id + 'Body">' +
         '<div class="section-header">' +
-          '<span class="section-header-title">Google Calendar</span>' +
+          '<div class="section-header-title-group">' +
+            '<button type="button" class="widget-icon-btn" data-icon-btn="' + id + '" title="Add icon"><span class="widget-icon-display" data-icon-display="' + id + '"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>' +
+            '<span class="section-header-title">Google Calendar</span>' +
+          '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
