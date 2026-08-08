@@ -263,6 +263,7 @@
     border: 1px solid #000000; border-radius: 4px; padding: 12px 14px;
     font-size: 12px; color: #000000; flex: 0 0 auto; line-height: 1.4;
   }
+  .vocab-box + .vocab-box { margin-top: 8px; }
   .vocab-box .headword-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
   .vocab-box .word { font-weight: bold; font-size: 17px; }
   .vocab-box .syllables { font-weight: bold; font-size: 17px; }
@@ -4411,16 +4412,18 @@
     console[method] = function () {};
   });
 
-  // Fallback vocabulary (used only if the daily AI generation fails).
+  // Fallback vocabulary (used only if the daily AI generation fails). Always
+  // this same fixed set regardless of how many words were requested for the
+  // day \u2014 it's a "generation broke" safety net, not a scaled-down generator.
   const FALLBACK = {
-    english: {
+    english: [{
       word: "Palimpsest",
       syllables: "pal\u00b7imp\u00b7sest",
       pronunciation: "/\u02c8p\u00e6.l\u026amp.sest/",
       pos: "noun",
       meaning: "A surface or object reused over time that still bears visible traces of its earlier form.",
       example: "The old contract read like a palimpsest, with earlier crossed-out terms still faintly visible beneath the final language."
-    },
+    }],
     chinese: [
       // 1 business term
       { characters:["現","金","流","量"], pinyin:["xiàn","jīn","liú","liàng"], jyutping_chars:["jin6","gam1","lau4","loeng6"], meaning:"cash flow",
@@ -5746,6 +5749,11 @@
       };
       closeVocabSetupPopup();
       const id = createDynamicWidgetInstance("vocab", { vocabSettings: settings });
+      // Every Vocabulary widget mirrors the same generated content, so this
+      // becomes the one active config driving generation for all of them —
+      // see resolveVocabConfig() in the vocab-generation script.
+      storageSet("vocab-config", JSON.stringify(settings));
+      if (window.__refreshVocab) window.__refreshVocab();
       flashWidget(id);
     });
   })();
@@ -5755,7 +5763,7 @@
   const capFirst = s => { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); };
   const esc = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  function renderEnglish(en, targetId) {
+  function englishEntryHtml(en) {
     const hasSyll = en.syllables && String(en.syllables).trim();
     const headword = hasSyll ? esc(en.syllables) : esc(capFirst(en.word));
     let html = '<div class="vocab-box"><div class="headword-row">' +
@@ -5769,8 +5777,17 @@
       html += '<div class="example-row"><div class="example-translation">' + esc(en.example) + '</div></div>';
     }
     html += '</div>';
+    return html;
+  }
+
+  // Accepts either a list of English entries (the current shape, one per
+  // configured word/day) or a single legacy entry object (defensive, in
+  // case a stale pre-multi-word cache value is ever read).
+  function renderEnglish(list, targetId) {
     const el = document.getElementById(targetId || "englishArea");
-    if (el) el.innerHTML = html;
+    if (!el) return;
+    const entries = Array.isArray(list) ? list : (list ? [list] : []);
+    el.innerHTML = entries.map(englishEntryHtml).join("");
   }
 
   function renderChinese(list, targetId) {
@@ -5905,7 +5922,7 @@
   }
   async function updateHistory(vocab) {
     const h = await getHistory();
-    if (vocab.english && vocab.english.word) h.words.push(vocab.english.word);
+    (vocab.english || []).forEach(function (e) { if (e && e.word) h.words.push(e.word); });
     (vocab.chinese || []).forEach(c => h.phrases.push((c.characters || []).join("")));
     h.words = h.words.slice(-300);
     h.phrases = h.phrases.slice(-300);
@@ -5921,10 +5938,13 @@
   // original 60-word list was less than half example-bearing, so this is
   // an expanded 121-word pool built the same way to get back to a healthy
   // multi-month rotation while keeping every day's example line populated.
-  // Was originally business/GRE-lite tier (pragmatic, nuance, leverage...) —
-  // too easy for this user, so replaced with genuinely difficult, less
-  // common vocabulary (true GRE/literary tier) instead.
-  const ENGLISH_WORDS = ["Abstruse", "Acumen", "Alacrity", "Ameliorate", "Anachronistic", "Antithesis", "Apocryphal", "Arduous", "Assiduous", "Audacious", "Belie", "Bombastic", "Cacophony", "Capricious", "Castigate", "Circumlocution", "Cogent", "Complacent", "Conflagration", "Contrite", "Copious", "Cursory", "Deleterious", "Demagogue", "Deride", "Desultory", "Diaphanous", "Didactic", "Diffident", "Disparate", "Ebullient", "Efficacious", "Egregious", "Elucidate", "Enervate", "Ephemeral", "Equanimity", "Equivocate", "Erudite", "Esoteric", "Eulogy", "Euphemism", "Exculpate", "Exigent", "Extemporaneous", "Extol", "Facetious", "Fastidious", "Fatuous", "Fervent", "Florid", "Fortuitous", "Furtive", "Garrulous", "Grandiloquent", "Gregarious", "Hackneyed", "Hegemony", "Iconoclast", "Idiosyncratic", "Ignominious", "Impassive", "Impetuous", "Implacable", "Incontrovertible", "Ineffable", "Inexorable", "Ingenuous", "Inimical", "Insipid", "Intransigent", "Inveterate", "Irascible", "Jubilant", "Juxtapose", "Laconic", "Lassitude", "Loquacious", "Magnanimous", "Malfeasance", "Maverick", "Mendacious", "Mercurial", "Mollify", "Munificent", "Nefarious", "Obdurate", "Obfuscate", "Obsequious", "Obstinate", "Obstreperous", "Occlude", "Officious", "Onerous", "Opprobrium", "Ostentatious", "Pallid", "Parsimonious", "Pedantic", "Pellucid", "Perfidious", "Perfunctory", "Pernicious", "Perspicacious", "Petulant", "Pithy", "Placate", "Platitude", "Plethora", "Polemic", "Precocious", "Prodigal", "Profligate", "Propitious", "Prosaic", "Puerile", "Pugnacious", "Quiescent", "Quixotic", "Recalcitrant", "Recondite", "Repudiate", "Reticent", "Sagacious", "Sanguine", "Sardonic", "Sedulous", "Solicitous", "Sonorous", "Specious", "Stolid", "Sycophant", "Taciturn", "Tenacious", "Tenuous", "Timorous", "Torpid", "Tractable", "Truculent", "Umbrage", "Unctuous", "Untenable", "Vacillate", "Vehement", "Venerate", "Veracity", "Vindictive", "Virulent", "Vitriolic", "Vociferous", "Wanton", "Zealot"];
+  // Was originally business/GRE-lite tier (pragmatic, nuance, leverage...),
+  // then bumped up to true GRE/literary tier (Abstruse, Acumen, Alacrity...)
+  // — still too easy for this user once that list itself became familiar,
+  // so bumped up one tier further again: rarer, more advanced literary
+  // vocabulary a well-read native speaker would still find genuinely
+  // challenging, with none of the words repeated from the prior tier.
+  const ENGLISH_WORDS = ["Abecedarian", "Abjure", "Abnegate", "Abrogate", "Abstemious", "Acerbic", "Acrimonious", "Adumbrate", "Adventitious", "Aggrandize", "Anodyne", "Antediluvian", "Antinomy", "Apostate", "Apotheosis", "Approbation", "Arrogate", "Ascetic", "Asperity", "Assiduity", "Assuage", "Atavistic", "Attenuate", "Avarice", "Avuncular", "Bellicose", "Bilious", "Blandishment", "Bloviate", "Bowdlerize", "Cadge", "Callow", "Captious", "Cavil", "Chary", "Chicanery", "Churlish", "Coeval", "Comity", "Contumacious", "Contumely", "Crapulous", "Crepuscular", "Cupidity", "Declivity", "Defenestrate", "Dilatory", "Discomfit", "Dissemble", "Dissolute", "Doughty", "Eclat", "Effete", "Effrontery", "Emollient", "Encomium", "Ennui", "Ersatz", "Excoriate", "Execrable", "Exiguous", "Expiate", "Expurgate", "Extirpate", "Farrago", "Fecund", "Feckless", "Fetid", "Fractious", "Frangible", "Fulminate", "Fulsome", "Gainsay", "Gauche", "Glib", "Halcyon", "Harangue", "Histrionic", "Hoary", "Hubris", "Ignoble", "Immure", "Impecunious", "Importune", "Impugn", "Inchoate", "Incorrigible", "Indefatigable", "Indolent", "Ineluctable", "Inimitable", "Insouciant", "Inured", "Invective", "Inveigle", "Jejune", "Kowtow", "Lachrymose", "Languid", "Largesse", "Lascivious", "Levity", "Lucre", "Lugubrious", "Malapropos", "Malinger", "Maudlin", "Mawkish", "Mellifluous", "Mendicant", "Meretricious", "Mettlesome", "Miasma", "Misanthrope", "Mordant", "Multifarious", "Noisome", "Nonplussed", "Obeisance", "Obloquy", "Opine", "Orotund", "Palliate", "Peccadillo", "Penurious", "Perambulate", "Peripatetic", "Perspicuous", "Pertinacious", "Philippic", "Phlegmatic", "Picayune", "Piquant", "Plaintive", "Plangent", "Plaudit", "Pontificate", "Portentous", "Presage", "Prevaricate", "Probity", "Propinquity", "Pusillanimous", "Quaff", "Querulous", "Quotidian", "Rapacious", "Recumbent", "Redolent", "Refulgent", "Reprobate", "Ribald", "Rubicund", "Sacrosanct", "Salacious", "Salubrious", "Sanctimonious", "Satiate", "Saturnine", "Scintilla", "Scurrilous", "Servile", "Shibboleth", "Slake", "Solipsistic", "Somnolent", "Sophistry", "Spurious", "Stentorian", "Stygian", "Sublunary", "Supercilious", "Supine", "Surfeit", "Surreptitious", "Susurrus", "Sybaritic", "Tautology", "Temerity", "Threnody", "Traduce", "Trenchant", "Turbid", "Turgid", "Turpitude", "Unprepossessing", "Untoward", "Usurious", "Vapid", "Venal", "Verisimilitude", "Vitiate", "Vituperative", "Voluble", "Wheedle"];
 
   // Parses a api.dictionaryapi.dev response (an array of entries, each with
   // phonetics + meanings/definitions) into the {word, syllables,
@@ -6155,37 +6175,110 @@
     throw lastErr;
   }
 
-  function getDailyIndex(len) {
-    const dayNumber = Math.floor(cacheRolloverDate.getTime() / 86400000);
-    return ((dayNumber % len) + len) % len;
+  // How many real days a single displayed set of words stays put before the
+  // rotation advances — daily-config's Frequency step ("Daily" / "Every 3
+  // days" / "Weekly") maps directly onto this.
+  function periodDaysFor(frequency) {
+    if (frequency === "3days") return 3;
+    if (frequency === "weekly") return 7;
+    return 1;
   }
 
-  async function generateVocab() {
-    // English and the two Chinese categories each rotate on the same
-    // underlying day number but at their own list length — they used to
-    // share one index because every list happened to be 60 long, but that
-    // coupling breaks the moment any of them diverges in size.
-    const [english, business, everyday] = await Promise.all([
-      fetchEnglishWord(ENGLISH_WORDS[getDailyIndex(ENGLISH_WORDS.length)]),
-      fetchChineseTerm(BUSINESS_TERMS[getDailyIndex(BUSINESS_TERMS.length)], "business"),
-      fetchChineseTerm(EVERYDAY_TERMS[getDailyIndex(EVERYDAY_TERMS.length)], "everyday")
+  // Picks `count` consecutive entries out of `list`, advancing by a whole
+  // block of `count` every `periodDays` real days (rather than by 1/day) so
+  // a multi-word selection doesn't overlap itself day to day, and wrapping
+  // cleanly back to the start once every entry's been shown. With count=1,
+  // periodDays=1 this reduces to the plain "one new word per day" rotation
+  // the single-word pipeline always used, so existing defaults are unchanged.
+  function pickWords(list, count, periodDays) {
+    if (!list.length || count <= 0) return [];
+    const dayNumber = Math.floor(cacheRolloverDate.getTime() / 86400000);
+    const period = Math.floor(dayNumber / periodDays);
+    const start = ((period * count) % list.length + list.length) % list.length;
+    const out = [];
+    for (let i = 0; i < count; i++) out.push(list[(start + i) % list.length]);
+    return out;
+  }
+
+  const DEFAULT_VOCAB_CONFIG = { languages: ["english", "chinese"], frequency: "daily", counts: { english: 1, chinese: 2 } };
+
+  // The Vocabulary "+" setup flow (Language -> Frequency -> Words/day, see
+  // the widget-layout script's vocabSetup code) persists its result here.
+  // Every vocab widget mirrors the same generated content (see
+  // window.__wireVocabMirrorSection below), so — same as the content itself
+  // — there's a single active config driving generation, not one per widget;
+  // completing the setup flow again simply replaces it. Absent any saved
+  // config (nobody's ever run the setup flow), this falls back to exactly
+  // the original fixed behavior: one English word, one business + one
+  // everyday Chinese term, refreshed daily.
+  async function resolveVocabConfig() {
+    const raw = await storageGet("vocab-config");
+    if (raw) {
+      try {
+        const cfg = JSON.parse(raw);
+        if (cfg && Array.isArray(cfg.languages) && cfg.languages.length && cfg.counts) return cfg;
+      } catch (e) { /* fall through to default */ }
+    }
+    return DEFAULT_VOCAB_CONFIG;
+  }
+
+  // Folded into the cache key so switching languages/frequency/counts via
+  // the setup flow is treated as "new content to generate", not a same-day
+  // cache hit on whatever was cached under the previous config.
+  function vocabCacheKeySuffix(config) {
+    const langs = config.languages.slice().sort().join(",");
+    return langs + ":" + (config.counts.english || 0) + "-" + (config.counts.chinese || 0) + ":" + config.frequency;
+  }
+
+  async function generateVocab(config) {
+    const periodDays = periodDaysFor(config.frequency);
+    const wantEnglish = config.languages.indexOf("english") !== -1;
+    const wantChinese = config.languages.indexOf("chinese") !== -1;
+    const englishCount = wantEnglish ? Math.max(1, config.counts.english || 1) : 0;
+    const chineseCount = wantChinese ? Math.max(1, config.counts.chinese || 1) : 0;
+    // Split the Chinese count across the two term categories (business vs.
+    // everyday/literary) the same way the original fixed 2-per-day did —
+    // one from each — so the default (count 2) reproduces that exactly;
+    // an odd count gives the extra term to business.
+    const businessCount = Math.ceil(chineseCount / 2);
+    const everydayCount = chineseCount - businessCount;
+
+    const englishWords = pickWords(ENGLISH_WORDS, englishCount, periodDays);
+    const businessWords = pickWords(BUSINESS_TERMS, businessCount, periodDays);
+    const everydayWords = pickWords(EVERYDAY_TERMS, everydayCount, periodDays);
+
+    const [englishEntries, businessEntries, everydayEntries] = await Promise.all([
+      Promise.all(englishWords.map(fetchEnglishWord)),
+      Promise.all(businessWords.map(function (t) { return fetchChineseTerm(t, "business"); })),
+      Promise.all(everydayWords.map(function (t) { return fetchChineseTerm(t, "everyday"); }))
     ]);
-    return { english: english, chinese: [business, everyday] };
+
+    // Interleave business/everyday (business, everyday, business, ...) so
+    // the display order matches the original single-pair ordering.
+    const chineseEntries = [];
+    const chineseLen = Math.max(businessEntries.length, everydayEntries.length);
+    for (let i = 0; i < chineseLen; i++) {
+      if (businessEntries[i]) chineseEntries.push(businessEntries[i]);
+      if (everydayEntries[i]) chineseEntries.push(everydayEntries[i]);
+    }
+
+    return { english: englishEntries, chinese: chineseEntries };
   }
 
   async function init() {
-    const cacheKey = "daily-vocab-api-v4:" + dateKey;
+    const config = await resolveVocabConfig();
+    const cacheKey = "daily-vocab-api-v5:" + dateKey + ":" + vocabCacheKeySuffix(config);
 
-    // If today's vocab is already cached, use it and stop — no repeat generation.
+    // If today's vocab (for this config) is already cached, use it and stop — no repeat generation.
     const cached = await storageGet(cacheKey);
     if (cached) {
       try { renderVocab(JSON.parse(cached)); return; } catch (e) { /* fall through */ }
     }
 
-    // New day (or first load): select the next pair from the preloaded vocabulary bank.
+    // New day/config (or first load): select the next words from the preloaded vocabulary bank.
     showLoading();
     try {
-      const vocab = await generateVocab();
+      const vocab = await generateVocab(config);
       renderVocab(vocab);
       await storageSet(cacheKey, JSON.stringify(vocab));
       await updateHistory(vocab);
@@ -6195,6 +6288,11 @@
       await storageSet(cacheKey, JSON.stringify(FALLBACK));
     }
   }
+
+  // Lets the "+" setup flow trigger an immediate re-generation right after
+  // saving a new config, instead of the user having to reload the page to
+  // see it take effect.
+  window.__refreshVocab = init;
 
   init();
 })();
