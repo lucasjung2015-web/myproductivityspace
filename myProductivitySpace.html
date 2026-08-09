@@ -102,7 +102,6 @@
      since individual links carry their own icons). */
   .links-row-wrap { position: relative; flex: 0 0 auto; }
   .links-menu-header { padding: 0 28px; }
-  .links-row-wrap.links-row-merged .links-menu-header { padding: 0; }
   /* Fallback anchor for the hover controls: the row's own top-right corner,
      used only when the menu is empty or stacked vertically inside another
      widget (see .links-menu-anchor below for the normal case). */
@@ -116,7 +115,7 @@
      rightmost/most-recently-added link — the row spans the full page width,
      so a corner-pinned toolbar would sit far from a short list of links. */
   .link-item-wrap.links-menu-anchor > .links-menu-controls {
-    position: absolute; top: -26px; right: -4px; z-index: 5;
+    position: absolute; top: -26px; right: -28px; z-index: 5;
     display: flex; align-items: center; gap: 2px;
     opacity: 0; transition: opacity 0.15s ease; background: #ffffff;
     border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.14); padding: 2px;
@@ -125,8 +124,9 @@
   .links-row-wrap .links-menu-controls:focus-within { opacity: 1; }
   .links-edit-btn.active { background: #e8f0fe; color: #1a73e8; }
 
-  .links-row-wrap.links-row-merged { padding: 0 0 8px 0; margin-bottom: 8px; border-bottom: 1px solid var(--hair); }
-  .links-row-wrap.links-row-merged .links-row { border-bottom: none; padding: 0; }
+  /* Vertical/stacked link list — used inside a grid-mode Menu widget (a
+     normal, narrow .col slot), where a horizontal row of links wouldn't
+     fit the way it does in the full-width floating bar. */
   .links-row.links-row-vertical { flex-direction: column; align-items: stretch; gap: 2px; }
 
   .link-item-wrap { position: relative; display: flex; }
@@ -195,6 +195,11 @@
     padding: 14px 28px 8px 28px; color: var(--ink-soft); flex: 0 0 auto;
     letter-spacing: 0.1em;
   }
+  /* Shown while dragging the Menu widget above the grid, indicating a
+     release there sends it back to the full-width floating bar at the
+     top of the page (see the links-menu script's exit-to-floating drag
+     handling). */
+  .date-header.menu-drop-target { box-shadow: inset 0 -4px 0 0 #4285F4; }
 
   /* Columns are plain flex items (not CSS Grid tracks) specifically so they
      can be reordered by moving DOM nodes — a grid-template-columns approach
@@ -240,11 +245,23 @@
   /* A solid edge on whichever side of the drop target the dragged widget
      will land — left/right means "split into a new section beside this
      one" (adjusts width), top/bottom means "stack with this one" (adjusts
-     height) — so it's always clear which kind of split will happen. */
-  .col.col-drop-left { box-shadow: inset 4px 0 0 0 #4285F4; border-radius: 6px; }
-  .col.col-drop-right { box-shadow: inset -4px 0 0 0 #4285F4; border-radius: 6px; }
-  .col.col-drop-top { box-shadow: inset 0 4px 0 0 #4285F4; border-radius: 6px; }
-  .col.col-drop-bottom { box-shadow: inset 0 -4px 0 0 #4285F4; border-radius: 6px; }
+     height) — so it's always clear which kind of split will happen.
+     Drawn as an absolutely-positioned overlay (rather than directly as the
+     .col's own inset box-shadow) because a note widget's sticky-note fills
+     its body flush to every edge with its own opaque background — an inset
+     box-shadow on the .col itself paints *underneath* that child and is
+     completely hidden by it. The overlay is a positioned descendant with
+     its own stacking level, so it always paints above any child content
+     regardless of widget type. */
+  .col.collapsible-col-wrap { position: relative; }
+  .col.col-drop-left::after, .col.col-drop-right::after,
+  .col.col-drop-top::after, .col.col-drop-bottom::after {
+    content: ""; position: absolute; inset: 0; z-index: 20; pointer-events: none; border-radius: 6px;
+  }
+  .col.col-drop-left::after { box-shadow: inset 4px 0 0 0 #4285F4; }
+  .col.col-drop-right::after { box-shadow: inset -4px 0 0 0 #4285F4; }
+  .col.col-drop-top::after { box-shadow: inset 0 4px 0 0 #4285F4; }
+  .col.col-drop-bottom::after { box-shadow: inset 0 -4px 0 0 #4285F4; }
 
   /* Every widget's own controls (drag handle, ▲/▼ in-place collapse, ▶
      collapse-to-strip) live in a hover-reveal overlay pinned to its top-right
@@ -342,8 +359,12 @@
   .vocab-header { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
   .vocab-header .label { margin-bottom: 0; }
 
+  /* No border — reads as a small physical card purely through its own drop
+     shadow (same "sticky note" surface language as .sticky-note above),
+     rather than a black-outlined box. */
   .vocab-box {
-    border: 1px solid #000000; border-radius: 4px; padding: 12px 14px;
+    border: none; border-radius: 6px; padding: 12px 14px;
+    background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.09), 0 4px 12px rgba(0,0,0,0.13);
     font-size: 12px; color: #000000; flex: 0 0 auto; line-height: 1.4;
   }
   .vocab-box + .vocab-box { margin-top: 8px; }
@@ -358,11 +379,14 @@
   .loading { font-size: 13px; font-style: italic; color: #000000; }
 
   .chinese-list {
-    flex: 1 1 auto; min-height: 0; overflow-y: auto;
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 16px;
     display: flex; flex-direction: column; gap: 8px; padding-right: 4px;
   }
 
-  .phrase-card { border: 1px solid #000000; border-radius: 4px; padding: 16px 20px; flex: 0 0 auto; }
+  .phrase-card {
+    border: none; border-radius: 6px; padding: 16px 20px; flex: 0 0 auto;
+    background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.09), 0 4px 12px rgba(0,0,0,0.13);
+  }
   .phrase-content { display: flex; align-items: center; gap: 22px; }
 
   .char-row { display: flex; gap: 7px; flex: 0 0 auto; }
@@ -1151,6 +1175,10 @@
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg></span>
       <span class="add-widget-label">Page</span>
     </button>
+    <button type="button" class="add-widget-card" data-add-type="menu">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg></span>
+      <span class="add-widget-label">Menu</span>
+    </button>
   </div>
 </div>
 
@@ -1357,10 +1385,8 @@
         </div>
       </div>
       <div class="widget-body" id="vocabWidgetBody">
-        <div class="sublabel">English</div>
         <div id="englishArea"><div class="vocab-box"><span class="loading">Loading...</span></div></div>
 
-        <div class="sublabel">Chinese</div>
         <div class="chinese-list" id="chineseList"><div class="loading">Loading...</div></div>
       </div>
     </div>
@@ -5262,6 +5288,13 @@
         let dropTargetId = null;
         let dropZone = null; // "left" | "right" | "top" | "bottom"
         let dragActive = false; // only true once the pointer has actually moved a few px — see MOVE_THRESHOLD
+        // Menu-only: dragging it above/below the grid's own bounds exits
+        // back to the full-width floating bar (see the links-menu script)
+        // instead of splitting some widget's slot — every other widget has
+        // no floating mode, so this is gated on draggedId === "menu"
+        // throughout and is a no-op for anything else.
+        let menuExitZone = null; // "top" | "bottom" | null
+        let menuExitDropzone = null;
 
         function pointXY(ev) {
           if (ev.touches && ev.touches.length) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
@@ -5280,6 +5313,26 @@
           dropZone = null;
         }
 
+        function ensureMenuExitDropzone() {
+          if (menuExitDropzone) return menuExitDropzone;
+          menuExitDropzone = document.createElement("div");
+          menuExitDropzone.className = "links-bottom-dropzone links-drag-active";
+          widget.insertAdjacentElement("afterend", menuExitDropzone);
+          return menuExitDropzone;
+        }
+
+        function clearMenuExitHighlight() {
+          menuExitZone = null;
+          const dh = document.getElementById("dateHeader");
+          if (dh) dh.classList.remove("menu-drop-target");
+          if (menuExitDropzone) menuExitDropzone.classList.remove("links-drop-target");
+        }
+
+        function removeMenuExitDropzone() {
+          if (menuExitDropzone && menuExitDropzone.parentNode) menuExitDropzone.parentNode.removeChild(menuExitDropzone);
+          menuExitDropzone = null;
+        }
+
         function onMove(ev) {
           const p = pointXY(ev);
           // Safety net: if the mouse button is reported as no longer held
@@ -5295,6 +5348,24 @@
             widget.classList.add("dragging-col");
           }
           clearHighlight();
+
+          if (draggedId === "menu") {
+            clearMenuExitHighlight();
+            const gridRect = widget.getBoundingClientRect();
+            if (p.y < gridRect.top) {
+              menuExitZone = "top";
+              const dh = document.getElementById("dateHeader");
+              if (dh) dh.classList.add("menu-drop-target");
+              ev.preventDefault();
+              return;
+            }
+            if (p.y > gridRect.bottom) {
+              menuExitZone = "bottom";
+              ensureMenuExitDropzone().classList.add("links-drop-target");
+              ev.preventDefault();
+              return;
+            }
+          }
 
           const candidates = WIDGET_IDS
             .map(function (id) { return { id: id, el: widgetEl(id) }; })
@@ -5342,6 +5413,16 @@
           document.removeEventListener("touchmove", onMove);
           document.removeEventListener("touchend", onUp);
 
+          if (draggedId === "menu" && menuExitZone) {
+            const zone = menuExitZone;
+            clearMenuExitHighlight();
+            removeMenuExitDropzone();
+            if (window.__menuGrid) window.__menuGrid.remove();
+            if (window.__linksMenuExitToFloating) window.__linksMenuExitToFloating(zone);
+            return;
+          }
+          removeMenuExitDropzone();
+
           if (dropTargetId) {
             const zone = dropZone, targetId = dropTargetId;
             clearHighlight();
@@ -5378,6 +5459,74 @@
     }
 
     Array.prototype.forEach.call(document.querySelectorAll(".col-drag-handle"), wireDragHandle);
+
+    // ---- Menu widget <-> grid bridge ----
+    // The hyperlink menu (see the links-menu script near the end of the
+    // file) normally lives outside this layout system entirely, as a
+    // full-width floating bar above or below the grid. Dragging it onto a
+    // widget promotes it into a real, ordinary member of WIDGET_IDS/layout
+    // — at that point it's just another widget, split/stacked/resized via
+    // the exact same wireDragHandle/render machinery as everything else
+    // (including the row/col resizers "every other widget" gets, which a
+    // one-off "nest it inside the target's body" approach could never
+    // produce). This is the seam the links-menu script promotes/demotes
+    // through, rather than it reaching into this closure's internals.
+    window.__menuGrid = {
+      isIn: function () { return WIDGET_IDS.indexOf("menu") !== -1; },
+      // Registers "menu" as a real widget (if not already) and attaches
+      // its element to the grid so widgetEl("menu")/render() can find it.
+      // Wiring its drag handle here (rather than relying on the one-time
+      // page-load forEach above) is what lets it reuse wireDragHandle at
+      // all — that loop already ran long before this element ever existed.
+      ensure: function (el) {
+        if (WIDGET_IDS.indexOf("menu") === -1) WIDGET_IDS.push("menu");
+        if (DEFAULT_WIDTH.menu == null) DEFAULT_WIDTH.menu = 260;
+        if (DEFAULT_HEIGHT.menu == null) DEFAULT_HEIGHT.menu = 220;
+        if (!WIDTH_STORAGE_KEY.menu) WIDTH_STORAGE_KEY.menu = "colMenu-width";
+        if (!HEIGHT_STORAGE_KEY.menu) HEIGHT_STORAGE_KEY.menu = "colMenu-height";
+        if (widths.menu == null) widths.menu = DEFAULT_WIDTH.menu;
+        if (heights.menu == null) heights.menu = DEFAULT_HEIGHT.menu;
+        if (!widgetEl("menu")) {
+          widget.appendChild(el);
+          wireDragHandle(el.querySelector(".col-drag-handle"));
+        }
+      },
+      // Splices "menu" into `layout` exactly the way wireDragHandle's own
+      // onUp does for any other widget — left/right beside targetId's slot
+      // (new slot, adjusts width) or top/bottom within it (stacked,
+      // adjusts height, gets a row-resizer).
+      insert: function (zone, targetId) {
+        removeFromLayout("menu");
+        if (zone === "left" || zone === "right") {
+          const targetSlotIdx = layout.findIndex(function (s) { return s.indexOf(targetId) !== -1; });
+          layout.splice(zone === "left" ? targetSlotIdx : targetSlotIdx + 1, 0, ["menu"]);
+        } else {
+          const targetSlot = layout[layout.findIndex(function (s) { return s.indexOf(targetId) !== -1; })];
+          widths.menu = widths[targetId];
+          const idxInSlot = targetSlot.indexOf(targetId);
+          targetSlot.splice(zone === "top" ? idxInSlot : idxInSlot + 1, 0, "menu");
+        }
+        persistLayout();
+        render();
+      },
+      // Pulls "menu" back out of WIDGET_IDS/layout entirely — used both
+      // when dragging it back out to the floating bar and when it's
+      // removed altogether (see the links-menu script's remove button).
+      remove: function () {
+        removeFromLayout("menu");
+        const idx = WIDGET_IDS.indexOf("menu");
+        if (idx !== -1) WIDGET_IDS.splice(idx, 1);
+        const el = widgetEl("menu");
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        persistLayout();
+        render();
+      },
+      gridRect: function () { return widget.getBoundingClientRect(); },
+      candidateIds: function () {
+        return WIDGET_IDS.filter(function (id) { return id !== "menu" && widgetEl(id) && !isCollapsed(id); });
+      },
+      widgetEl: widgetEl
+    };
 
     // ---- note editor (Atomic Habits / Affirmations / any Page widget) ----
     // One continuous contenteditable region — no separate title field. The
@@ -6054,6 +6203,15 @@
         return;
       }
 
+      // The hyperlink menu is a singleton (see the links-menu script) —
+      // there's only ever one, so "adding" it just brings it back into
+      // view, restoring it to the floating top bar first if it had been
+      // removed via its own remove button.
+      if (type === "menu") {
+        if (window.__linksMenuShow) window.__linksMenuShow();
+        return;
+      }
+
       // The original Calendar/Unscheduled Tasks pair carries the one real
       // Google sign-in — deleting it only hides it (see hideWidget), so if
       // it's currently missing, bring it (and its pair) straight back
@@ -6377,9 +6535,7 @@
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
-          '<div class="sublabel">English</div>' +
           '<div id="' + id + 'EnglishArea"><div class="vocab-box"><span class="loading">Loading...</span></div></div>' +
-          '<div class="sublabel">Chinese</div>' +
           '<div class="chinese-list" id="' + id + 'ChineseList"><div class="loading">Loading...</div></div>' +
         '</div>' +
       '</div>' +
@@ -9533,11 +9689,19 @@
 
   var FALLBACK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l1.93-1.93a5 5 0 0 0-7.07-7.07L10.5 5.5"/><path d="M14 11a5 5 0 0 0-7.07 0L5 12.93a5 5 0 0 0 7.07 7.07L13.5 18.5"/></svg>';
 
+  var DRAG_HANDLE_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+  var EDIT_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  var TRASH_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+
   var links = [];
+  // type: "top" | "bottom" (floating full-width bar above/below the grid) |
+  // "grid" (a real, ordinary member of the widget grid's own layout — see
+  // window.__menuGrid in the widget-layout script) | "removed" (not shown
+  // anywhere; brought back via the "+" add-a-section popup's Menu tile).
   var position = { type: "top" };
   var editMode = false;
   var addingLink = false;
-  var wrapEl = null;
+  var wrapEl = null; // the floating bar's own element (top/bottom modes only)
 
   async function loadState() {
     try {
@@ -9608,24 +9772,11 @@
     return img;
   }
 
-  function render() {
-    var vertical = position.type === "merged";
-    var previous = wrapEl;
-
-    wrapEl = document.createElement("div");
-    wrapEl.className = "links-row-wrap" + (vertical ? " links-row-merged" : "");
-
-    var header = document.createElement("div");
-    header.className = "section-header links-menu-header";
-    header.innerHTML = '<div class="section-header-title-group"><span class="section-header-title">Menu</span></div>';
-    wrapEl.appendChild(header);
-
-    var controls = document.createElement("div");
-    controls.className = "links-menu-controls";
-    controls.innerHTML =
-      '<button type="button" class="col-drag-handle" title="Drag to move this menu"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
-      '<button type="button" class="collapse-btn links-edit-btn' + (editMode ? " active" : "") + '" title="Edit links"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>';
-
+  // Builds the <div class="links-row">...</div> of link items + (in edit
+  // mode) the add-a-link control — identical markup/behavior whether it
+  // ends up in the floating horizontal bar or a grid-mode vertical list,
+  // so this is shared by both render paths instead of duplicated.
+  function buildLinksRow(vertical) {
     var row = document.createElement("div");
     row.className = "links-row" + (vertical ? " links-row-vertical" : "") + (editMode ? " edit-mode" : "");
 
@@ -9653,7 +9804,7 @@
         e.stopPropagation();
         links = links.filter(function (l) { return l.id !== link.id; });
         saveLinks();
-        render();
+        renderCurrent();
       });
       itemWrap.appendChild(rm);
 
@@ -9689,16 +9840,16 @@
           });
           addingLink = false;
           saveLinks();
-          render();
+          renderCurrent();
         };
         input.addEventListener("keydown", function (e) {
           if (e.key === "Enter") { e.preventDefault(); commit(); }
-          else if (e.key === "Escape") { e.preventDefault(); addingLink = false; render(); }
+          else if (e.key === "Escape") { e.preventDefault(); addingLink = false; renderCurrent(); }
           else { input.classList.remove("link-add-input-invalid"); }
         });
         input.addEventListener("blur", function () {
           setTimeout(function () {
-            if (addingLink && !input.value.trim()) { addingLink = false; render(); }
+            if (addingLink && !input.value.trim()) { addingLink = false; renderCurrent(); }
           }, 150);
         });
         row.appendChild(addWrap);
@@ -9711,46 +9862,70 @@
         addBtn.textContent = "+";
         addBtn.addEventListener("click", function () {
           addingLink = true;
-          render();
+          renderCurrent();
         });
         addWrap.appendChild(addBtn);
         row.appendChild(addWrap);
       }
     }
 
-    wrapEl.appendChild(row);
+    return { row: row, lastItemWrap: lastItemWrap };
+  }
 
-    // Hover controls track the rightmost/most-recently-added link in the
-    // normal horizontal layout instead of the row's own corner (which sits
-    // far from a short list, since the row spans the full page width);
-    // fall back to the wrap's corner — matching every other widget's hover
-    // controls — when the menu is empty or stacked vertically.
-    if (!vertical && lastItemWrap) {
-      lastItemWrap.classList.add("links-menu-anchor");
-      lastItemWrap.appendChild(controls);
+  function renderCurrent() {
+    if (position.type === "removed") {
+      if (wrapEl && wrapEl.parentNode) { wrapEl.parentNode.removeChild(wrapEl); wrapEl = null; }
+      if (window.__menuGrid && window.__menuGrid.isIn()) window.__menuGrid.remove();
+      return;
+    }
+    if (position.type === "grid") { renderGrid(); return; }
+    renderFloating();
+  }
+
+  // ---- Floating mode: the full-width horizontal bar above/below the grid ----
+  function renderFloating() {
+    var previous = wrapEl;
+
+    wrapEl = document.createElement("div");
+    wrapEl.className = "links-row-wrap";
+
+    var header = document.createElement("div");
+    header.className = "section-header links-menu-header";
+    header.innerHTML = '<div class="section-header-title-group"><span class="section-header-title">Menu</span></div>';
+    wrapEl.appendChild(header);
+
+    var controls = document.createElement("div");
+    controls.className = "links-menu-controls";
+    controls.innerHTML =
+      '<button type="button" class="col-drag-handle" title="Drag to move this menu">' + DRAG_HANDLE_SVG + '</button>' +
+      '<button type="button" class="collapse-btn links-edit-btn' + (editMode ? " active" : "") + '" title="Edit links">' + EDIT_ICON_SVG + '</button>' +
+      '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove menu">' + TRASH_ICON_SVG + '</button>';
+
+    var built = buildLinksRow(false);
+
+    // Hover controls track the rightmost/most-recently-added link instead
+    // of the row's own corner (which sits far from a short list, since the
+    // row spans the full page width); fall back to the wrap's corner —
+    // matching every other widget's hover controls — when the menu is empty.
+    if (built.lastItemWrap) {
+      built.lastItemWrap.classList.add("links-menu-anchor");
+      built.lastItemWrap.appendChild(controls);
     } else {
       wrapEl.appendChild(controls);
     }
 
-    placeWrap();
+    wrapEl.appendChild(built.row);
+
+    placeFloating();
 
     if (previous && previous.parentNode) previous.parentNode.removeChild(previous);
 
-    wireEditBtn();
-    wireDrag();
+    wireEditBtn(wrapEl);
+    wireRemoveBtn(wrapEl);
+    wireFloatingDrag(wrapEl);
   }
 
-  function placeWrap() {
-    if (position.type === "merged") {
-      var host = document.querySelector('.col.collapsible-col-wrap[data-col-id="' + position.widgetId + '"] .widget-body');
-      if (!host) {
-        position = { type: "top" };
-        savePosition();
-        return placeWrap();
-      }
-      host.insertBefore(wrapEl, host.firstChild);
-      return;
-    }
+  function placeFloating() {
     if (position.type === "bottom") {
       var grid = document.getElementById("widgetGrid");
       grid.insertAdjacentElement("afterend", wrapEl);
@@ -9760,18 +9935,81 @@
     dateHeader.insertAdjacentElement("afterend", wrapEl);
   }
 
-  function wireEditBtn() {
-    var btn = wrapEl.querySelector(".links-edit-btn");
+  // ---- Grid mode: an ordinary member of the widget grid's own layout ----
+  // Unlike the floating bar (torn down and rebuilt every render), this
+  // element is created ONCE and then only ever moved/updated in place —
+  // the grid's own render() (see window.__menuGrid in the widget-layout
+  // script) relies on finding the *same* node every time via
+  // data-col-id="menu", exactly like every other widget's element.
+  function ensureGridWrapEl() {
+    var el = document.querySelector('.col.collapsible-col-wrap[data-col-id="menu"]');
+    if (el) return el;
+    el = document.createElement("div");
+    el.className = "col collapsible-col-wrap";
+    el.setAttribute("data-col-id", "menu");
+    el.innerHTML =
+      '<div class="collapsible-body">' +
+        '<div class="section-header">' +
+          '<div class="section-header-title-group"><span class="section-header-title">Menu</span></div>' +
+          '<div class="widget-header-controls">' +
+            '<button type="button" class="col-drag-handle" data-drag-col="menu" title="Drag to reorder this menu">' + DRAG_HANDLE_SVG + '</button>' +
+            '<button type="button" class="collapse-btn links-edit-btn" title="Edit links">' + EDIT_ICON_SVG + '</button>' +
+            '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove menu">' + TRASH_ICON_SVG + '</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="widget-body"><div class="links-row links-row-vertical"></div></div>' +
+      '</div>';
+    wireEditBtn(el);
+    wireRemoveBtn(el);
+    return el;
+  }
+
+  function renderGrid() {
+    var el = ensureGridWrapEl();
+
+    var editBtn = el.querySelector(".links-edit-btn");
+    if (editBtn) editBtn.classList.toggle("active", editMode);
+
+    var built = buildLinksRow(true);
+    var body = el.querySelector(".widget-body");
+    body.innerHTML = "";
+    body.appendChild(built.row);
+
+    if (window.__menuGrid) window.__menuGrid.ensure(el);
+
+    if (wrapEl && wrapEl.parentNode) { wrapEl.parentNode.removeChild(wrapEl); wrapEl = null; }
+  }
+
+  function wireEditBtn(root) {
+    var btn = root.querySelector(".links-edit-btn");
     if (!btn) return;
     btn.addEventListener("click", function () {
       editMode = !editMode;
       addingLink = false;
-      render();
+      renderCurrent();
     });
   }
 
-  function wireDrag() {
-    var handle = wrapEl.querySelector(".col-drag-handle");
+  function wireRemoveBtn(root) {
+    var btn = root.querySelector(".links-remove-btn");
+    if (!btn) return;
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (window.__menuGrid && window.__menuGrid.isIn()) window.__menuGrid.remove();
+      if (wrapEl && wrapEl.parentNode) { wrapEl.parentNode.removeChild(wrapEl); wrapEl = null; }
+      position = { type: "removed" };
+      savePosition();
+    });
+  }
+
+  // Dragging the menu's own handle while it's floating: dropping it onto a
+  // widget promotes it into a real slot in the grid (left/right/top/bottom,
+  // detected exactly the same 25%-edge way wireDragHandle does for every
+  // other widget, so it gets the exact same split-vs-stack behavior and the
+  // exact same blue drop highlight); dropping above the grid or below it
+  // repositions the floating bar itself (top vs. bottom).
+  function wireFloatingDrag(root) {
+    var handle = root.querySelector(".col-drag-handle");
     if (!handle) return;
     var MOVE_THRESHOLD = 6;
 
@@ -9781,7 +10019,9 @@
       var startX = downEv.clientX, startY = downEv.clientY;
       var dragging = false;
       var dropzone = null;
-      var currentTarget = null;
+      var currentTargetId = null;
+      var currentZone = null; // "left" | "right" | "top" | "bottom" — split against a widget
+      var edgeZone = null; // "top" | "bottom" — reposition the floating bar itself
 
       function ensureDropzone() {
         if (dropzone) return dropzone;
@@ -9792,11 +10032,15 @@
       }
 
       function clearHighlight() {
-        // Reuses the same "col-drop-top" blue-edge indicator every other
-        // widget shows while being dragged onto a target — a merge always
-        // stacks the menu at the top of the target's body (see placeWrap),
-        // so the top edge is the only direction that ever applies here.
-        if (currentTarget) { currentTarget.classList.remove("col-drop-top"); currentTarget = null; }
+        if (currentTargetId) {
+          var el = document.querySelector('.col.collapsible-col-wrap[data-col-id="' + currentTargetId + '"]');
+          if (el) el.classList.remove("col-drop-left", "col-drop-right", "col-drop-top", "col-drop-bottom");
+        }
+        currentTargetId = null;
+        currentZone = null;
+        edgeZone = null;
+        var dh = document.getElementById("dateHeader");
+        if (dh) dh.classList.remove("menu-drop-target");
         if (dropzone) dropzone.classList.remove("links-drop-target");
       }
 
@@ -9805,29 +10049,41 @@
         if (!dragging) {
           if (Math.abs(dx) < MOVE_THRESHOLD && Math.abs(dy) < MOVE_THRESHOLD) return;
           dragging = true;
-          ensureDropzone();
         }
         clearHighlight();
 
-        var widgets = Array.prototype.slice.call(document.querySelectorAll(".col.collapsible-col-wrap"));
-        var overWidget = null;
-        for (var i = 0; i < widgets.length; i++) {
-          var r = widgets[i].getBoundingClientRect();
+        var candidateIds = window.__menuGrid ? window.__menuGrid.candidateIds() : [];
+        var match = null;
+        for (var i = 0; i < candidateIds.length; i++) {
+          var el = document.querySelector('.col.collapsible-col-wrap[data-col-id="' + candidateIds[i] + '"]');
+          if (!el) continue;
+          var r = el.getBoundingClientRect();
           if (moveEv.clientX >= r.left && moveEv.clientX <= r.right && moveEv.clientY >= r.top && moveEv.clientY <= r.bottom) {
-            overWidget = widgets[i];
+            match = { id: candidateIds[i], el: el, r: r };
             break;
           }
         }
-        if (overWidget) {
-          currentTarget = overWidget;
-          overWidget.classList.add("col-drop-top");
+
+        if (match) {
+          var relX = (moveEv.clientX - match.r.left) / match.r.width;
+          var relY = (moveEv.clientY - match.r.top) / match.r.height;
+          var edge = 0.25;
+          if (relX < edge) currentZone = "left";
+          else if (relX > 1 - edge) currentZone = "right";
+          else currentZone = relY < 0.5 ? "top" : "bottom";
+          currentTargetId = match.id;
+          match.el.classList.add("col-drop-" + currentZone);
           return;
         }
 
-        var dz = ensureDropzone();
         var gridRect = document.getElementById("widgetGrid").getBoundingClientRect();
         if (moveEv.clientY > gridRect.bottom) {
-          dz.classList.add("links-drop-target");
+          edgeZone = "bottom";
+          ensureDropzone().classList.add("links-drop-target");
+        } else if (moveEv.clientY < gridRect.top) {
+          edgeZone = "top";
+          var dh = document.getElementById("dateHeader");
+          if (dh) dh.classList.add("menu-drop-target");
         }
       }
 
@@ -9836,15 +10092,29 @@
         document.removeEventListener("mouseup", onUp);
         if (!dragging) return;
 
-        if (currentTarget) {
-          position = { type: "merged", widgetId: currentTarget.getAttribute("data-col-id") };
-        } else if (dropzone && dropzone.classList.contains("links-drop-target")) {
-          position = { type: "bottom" };
+        if (currentTargetId) {
+          var zone = currentZone, targetId = currentTargetId;
+          clearHighlight();
+          if (dropzone && dropzone.parentNode) dropzone.parentNode.removeChild(dropzone);
+          var el = ensureGridWrapEl();
+          if (window.__menuGrid) {
+            window.__menuGrid.ensure(el);
+            window.__menuGrid.insert(zone, targetId);
+          }
+          position = { type: "grid" };
+          savePosition();
+          renderGrid();
+          return;
         }
+
+        var chosenEdge = edgeZone;
         clearHighlight();
         if (dropzone && dropzone.parentNode) dropzone.parentNode.removeChild(dropzone);
+
+        if (chosenEdge === "bottom") position = { type: "bottom" };
+        else if (chosenEdge === "top") position = { type: "top" };
         savePosition();
-        render();
+        renderFloating();
       }
 
       document.addEventListener("mousemove", onMove);
@@ -9852,9 +10122,66 @@
     });
   }
 
+  // Called from the widget-layout script's wireDragHandle when the Menu
+  // widget (already in grid mode) is dragged back out above/below the
+  // grid — see the draggedId === "menu" special case there.
+  window.__linksMenuExitToFloating = function (zone) {
+    position = { type: zone };
+    savePosition();
+    renderFloating();
+  };
+
+  // Called from the "+" add-a-section popup when its Menu tile is clicked.
+  window.__linksMenuShow = function () {
+    if (position.type === "removed") {
+      position = { type: "top" };
+      savePosition();
+      renderCurrent();
+    }
+    var el = position.type === "grid"
+      ? document.querySelector('.col.collapsible-col-wrap[data-col-id="menu"]')
+      : wrapEl;
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      el.classList.add("widget-flash");
+      setTimeout(function () { el.classList.remove("widget-flash"); }, 900);
+    }
+  };
+
+  // One-time migration for the older "merged into a specific widget's
+  // body" position shape (this used to be the only way to place the menu
+  // inside the grid) into a real grid-mode slot at the same spot, stacked
+  // above that widget. window.__menuGrid (defined in the widget-layout
+  // script) may not exist yet the instant this runs, and the target
+  // widget's own element may not either — both are only guaranteed once
+  // that script's own async init() has finished — so this polls briefly
+  // rather than assuming a fixed load order between the two scripts.
+  function migrateMergedPosition() {
+    var targetId = position.widgetId;
+    var tries = 0;
+    (function attempt() {
+      tries++;
+      if (window.__menuGrid && window.__menuGrid.widgetEl(targetId)) {
+        var el = ensureGridWrapEl();
+        window.__menuGrid.ensure(el);
+        window.__menuGrid.insert("top", targetId);
+        position = { type: "grid" };
+        savePosition();
+        renderGrid();
+      } else if (tries < 40) {
+        setTimeout(attempt, 50);
+      } else {
+        position = { type: "top" };
+        savePosition();
+        renderFloating();
+      }
+    })();
+  }
+
   async function init() {
     await loadState();
-    render();
+    if (position.type === "merged" && position.widgetId) { migrateMergedPosition(); return; }
+    renderCurrent();
   }
 
   if (document.readyState === "loading") {
