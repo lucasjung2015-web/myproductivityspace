@@ -307,6 +307,18 @@
   .col { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 
   .sublabel { font-size: 12px; font-weight: 600; margin: 16px 0 10px 0; color: #333333; letter-spacing: 0.1px; }
+  /* The Vocabulary widget's body stays white no matter what (see
+     applyWidgetColor's vocab exemption), so its English and Chinese boxes
+     each carry their own color control on the sublabel row instead. Same
+     hover-reveal convention as .widget-header-controls, so the widget reads
+     clean until you actually need one. */
+  .sublabel-row { display: flex; align-items: center; gap: 5px; }
+  .sublabel-row .sublabel { margin-bottom: 10px; }
+  .sublabel-color-btn {
+    opacity: 0; transition: opacity 0.15s ease; margin-top: 6px;
+  }
+  .col.collapsible-col-wrap:hover .sublabel-color-btn,
+  .sublabel-color-btn:focus { opacity: 1; }
 
   /* ---------- sticky notes (Atomic Habits / Affirmations / custom Master
      segments) ---------- */
@@ -444,6 +456,11 @@
   .col-delete-btn:hover { background: #fdecea; color: #c92a2a; }
   .col-color-btn { color: #6b6b6b; }
   .col-color-btn:hover { background: #f2f2f2; color: #000000; }
+  /* The button reads as a solid dot of the widget's own current color:
+     applyWidgetColorButton() writes that color to the button's inline
+     `color`, and the circle fills from currentColor. The stroke is what
+     keeps the default (white) state visible against the white header. */
+  .col-color-btn svg circle { fill: currentColor; stroke: rgba(0, 0, 0, 0.25); stroke-width: 1.5; }
 
   /* Applying a custom color gives the widget a card-like surface (rounded
      corners + inner padding) so the tint reads as a distinct panel; the
@@ -624,6 +641,14 @@
     cursor: pointer;
   }
   .add-task-btn:hover { background: #3367d6; }
+  /* "+ Add a medium" is black, but "Connect Google Calendar" — which shares
+     .add-task-btn — deliberately stays blue, so this is scoped by id rather
+     than by editing .add-task-btn itself. The [id$="AddBtn"] half catches the
+     dynamically built reading-list widgets (see __buildReadingListSection,
+     which names its button `id + "AddBtn"`); without it those copies would
+     stay blue while the static one turned black. */
+  #addReadingBtn, .add-task-btn[id$="AddBtn"] { background: #000000; }
+  #addReadingBtn:hover, .add-task-btn[id$="AddBtn"]:hover { background: #222222; }
   #mainTasksList { display: flex; flex-direction: column; gap: 10px; }
 
   #readingListBox { border: none; padding: 10px 0 0 0; flex: 1 1 0; min-height: 60px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -682,6 +707,10 @@
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
     cursor: pointer;
   }
+  /* Scoped to the id, not .cal-create-btn, so any future toolbar reusing the
+     class keeps the default blue. */
+  #calCreateBtn { background: #000000; }
+  #calCreateBtn:hover { background: #222222; }
 
   .cal-navbar { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-bottom: 8px; }
   .cal-navbtn, .cal-refreshbtn {
@@ -1186,7 +1215,7 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="cal" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="cal" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="cal" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="cal" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="cal" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="calCollapseBtn" title="Collapse to side">&#9654;</button>
@@ -1235,11 +1264,11 @@
       <div class="section-header">
         <div class="section-header-title-group">
           <button type="button" class="widget-icon-btn" data-icon-btn="unschedTasks" title="Add icon"><span class="widget-icon-display" data-icon-display="unschedTasks"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
-          <span class="section-header-title" title="Tasks with no due date — everything dated appears on the calendar above">Unscheduled Tasks</span>
+          <span class="section-header-title" title="Tasks with no due date — everything dated appears on the calendar above">Tasks</span>
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="unschedTasks" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="unschedTasks" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="unschedTasks" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="unschedTasks" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="unschedTasks" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="unschedTasksCollapseBtn" title="Collapse to side">&#9654;</button>
@@ -1265,7 +1294,7 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="readingList" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="readingList" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="readingList" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="readingList" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="readingList" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="readingListCollapseBtn" title="Collapse to side">&#9654;</button>
@@ -1293,7 +1322,7 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="atomicHabits" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="atomicHabits" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="atomicHabits" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="atomicHabits" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="atomicHabits" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="atomicHabitsCollapseBtn" title="Collapse to side">&#9654;</button>
@@ -1321,7 +1350,7 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="affirmations" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="affirmations" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="affirmations" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="affirmations" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="affirmations" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="affirmationsCollapseBtn" title="Collapse to side">&#9654;</button>
@@ -1350,17 +1379,23 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="vocab" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="vocab" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="vocabCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="vocabWidgetBody">
-        <div class="sublabel">English</div>
+        <div class="sublabel-row">
+          <div class="sublabel">English</div>
+          <button type="button" class="collapse-btn col-color-btn sublabel-color-btn" data-color-btn="vocab:english" title="Customize the English box color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+        </div>
         <div id="englishArea"><div class="vocab-box"><span class="loading">Loading...</span></div></div>
 
-        <div class="sublabel">Chinese</div>
+        <div class="sublabel-row">
+          <div class="sublabel">Chinese</div>
+          <button type="button" class="collapse-btn col-color-btn sublabel-color-btn" data-color-btn="vocab:chinese" title="Customize the Chinese box color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+        </div>
         <div class="chinese-list" id="chineseList"><div class="loading">Loading...</div></div>
       </div>
     </div>
@@ -1583,7 +1618,11 @@
   .subpage-heading .text,.subpage-heading .edit{
     font-size:20px;font-weight:800;line-height:1.3;padding:0;background:transparent;min-height:auto;
   }
+  /* Black rather than --accent, scoped to this one button: .btn.primary and
+     the --accent token itself are shared with the timer controls, focus
+     rings, link handles and drop states, none of which change. */
   .subpage-add{flex:0 0 auto;align-self:flex-start;margin-top:1px;white-space:nowrap}
+  .btn.primary.subpage-add{background:#000000;border-color:#000000;color:#fff}
   .subpage-delete{
     flex:0 0 auto; display:flex; align-items:center; justify-content:center;
     width:26px; height:26px; padding:0; margin-top:3px;
@@ -1725,6 +1764,8 @@
   .act.notepad.mini-expanded{background:var(--accent);color:#fff}
   .act.timer{color:var(--accent)}
   .act.timer.mini-expanded{background:var(--accent);color:#fff}
+  .act.ai{color:var(--accent)}
+  .act.ai.thinking{opacity:.5;pointer-events:none}
   /* Sits after the tagbar (see .node's flex order below) so it reads as an
      extension of the card's own content — a sticky note attached to the
      bottom of the task, not a separate surface floating below it. */
@@ -1737,15 +1778,15 @@
   .notepad-textarea:focus{outline:none}
 
   /* ---------- dragging a connector between root tasks ---------- */
-  /* Fixed distance from the card's own top edge (matching ROOT_LINK_ANCHOR_Y
-     in drawLinks()) rather than top:50%, which used to put the handle (and
-     the link line drawn to it) at the card's vertical MIDPOINT — a point
-     that shifts with however much content the card happens to have (a
-     wrapped title, tag pills, notes...), so lines between cards of
-     different heights slanted. A fixed offset from the top is identical for
-     every card regardless of its content, so the line is always level. */
+  /* The handle sits at its own card's vertical midpoint. drawLinks() anchors
+     the line it draws slightly differently — at the midpoint of the SHORTER
+     of the two cards it connects, applied as the same offset from both cards'
+     tops — so that a line between cards of unequal height (a wrapped title,
+     tag pills, open notes) still reads as centered without slanting. The two
+     therefore coincide exactly whenever the connected cards are the same
+     height, and differ by a few pixels when they aren't. */
   .link-handle{
-    position:absolute;top:32px;width:16px;height:16px;
+    position:absolute;top:50%;width:16px;height:16px;
     background:transparent;border:none;padding:0;margin:0;
     transform:translateY(-50%);cursor:crosshair;touch-action:none;
   }
@@ -1763,6 +1804,59 @@
   svg.links-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .link-line{stroke:var(--line);stroke-width:2;stroke-linecap:round;pointer-events:stroke;cursor:pointer}
   .link-line:hover{stroke-width:3.5}
+  /* Auto-drawn root-row connectors (the "Show Branches for top level"
+     setting). They're derived from sibling order rather than stored in the
+     `links` array, so unlike a hand-drawn link they can't be clicked away —
+     hence no pointer events and no hover affordance. */
+  .link-line.auto-link{pointer-events:none;cursor:default}
+
+  /* "Show Branches" off: the CSS org-chart connectors between a parent and
+     its children disappear, and .link-handle drags take over below the root
+     row exactly as they already work on it. */
+  .tree.no-branches li::before,
+  .tree.no-branches li::after,
+  .tree.no-branches ul ul::before{display:none}
+
+  /* ---------- running-timer highlight ---------- */
+  /* The card whose timer is running, its floating popup, and — one level
+     only — its direct parent, which gets the lighter treatment so the
+     running card itself still reads as the subject. */
+  .node.timer-running-hl{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+  .node.timer-running-parent-hl{border-color:var(--accent)}
+  .timer-popup.timer-running-hl{box-shadow:0 0 0 2px var(--accent),0 4px 14px rgba(23,32,42,.12),0 12px 32px rgba(23,32,42,.16)}
+
+  /* ---------- branch settings (gear, top-right of the subpage) ---------- */
+  /* The top-right corner, one row down from #pipToggle's exact spot. That
+     first row is fully occupied: the subpage bar's own "+ Add a subtask" and
+     delete buttons run to the frame's right edge, and the Dashboard paints
+     its "+" (add widget) and pop-out buttons on top of this frame there at
+     z-index 3000. Sitting just beneath all of it keeps the gear in the same
+     corner without ever being covered or crowding the bar. */
+  #branchSettingsBtn{
+    position:fixed;top:56px;right:14px;z-index:9999;width:34px;height:34px;
+    border-radius:50%;border:1px solid #dbe2ec;background:#fff;color:#5b6675;
+    cursor:pointer;display:none;place-items:center;padding:0;
+    box-shadow:0 2px 8px rgba(23,32,42,.14);
+  }
+  #branchSettingsBtn.visible{display:grid}
+  #branchSettingsBtn:hover{color:var(--ink);border-color:#c3cede}
+  #branchSettingsBtn svg{width:17px;height:17px}
+  .branch-settings-pop{
+    position:fixed;z-index:10000;display:none;background:#fff;border-radius:10px;
+    padding:12px 14px;min-width:236px;
+    box-shadow:0 4px 14px rgba(23,32,42,.12),0 12px 32px rgba(23,32,42,.16);
+    font-size:12.5px;color:var(--ink);
+  }
+  .branch-settings-pop.open{display:block}
+  .branch-settings-pop label{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer;line-height:1.35}
+  .branch-settings-pop input[type=checkbox]{margin:2px 0 0 0;flex:0 0 auto;cursor:pointer}
+  .branch-settings-confirm{
+    display:none;margin-top:10px;padding-top:10px;border-top:1px solid #eef1f5;
+  }
+  .branch-settings-confirm.open{display:block}
+  .branch-settings-confirm p{margin:0 0 8px 0;color:var(--muted);font-size:11.5px}
+  .branch-settings-confirm .btn{width:100%;justify-content:center;margin-bottom:6px}
+  .branch-settings-confirm .btn:last-child{margin-bottom:0}
 
   /* ---------- dragging a task card onto / next to another task ---------- */
   .node{cursor:grab}
@@ -1813,6 +1907,8 @@
   @media (hover:hover){
     .btn:hover{border-color:var(--accent);color:var(--accent)}
     .btn.primary:hover{background:#2148d8;color:#fff}
+    /* after .btn.primary:hover, so the black button doesn't flash blue */
+    .btn.primary.subpage-add:hover{background:#222222;border-color:#222222;color:#fff}
     .btn.ghost:hover{background:#e2e8f1;color:var(--ink)}
     .node:hover{border-color:#b9c6da}
     .check:hover{opacity:.75}
@@ -1820,6 +1916,7 @@
     .act.del:hover{background:#FF0000;color:#fff}
     .act.notepad:hover{background:var(--accent);color:#fff}
     .act.timer:hover{background:var(--accent);color:#fff}
+    .act.ai:hover{background:var(--accent);color:#fff}
     .timer-play-pause:hover,.timer-reset:hover{background:var(--accent);color:#fff}
   }
 </style>
@@ -1828,6 +1925,23 @@
   <button id="pipToggle" aria-label="Pin window" title="Pop out as an always-on-top window" style="position:fixed;top:10px;right:10px;z-index:9999;width:34px;height:34px;border-radius:50%;border:1px solid #b3bfcd;background:#fff;box-shadow:0 1px 2px rgba(23,32,42,.06),0 6px 20px rgba(23,32,42,.08);cursor:pointer;display:flex;align-items:center;justify-content:center;">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="#111" stroke="#111" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M8 5 L8 19 L18 12 Z"/></svg>
   </button>
+  <!-- Branch-line settings. Takes the same top-right corner as #pipToggle,
+       which is hidden whenever this app is embedded in the Dashboard (see
+       the injected "#pipToggle{display:none!important}" rule above), so the
+       two never collide in practice. Shown only while a subpage is open —
+       render() owns the .visible class. -->
+  <button id="branchSettingsBtn" type="button" aria-label="Branch settings" title="Branch settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+  <div class="branch-settings-pop" id="branchSettingsPop">
+    <label><input type="checkbox" id="branchShowBranches"><span>Show Branches<br><small style="color:#7a8699">Lines from each task to its own subtasks</small></span></label>
+    <label><input type="checkbox" id="branchShowRootBranches"><span>Show Branches for top level<br><small style="color:#7a8699">Connect this page's top-level tasks in order</small></span></label>
+    <div class="branch-settings-confirm" id="branchSettingsConfirm">
+      <p>Where should this apply?</p>
+      <button class="btn primary" type="button" id="branchApplyAll">Apply to all</button>
+      <button class="btn ghost" type="button" id="branchApplyOne">Apply to just this one</button>
+    </div>
+  </div>
 
   <div id="app-root">
   <!-- The standalone root-task board (and its "Add a task" button) is gone:
@@ -1891,7 +2005,8 @@
     play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>',
     pause:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>',
     reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 17v-5h5"/></svg>',
-    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>'
+    clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+    sparkle:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.2 13.6 8 18.4 9.6 13.6 11.2 12 16 10.4 11.2 5.6 9.6 10.4 8Z"/><path d="M18 15.2 18.7 17.3 20.8 18 18.7 18.7 18 20.8 17.3 18.7 15.2 18 17.3 17.3Z"/></svg>'
   };
 
   // Google-Task-keyed subtask trees. Each root's id IS a Google Task id, and
@@ -1908,6 +2023,127 @@
   var notepadOpenIds = {}; // id -> true while that node's notepad textarea is expanded (not persisted, purely a UI toggle)
   var timerPopupOpenIds = {}; // id -> true while that node's timer popup is showing (not persisted, purely a UI toggle)
   var timerPopupPos = {}; // id -> {left,top} once a popup has been manually dragged; cleared when it's closed, so reopening re-anchors to the clock button
+  var aiPendingIds = {}; // id -> true while an AI reply is in flight, so the button can't be fired twice (not persisted)
+
+  // Branch-line settings (the gear, top-right). Kept in their own storage key
+  // rather than folded into the {roots,links} blob so that a settings write
+  // can never race with, or corrupt, the actual task tree.
+  //
+  //   showBranches      — lines below the root row. ON (the default) is the
+  //                       tree's existing CSS org-chart connectors; OFF hides
+  //                       them and enables .link-handle dragging on child
+  //                       cards, the same mechanism the root row already has.
+  //   showRootBranches  — the root row only. OFF (the default) is today's
+  //                       behavior: hand-drawn links only. ON additionally
+  //                       draws one connector between each pair of adjacent
+  //                       roots, derived from sibling order.
+  //
+  // perSubtree[parentId] holds a subpage's own override of either flag ("apply
+  // to just this one"); "apply to all" writes the defaults and clears every
+  // override, so it genuinely means everywhere.
+  var BRANCH_SETTINGS_KEY = "gtask-branch-settings-v1";
+  var branchSettings = { showBranches: true, showRootBranches: false, perSubtree: {} };
+
+  function effectiveBranchSettings(){
+    var o = (currentParentId && branchSettings.perSubtree[currentParentId]) || {};
+    return {
+      showBranches: typeof o.showBranches === "boolean" ? o.showBranches : branchSettings.showBranches,
+      showRootBranches: typeof o.showRootBranches === "boolean" ? o.showRootBranches : branchSettings.showRootBranches
+    };
+  }
+
+  async function saveBranchSettings(){
+    await window.storage.set(BRANCH_SETTINGS_KEY, JSON.stringify(branchSettings), true);
+  }
+
+  async function loadBranchSettings(){
+    try{
+      var result = await window.storage.get(BRANCH_SETTINGS_KEY, true);
+      var raw = result ? result.value : null;
+      if(!raw) return;
+      var parsed = JSON.parse(raw);
+      if(!parsed || typeof parsed !== "object") return;
+      if(typeof parsed.showBranches === "boolean") branchSettings.showBranches = parsed.showBranches;
+      if(typeof parsed.showRootBranches === "boolean") branchSettings.showRootBranches = parsed.showRootBranches;
+      if(parsed.perSubtree && typeof parsed.perSubtree === "object") branchSettings.perSubtree = parsed.perSubtree;
+    }catch(e){}
+  }
+
+  /* ---------- branch settings popover ---------- */
+  // Nothing is committed as the checkboxes are ticked: the change reveals the
+  // confirm row, and only "Apply to all" / "Apply to just this one" writes.
+  // Dismissing the popover without choosing therefore discards the edit, and
+  // reopening re-reads the settings actually in force.
+  function branchSettingsEls(){
+    return {
+      btn: document.getElementById("branchSettingsBtn"),
+      pop: document.getElementById("branchSettingsPop"),
+      confirm: document.getElementById("branchSettingsConfirm"),
+      branches: document.getElementById("branchShowBranches"),
+      rootBranches: document.getElementById("branchShowRootBranches")
+    };
+  }
+
+  function openBranchSettings(){
+    var el = branchSettingsEls();
+    if(!el.pop || !el.btn) return;
+    var eff = effectiveBranchSettings();
+    el.branches.checked = eff.showBranches;
+    el.rootBranches.checked = eff.showRootBranches;
+    el.confirm.classList.remove("open");
+    el.pop.classList.add("open");
+    var r = el.btn.getBoundingClientRect();
+    var pr = el.pop.getBoundingClientRect();
+    el.pop.style.top = (r.bottom + 8) + "px";
+    el.pop.style.left = Math.max(8, Math.min(r.right - pr.width, window.innerWidth - pr.width - 8)) + "px";
+  }
+
+  // Returns whether it actually closed anything, so Escape can tell if it
+  // consumed the keypress.
+  function closeBranchSettings(){
+    var el = branchSettingsEls();
+    if(!el.pop || !el.pop.classList.contains("open")) return false;
+    el.pop.classList.remove("open");
+    el.confirm.classList.remove("open");
+    return true;
+  }
+
+  function applyBranchSettings(scope){
+    var el = branchSettingsEls();
+    if(!el.branches) return;
+    var next = { showBranches: !!el.branches.checked, showRootBranches: !!el.rootBranches.checked };
+    if(scope === "one" && currentParentId){
+      branchSettings.perSubtree[currentParentId] = next;
+    }else{
+      // "Apply to all" has to clear the per-subpage overrides too, or pages
+      // that were customized earlier would quietly ignore the new default.
+      branchSettings.showBranches = next.showBranches;
+      branchSettings.showRootBranches = next.showRootBranches;
+      branchSettings.perSubtree = {};
+    }
+    saveBranchSettings();
+    closeBranchSettings();
+    render();
+  }
+
+  function wireBranchSettings(){
+    var el = branchSettingsEls();
+    if(!el.btn || !el.pop) return;
+    el.btn.addEventListener("click", function(e){
+      e.stopPropagation();
+      if(el.pop.classList.contains("open")) closeBranchSettings(); else openBranchSettings();
+    });
+    [el.branches, el.rootBranches].forEach(function(cb){
+      cb.addEventListener("change", function(){ el.confirm.classList.add("open"); });
+    });
+    document.getElementById("branchApplyAll").addEventListener("click", function(){ applyBranchSettings("all"); });
+    document.getElementById("branchApplyOne").addEventListener("click", function(){ applyBranchSettings("one"); });
+    document.addEventListener("pointerdown", function(e){
+      if(!el.pop.classList.contains("open")) return;
+      if(e.target.closest && (e.target.closest("#branchSettingsPop") || e.target.closest("#branchSettingsBtn"))) return;
+      closeBranchSettings();
+    });
+  }
 
   // the list "Add a task" and the top-level render loop operate on: the
   // real top-level roots array on the main board, or the pinned task's own
@@ -2053,7 +2289,77 @@
   function escapeForTextareaHtml(s){
     return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
+
+  /* ---------- ask AI (per node) ----------
+     The notes field is a plain <textarea>, so an AI reply can't be styled
+     apart from the user's own writing the way it could in a rich-text
+     surface — every line it adds is marked with AI_MARKER instead, which
+     also survives saving, reloading and editing around it.
+
+     aiReplyFor() is the ONLY place the reply is produced. It currently
+     returns a canned string; swapping in a real call means returning a
+     Promise of the reply text from here (fetch(...).then(r => r.json())...)
+     and nothing else in this file has to change — the caller below already
+     awaits it. aiContextFor() is what that call would send. */
+  var AI_MARKER = "✦ ";
+
+  function aiContextFor(n){
+    return {
+      title: n.text || "",
+      notes: n.notepadText || "",
+      done: !!n.done,
+      status: n.status || "",
+      taskType: n.taskType || "",
+      workDepth: n.workDepth || "",
+      durationMinutes: n.durationMinutes || 0,
+      subtasks: (n.children||[]).map(function(c){ return c.text || ""; }),
+      // the task this node sits under, for context on what it's part of
+      parentTitle: (function(){
+        var p = parentIdOf(n.id); var pn = p && nodeById(p);
+        return pn ? (pn.text || "") : "";
+      })()
+    };
+  }
+
+  function aiReplyFor(n){
+    var ctx = aiContextFor(n);
+    var name = ctx.title || "this task";
+    return "Here's how I'd break down " + name + ":\n" +
+      "1. Start with the smallest piece you can finish in one sitting.\n" +
+      "2. Note what “done” looks like before you begin, so you can stop.\n" +
+      "3. Park anything that turns out to be its own task as a subtask.\n" +
+      "(Example reply — not a live model response yet.)";
+  }
+
+  // Appends the reply under whatever's already in the note, every line
+  // marked, with a trailing newline so the caret lands on a clean line
+  // underneath and typing continues as normal.
+  function appendAiReply(n, reply){
+    var marked = String(reply||"").split("\n").map(function(line){ return AI_MARKER + line; }).join("\n");
+    var existing = String(n.notepadText || "");
+    n.notepadText = (existing ? existing.replace(/\s*$/, "") + "\n\n" : "") + marked + "\n";
+  }
+
   document.addEventListener("keydown", function(e){
+    // Escape closes whichever timer popup(s) are open — the clock button was
+    // previously the only way to dismiss one. Checked before the modifier
+    // gate below, and skipped whenever focus is somewhere that owns Escape
+    // itself (the rename box reverts, the duration inputs blur) or is a
+    // text field where Escape shouldn't have side effects.
+    if(e.key === "Escape"){
+      var ae = document.activeElement;
+      if(ae && ae.closest && ae.closest("div.edit,.timer-duration-input,.notepad-textarea")) return;
+      var closedSomething = false;
+      if(closeBranchSettings()) closedSomething = true;
+      Object.keys(timerPopupOpenIds).forEach(function(id){
+        if(!timerPopupOpenIds[id]) return;
+        delete timerPopupOpenIds[id];
+        delete timerPopupPos[id]; // match the toggle path: reopening re-anchors to the clock button
+        closedSomething = true;
+      });
+      if(closedSomething){ e.preventDefault(); render(); }
+      return;
+    }
     var mod = e.metaKey || e.ctrlKey;
     if(!mod) return;
     if(e.key==="z" || e.key==="Z"){
@@ -2135,8 +2441,13 @@
   }
 
   // links only make sense between root-level tasks; drop any that reference
-  // a node once it's no longer at the root
+  // a node once it's no longer at the root.
+  // Exception: with "Show Branches" off, hand-drawn links are the ONLY
+  // connectors below the root row too, so a card moving between parents must
+  // keep them — discarding them there would silently erase the user's own
+  // lines on an ordinary drag-reorder.
   function stripRootLinks(id){
+    if(!effectiveBranchSettings().showBranches) return;
     links = links.filter(function(l){ return l.a!==id && l.b!==id; });
   }
 
@@ -2261,10 +2572,20 @@
       ? '<div class="edit" contenteditable="true" data-id="'+n.id+'" data-placeholder="Title">'+(n.text||"")+'</div>'
       : '<div class="text" data-act="edit" data-id="'+n.id+'">'+(n.text||"")+'</div>';
 
-    var handles = isRoot
-      ? (showLeft ? '<button class="link-handle left" data-handle="left" data-id="'+n.id+'" title="Drag to link"></button>' : '')+
-        (showRight ? '<button class="link-handle right" data-handle="right" data-id="'+n.id+'" title="Drag to link"></button>' : '')
-      : '';
+    var leftHandle = '<button class="link-handle left" data-handle="left" data-id="'+n.id+'" title="Drag to link"></button>';
+    var rightHandle = '<button class="link-handle right" data-handle="right" data-id="'+n.id+'" title="Drag to link"></button>';
+    var handles;
+    if(isRoot){
+      handles = (showLeft ? leftHandle : '') + (showRight ? rightHandle : '');
+    }else if(!effectiveBranchSettings().showBranches){
+      // With automatic branches off, a card below the root row is linked by
+      // hand exactly like a root is. Both handles are always present here
+      // rather than being suppressed at the ends of a row, since a child can
+      // legitimately link in either direction (to a sibling, or back up).
+      handles = leftHandle + rightHandle;
+    }else{
+      handles = '';
+    }
 
     var card =
       '<div class="node'+(n.done?' done':'')+(drillable?' drillable':'')+'"'+
@@ -2274,6 +2595,7 @@
         '<div class="actions">'+
           '<button class="act notepad'+(notepadOpenIds[n.id]?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Notes">'+ICON.note+'</button>'+
           buildTimerButtonHtml(n)+
+          '<button class="act ai'+(aiPendingIds[n.id]?' thinking':'')+'" data-act="ai" data-id="'+n.id+'" title="Ask AI">'+ICON.sparkle+'</button>'+
           (drillable ? '' : '<button class="act add" data-act="add" data-id="'+n.id+'" title="Add subtask">'+ICON.plus+'</button>')+
           '<button class="act del" data-act="del" data-id="'+n.id+'" title="Delete branch">'+ICON.x+'</button>'+
         '</div>'+
@@ -2304,12 +2626,20 @@
       currentParentId = null;
     }
 
+    // The branch-settings gear belongs to the subpage, so it appears and
+    // disappears with one — including on the empty state below, which is
+    // still a subpage and can still have its branches configured.
+    var gear = document.getElementById("branchSettingsBtn");
+
     // No main board any more. With no task open there is nothing to draw —
     // the Dashboard keeps this whole frame hidden in that state anyway.
     if(currentParentId===null){
       stage.innerHTML = "";
+      if(gear) gear.classList.remove("visible");
+      closeBranchSettings();
       return;
     }
+    if(gear) gear.classList.add("visible");
 
     var onSubpage = true;
     var list = activeList();
@@ -2338,8 +2668,11 @@
       '</div>';
     }
 
+    // .no-branches drops the CSS org-chart connectors between a parent and
+    // its children; renderNode() puts drag handles on those cards instead.
+    var branchClass = effectiveBranchSettings().showBranches ? '' : ' no-branches';
     var bodyHtml = list.length
-      ? '<div class="tree '+(onSubpage?'subpage':'mainboard')+'"><ul>'+
+      ? '<div class="tree '+(onSubpage?'subpage':'mainboard')+branchClass+'"><ul>'+
           list.map(function(r, i){ return renderNode(r, true, i>0, i<list.length-1, !onSubpage, !onSubpage); }).join("")+
         '</ul></div>'
       : (onSubpage ? '<div class="subpage-empty">No subtasks yet.</div>' : '<div class="mainboard-empty">No tasks yet.</div>');
@@ -2367,11 +2700,45 @@
     // pill-less card height, leaving them stranded near the top edge instead
     // of the card's true vertical center once the pills appeared.
     drawLinks();
+    // Last, because it decorates the cards and popups the steps above have
+    // just (re)built and moved. Every path that starts, pauses, resets or
+    // completes a timer ends in a render(), so this one call keeps the
+    // highlight in sync with no separate bookkeeping.
+    applyTimerRunningHighlights();
     // Resumes ticking on its own if this render just mounted an
     // already-running timer (e.g. reopening a subpage, or a reload landing
     // straight on one) — Start isn't the only way a running countdown ends
     // up on screen.
     ensureTimerTickLoop();
+  }
+
+  /* ---------- running-timer highlight ----------
+     Marks the running node's own card, its floating popup, and exactly one
+     level up (its direct parent) — deliberately not the whole ancestor
+     chain, which on a deep tree would light up nearly every card on screen
+     and stop meaning anything. */
+  function applyTimerRunningHighlights(){
+    var stage = getDoc().getElementById("stage");
+    if(!stage) return;
+    var doc = getDoc();
+    // Popups are reparented to <body> by positionTimerPopups(), so they're
+    // cleared and re-marked document-wide rather than within the stage.
+    Array.prototype.forEach.call(
+      doc.querySelectorAll(".node.timer-running-hl,.node.timer-running-parent-hl,.timer-popup.timer-running-hl"),
+      function(el){ el.classList.remove("timer-running-hl", "timer-running-parent-hl"); }
+    );
+    collectRunningTimerNodes().forEach(function(n){
+      var card = stage.querySelector('.node[data-id="'+n.id+'"]');
+      if(card) card.classList.add("timer-running-hl");
+      var pop = doc.querySelector('.timer-popup[data-id="'+n.id+'"]');
+      if(pop) pop.classList.add("timer-running-hl");
+      var parentId = parentIdOf(n.id);
+      if(!parentId) return;
+      var parentCard = stage.querySelector('.node[data-id="'+parentId+'"]');
+      // A parent that IS the open subpage renders as the heading bar, not a
+      // card, so there's simply nothing to highlight in that case.
+      if(parentCard && parentCard !== card) parentCard.classList.add("timer-running-parent-hl");
+    });
   }
 
   // Debounced per-textarea autosave, deliberately bypassing render() (see
@@ -2384,16 +2751,76 @@
       (function(el){
         var id = el.getAttribute("data-id");
         var t = null;
-        el.addEventListener("input", function(){
+        function queueSave(){
           if(t) clearTimeout(t);
           t = setTimeout(function(){ t=null; setNotepadTextQuiet(id, el.value); save(); }, 400);
+        }
+        el.addEventListener("input", function(){
+          if(applyBulletShorthand(el)) { /* value rewritten below the caret */ }
+          queueSave();
         });
+        el.addEventListener("keydown", function(e){ handleBulletKeydown(el, e, queueSave); });
         el.addEventListener("blur", function(){
           if(t){ clearTimeout(t); t=null; }
           setNotepadTextQuiet(id, el.value); save();
         });
       })(areas[i]);
     }
+  }
+
+  /* ---------- bullets in the notes field ----------
+     The field is a plain <textarea>, so "bullets" are literal "• "
+     characters rather than a real list structure — which keeps notes as
+     plain text everywhere they're read back (the tag bridge, the parent
+     document's own copy of a top-level note) at the cost of nesting and
+     indent levels, which a textarea can't express anyway. */
+  var BULLET = "• ";
+
+  // The [start,end) span of the line the caret sits on.
+  function caretLineBounds(el){
+    var v = el.value, pos = el.selectionStart;
+    var start = v.lastIndexOf("\n", pos-1) + 1;
+    var end = v.indexOf("\n", pos);
+    if(end === -1) end = v.length;
+    return {start:start, end:end, line:v.slice(start,end)};
+  }
+
+  function setValueAndCaret(el, value, caret){
+    el.value = value;
+    el.selectionStart = el.selectionEnd = caret;
+  }
+
+  // "- " or "* " typed at the very start of a line becomes a bullet.
+  function applyBulletShorthand(el){
+    if(el.selectionStart !== el.selectionEnd) return false;
+    var b = caretLineBounds(el);
+    if(!/^[-*] /.test(b.line)) return false;
+    // Only convert the marker the caret just finished typing, not one that
+    // happens to already sit further up the note.
+    if(el.selectionStart !== b.start + 2) return false;
+    var v = el.value;
+    setValueAndCaret(el, v.slice(0, b.start) + BULLET + v.slice(b.start + 2), b.start + BULLET.length);
+    return true;
+  }
+
+  function handleBulletKeydown(el, e, queueSave){
+    if(e.key !== "Enter" || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+    if(el.selectionStart !== el.selectionEnd) return;
+    var b = caretLineBounds(el);
+    if(b.line.indexOf(BULLET) !== 0) return;
+    var v = el.value;
+    if(b.line.trim() === BULLET.trim()){
+      // Enter on an empty bullet ends the list instead of adding another —
+      // the usual way out of one.
+      e.preventDefault();
+      setValueAndCaret(el, v.slice(0, b.start) + v.slice(b.start + b.line.length), b.start);
+      queueSave();
+      return;
+    }
+    e.preventDefault();
+    var pos = el.selectionStart;
+    setValueAndCaret(el, v.slice(0, pos) + "\n" + BULLET + v.slice(pos), pos + 1 + BULLET.length);
+    queueSave();
   }
 
   // The popup is position:fixed, so — unlike the notepad, which is a plain
@@ -2776,18 +3203,24 @@
     c.scrollLeft = (c.scrollWidth - c.clientWidth)/2;
   }
 
-  // draws a straight connector line between each linked pair of root nodes,
-  // as an SVG overlay positioned over the tree
-  // Matches the .link-handle CSS's own "top:32px" — both need to agree so
-  // the visible drag handle sits exactly where the line it draws actually
-  // lands.
-  var ROOT_LINK_ANCHOR_Y = 32;
+  // draws a straight connector line between each linked pair of cards, as an
+  // SVG overlay positioned over the tree
 
   function drawLinks(){
     var stage = getDoc().getElementById("stage");
     var old = stage.querySelector("svg.links-layer");
     if(old) old.remove();
-    if(!links.length) return;
+
+    // Adjacent roots are joined automatically when "Show Branches for top
+    // level" is on. These are derived from sibling order rather than stored,
+    // so they're rebuilt from scratch here on every render and never touch
+    // the `links` array.
+    var autoPairs = [];
+    if(effectiveBranchSettings().showRootBranches){
+      var rootList = activeList();
+      for(var i=0;i<rootList.length-1;i++) autoPairs.push({a:rootList[i].id, b:rootList[i+1].id});
+    }
+    if(!links.length && !autoPairs.length) return;
 
     var stageRect = stage.getBoundingClientRect();
     var svgNS = "http://www.w3.org/2000/svg";
@@ -2796,19 +3229,20 @@
     svg.setAttribute("width", stage.scrollWidth);
     svg.setAttribute("height", stage.scrollHeight);
 
-    links.forEach(function(l){
+    function drawPair(l, isAuto){
       var elA = stage.querySelector('.node[data-id="'+l.a+'"]');
       var elB = stage.querySelector('.node[data-id="'+l.b+'"]');
       if(!elA || !elB) return;
       var ra = elA.getBoundingClientRect(), rb = elB.getBoundingClientRect();
-      // Anchor each end a fixed distance from that card's own top edge —
-      // NOT its vertical center, which used to shift (and slant the line)
-      // with however many lines the title wrapped to, how many tag pills
-      // were on, or whether notes were open. A fixed offset from the top is
-      // the same for every card no matter its content, so the line is
-      // always perfectly level.
-      var ay = ra.top + ROOT_LINK_ANCHOR_Y - stageRect.top;
-      var by = rb.top + ROOT_LINK_ANCHOR_Y - stageRect.top;
+      // Anchor at the cards' vertical midpoint, but take the offset from the
+      // SHORTER of the two and apply it to both. Cards in a row are
+      // top-aligned, so an identical offset keeps the line perfectly level
+      // while still reading as centered — using each card's own midpoint
+      // instead would slant the line whenever two cards differ in height (a
+      // wrapped title, extra tag pills, notes left open).
+      var off = Math.min(ra.height, rb.height) / 2;
+      var ay = ra.top + off - stageRect.top;
+      var by = rb.top + off - stageRect.top;
       var ax, bx;
       if(ra.left < rb.left){ ax = ra.right - stageRect.left; bx = rb.left - stageRect.left; }
       else { ax = ra.left - stageRect.left; bx = rb.right - stageRect.left; }
@@ -2816,13 +3250,18 @@
       var line = getDoc().createElementNS(svgNS, "line");
       line.setAttribute("x1", ax); line.setAttribute("y1", ay);
       line.setAttribute("x2", bx); line.setAttribute("y2", by);
-      line.setAttribute("class", "link-line");
-      line.setAttribute("data-link-id", l.id);
-      var title = getDoc().createElementNS(svgNS, "title");
-      title.textContent = "Click to remove link";
-      line.appendChild(title);
+      line.setAttribute("class", isAuto ? "link-line auto-link" : "link-line");
+      if(!isAuto){
+        line.setAttribute("data-link-id", l.id);
+        var title = getDoc().createElementNS(svgNS, "title");
+        title.textContent = "Click to remove link";
+        line.appendChild(title);
+      }
       svg.appendChild(line);
-    });
+    }
+
+    autoPairs.forEach(function(l){ drawPair(l, true); });
+    links.forEach(function(l){ drawPair(l, false); });
 
     stage.appendChild(svg);
   }
@@ -2944,6 +3383,27 @@
     }
     else if(act==="timer-reset"){ resetTimerNode(f.node); save(); render(); }
     else if(act==="notepad"){ notepadOpenIds[id] = !notepadOpenIds[id]; render(); }
+    else if(act==="ai"){
+      // Open the note first and render, so the field is already on screen
+      // while the reply is being produced — once aiReplyFor() is a real
+      // network call that gap stops being instant, and this ordering means
+      // nothing about the flow has to change when it is.
+      notepadOpenIds[id] = true;
+      aiPendingIds[id] = true;
+      render();
+      Promise.resolve(aiReplyFor(f.node)).then(function(reply){
+        delete aiPendingIds[id];
+        // The node can be gone by the time a slow reply lands.
+        var still = locate(id);
+        if(!still || !reply){ render(); return; }
+        pushUndo(); // unlike the notepad toggle, this one edits content
+        appendAiReply(still.node, reply);
+        save(); render();
+      }, function(){
+        delete aiPendingIds[id];
+        render();
+      });
+    }
     else if(act==="timer-popup-toggle"){
       timerPopupOpenIds[id] = !timerPopupOpenIds[id];
       // Always re-anchor to the clock button on open rather than reusing a
@@ -2982,7 +3442,11 @@
 
   function dropTargetAt(clientX, clientY){
     var el = getDoc().elementFromPoint(clientX, clientY);
-    var card = el ? el.closest('.node[data-root="true"]') : null;
+    // Root-only while automatic branches are drawn below the root row; with
+    // them off, any card is a valid end for a hand-drawn link — that's the
+    // whole point of the "Show Branches" off mode.
+    var selector = effectiveBranchSettings().showBranches ? '.node[data-root="true"]' : '.node';
+    var card = el ? el.closest(selector) : null;
     if(card && card.getAttribute("data-id")===dragState.fromId) card = null; // no self-link
     return card;
   }
@@ -3404,8 +3868,9 @@
   /* ---------- boot ---------- */
   // Loads the saved trees but renders nothing until the Dashboard opens a
   // specific Google Task via __unbleepOpenGTask() — there is no main board.
-  var loaded = load().then(function(){
+  var loaded = Promise.all([load(), loadBranchSettings()]).then(function(){
     try{ window.history.replaceState({parentId:null}, ""); }catch(e){}
+    wireBranchSettings();
     render();
     document.getElementById("stage").classList.add("fade");
     // A reload can land with a timer already running from before — resume
@@ -3515,6 +3980,10 @@
       status: r.status || "", workDepth: r.workDepth || "",
       durationMinutes: r.durationMinutes || 0, location: r.location || "",
       habitStacking: r.habitStacking || "", taskType: r.taskType || "",
+      // Google Tasks' `due` is a date with no time-of-day, so a due TIME can
+      // only live here, alongside the other fields the API has nowhere to
+      // put. The date itself still syncs to Google exactly as before.
+      dueTime: r.dueTime || "",
       subtaskCount: (r.children || []).length,
       notepadText: r.notepadText || "",
       timerStarted: !!r.timerStarted, timerRunning: !!r.timerRunning,
@@ -5518,7 +5987,7 @@
             '</div>' +
             '<div class="widget-header-controls">' +
               '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
-              '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
+              '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
               '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
               '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
               '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
@@ -5587,7 +6056,10 @@
           makeMiniCollapseToggle(id);
           wireDragHandle(el.querySelector(".col-drag-handle"));
           wireDeleteButton(el.querySelector("[data-delete-col]"));
-          wireColorButton(el.querySelector("[data-color-btn]"));
+          // querySelectorAll, not querySelector: a vocab mirror carries three
+          // color buttons (the widget header plus its English and Chinese
+          // boxes), and only the header one would have been wired otherwise.
+          Array.prototype.forEach.call(el.querySelectorAll("[data-color-btn]"), wireColorButton);
           wireIconButton(el.querySelector("[data-icon-btn]"));
         }
         if (type === "page") wireNoteEditor(id, {});
@@ -5681,9 +6153,82 @@
 
     function persistWidgetColors() { storageSet(WIDGET_COLOR_STORAGE_KEY, JSON.stringify(WIDGET_COLORS)); }
 
+    // The color button itself renders as a solid dot of whatever color it
+    // controls, so it has to repaint on every path that changes one — which
+    // is why the call sits at the top of applyWidgetColor(), the single
+    // funnel every such path already goes through (setWidgetColor, the
+    // restore-on-load sweep, and registerDynamicWidget).
+    function applyWidgetColorButton(id) {
+      const btns = document.querySelectorAll('[data-color-btn="' + cssEscapeAttr(id) + '"]');
+      const color = WIDGET_COLORS[id] || "#FFFFFF";
+      Array.prototype.forEach.call(btns, function (btn) { btn.style.color = color; });
+    }
+
+    // data-color-btn values are our own ids, but the vocab box ids contain a
+    // ":" — which an attribute selector handles fine inside quotes, as long
+    // as any quote/backslash in the value is escaped.
+    function cssEscapeAttr(v) { return String(v).replace(/(["\\])/g, "\\$1"); }
+
+    // A vocab widget (the primary one or any mirror) is identified
+    // structurally rather than by a type registry, since the widget-layout
+    // module and the vocab module are separate scopes: only vocab widgets
+    // contain a .chinese-list.
+    function isVocabWidget(el) { return !!(el && el.querySelector(".chinese-list")); }
+
+    // The Vocabulary widget opts out of the normal background tint (its body
+    // stays white at every color) and instead colors its two kinds of box
+    // independently: the single English .vocab-box, and all .phrase-card
+    // entries in the Chinese list together, under the synthetic ids
+    // "<widgetId>:english" and "<widgetId>:chinese". Those two classes only
+    // ever appear in their respective halves, so no id plumbing is needed to
+    // tell the halves apart — this works unchanged for mirror widgets.
+    function applyVocabBoxColors(baseId) {
+      const el = widgetEl(baseId);
+      const enId = baseId + ":english";
+      const zhId = baseId + ":chinese";
+      applyWidgetColorButton(enId);
+      applyWidgetColorButton(zhId);
+      if (!el) return;
+      const enColor = WIDGET_COLORS[enId];
+      const zhColor = WIDGET_COLORS[zhId];
+      Array.prototype.forEach.call(el.querySelectorAll(".vocab-box"), function (box) {
+        box.style.backgroundColor = enColor || "";
+      });
+      Array.prototype.forEach.call(el.querySelectorAll(".phrase-card"), function (card) {
+        card.style.backgroundColor = zhColor || "";
+      });
+    }
+
+    // renderEnglish()/renderChinese() rebuild those boxes from scratch on
+    // every vocab refresh, dropping the inline colors with them — they call
+    // back through here afterwards to repaint.
+    window.__applyVocabBoxColors = function () {
+      Array.prototype.forEach.call(
+        document.querySelectorAll(".col.collapsible-col-wrap"),
+        function (el) {
+          if (isVocabWidget(el)) applyVocabBoxColors(el.getAttribute("data-col-id"));
+        }
+      );
+    };
+
     function applyWidgetColor(id) {
+      applyWidgetColorButton(id);
+      // Synthetic vocab box ids aren't widgets — they route straight to the
+      // box painter instead of the widgetEl() lookup, which would find
+      // nothing for them.
+      const vocabBox = /^(.*):(english|chinese)$/.exec(id);
+      if (vocabBox) { applyVocabBoxColors(vocabBox[1]); return; }
       const el = widgetEl(id);
       if (!el) return;
+      if (isVocabWidget(el)) {
+        // Never tinted — see applyVocabBoxColors. Clearing rather than just
+        // skipping matters for a widget that was colored before this rule
+        // existed, or that stored a color while it was a different type.
+        el.classList.remove("widget-colored");
+        el.style.backgroundColor = "";
+        applyVocabBoxColors(id);
+        return;
+      }
       const color = WIDGET_COLORS[id];
       const customColor = color && color.toUpperCase() !== "#FFFFFF";
       // Note widgets (Page/Atomic Habits/Affirmations) render their text —
@@ -6272,6 +6817,9 @@
     if (!el) return;
     const entries = Array.isArray(list) ? list : (list ? [list] : []);
     el.innerHTML = entries.map(englishEntryHtml).join("");
+    // The boxes were just rebuilt, so their per-box background (an inline
+    // style, see applyVocabBoxColors in the widget-layout script) is gone.
+    if (window.__applyVocabBoxColors) window.__applyVocabBoxColors();
   }
 
   function renderChinese(list, targetId) {
@@ -6324,6 +6872,8 @@
         exampleHtml;
       box.appendChild(card);
     });
+    // Freshly created cards carry no inline background — repaint them.
+    if (window.__applyVocabBoxColors) window.__applyVocabBoxColors();
   }
 
   // Extra Vocabulary widgets (beyond the original) mirror this same daily
@@ -6370,16 +6920,22 @@
           '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
             '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
             '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
-          '<div class="sublabel">English</div>' +
+          '<div class="sublabel-row">' +
+            '<div class="sublabel">English</div>' +
+            '<button type="button" class="collapse-btn col-color-btn sublabel-color-btn" data-color-btn="' + id + ':english" title="Customize the English box color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+          '</div>' +
           '<div id="' + id + 'EnglishArea"><div class="vocab-box"><span class="loading">Loading...</span></div></div>' +
-          '<div class="sublabel">Chinese</div>' +
+          '<div class="sublabel-row">' +
+            '<div class="sublabel">Chinese</div>' +
+            '<button type="button" class="collapse-btn col-color-btn sublabel-color-btn" data-color-btn="' + id + ':chinese" title="Customize the Chinese box color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+          '</div>' +
           '<div class="chinese-list" id="' + id + 'ChineseList"><div class="loading">Loading...</div></div>' +
         '</div>' +
       '</div>' +
@@ -7332,7 +7888,7 @@
           '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
             '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
             '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
@@ -8212,7 +8768,10 @@
   // current {status, taskType, workDepth, durationMinutes, location,
   // habitStacking}; `commit(field, value)` applies one change and is
   // responsible for triggering whatever redraw the caller needs.
-  function buildTagRowCore(getMeta, commit) {
+  // opts.skipDueTime omits the Due time control — used by the create panel,
+  // which shows that field next to its Due date instead.
+  function buildTagRowCore(getMeta, commit, opts) {
+    opts = opts || {};
     const defs = tagDefs();
     const bar = document.createElement("div");
     bar.className = "cal-tagbar";
@@ -8343,17 +8902,96 @@
         bar.appendChild(add);
       }
     }
+    // Due TIME. Deliberately separate from the "Due date" button below,
+    // which PATCHes Google: the Tasks API's `due` is a date only (it ignores
+    // any time part), so a time-of-day is kept here as local metadata — the
+    // same place the tags live — and is shown and edited in-app only. The
+    // due DATE continues to sync to Google exactly as before.
+    function dueTimeControl() {
+      const value = meta.dueTime || "";
+      function makeInput(initial, onDone) {
+        const inp = document.createElement("input");
+        inp.type = "time";
+        inp.className = "inline-text-input";
+        if (initial) inp.value = initial;
+        inp.addEventListener("blur", function () { onDone(inp.value); });
+        inp.addEventListener("keydown", function (e) {
+          e.stopPropagation();
+          if (e.key === "Enter") inp.blur();
+          if (e.key === "Escape") { inp.value = initial; inp.blur(); }
+        });
+        return inp;
+      }
+      if (value) {
+        const pill = document.createElement("span");
+        pill.className = "tag-pill";
+        pill.textContent = fmtHmTime(value);
+        pill.title = "Click to change the due time (local to this app — Google Tasks stores only the date)";
+        pill.style.cursor = "pointer";
+        pill.addEventListener("click", function (e) {
+          e.stopPropagation();
+          const inp = makeInput(value, function (v) { commit("dueTime", v); });
+          pill.replaceWith(inp);
+          inp.focus();
+        });
+        bar.appendChild(pill);
+      } else {
+        const add = document.createElement("button");
+        add.type = "button";
+        add.className = "tag-add-btn";
+        add.textContent = "Due time";
+        add.addEventListener("click", function (e) {
+          e.stopPropagation();
+          const inp = makeInput("", function (v) {
+            if (v) commit("dueTime", v);
+            else inp.replaceWith(add);
+          });
+          add.replaceWith(inp);
+          inp.focus();
+          if (inp.showPicker) { try { inp.showPicker(); } catch (err) {} }
+        });
+        bar.appendChild(add);
+      }
+    }
+
     textTagControl("location", "Location");
     textTagControl("habitStacking", "Habit Stacking");
+    if (!opts.skipDueTime) dueTimeControl();
 
     return bar;
+  }
+
+  // Google's `due` is an RFC-3339 string whose time part is meaningless
+  // (always midnight UTC, see the PATCH/POST call sites) — so the date is
+  // read off the string directly rather than through a Date, which would
+  // shift it a day for anyone west of UTC.
+  function fmtDueDate(due) {
+    const d = parseYmd(String(due).slice(0, 10));
+    if (!d || isNaN(d.getTime())) return String(due).slice(0, 10);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  // "HH:MM" (what <input type="time"> produces) in the same 12-hour style
+  // fmtTime() uses for calendar entries, without needing a Date to format.
+  function fmtHmTime(hm) {
+    const parts = String(hm || "").split(":");
+    if (parts.length < 2) return String(hm || "");
+    let h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return String(hm);
+    const ap = h < 12 ? "am" : "pm";
+    h = h % 12 || 12;
+    return h + (m ? ":" + String(m).padStart(2, "0") : "") + ap;
   }
 
   // Live tag row for an existing task/event, keyed by its namespaced id.
   function buildTagRow(nsId, title) {
     const bar = buildTagRowCore(
       function () { return tagMeta(nsId); },
-      function (field, value) { setTagMeta(nsId, field, value, title); refreshTagSurfaces(); }
+      function (field, value) { setTagMeta(nsId, field, value, title); refreshTagSurfaces(); },
+      // Same gate as the Due date button below: a calendar event already has
+      // a real start time, so "due time" only means something on a task.
+      { skipDueTime: nsId.indexOf("task:") !== 0 }
     );
     bar.addEventListener("mousedown", function (e) { e.stopPropagation(); });
     // The row this tagbar lives in is HTML5 draggable=true (for drag-to-
@@ -8423,12 +9061,13 @@
   // item exists in Google (so there's no id yet for the live row above to
   // key off). Values are held in `pending` and only pushed to Google — via
   // setTagMeta, exactly like any other tag edit — once the item is created.
-  function buildStagingTagRow(pending, container) {
+  function buildStagingTagRow(pending, container, opts) {
     function rerender() {
       container.innerHTML = "";
       container.appendChild(buildTagRowCore(
         function () { return pending; },
-        function (field, value) { pending[field] = value; rerender(); }
+        function (field, value) { pending[field] = value; rerender(); },
+        opts
       ));
     }
     rerender();
@@ -8726,6 +9365,20 @@
 
       if (notepadOpenIds[nsId]) {
         row.appendChild(buildNotepadControl(nsId, meta));
+      }
+
+      // Due date and/or time. This list only ever holds undated tasks (a task
+      // with a `due` moves onto the calendar grid above), so in practice this
+      // shows a bare time — a "when today" without a day attached, which is
+      // exactly what a due time on an unscheduled task means.
+      const dueBits = [];
+      if (t.due) dueBits.push(fmtDueDate(t.due));
+      if (meta && meta.dueTime) dueBits.push(fmtHmTime(meta.dueTime));
+      if (dueBits.length) {
+        const dueEl = document.createElement("div");
+        dueEl.className = "cal-taskrow-due";
+        dueEl.textContent = "Due " + dueBits.join(" · ");
+        row.appendChild(dueEl);
       }
 
       if (meta && meta.subtaskCount) {
@@ -9140,7 +9793,8 @@
     const tagsContainer = document.createElement("div");
     tagsField.appendChild(tagsLabel);
     tagsField.appendChild(tagsContainer);
-    buildStagingTagRow(pendingTags, tagsContainer);
+    // An event has a real start time of its own, so no "due time" here.
+    buildStagingTagRow(pendingTags, tagsContainer, { skipDueTime: true });
 
     createPanel.appendChild(title.wrap);
     createPanel.appendChild(date.wrap);
@@ -9208,6 +9862,12 @@
     createPanel.appendChild(panelHeading("New task"));
     const title = field("Task title", "text", "");
     const due = field("Due date", "date", "");
+    // Sits next to the date rather than in the Tags row below (which is why
+    // that row omits its own Due time control while staging — see
+    // buildStagingTagRow): a time belongs beside the date it qualifies.
+    // Its value still travels the staged-tags path, since a time-of-day is
+    // local metadata and never part of the Google Tasks payload.
+    const dueTime = field("Due time", "time", "");
 
     const pendingTags = {};
     const tagsField = document.createElement("div");
@@ -9217,14 +9877,16 @@
     const tagsContainer = document.createElement("div");
     tagsField.appendChild(tagsLabel);
     tagsField.appendChild(tagsContainer);
-    buildStagingTagRow(pendingTags, tagsContainer);
+    buildStagingTagRow(pendingTags, tagsContainer, { skipDueTime: true });
 
     createPanel.appendChild(title.wrap);
     createPanel.appendChild(due.wrap);
+    createPanel.appendChild(dueTime.wrap);
     createPanel.appendChild(tagsField);
     createPanel.appendChild(panelActions(async function (btn) {
       const t = title.input.value.trim();
       if (!t) return showError("Give the task a title.");
+      if (dueTime.input.value) pendingTags.dueTime = dueTime.input.value;
       btn.disabled = true;
       btn.textContent = "Creating…";
       try {
@@ -9383,7 +10045,7 @@
           '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
             '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
             '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
