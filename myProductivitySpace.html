@@ -648,6 +648,8 @@
     cursor: pointer;
   }
   .add-task-btn:hover { background: #3367d6; }
+  #calConnectBtn { background: #000000; color: #ffffff; }
+  #calConnectBtn:hover { background: #222222; }
   #mainTasksList { display: flex; flex-direction: column; gap: 10px; }
 
   #readingListBox { border: none; padding: 10px 0 0 0; flex: 1 1 0; min-height: 60px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -1407,7 +1409,7 @@
 <!-- Fullscreen host for a Google Task's subtask tree. Holds the tree-engine
      iframe, which stays loaded (and keeps its saved state) even while hidden. -->
 <div id="gtaskSubpageHost" hidden>
-  <iframe id="unbleepTasksFrame" title="Task subtasks" allow="document-picture-in-picture"></iframe>
+  <iframe id="unbleepTasksFrame" title="Branch AI — task subtasks" allow="document-picture-in-picture"></iframe>
 </div>
 
 <!-- Source for the task-subtree engine rendered into #unbleepTasksFrame.
@@ -1484,35 +1486,35 @@
     border-radius: 5px; padding: 2px 6px; font-size: 10.5px; font-weight: 600;
     font-family: Arial, Helvetica, sans-serif; cursor: pointer; line-height: 1.4;
   }
-  .tag-add-btn:hover { border-color: #4285F4; color: #4285F4; }
+  .tag-add-btn:hover { border-color: #000000; color: #000000; }
   .status-select-empty {
     border: 1px dashed #cfd8e2 !important; color: #7a8699 !important;
     background: transparent !important; font-weight: 600;
   }
-  .status-select-empty:hover { border-color: #4285F4 !important; color: #4285F4 !important; }
+  .status-select-empty:hover { border-color: #000000 !important; color: #000000 !important; }
   .duration-editor-empty {
     display: inline-flex; border: 1px dashed #cfd8e2 !important; background: transparent !important;
   }
-  .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #4285F4 !important; }
+  .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #000000 !important; }
   .inline-text-input {
     width: 90px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; color: #000; font-weight: 600;
     border: 1px dashed #cfd8e2; border-radius: 5px; padding: 2px 6px; outline: none;
     background: transparent;
   }
   .inline-text-input::placeholder { color: #9aa7b8; }
-  .inline-text-input:hover, .inline-text-input:focus { border-color: #4285F4; }
+  .inline-text-input:hover, .inline-text-input:focus { border-color: #000000; }
   .tagbar-editor { display: inline-flex; }
   .tagbar-editor input {
     width: 90px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; font-weight: 600;
-    border: 1px solid #4285F4; border-radius: 5px; padding: 2px 6px; outline: none;
+    border: 1px solid #000000; border-radius: 5px; padding: 2px 6px; outline: none;
   }
   .status-select {
     font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; color: #000; font-weight: 600;
-    border: 1px solid #4285F4; border-radius: 5px; padding: 2px 4px; outline: none;
+    border: 1px solid #000000; border-radius: 5px; padding: 2px 4px; outline: none;
     background: #fff;
   }
   .duration-editor {
-    align-items: center; gap: 2px; border: 1px solid #4285F4; border-radius: 5px;
+    align-items: center; gap: 2px; border: 1px solid #000000; border-radius: 5px;
     padding: 2px 4px; background: #fff;
   }
   .duration-input {
@@ -1523,7 +1525,7 @@
 </style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tasks</title>
+<title>Branch AI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1535,8 +1537,8 @@
     --ink:#000000;
     --muted:#000000;
     --line:#b3bfcd;
-    --accent:#4285F4;
-    --accent-soft:#e7ecff;
+    --accent:#000000;
+    --accent-soft:#ececec;
     --danger:#e8595a;
     --shadow:0 1px 2px rgba(23,32,42,.06),0 6px 20px rgba(23,32,42,.08);
     --radius:12px;
@@ -1680,8 +1682,8 @@
     cursor:pointer;padding:0;display:grid;place-items:center;transition:transform .15s;
   }
   
-  .check svg{width:16px;height:16px;stroke:#4285F4;stroke-width:1.6;stroke-linejoin:round;fill:none;transition:fill .15s;display:block}
-  .node.done .check svg{fill:#4285F4}
+  .check svg{width:16px;height:16px;stroke:#000000;stroke-width:1.6;stroke-linejoin:round;fill:none;transition:fill .15s;display:block}
+  .node.done .check svg{fill:#000000}
   .text{
     flex:1 1 auto;font-size:14px;line-height:1.35;color:var(--ink);
     cursor:text;word-break:break-word;padding:1px 0;min-height:19px;
@@ -1705,7 +1707,7 @@
   .node:hover .actions,.node:focus-within .actions,.node.js-hover .actions{opacity:1;pointer-events:auto}
   .act{
     width:24px;height:24px;border-radius:7px;border:none;background:#fff;
-    color:#4285F4;cursor:pointer;display:grid;place-items:center;
+    color:#000000;cursor:pointer;display:grid;place-items:center;
     transition:all .13s;
   }
   .act svg{width:13px;height:13px}
@@ -1856,6 +1858,32 @@
   </button>
 
   <div id="app-root">
+  <!-- Branch AI logo: two rounded "task card" eyes (each with a sparkle)
+       joined by a smile-shaped connector, like a smiley face — logo mark
+       only, no wordmark. A normal flex row (not position:fixed) so it
+       takes its own space above the canvas, with the subpage's own
+       back-button/heading row landing below it (see .stage's own top
+       padding), instead of floating over that corner. Lives outside
+       #stage (which gets fully replaced on every render — see
+       stage.innerHTML below) so it stays put across mainboard/subpage
+       view switches. -->
+  <div id="brandLogo" style="flex:0 0 auto;padding:10px 11px 8px;">
+    <svg viewBox="0 0 464 300" width="38" height="25" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+      <path d="M 116 108 C 116 168, 116 168, 176 168 L 288 168 C 348 168, 348 168, 348 108"
+            fill="none" stroke="#000000" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="36" y="20" rx="24" ry="24" width="160" height="70" fill="#000000"/>
+      <g transform="translate(116,55) scale(2.2) translate(-13,-14)">
+        <path d="M 12 0 C 13 10, 14 11, 24 12 C 14 13, 13 14, 12 24 C 11 14, 10 13, 0 12 C 10 11, 11 10, 12 0 Z" fill="#FFFFFF"/>
+        <path d="M 26 18 C 26.5 22, 27 22.5, 31 23 C 27 23.5, 26.5 24, 26 28 C 25.5 24, 25 23.5, 21 23 C 25 22.5, 25.5 22, 26 18 Z" fill="#FFFFFF"/>
+      </g>
+      <rect x="268" y="20" rx="24" ry="24" width="160" height="70" fill="#000000"/>
+      <g transform="translate(348,55) scale(2.2) translate(-13,-14)">
+        <path d="M 12 0 C 13 10, 14 11, 24 12 C 14 13, 13 14, 12 24 C 11 14, 10 13, 0 12 C 10 11, 11 10, 12 0 Z" fill="#FFFFFF"/>
+        <path d="M 26 18 C 26.5 22, 27 22.5, 31 23 C 27 23.5, 26.5 24, 26 28 C 25.5 24, 25 23.5, 21 23 C 25 22.5, 25.5 22, 26 18 Z" fill="#FFFFFF"/>
+      </g>
+    </svg>
+  </div>
+
   <!-- The standalone root-task board (and its "Add a task" button) is gone:
        root tasks now come from Google Tasks, created in the Dashboard's
        Calendar column. This app renders only a single Google Task's subpage
