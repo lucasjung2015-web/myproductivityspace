@@ -161,6 +161,34 @@
   .link-add-input.link-add-input-invalid { border-color: #e03131; }
   .links-row.links-row-vertical .link-add-input { width: 100%; box-sizing: border-box; }
 
+  /* Popup for editing an existing link's URL/title, opened by clicking the
+     link itself while edit mode is on (see openLinkEditPopup). Anchored to
+     .link-item-wrap, which is already position:relative for the remove
+     button above. */
+  .link-edit-popup {
+    position: absolute; top: 100%; left: 0; margin-top: 6px; z-index: 30;
+    display: flex; flex-direction: column; gap: 4px;
+    background: #ffffff; border: 1px solid #cccccc; border-radius: 6px;
+    padding: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.16);
+    width: 200px; cursor: default;
+  }
+  .link-edit-popup .link-add-input { width: 100%; box-sizing: border-box; }
+  .link-edit-label {
+    font-size: 10px; font-weight: 700; color: #666666;
+    text-transform: uppercase; letter-spacing: .02em;
+  }
+  .link-edit-actions { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 2px; }
+  .link-edit-remove {
+    border: none; background: transparent; color: #e03131; font-size: 12px;
+    font-family: inherit; cursor: pointer; padding: 4px 6px; border-radius: 4px;
+  }
+  .link-edit-remove:hover { background: #fbe9e9; }
+  .link-edit-done {
+    border: none; background: #4285F4; color: #ffffff; font-size: 12px; font-weight: 600;
+    font-family: inherit; cursor: pointer; padding: 4px 10px; border-radius: 4px;
+  }
+  .link-edit-done:hover { background: #2f6fd6; }
+
   .links-bottom-dropzone {
     flex: 0 0 auto; height: 0; overflow: hidden; margin: 0 28px; border-radius: 6px;
     border: 2px dashed transparent; box-sizing: border-box;
@@ -293,6 +321,14 @@
      just relocated since a note widget's title is the note's own first line
      rather than a separate header field. */
   .col.collapsible-col-wrap.note-widget .sticky-note > .widget-icon-btn { margin-top: 1px; }
+  /* Mini-collapsed state for a note widget (see makeMiniCollapseToggle's
+     `isNote` branch): clip to the note-editor's own first line — matching
+     :first-line's bold styling below — instead of display:none-ing the
+     whole widget-body, so the note's "title" (its first line) stays visible
+     the same way every other widget's header title does while collapsed. */
+  .col.collapsible-col-wrap.note-widget .widget-body.mini-body-collapsed .note-editor {
+    max-height: 1.4em; overflow: hidden;
+  }
 
   .collapsed-tabs-bar {
     display: none; flex-direction: row; flex-wrap: wrap; gap: 8px;
@@ -2944,11 +2980,6 @@
           if(t){ clearTimeout(t); t=null; }
           setNotepadTextQuiet(id, el.value); save();
         });
-        // resize:both writes width/height straight onto the element's style
-        // with no event of its own, so the drag is caught on release by
-        // comparing against the size we last rendered. Storing it on the node
-        // is what makes a resize outlast the next render() (which rebuilds
-        // every textarea from scratch) and a reload.
         // resize:both writes width/height straight onto the element's style
         // with no event of its own, so a drag is detected by measuring before
         // and after the press. Comparing against the size at mousedown (not
@@ -5836,8 +5867,22 @@
       const body = document.getElementById(id + "WidgetBody");
       if (!btn || !body) return;
 
+      // A note widget (see NOTE_WIDGETS/.note-widget) has no header title of
+      // its own — the visible "title" is just the note's own bold first
+      // line, living inside this same .widget-body. display:none-ing the
+      // whole body like every other widget would take that first line with
+      // it, leaving the collapsed widget looking nameless. Clipping to one
+      // line height instead keeps that first line on screen and hides only
+      // what's below it — collapsing the content while the section's
+      // "title" (the note's first line) stays put, same as every other
+      // widget already does.
+      const isNote = !!NOTE_WIDGETS[id];
+      let collapsedNow = false;
+
       function apply(collapsed) {
-        body.style.display = collapsed ? "none" : "";
+        collapsedNow = collapsed;
+        if (isNote) body.classList.toggle("mini-body-collapsed", collapsed);
+        else body.style.display = collapsed ? "none" : "";
         btn.classList.toggle("mini-expanded", !collapsed);
       }
 
@@ -5847,7 +5892,7 @@
       })();
 
       btn.addEventListener("click", function () {
-        const collapsed = body.style.display !== "none";
+        const collapsed = !collapsedNow;
         apply(collapsed);
         storageSet(MINI_COLLAPSE_STORAGE_KEY[id], collapsed ? "true" : "false");
         if (!collapsed) {
@@ -10896,6 +10941,10 @@
   var position = { type: "top" };
   var editMode = false;
   var addingLink = false;
+  // Which link's edit popup (URL + title) is currently open, or null. Only
+  // one at a time — opening a second closes whichever was open, same as
+  // addingLink above.
+  var editingLinkId = null;
   var wrapEl = null; // the floating bar's own element (top/bottom modes only)
 
   async function loadState() {
@@ -10943,6 +10992,91 @@
     } catch (e) { return null; }
   }
 
+  // Popup opened by clicking a link while edit mode is on — lets you change
+  // both the URL and the label/title text (the label is what's displayed
+  // after the icon; free text, not derived from the URL once set here).
+  // Appended into the link's own .link-item-wrap, which is already
+  // position:relative, so it anchors directly below that link.
+  function buildLinkEditPopup(link) {
+    var pop = document.createElement("div");
+    pop.className = "link-edit-popup";
+    // Keeps clicks/drags inside the popup from bubbling to the row's own
+    // drag wiring or back out to the <a> itself.
+    pop.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+    pop.addEventListener("click", function (e) { e.stopPropagation(); });
+
+    var urlLabel = document.createElement("label");
+    urlLabel.className = "link-edit-label";
+    urlLabel.textContent = "URL";
+    var urlInput = document.createElement("input");
+    urlInput.type = "text";
+    urlInput.className = "link-add-input";
+    urlInput.value = link.url;
+
+    var titleLabel = document.createElement("label");
+    titleLabel.className = "link-edit-label";
+    titleLabel.textContent = "Title";
+    var titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "link-add-input";
+    titleInput.placeholder = "Link title";
+    titleInput.value = link.label;
+
+    function commit() {
+      var normalized = normalizeUrl(urlInput.value);
+      if (!normalized) { urlInput.classList.add("link-add-input-invalid"); return; }
+      link.url = normalized;
+      link.label = titleInput.value.trim() || hostLabelFromUrl(normalized);
+      // Only a favicon-derived icon (not one of the bundled brand SVGs above)
+      // should follow a URL edit — refetch it for the new host.
+      if (!link.iconSvg) link.iconImg = faviconUrlFor(normalized);
+      editingLinkId = null;
+      saveLinks();
+      renderCurrent();
+    }
+    function cancel() {
+      editingLinkId = null;
+      renderCurrent();
+    }
+
+    [urlInput, titleInput].forEach(function (inp) {
+      inp.addEventListener("keydown", function (e) {
+        e.stopPropagation();
+        if (e.key === "Enter") { e.preventDefault(); commit(); }
+        else if (e.key === "Escape") { e.preventDefault(); cancel(); }
+        else inp.classList.remove("link-add-input-invalid");
+      });
+    });
+
+    var actions = document.createElement("div");
+    actions.className = "link-edit-actions";
+    var removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "link-edit-remove";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", function () {
+      links = links.filter(function (l) { return l.id !== link.id; });
+      editingLinkId = null;
+      saveLinks();
+      renderCurrent();
+    });
+    var doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "link-edit-done";
+    doneBtn.textContent = "Done";
+    doneBtn.addEventListener("click", commit);
+    actions.appendChild(removeBtn);
+    actions.appendChild(doneBtn);
+
+    pop.appendChild(urlLabel);
+    pop.appendChild(urlInput);
+    pop.appendChild(titleLabel);
+    pop.appendChild(titleInput);
+    pop.appendChild(actions);
+    setTimeout(function () { urlInput.focus(); }, 0);
+    return pop;
+  }
+
   function buildIconEl(link) {
     if (link.iconSvg) {
       var span = document.createElement("span");
@@ -10987,6 +11121,16 @@
       a.rel = "noopener";
       a.appendChild(buildIconEl(link));
       a.appendChild(document.createTextNode(" " + link.label));
+      // In edit mode, clicking a link opens its edit popup (URL + title)
+      // instead of following it — same reasoning as .link-remove-btn already
+      // stopping propagation there, just gating the <a>'s own default action.
+      a.addEventListener("click", function (e) {
+        if (!editMode) return;
+        e.preventDefault();
+        editingLinkId = editingLinkId === link.id ? null : link.id;
+        addingLink = false;
+        renderCurrent();
+      });
       itemWrap.appendChild(a);
 
       var rm = document.createElement("button");
@@ -10998,10 +11142,15 @@
         e.preventDefault();
         e.stopPropagation();
         links = links.filter(function (l) { return l.id !== link.id; });
+        if (editingLinkId === link.id) editingLinkId = null;
         saveLinks();
         renderCurrent();
       });
       itemWrap.appendChild(rm);
+
+      if (editMode && editingLinkId === link.id) {
+        itemWrap.appendChild(buildLinkEditPopup(link));
+      }
 
       row.appendChild(itemWrap);
       lastItemWrap = itemWrap;
@@ -11057,6 +11206,7 @@
         addBtn.textContent = "+";
         addBtn.addEventListener("click", function () {
           addingLink = true;
+          editingLinkId = null;
           renderCurrent();
         });
         addWrap.appendChild(addBtn);
@@ -11181,6 +11331,7 @@
     btn.addEventListener("click", function () {
       editMode = !editMode;
       addingLink = false;
+      editingLinkId = null;
       renderCurrent();
     });
   }
