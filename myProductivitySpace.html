@@ -584,10 +584,10 @@
     display: flex; align-items: center; justify-content: center;
   }
   .task-star svg {
-    width: 16px; height: 16px; stroke: #4285F4; stroke-width: 1.6;
+    width: 16px; height: 16px; stroke: #000000; stroke-width: 1.6;
     stroke-linejoin: round; fill: none; transition: fill 0.15s ease; display: block;
   }
-  .task-star.done svg { fill: #4285F4; }
+  .task-star.done svg { fill: #000000; }
   .task-title {
     flex: 1 1 auto; min-width: 0; font-weight: normal; color: #000000;
     cursor: text; outline: none; word-break: break-word; line-height: 1.15; font-size: 13px;
@@ -610,23 +610,23 @@
   }
   .tag-remove-btn:hover { color: #e8595a; }
   .tag-add-btn {
-    border: 1px dashed #cccccc; background: transparent; color: #777777;
+    border: 1px solid #cccccc; background: transparent; color: #777777;
     border-radius: 5px; padding: 2px 6px; font-size: 10.5px; font-weight: 600;
     cursor: pointer; line-height: 1.4;
   }
   .tag-add-btn:hover { border-color: #4285F4; color: #4285F4; }
   .status-select-empty {
-    border: 1px dashed #cccccc !important; color: #777777 !important;
+    border: 1px solid #cccccc !important; color: #777777 !important;
     background: transparent !important; font-weight: 600;
   }
   .status-select-empty:hover { border-color: #4285F4 !important; color: #4285F4 !important; }
   .duration-editor-empty {
-    display: inline-flex; border: 1px dashed #cccccc !important; background: transparent !important;
+    display: inline-flex; border: 1px solid #cccccc !important; background: transparent !important;
   }
   .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #4285F4 !important; }
   .inline-text-input {
     width: 90px; font-size: 10.5px; font-family: inherit; color: #000000; font-weight: 600;
-    border: 1px dashed #cccccc; border-radius: 5px; padding: 2px 6px; outline: none;
+    border: 1px solid #cccccc; border-radius: 5px; padding: 2px 6px; outline: none;
     background: transparent;
   }
   .inline-text-input::placeholder { color: #999999; }
@@ -836,6 +836,13 @@
   }
   .cal-panel-save { border: none; background: #4285F4; color: #ffffff; font-weight: 600; }
   .cal-panel-cancel { border: 1px solid #000000; background: transparent; color: #000000; }
+  /* Only present when editing something that already exists. margin-right:auto
+     pushes it to the far left, away from Cancel/Save, so it can't be hit by
+     someone reaching for either. */
+  .cal-panel-delete {
+    margin-right: auto; border: 1px solid #c0392b; background: transparent; color: #c0392b;
+  }
+  .cal-panel-delete:hover { background: #c0392b; color: #ffffff; }
   .cal-panel-error { font-size: 13px; color: #c0392b; }
 
   .cal-viewport {
@@ -863,14 +870,17 @@
     width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   }
   .cal-daynum { font-size: 11px; font-weight: bold; color: #000000; }
+  /* Same default as .cal-tg-event: black with white text until a status
+     colour is set. Events and tasks share it — the status dot inside the
+     chip is what distinguishes state, not the chip's own colour. */
   .cal-chip {
     font-size: 10px; line-height: 1.25; padding: 1px 3px; border-radius: 3px;
-    background: #e7ecff; color: #2952cc; cursor: pointer;
+    background: #000000; color: #ffffff; cursor: pointer;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     display: flex; align-items: center; gap: 3px; min-width: 0;
   }
-  .cal-chip:hover { filter: brightness(0.94); }
-  .cal-chip.task { background: #faecd8; color: #9a6708; }
+  .cal-chip:hover { filter: brightness(1.35); }
+  .cal-chip.task { background: #000000; color: #ffffff; }
   .cal-chip.more { background: transparent; color: #000000; opacity: 0.6; cursor: default; display: block; }
   /* Tag state on the grid: month cells have no room for full pills, so status
      shows as a dot and the subtask count as a small suffix. */
@@ -904,14 +914,14 @@
   }
   .cal-tg-slot { height: 26px; border-top: 1px solid #ececec; position: relative; min-width: 0; }
   .cal-tg-slot.daystart { border-left: 1px solid #ececec; }
-  /* Neutral by default. The old blue (#e7ecff / #2952cc / #cdd8fb) is no
-     longer forced on every untagged event — it's now the "Default" entry in
-     STATUS_COLORS, so you can still pick that look deliberately. */
+  /* Solid black with white text is the default look for anything with no
+     status set; a status colour overrides all three properties inline
+     (see renderTimeGrid). */
   .cal-tg-event {
     position: absolute; left: 1px; right: 1px; z-index: 1;
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
-    background: #ffffff; color: #000000; overflow: hidden;
-    border: 1px solid #d5d5d5;
+    background: #000000; color: #ffffff; overflow: hidden;
+    border: 1px solid #000000;
   }
   .cal-allday-row {
     display: flex; flex-wrap: wrap; gap: 3px; padding-bottom: 6px; margin-bottom: 4px;
@@ -1017,7 +1027,7 @@
   .cal-tagbar .tag-add-btn, .cal-tagbar select, .cal-tagbar input {
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
     font-size: 10px; padding: 1px 5px; border-radius: 999px;
-    border: 1px dashed #b3bfcd; background: transparent; color: #777777;
+    border: 1px solid #b3bfcd; background: transparent; color: #777777;
     cursor: pointer; max-width: 110px;
   }
   .cal-tagbar input { border-radius: 4px; cursor: text; color: #000000; }
@@ -1430,10 +1440,12 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="vocab" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
           <button type="button" class="collapse-btn" data-mini-collapse="vocab" title="Collapse">&#9654;</button>
           <button type="button" class="collapse-btn" id="vocabCollapseBtn" title="Collapse to side">&#9654;</button>
+          <!-- Sits last, at the right end of the row — unlike every other
+               widget, where the colour button is second. -->
+          <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
         </div>
       </div>
       <div class="widget-body" id="vocabWidgetBody">
@@ -1540,23 +1552,23 @@
   }
   .tag-remove-btn:hover { color: #e8595a; }
   .tag-add-btn {
-    border: 1px dashed #cfd8e2; background: transparent; color: #7a8699;
+    border: 1px solid #cfd8e2; background: transparent; color: #7a8699;
     border-radius: 5px; padding: 2px 6px; font-size: 10.5px; font-weight: 600;
     font-family: Arial, Helvetica, sans-serif; cursor: pointer; line-height: 1.4;
   }
   .tag-add-btn:hover { border-color: #4285F4; color: #4285F4; }
   .status-select-empty {
-    border: 1px dashed #cfd8e2 !important; color: #7a8699 !important;
+    border: 1px solid #cfd8e2 !important; color: #7a8699 !important;
     background: transparent !important; font-weight: 600;
   }
   .status-select-empty:hover { border-color: #4285F4 !important; color: #4285F4 !important; }
   .duration-editor-empty {
-    display: inline-flex; border: 1px dashed #cfd8e2 !important; background: transparent !important;
+    display: inline-flex; border: 1px solid #cfd8e2 !important; background: transparent !important;
   }
   .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #4285F4 !important; }
   .inline-text-input {
     width: 90px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; color: #000; font-weight: 600;
-    border: 1px dashed #cfd8e2; border-radius: 5px; padding: 2px 6px; outline: none;
+    border: 1px solid #cfd8e2; border-radius: 5px; padding: 2px 6px; outline: none;
     background: transparent;
   }
   .inline-text-input::placeholder { color: #9aa7b8; }
@@ -1665,6 +1677,10 @@
   .subpage-back svg{ width:20px; height:20px; display:block; }
   .subpage-heading{flex:1 1 auto;font-size:20px;font-weight:800;color:var(--ink);word-break:break-word}
   .subpage-heading b,.subpage-heading strong{font-weight:800}
+  /* Links exist only in this heading — see sanitizeHtml's allowLinks. Plain
+     click still opens the title for editing; Cmd/Ctrl+click follows the link,
+     the same modifier the dashboard's note editor uses for its own links. */
+  .subpage-heading a{color:var(--accent);text-decoration:underline;cursor:text}
   .subpage-heading .placeholder{color:#9aa7b8;font-weight:600}
   .subpage-heading .text,.subpage-heading .edit{
     font-size:20px;font-weight:800;line-height:1.3;padding:0;background:transparent;min-height:auto;
@@ -1744,8 +1760,8 @@
     cursor:pointer;padding:0;display:grid;place-items:center;transition:transform .15s;
   }
   
-  .check svg{width:16px;height:16px;stroke:#4285F4;stroke-width:1.6;stroke-linejoin:round;fill:none;transition:fill .15s;display:block}
-  .node.done .check svg{fill:#4285F4}
+  .check svg{width:16px;height:16px;stroke:#000000;stroke-width:1.6;stroke-linejoin:round;fill:none;transition:fill .15s;display:block}
+  .node.done .check svg{fill:#000000}
   .text{
     flex:1 1 auto;font-size:14px;line-height:1.35;color:var(--ink);
     cursor:text;word-break:break-word;padding:1px 0;min-height:19px;
@@ -1885,8 +1901,13 @@
   .link-handle.top{top:-11px;transform:translate(-50%,-50%)}
   .link-handle.bottom{bottom:-11px;transform:translate(-50%,50%)}
   .node.drop-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+  /* Dragging back onto a card you're already connected to removes that
+     connection rather than adding a second one — red says "let go here and
+     the line goes away". */
+  .node.drop-unlink{border-color:var(--danger);box-shadow:0 0 0 3px rgba(232,89,90,.22),var(--shadow)}
   svg.drag-preview-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .drag-preview-line{stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-dasharray:5 4}
+  .drag-preview-line.unlinking{stroke:var(--danger)}
   svg.links-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .link-line{stroke:var(--line);stroke-width:2;stroke-linecap:round;pointer-events:stroke;cursor:pointer}
   .link-line:hover{stroke-width:3.5}
@@ -1916,6 +1937,12 @@
   .tree.no-branches li::after,
   .tree.no-branches ul ul::before{display:none}
 
+  /* One parent→child connector retraced away (see removeConnection), rather
+     than Auto Branch switched off for everything. */
+  .tree li.no-auto-branch::before,
+  .tree li.no-auto-branch::after{display:none}
+  .tree ul.no-auto-stub::before{display:none}
+
   /* ---------- running-timer highlight ---------- */
   /* The card whose timer is running, its floating popup, and — one level
      only — its direct parent, which gets the lighter treatment so the
@@ -1924,38 +1951,14 @@
   .node.timer-running-parent-hl{border-color:var(--accent)}
   .timer-popup.timer-running-hl{box-shadow:0 0 0 2px var(--accent),0 4px 14px rgba(23,32,42,.12),0 12px 32px rgba(23,32,42,.16)}
 
-  /* ---------- branch settings (gear, top-right of the subpage) ---------- */
-  /* The top-right corner, one row down from #pipToggle's exact spot. That
-     first row is fully occupied: the subpage bar's own "+ Add a subtask" and
-     delete buttons run to the frame's right edge, and the Dashboard paints
-     its "+" (add widget) and pop-out buttons on top of this frame there at
-     z-index 3000. Sitting just beneath all of it keeps the gear in the same
-     corner without ever being covered or crowding the bar. */
-  #branchSettingsBtn{
-    position:fixed;top:56px;right:14px;z-index:9999;width:34px;height:34px;
-    border-radius:50%;border:1px solid #dbe2ec;background:#fff;color:#5b6675;
-    cursor:pointer;display:none;place-items:center;padding:0;
-    box-shadow:0 2px 8px rgba(23,32,42,.14);
+  /* ---------- Auto Branch toggle ----------
+     A plain global on/off, rendered in the subpage bar immediately left of
+     the "+ Add a subtask" button (see render()). No popover and no scoping
+     prompt — one setting, applied everywhere. */
+  .autobranch-toggle{
+    flex:0 0 auto;align-self:flex-start;margin-top:1px;white-space:nowrap;
   }
-  #branchSettingsBtn.visible{display:grid}
-  #branchSettingsBtn:hover{color:var(--ink);border-color:#c3cede}
-  #branchSettingsBtn svg{width:17px;height:17px}
-  .branch-settings-pop{
-    position:fixed;z-index:10000;display:none;background:#fff;border-radius:10px;
-    padding:12px 14px;min-width:236px;
-    box-shadow:0 4px 14px rgba(23,32,42,.12),0 12px 32px rgba(23,32,42,.16);
-    font-size:12.5px;color:var(--ink);
-  }
-  .branch-settings-pop.open{display:block}
-  .branch-settings-pop label{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer;line-height:1.35}
-  .branch-settings-pop input[type=checkbox]{margin:2px 0 0 0;flex:0 0 auto;cursor:pointer}
-  .branch-settings-confirm{
-    display:none;margin-top:10px;padding-top:10px;border-top:1px solid #eef1f5;
-  }
-  .branch-settings-confirm.open{display:block}
-  .branch-settings-confirm p{margin:0 0 8px 0;color:var(--muted);font-size:11.5px}
-  .branch-settings-confirm .btn{width:100%;justify-content:center;margin-bottom:6px}
-  .branch-settings-confirm .btn:last-child{margin-bottom:0}
+  .btn.autobranch-toggle.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
   /* ---------- dragging a task card onto / next to another task ---------- */
   .node{cursor:grab}
@@ -2030,23 +2033,6 @@
   <button id="pipToggle" aria-label="Pin window" title="Pop out as an always-on-top window" style="position:fixed;top:10px;right:10px;z-index:9999;width:34px;height:34px;border-radius:50%;border:1px solid #b3bfcd;background:#fff;box-shadow:0 1px 2px rgba(23,32,42,.06),0 6px 20px rgba(23,32,42,.08);cursor:pointer;display:flex;align-items:center;justify-content:center;">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="#111" stroke="#111" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M8 5 L8 19 L18 12 Z"/></svg>
   </button>
-  <!-- Branch-line settings. Takes the same top-right corner as #pipToggle,
-       which is hidden whenever this app is embedded in the Dashboard (see
-       the injected "#pipToggle{display:none!important}" rule above), so the
-       two never collide in practice. Shown only while a subpage is open —
-       render() owns the .visible class. -->
-  <button id="branchSettingsBtn" type="button" aria-label="Branch settings" title="Branch settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-  </button>
-  <div class="branch-settings-pop" id="branchSettingsPop">
-    <label><input type="checkbox" id="branchAutoBranch"><span>Auto Branch</span></label>
-    <div class="branch-settings-confirm" id="branchSettingsConfirm">
-      <p>Where should this apply?</p>
-      <button class="btn primary" type="button" id="branchApplyAll">Apply to all</button>
-      <button class="btn ghost" type="button" id="branchApplyOne">Apply to just this one</button>
-    </div>
-  </div>
-
   <div id="app-root">
   <!-- The standalone root-task board (and its "Add a task" button) is gone:
        root tasks now come from Google Tasks, created in the Dashboard's
@@ -2125,12 +2111,12 @@
   var cancelEdit = false;
   var dragState = null;   // in-progress drag-to-link state (not persisted)
   var currentParentId = null; // null = main board; otherwise the id of the root task whose children we're viewing as a subpage (not persisted)
-  // id -> explicit open/closed state for that node's notepad. Notes are OPEN
-  // by default, so an ABSENT key means open and only an explicit `false`
-  // closes one — hence isNotepadOpen() rather than reading the map directly.
-  // Not persisted; it's view state, like the other toggles here.
+  // id -> true while that node's notepad is expanded. Closed by default: a
+  // card shows its note only once the Notes hover button is clicked. Not
+  // persisted; it's view state, like the other toggles here. Read through
+  // isNotepadOpen() rather than directly, so the default lives in one place.
   var notepadOpenIds = {};
-  function isNotepadOpen(id){ return notepadOpenIds[id] !== false; }
+  function isNotepadOpen(id){ return !!notepadOpenIds[id]; }
   var timerPopupOpenIds = {}; // id -> true while that node's timer popup is showing (not persisted, purely a UI toggle)
   var timerPopupPos = {}; // id -> {left,top} once a popup has been manually dragged; cleared when it's closed, so reopening re-anchors to the clock button
   // id -> true while that node's tag pills are revealed. Tags are hidden by
@@ -2142,31 +2128,30 @@
   var tagsOpenIds = {};
   var aiPendingIds = {}; // id -> true while an AI reply is in flight, so the button can't be fired twice (not persisted)
 
-  // Branch-line settings (the gear, top-right). Kept in their own storage key
-  // rather than folded into the {roots,links} blob so that a settings write
-  // can never race with, or corrupt, the actual task tree.
+  // Auto Branch: one global on/off, driven by the toggle button in the
+  // subpage bar. ON (the default) draws every automatic line — the CSS
+  // org-chart connectors from each parent to its children, AND a connector
+  // between each pair of adjacent root cards. OFF draws none, at any level.
   //
-  //   autoBranch — ON (the default) draws every automatic line: the CSS
-  //     org-chart connectors from each parent to its children, AND a
-  //     connector between each pair of adjacent root cards. OFF draws no
-  //     automatic lines at any level.
+  // Kept in its own storage key rather than folded into the {roots,links}
+  // blob so that a settings write can never race with, or corrupt, the tree.
   //
-  // Drawing links BY HAND (the .link-handle drags) is deliberately not gated
-  // by this at all — it stays available either way, which is why nothing here
-  // is consulted when deciding whether to render handles.
+  // Drawing and removing links BY HAND (the .link-handle drags) is
+  // deliberately not gated by this at all — both stay available either way,
+  // which is why nothing here is consulted when rendering handles.
   //
-  // perSubtree[parentId] holds a subpage's own override ("apply to just this
-  // one"); "apply to all" writes the default and clears every override, so it
-  // genuinely means everywhere.
+  // removedAutoPairs holds the individual automatic connections the user has
+  // retraced away (see removeConnection). Auto lines aren't stored anywhere —
+  // they're derived from sibling order and parent/child structure on every
+  // render — so suppressing one has to be recorded as its own fact. Keyed by
+  // the two node ids sorted and joined, so direction never matters.
   var BRANCH_SETTINGS_KEY = "gtask-branch-settings-v1";
-  var branchSettings = { autoBranch: true, perSubtree: {} };
+  var branchSettings = { autoBranch: true, removedAutoPairs: {} };
 
-  function effectiveBranchSettings(){
-    var o = (currentParentId && branchSettings.perSubtree[currentParentId]) || {};
-    return {
-      autoBranch: typeof o.autoBranch === "boolean" ? o.autoBranch : branchSettings.autoBranch
-    };
-  }
+  function effectiveBranchSettings(){ return { autoBranch: !!branchSettings.autoBranch }; }
+
+  function autoPairKey(a, b){ return [String(a), String(b)].sort().join("|"); }
+  function isAutoPairRemoved(a, b){ return !!branchSettings.removedAutoPairs[autoPairKey(a, b)]; }
 
   async function saveBranchSettings(){
     await window.storage.set(BRANCH_SETTINGS_KEY, JSON.stringify(branchSettings), true);
@@ -2180,90 +2165,88 @@
       var parsed = JSON.parse(raw);
       if(!parsed || typeof parsed !== "object") return;
       if(typeof parsed.autoBranch === "boolean") branchSettings.autoBranch = parsed.autoBranch;
-      // Settings written before the two flags were merged into one: a saved
-      // file only has meaning for the below-root lines, so that flag carries over.
+      // Settings written before the flags were merged into one. A per-subpage
+      // override (`perSubtree`) no longer exists — Auto Branch is global now —
+      // so an old file's overrides are simply dropped, not migrated.
       else if(typeof parsed.showBranches === "boolean") branchSettings.autoBranch = parsed.showBranches;
-      if(parsed.perSubtree && typeof parsed.perSubtree === "object"){
-        branchSettings.perSubtree = {};
-        Object.keys(parsed.perSubtree).forEach(function(k){
-          var o = parsed.perSubtree[k] || {};
-          var v = typeof o.autoBranch === "boolean" ? o.autoBranch
-                : typeof o.showBranches === "boolean" ? o.showBranches : null;
-          if(v !== null) branchSettings.perSubtree[k] = { autoBranch: v };
-        });
+      if(parsed.removedAutoPairs && typeof parsed.removedAutoPairs === "object"){
+        branchSettings.removedAutoPairs = parsed.removedAutoPairs;
       }
     }catch(e){}
   }
 
-  /* ---------- branch settings popover ---------- */
-  // Nothing is committed as the checkboxes are ticked: the change reveals the
-  // confirm row, and only "Apply to all" / "Apply to just this one" writes.
-  // Dismissing the popover without choosing therefore discards the edit, and
-  // reopening re-reads the settings actually in force.
-  function branchSettingsEls(){
-    return {
-      btn: document.getElementById("branchSettingsBtn"),
-      pop: document.getElementById("branchSettingsPop"),
-      confirm: document.getElementById("branchSettingsConfirm"),
-      autoBranch: document.getElementById("branchAutoBranch")
-    };
-  }
+  /* ---------- retrace-to-remove ----------
+     Dragging from a card's handle back onto a card it is already connected to
+     removes that connection instead of making a second one. It's the only way
+     to remove an automatic line (those are pointer-events:none, so the
+     click-a-line handler never sees them), and it lets one auto line go
+     without switching Auto Branch off everywhere.
 
-  function openBranchSettings(){
-    var el = branchSettingsEls();
-    if(!el.pop || !el.btn) return;
-    var eff = effectiveBranchSettings();
-    el.autoBranch.checked = eff.autoBranch;
-    el.confirm.classList.remove("open");
-    el.pop.classList.add("open");
-    var r = el.btn.getBoundingClientRect();
-    var pr = el.pop.getBoundingClientRect();
-    el.pop.style.top = (r.bottom + 8) + "px";
-    el.pop.style.left = Math.max(8, Math.min(r.right - pr.width, window.innerWidth - pr.width - 8)) + "px";
-  }
-
-  // Returns whether it actually closed anything, so Escape can tell if it
-  // consumed the keypress.
-  function closeBranchSettings(){
-    var el = branchSettingsEls();
-    if(!el.pop || !el.pop.classList.contains("open")) return false;
-    el.pop.classList.remove("open");
-    el.confirm.classList.remove("open");
-    return true;
-  }
-
-  function applyBranchSettings(scope){
-    var el = branchSettingsEls();
-    if(!el.autoBranch) return;
-    var next = { autoBranch: !!el.autoBranch.checked };
-    if(scope === "one" && currentParentId){
-      branchSettings.perSubtree[currentParentId] = next;
-    }else{
-      // "Apply to all" has to clear the per-subpage overrides too, or pages
-      // that were customized earlier would quietly ignore the new default.
-      branchSettings.autoBranch = next.autoBranch;
-      branchSettings.perSubtree = {};
+     Returns true if something was removed, so the drag handler knows not to
+     fall through to creating a link. */
+  function manualLinkBetween(a, b){
+    for(var i=0;i<links.length;i++){
+      var l = links[i];
+      if((l.a===a && l.b===b) || (l.a===b && l.b===a)) return l;
     }
-    saveBranchSettings();
-    closeBranchSettings();
-    render();
+    return null;
   }
 
-  function wireBranchSettings(){
-    var el = branchSettingsEls();
-    if(!el.btn || !el.pop) return;
-    el.btn.addEventListener("click", function(e){
-      e.stopPropagation();
-      if(el.pop.classList.contains("open")) closeBranchSettings(); else openBranchSettings();
+  // An automatic connection exists between two cards when Auto Branch is on
+  // and they are either adjacent in the same sibling row (the SVG root-row
+  // lines) or a parent and one of its own children (the CSS org-chart
+  // connectors) — and it hasn't already been retraced away.
+  function autoConnectionBetween(a, b){
+    if(!effectiveBranchSettings().autoBranch) return false;
+    if(isAutoPairRemoved(a, b)) return false;
+    if(parentIdOf(a) === b || parentIdOf(b) === a) return true;
+    // Sibling adjacency only counts in the top row: drawLinks derives its
+    // auto lines from activeList(), and deeper siblings are joined to their
+    // parent by the CSS connectors rather than to each other.
+    var rootList = activeList();
+    var ca = findContainer(a), cb = findContainer(b);
+    if(!ca || !cb || ca.list !== rootList || cb.list !== rootList) return false;
+    return Math.abs(ca.index - cb.index) === 1;
+  }
+
+  function connectionBetween(a, b){
+    if(a === b) return false;
+    return !!manualLinkBetween(a, b) || autoConnectionBetween(a, b);
+  }
+
+  // Deleting a card drops any retraced-away pairs that mentioned it, so the
+  // settings blob doesn't accumulate keys for ids that no longer exist.
+  function forgetRemovedAutoPairsFor(id){
+    var changed = false;
+    Object.keys(branchSettings.removedAutoPairs).forEach(function(key){
+      if(key.split("|").indexOf(String(id)) === -1) return;
+      delete branchSettings.removedAutoPairs[key];
+      changed = true;
     });
-    el.autoBranch.addEventListener("change", function(){ el.confirm.classList.add("open"); });
-    document.getElementById("branchApplyAll").addEventListener("click", function(){ applyBranchSettings("all"); });
-    document.getElementById("branchApplyOne").addEventListener("click", function(){ applyBranchSettings("one"); });
-    document.addEventListener("pointerdown", function(e){
-      if(!el.pop.classList.contains("open")) return;
-      if(e.target.closest && (e.target.closest("#branchSettingsPop") || e.target.closest("#branchSettingsBtn"))) return;
-      closeBranchSettings();
-    });
+    if(changed) saveBranchSettings();
+  }
+
+  function removeConnection(a, b){
+    var manual = manualLinkBetween(a, b);
+    if(manual){
+      links = links.filter(function(l){ return l !== manual; });
+      return true;
+    }
+    if(autoConnectionBetween(a, b)){
+      branchSettings.removedAutoPairs[autoPairKey(a, b)] = true;
+      saveBranchSettings();
+      return true;
+    }
+    return false;
+  }
+
+  // Flips Auto Branch for every subpage at once and redraws immediately, so
+  // the whole tree that's already on screen gains or loses its lines on the
+  // spot rather than only newly-added cards picking up the change.
+  function toggleAutoBranch(){
+    branchSettings.autoBranch = !branchSettings.autoBranch;
+    saveBranchSettings();
+    render();
   }
 
   // the list "Add a task" and the top-level render loop operate on: the
@@ -2471,7 +2454,6 @@
       var ae = document.activeElement;
       if(ae && ae.closest && ae.closest("div.edit,.timer-duration-input,.notepad-textarea")) return;
       var closedSomething = false;
-      if(closeBranchSettings()) closedSomething = true;
       Object.keys(timerPopupOpenIds).forEach(function(id){
         if(!timerPopupOpenIds[id]) return;
         delete timerPopupOpenIds[id];
@@ -2731,9 +2713,19 @@
 
     var childrenHtml = "";
     if(!hideChildren && n.children.length){
-      childrenHtml = '<ul>'+n.children.map(function(c){ return renderNode(c, false, false, false, false, false); }).join("")+'</ul>';
+      // A parent→child connector the user retraced away is hidden by marking
+      // that child's <li> (the ::before/::after elbows belong to it). If every
+      // child is hidden, the <ul>'s own vertical stub would be left dangling
+      // in mid-air, so the list gets marked too.
+      var allChildrenCut = n.children.every(function(c){ return isAutoPairRemoved(n.id, c.id); });
+      childrenHtml = '<ul'+(allChildrenCut ? ' class="no-auto-stub"' : '')+'>'+
+        n.children.map(function(c){ return renderNode(c, false, false, false, false, false); }).join("")+
+      '</ul>';
     }
-    return '<li>'+card+childrenHtml+'</li>';
+    // isRoot cards sit in the top row, which has no elbows of its own — the
+    // class only matters for a child li.
+    var liClass = (!isRoot && isAutoPairRemoved(parentIdOf(n.id) || "", n.id)) ? ' class="no-auto-branch"' : '';
+    return '<li'+liClass+'>'+card+childrenHtml+'</li>';
   }
 
   // The subpage now replaces the main board's own content in-place (on the
@@ -2747,20 +2739,12 @@
       currentParentId = null;
     }
 
-    // The branch-settings gear belongs to the subpage, so it appears and
-    // disappears with one — including on the empty state below, which is
-    // still a subpage and can still have its branches configured.
-    var gear = document.getElementById("branchSettingsBtn");
-
     // No main board any more. With no task open there is nothing to draw —
     // the Dashboard keeps this whole frame hidden in that state anyway.
     if(currentParentId===null){
       stage.innerHTML = "";
-      if(gear) gear.classList.remove("visible");
-      closeBranchSettings();
       return;
     }
-    if(gear) gear.classList.add("visible");
 
     var onSubpage = true;
     var list = activeList();
@@ -2778,9 +2762,17 @@
       // have "subtasks" conceptually, so their subpage calls the same action
       // "Add a task" instead.
       var addLabel = String(currentParentId).indexOf("event:") === 0 ? "Add a task" : "Add a subtask";
+      // Auto Branch sits immediately left of the add button. It's a plain
+      // global on/off — one click applies everywhere and redraws the tree
+      // that's already on screen (see toggleAutoBranch).
+      var autoOn = effectiveBranchSettings().autoBranch;
       barHtml = '<div class="subpage-bar">'+
         '<button class="subpage-back" type="button" data-act="back" title="Back" aria-label="Back">'+ICON.back+'</button>'+
         '<div class="subpage-heading">'+headingHtml+'</div>'+
+        '<button class="btn ghost autobranch-toggle'+(autoOn?' on':'')+'" type="button" data-act="auto-branch"'+
+          ' aria-pressed="'+(autoOn?'true':'false')+'" title="'+(autoOn?'Auto Branch is on':'Auto Branch is off')+'">'+
+          'Auto Branch'+
+        '</button>'+
         '<button class="btn primary subpage-add" type="button" data-act="add-root" title="'+addLabel+'">'+
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'+
           addLabel+
@@ -3322,9 +3314,21 @@
         cancelEdit = true; inp.blur();
       }
     });
+    var allowLinks = isTitleEditor(inp);
     inp.addEventListener("paste", function(e){
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData("text/plain");
+      // Pasting a URL over highlighted text in the subpage heading turns that
+      // text into the link, rather than replacing it with the raw URL.
+      if(allowLinks){
+        var url = pastedUrl(text);
+        var sel = getDoc().getSelection();
+        if(url && sel && sel.rangeCount && !sel.isCollapsed){
+          getDoc().execCommand("createLink", false, url);
+          inp.dispatchEvent(new Event("input", {bubbles:true}));
+          return;
+        }
+      }
       getDoc().execCommand("insertText", false, text);
     });
     // Live-sync every keystroke into the actual data model (and its own
@@ -3336,7 +3340,7 @@
       var found = locate(id);
       if(!found) return;
       pushUndo();
-      found.node.text = sanitizeHtml(inp.innerHTML);
+      found.node.text = sanitizeHtml(inp.innerHTML, allowLinks);
       save();
     });
     inp.addEventListener("blur", function(){
@@ -3357,7 +3361,7 @@
         }
       } else {
         var found2 = locate(id);
-        if(found2){ found2.node.text = sanitizeHtml(inp.innerHTML); } // final sync, already live-synced per keystroke above
+        if(found2){ found2.node.text = sanitizeHtml(inp.innerHTML, allowLinks); } // final sync, already live-synced per keystroke above
       }
       editingId = null; editStartText = null; save(); render();
       // Renaming the subpage heading renames the underlying Google Task.
@@ -3398,8 +3402,36 @@
 
   // strips a contenteditable div's HTML down to only <b>/<strong>/<br>, with no attributes,
   // so it's always safe to store and re-inject directly into the DOM.
-  function sanitizeHtml(html){
-    var allowed = {b:1, strong:1, br:1};
+  /* ---------- hyperlinks in the subpage heading ----------
+     Only the heading (the div.edit bound to the open task's own text) can
+     carry links. Per-row task titles and the dashboard's widget names are
+     deliberately excluded — a URL pasted there stays plain text. */
+  function isTitleEditor(el){ return !!(el && el.closest && el.closest(".subpage-heading")); }
+
+  // Anything not http(s)/mailto — javascript:, data:, vbscript: — is refused
+  // rather than escaped, since these strings end up in a live href.
+  function safeLinkHref(raw){
+    var href = String(raw || "").trim();
+    if(!href) return null;
+    if(/^(https?:|mailto:)/i.test(href)) return href;
+    // A bare domain typed or pasted without a scheme is treated as https.
+    if(/^www\.[^\s]+$/i.test(href)) return "https://" + href;
+    return null;
+  }
+
+  // What counts as "a URL was pasted" for the wrap-the-selection behaviour.
+  function pastedUrl(text){
+    var t = String(text || "").trim();
+    if(!t || /\s/.test(t)) return null;   // a sentence containing a URL isn't one
+    return safeLinkHref(t);
+  }
+
+  // allowLinks additionally keeps <a href> — passed only when sanitizing the
+  // subpage heading (see isTitleEditor). Ordinary card titles stay
+  // link-free, so a URL pasted onto a task row can never become a live
+  // anchor there.
+  function sanitizeHtml(html, allowLinks){
+    var allowed = allowLinks ? {b:1, strong:1, br:1, a:1} : {b:1, strong:1, br:1};
     var container = getDoc().createElement("div");
     container.innerHTML = html;
 
@@ -3409,8 +3441,19 @@
         var next = child.nextSibling;
         if(child.nodeType===1){
           var tag = child.tagName.toLowerCase();
+          // Read href before the attribute strip below wipes it, and only
+          // put it back if the scheme is one we're willing to render.
+          var keptHref = (allowLinks && tag==="a") ? safeLinkHref(child.getAttribute("href")) : null;
           while(child.attributes && child.attributes.length){
             child.removeAttribute(child.attributes[0].name);
+          }
+          if(keptHref){
+            child.setAttribute("href", keptHref);
+            child.setAttribute("target", "_blank");
+            child.setAttribute("rel", "noopener noreferrer");
+          } else if(tag==="a"){
+            // An anchor with nothing safe to point at is just text.
+            tag = "a-stripped";
           }
           clean(child);
           if(!allowed[tag]){
@@ -3452,7 +3495,12 @@
     var autoPairs = [];
     if(effectiveBranchSettings().autoBranch){
       var rootList = activeList();
-      for(var i=0;i<rootList.length-1;i++) autoPairs.push({a:rootList[i].id, b:rootList[i+1].id});
+      for(var i=0;i<rootList.length-1;i++){
+        var pa = rootList[i].id, pb = rootList[i+1].id;
+        // Skip a pair the user retraced away — see removeConnection.
+        if(isAutoPairRemoved(pa, pb)) continue;
+        autoPairs.push({a:pa, b:pb});
+      }
     }
     if(!links.length && !autoPairs.length) return;
 
@@ -3527,7 +3575,7 @@
     var inp = getDoc().querySelector('div.edit[data-id="'+editingId+'"]');
     if(inp){
       var found = locate(editingId);
-      if(found){ found.node.text = sanitizeHtml(inp.innerHTML); }
+      if(found){ found.node.text = sanitizeHtml(inp.innerHTML, isTitleEditor(inp)); }
     }
     editingId = null; editStartText = null;
   }
@@ -3589,6 +3637,7 @@
       pushUndo();
       var r = node(""); activeList().push(r); editingId = r.id; save(); render(); centerScroll(); scrollTaskIntoView(r.id); return;
     }
+    if(act==="auto-branch"){ toggleAutoBranch(); return; }
     if(act==="back"){
       currentParentId = null; editingId = null; editStartText = null; render(); notifyParentFullscreen(); return;
     }
@@ -3615,6 +3664,7 @@
       pushUndo();
       f.list.splice(f.index,1);
       links = links.filter(function(l){ return l.a!==id && l.b!==id; });
+      forgetRemovedAutoPairsFor(id);
       if(id===currentParentId) currentParentId = null; // the subpage we were viewing just got deleted
       save(); render(); notifyParentFullscreen();
     }
@@ -3713,9 +3763,15 @@
 
     var card = dropTargetAt(e.clientX, e.clientY);
     if(card !== dragState.hoverEl){
-      if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target");
+      if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target", "drop-unlink");
       dragState.hoverEl = card;
-      if(card) card.classList.add("drop-target");
+      if(card){
+        // Retracing an existing connection removes it, so the hover state
+        // has to say which of the two is about to happen.
+        var unlink = connectionBetween(dragState.fromId, card.getAttribute("data-id"));
+        card.classList.add(unlink ? "drop-unlink" : "drop-target");
+        dragState.line.classList.toggle("unlinking", unlink);
+      }
     }
   }
 
@@ -3725,10 +3781,18 @@
     getDoc().removeEventListener("pointerup", onDragEnd);
 
     var card = dropTargetAt(e.clientX, e.clientY);
-    if(card){ pushUndo(); addLink(dragState.fromId, card.getAttribute("data-id")); save(); }
+    if(card){
+      var toId = card.getAttribute("data-id");
+      pushUndo();
+      // Retrace-to-remove first; only an unconnected pair creates a link.
+      // addLink is itself a toggle, but going through removeConnection keeps
+      // manual and automatic connections on the same gesture.
+      if(!removeConnection(dragState.fromId, toId)) addLink(dragState.fromId, toId);
+      save();
+    }
 
     dragState.svg.remove();
-    if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target");
+    if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target", "drop-unlink");
     dragState = null;
     render();
   }
@@ -4051,6 +4115,16 @@
     var h = e.target.closest(".link-handle");
     if(h){ e.preventDefault(); startDrag(h, e); return; }
 
+    // Cmd/Ctrl+click a link in the subpage heading to follow it. Without the
+    // modifier the click falls through to "edit", so a fully-linked title is
+    // still editable — the same trade-off the dashboard's note editor makes.
+    var anchor = e.target.closest(".subpage-heading a[href]");
+    if(anchor && (e.metaKey || e.ctrlKey)){
+      e.preventDefault();
+      window.open(anchor.getAttribute("href"), "_blank", "noopener");
+      return;
+    }
+
     // Act on pointerdown, not click. Reason: if another node's text is still
     // being edited, a plain click would first blur that field (triggering its
     // own re-render) before the click event finishes resolving — which could
@@ -4123,7 +4197,6 @@
   // specific Google Task via __unbleepOpenGTask() — there is no main board.
   var loaded = Promise.all([load(), loadBranchSettings()]).then(function(){
     try{ window.history.replaceState({parentId:null}, ""); }catch(e){}
-    wireBranchSettings();
     render();
     document.getElementById("stage").classList.add("fade");
     // A reload can land with a timer already running from before — resume
@@ -4853,12 +4926,8 @@
     });
   }
 
-  // "Default" is the blue that calendar events used to get unconditionally
-  // when they had no status. Events are neutral now, so this is how you opt
-  // back into that look deliberately.
-  var STATUS_PRESETS = ["Default", "To-do", "In progress", "Complete"];
+  var STATUS_PRESETS = ["To-do", "In progress", "Complete"];
   var STATUS_COLORS = {
-    "Default": { bg: "#e7ecff", text: "#2952cc", dot: "#cdd8fb" },
     "To-do": { bg: "#e3e3e3", text: "#555555", dot: "#8a8a8a" },
     "In progress": { bg: "#faecd8", text: "#9a6708", dot: "#d9a441" },
     "Complete": { bg: "#dcf1e4", text: "#1a7f4e", dot: "#4caf6d" }
@@ -6629,15 +6698,10 @@
       if (vocabBox) { applyVocabBoxColors(vocabBox[1]); return; }
       const el = widgetEl(id);
       if (!el) return;
-      if (isVocabWidget(el)) {
-        // Never tinted — see applyVocabBoxColors. Clearing rather than just
-        // skipping matters for a widget that was colored before this rule
-        // existed, or that stored a color while it was a different type.
-        el.classList.remove("widget-colored");
-        el.style.backgroundColor = "";
-        applyVocabBoxColors(id);
-        return;
-      }
+      // A vocab widget tints its section background from this button like any
+      // other widget; the English and Chinese box colours are separate
+      // controls that paint on top of whatever that background is.
+      if (isVocabWidget(el)) applyVocabBoxColors(id);
       const color = WIDGET_COLORS[id];
       const customColor = color && color.toUpperCase() !== "#FFFFFF";
       // Note widgets (Page/Atomic Habits/Affirmations) render their text —
@@ -6737,147 +6801,491 @@
     const WIDGET_ICONS = {};
     const DEFAULT_ICON_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>';
 
-    // A curated (not exhaustive) emoji set, each tagged with search keywords —
-    // enough to make the filter box useful without trying to ship a full
-    // Unicode emoji database in a single-file app.
+    // Full-keyboard emoji set, grouped the way Apple's picker groups them and
+    // tagged with search keywords for the filter box. The picker UI is
+    // unchanged — this only widens the dataset it searches.
     const EMOJI_LIST = [
-      ["😀", "grinning face smile happy"], ["😃", "smile happy joy"], ["😄", "smile happy laugh"],
-      ["😁", "grin happy"], ["😆", "laugh happy squint"], ["😅", "sweat smile relief"],
-      ["🤣", "rofl laugh funny"], ["😂", "joy laugh tears funny"], ["🙂", "smile slight"],
-      ["🙃", "upside down silly"], ["😉", "wink"], ["😊", "blush smile happy"],
-      ["😇", "angel innocent halo"], ["😍", "heart eyes love"], ["🥰", "love hearts smile"],
-      ["😘", "kiss love"], ["😋", "yum tasty tongue"], ["😛", "tongue playful"],
-      ["😜", "wink tongue silly"], ["🤪", "zany crazy silly"], ["🤩", "star struck excited"],
-      ["🥳", "party celebrate birthday"], ["😎", "cool sunglasses"], ["🤓", "nerd glasses"],
-      ["🧐", "monocle curious"], ["😏", "smirk"], ["😒", "unamused annoyed"],
-      ["😞", "disappointed sad"], ["😔", "pensive sad"], ["😟", "worried"],
-      ["😕", "confused"], ["🙁", "frown sad"], ["😣", "persevere struggle"],
-      ["😖", "confounded frustrated"], ["😫", "tired exhausted"], ["😩", "weary tired"],
-      ["🥺", "pleading puppy eyes"], ["😢", "cry sad tear"], ["😭", "sob cry"],
-      ["😤", "triumph angry huff"], ["😠", "angry mad"], ["😡", "rage angry mad"],
-      ["🤯", "mind blown shocked"], ["😳", "flushed embarrassed"], ["🥵", "hot sweat"],
-      ["🥶", "cold freezing"], ["😱", "scream fear shocked"], ["😨", "fearful scared"],
-      ["😰", "anxious sweat"], ["😥", "sad relief tear"], ["😓", "sweat downcast"],
-      ["🤗", "hug"], ["🤔", "thinking"], ["🤭", "giggle oops"],
-      ["🤫", "shh quiet secret"], ["🤥", "lying pinocchio"], ["😶", "no mouth blank"],
-      ["😐", "neutral"], ["😑", "expressionless"], ["😬", "grimace awkward"],
-      ["🙄", "eye roll"], ["😴", "sleep tired zzz"], ["🤤", "drool"],
-      ["😷", "mask sick"], ["🤒", "sick thermometer fever"], ["🤕", "hurt bandage injured"],
-      ["🥴", "woozy dizzy"], ["🤢", "nauseated sick"], ["🤮", "vomit sick"],
-      ["🥱", "yawn tired bored"], ["😈", "devil smile mischief"], ["👿", "devil angry"],
-      ["💀", "skull dead"], ["👻", "ghost halloween"], ["👽", "alien"],
-      ["🤖", "robot"], ["🎃", "pumpkin halloween"], ["😺", "cat smile"],
-      ["😻", "cat heart eyes love"], ["🙈", "see no evil monkey"], ["🙉", "hear no evil monkey"],
-      ["🙊", "speak no evil monkey"],
-      ["👍", "thumbs up like good"], ["👎", "thumbs down dislike bad"], ["👏", "clap applause"],
-      ["🙌", "raise hands celebrate"], ["🙏", "pray thanks please"], ["🤝", "handshake deal"],
-      ["💪", "muscle strong flex"], ["🤞", "fingers crossed luck"], ["✌️", "peace victory"],
-      ["👋", "wave hello bye"], ["👌", "ok okay perfect"], ["✍️", "writing"],
-      ["❤️", "heart love red"], ["🧡", "heart orange love"], ["💛", "heart yellow love"],
-      ["💚", "heart green love"], ["💙", "heart blue love"], ["💜", "heart purple love"],
-      ["🖤", "heart black love"], ["🤍", "heart white love"], ["💔", "broken heart sad"],
-      ["💯", "hundred perfect score"], ["🔥", "fire hot lit"], ["✨", "sparkles shiny magic"],
-      ["⭐", "star favorite"], ["🌟", "star glowing"], ["⚡", "lightning bolt energy"],
-      ["🌈", "rainbow"], ["☀️", "sun sunny weather"], ["🌙", "moon night"],
-      ["☁️", "cloud weather"], ["❄️", "snowflake cold winter"], ["🌊", "wave ocean water"],
-      ["🌸", "blossom flower spring"], ["🌻", "sunflower"], ["🌵", "cactus plant"],
-      ["🍀", "clover luck"], ["🌴", "palm tree tropical"], ["🍁", "maple leaf autumn"],
-      ["🐶", "dog puppy animal"], ["🐱", "cat kitten animal"], ["🦊", "fox animal"],
-      ["🐼", "panda animal"], ["🐸", "frog animal"], ["🐢", "turtle animal"],
-      ["🦋", "butterfly"], ["🐝", "bee insect"], ["🐳", "whale animal"],
-      ["🍎", "apple fruit food"], ["🍊", "orange fruit food"], ["🍋", "lemon fruit food"],
-      ["🍇", "grapes fruit food"], ["🍓", "strawberry fruit food"], ["🍑", "peach fruit food"],
-      ["🍕", "pizza food"], ["🍔", "burger food"], ["🍟", "fries food"],
-      ["🍩", "donut food sweet"], ["🍪", "cookie food sweet"], ["🎂", "cake birthday"],
-      ["☕", "coffee drink"], ["🍵", "tea drink"], ["🍺", "beer drink"],
-      ["📚", "books reading study"], ["📖", "book open reading"], ["📝", "note memo write"],
-      ["✏️", "pencil write"], ["📌", "pin"], ["📍", "location pin"],
-      ["📅", "calendar date"], ["⏰", "alarm clock time"], ["⏳", "hourglass time"],
-      ["✅", "check done complete"], ["☑️", "checkbox done"], ["❌", "cross no wrong"],
-      ["❗", "exclamation important"], ["❓", "question mark"], ["💡", "idea lightbulb"],
-      ["🎯", "target goal"], ["🏆", "trophy win"], ["🎁", "gift present"],
-      ["🎉", "party celebrate confetti"], ["🎈", "balloon party"], ["💰", "money dollar"],
-      ["💵", "money cash dollar"], ["💳", "credit card money"], ["📈", "chart growth up"],
-      ["📉", "chart decline down"], ["💻", "laptop computer work"], ["🖥️", "computer desktop"],
-      ["📱", "phone mobile"], ["📷", "camera photo"], ["🎵", "music note"],
-      ["🎧", "headphones music"], ["🎮", "game controller"], ["⚽", "soccer ball sport"],
-      ["🏀", "basketball sport"], ["🏋️", "gym workout exercise"], ["🧘", "meditate yoga calm"],
-      ["🏃", "run exercise"], ["🚴", "bike cycling"], ["✈️", "airplane travel flight"],
-      ["🚗", "car travel drive"], ["🏠", "house home"], ["🏢", "office building work"],
-      ["🌍", "earth world globe"], ["🗺️", "map travel"], ["🧭", "compass direction"],
-      ["🔑", "key unlock"], ["🔒", "lock secure"], ["📦", "box package"],
-
-      // People & activity
-      ["🧑", "person people"], ["👤", "person user profile"], ["👥", "people group team"],
-      ["👶", "baby child"], ["🧒", "child kid"], ["👦", "boy child"],
-      ["👧", "girl child"], ["👨", "man person"], ["👩", "woman person"],
-      ["🧓", "older person elderly"], ["👪", "family"], ["🤱", "baby feeding family"],
-      ["🧑‍🍳", "cook chef food"], ["🧑‍⚕️", "doctor health medical"], ["🧑‍🏫", "teacher school"],
-      ["🧑‍💻", "developer coding work"], ["🧑‍🎓", "student graduate school"], ["🧑‍🔧", "mechanic repair"],
-      ["🕺", "dance man"], ["💃", "dance woman"], ["🏊", "swim exercise"],
-      ["🚶", "walk"], ["🧗", "climb exercise"], ["⛷️", "ski snow sport"],
-      ["🏂", "snowboard sport"], ["🏄", "surf sport"], ["🤸", "cartwheel gymnastics"],
-      ["🛌", "sleep bed rest"], ["🧖", "sauna spa relax"], ["💇", "haircut salon"],
-
-      // Nature, weather & animals
-      ["🌞", "sun sunny weather"], ["🌝", "moon face"], ["🌙", "moon night crescent"],
-      ["⭐", "star"], ["🌟", "glowing star sparkle"], ["✨", "sparkles shine magic"],
-      ["☀️", "sun weather clear"], ["⛅", "partly cloudy weather"], ["☁️", "cloud weather"],
-      ["🌧️", "rain weather"], ["⛈️", "storm thunder weather"], ["🌨️", "snow weather"],
-      ["❄️", "snowflake cold winter"], ["🌈", "rainbow"], ["🔥", "fire hot flame"],
-      ["💧", "water drop"], ["🌊", "wave ocean sea"], ["🌪️", "tornado storm"],
-      ["🌱", "seedling plant grow"], ["🌿", "herb plant leaf"], ["🍀", "clover luck"],
-      ["🌳", "tree nature"], ["🌵", "cactus plant"], ["🌷", "tulip flower"],
-      ["🌸", "blossom flower spring"], ["🌻", "sunflower flower"], ["🍁", "maple leaf autumn"],
+      // Smileys & Emotion
+      ["😀", "grinning face smile happy"], ["😃", "smile happy joy open mouth"], ["😄", "smile happy laugh eyes"],
+      ["😁", "grin happy beaming"], ["😆", "laugh happy squint satisfied"], ["😅", "sweat smile relief nervous"],
+      ["🤣", "rofl laugh funny rolling floor"], ["😂", "joy laugh tears funny"], ["🙂", "smile slight"],
+      ["🙃", "upside down silly irony"], ["🫠", "melting hot sarcasm"], ["😉", "wink flirt"],
+      ["😊", "blush smile happy warm"], ["😇", "angel innocent halo"], ["🥰", "love hearts smile adore"],
+      ["😍", "heart eyes love crush"], ["🤩", "star struck excited amazed"], ["😘", "kiss love blow"],
+      ["😗", "kissing"], ["😚", "kissing closed eyes"], ["😙", "kissing smile"],
+      ["🥲", "smiling tear happy sad"], ["😋", "yum tasty tongue delicious"], ["😛", "tongue playful"],
+      ["😜", "wink tongue silly joke"], ["🤪", "zany crazy silly wild"], ["😝", "squint tongue"],
+      ["🤑", "money mouth rich dollar"], ["🤗", "hug hands open"], ["🤭", "giggle oops hand over mouth"],
+      ["🫢", "gasp shock hand over mouth"], ["🫣", "peeking eye shy"], ["🤫", "shh quiet secret"],
+      ["🤔", "thinking hmm consider"], ["🫡", "salute respect yes"], ["🤐", "zipper mouth silence"],
+      ["🤨", "raised eyebrow skeptical"], ["😐", "neutral blank"], ["😑", "expressionless"],
+      ["😶", "no mouth speechless"], ["🫥", "dotted line invisible hidden"], ["😏", "smirk sly"],
+      ["😒", "unamused annoyed"], ["🙄", "eye roll"], ["😬", "grimace awkward"],
+      ["🤥", "lying pinocchio"], ["😌", "relieved calm content"], ["😔", "pensive sad down"],
+      ["😪", "sleepy tired"], ["🤤", "drool"], ["😴", "sleep zzz tired"],
+      ["😷", "mask sick medical"], ["🤒", "sick thermometer fever"], ["🤕", "hurt bandage injured"],
+      ["🤢", "nauseated sick green"], ["🤮", "vomit sick"], ["🤧", "sneeze tissue"],
+      ["🥵", "hot sweat overheated"], ["🥶", "cold freezing"], ["🥴", "woozy dizzy drunk"],
+      ["😵", "dizzy knocked out"], ["🤯", "mind blown shocked exploding"], ["🤠", "cowboy hat"],
+      ["🥳", "party celebrate birthday"], ["🥸", "disguise glasses incognito"], ["😎", "cool sunglasses"],
+      ["🤓", "nerd glasses geek"], ["🧐", "monocle curious inspect"], ["😕", "confused"],
+      ["🫤", "diagonal mouth meh"], ["😟", "worried"], ["🙁", "frown sad slight"],
+      ["☹️", "frowning sad"], ["😮", "open mouth surprise"], ["😯", "hushed surprise"],
+      ["😲", "astonished shocked"], ["😳", "flushed embarrassed"], ["🥺", "pleading puppy eyes beg"],
+      ["🥹", "holding back tears emotional"], ["😦", "frowning open mouth"], ["😧", "anguished"],
+      ["😨", "fearful scared"], ["😰", "anxious sweat"], ["😥", "sad relief tear"],
+      ["😢", "cry sad tear"], ["😭", "sob cry loudly"], ["😱", "scream fear shocked"],
+      ["😖", "confounded frustrated"], ["😣", "persevere struggle"], ["😞", "disappointed sad"],
+      ["😓", "sweat downcast"], ["😩", "weary tired"], ["😫", "tired exhausted"],
+      ["🥱", "yawn bored tired"], ["😤", "triumph huff steam"], ["😡", "rage angry mad red"],
+      ["😠", "angry mad"], ["🤬", "cursing swearing symbols"], ["😈", "devil smile mischief"],
+      ["👿", "devil angry imp"], ["💀", "skull dead"], ["☠️", "skull crossbones danger poison"],
+      ["💩", "poop pile"], ["🤡", "clown"], ["👹", "ogre monster"],
+      ["👺", "goblin"], ["👻", "ghost halloween boo"], ["👽", "alien"],
+      ["👾", "alien monster game"], ["🤖", "robot"], ["😺", "cat smile"],
+      ["😸", "cat grin"], ["😹", "cat joy tears"], ["😻", "cat heart eyes love"],
+      ["😼", "cat smirk"], ["😽", "cat kiss"], ["🙀", "cat weary shocked"],
+      ["😿", "cat crying"], ["😾", "cat pouting"], ["🙈", "see no evil monkey"],
+      ["🙉", "hear no evil monkey"], ["🙊", "speak no evil monkey"], ["💋", "kiss mark lips"],
+      ["💌", "love letter"], ["💘", "heart arrow cupid"], ["💝", "heart ribbon gift"],
+      ["💖", "sparkling heart"], ["💗", "growing heart"], ["💓", "beating heart"],
+      ["💞", "revolving hearts"], ["💕", "two hearts"], ["❤️", "heart love red"],
+      ["🧡", "orange heart"], ["💛", "yellow heart"], ["💚", "green heart"],
+      ["💙", "blue heart"], ["💜", "purple heart"], ["🖤", "black heart"],
+      ["🤍", "white heart"], ["🤎", "brown heart"], ["💔", "broken heart"],
+      ["❤️‍🔥", "heart on fire passion"], ["❤️‍🩹", "mending heart healing"], ["💯", "hundred perfect score"],
+      ["💢", "anger symbol"], ["💥", "collision boom explosion"], ["💫", "dizzy star"],
+      ["💦", "sweat droplets water"], ["💨", "dash wind fast"], ["🕳️", "hole"],
+      ["💬", "speech bubble chat"], ["💭", "thought bubble"], ["🗯️", "angry speech bubble"],
+      ["💤", "zzz sleep"],
+      // People & Body
+      ["👋", "wave hello bye hand"], ["🤚", "raised back of hand"], ["🖐️", "hand fingers splayed"],
+      ["✋", "raised hand stop"], ["🖖", "vulcan salute spock"], ["🫱", "rightwards hand"],
+      ["🫲", "leftwards hand"], ["🫳", "palm down hand"], ["🫴", "palm up hand"],
+      ["👌", "ok okay perfect"], ["🤌", "pinched fingers italian"], ["🤏", "pinch small tiny"],
+      ["✌️", "peace victory"], ["🤞", "fingers crossed luck hope"], ["🫰", "finger heart love"],
+      ["🤟", "love you gesture"], ["🤘", "rock on horns"], ["🤙", "call me shaka"],
+      ["👈", "point left"], ["👉", "point right"], ["👆", "point up"],
+      ["🖕", "middle finger"], ["👇", "point down"], ["☝️", "index up"],
+      ["🫵", "point at viewer you"], ["👍", "thumbs up like good yes"], ["👎", "thumbs down dislike bad no"],
+      ["✊", "raised fist"], ["👊", "fist bump punch"], ["🤛", "left fist"],
+      ["🤜", "right fist"], ["👏", "clap applause bravo"], ["🙌", "raise hands celebrate praise"],
+      ["🫶", "heart hands love"], ["👐", "open hands"], ["🤲", "palms up together"],
+      ["🤝", "handshake deal agreement"], ["🙏", "pray thanks please namaste"], ["✍️", "writing hand"],
+      ["💅", "nail polish manicure"], ["🤳", "selfie"], ["💪", "muscle strong flex biceps"],
+      ["🦾", "mechanical arm prosthetic"], ["🦿", "mechanical leg prosthetic"], ["🦵", "leg"],
+      ["🦶", "foot"], ["👂", "ear listen"], ["🦻", "ear hearing aid"],
+      ["👃", "nose smell"], ["🧠", "brain think mind"], ["🫀", "anatomical heart organ"],
+      ["🫁", "lungs breathe"], ["🦷", "tooth dental"], ["🦴", "bone"],
+      ["👀", "eyes look watch"], ["👁️", "eye see"], ["👅", "tongue"],
+      ["👄", "mouth lips"], ["🫦", "biting lip"], ["👶", "baby infant"],
+      ["🧒", "child kid"], ["👦", "boy"], ["👧", "girl"],
+      ["🧑", "person adult"], ["👱", "person blond hair"], ["👨", "man"],
+      ["🧔", "person beard"], ["👩", "woman"], ["🧓", "older person elderly"],
+      ["👴", "old man"], ["👵", "old woman"], ["🙍", "person frowning"],
+      ["🙎", "person pouting"], ["🙅", "person gesturing no"], ["🙆", "person gesturing ok"],
+      ["💁", "person tipping hand info"], ["🙋", "person raising hand question"], ["🧏", "deaf person"],
+      ["🙇", "person bowing sorry"], ["🤦", "facepalm"], ["🤷", "shrug dunno"],
+      ["🧑‍⚕️", "health worker doctor nurse"], ["🧑‍🎓", "student graduate"], ["🧑‍🏫", "teacher professor"],
+      ["🧑‍⚖️", "judge justice"], ["🧑‍🌾", "farmer"], ["🧑‍🍳", "cook chef"],
+      ["🧑‍🔧", "mechanic repair"], ["🧑‍🏭", "factory worker"], ["🧑‍💼", "office worker business"],
+      ["🧑‍🔬", "scientist researcher"], ["🧑‍💻", "technologist developer coding"], ["🧑‍🎤", "singer artist"],
+      ["🧑‍🎨", "artist painter"], ["🧑‍✈️", "pilot"], ["🧑‍🚀", "astronaut space"],
+      ["🧑‍🚒", "firefighter"], ["👮", "police officer cop"], ["🕵️", "detective spy investigate"],
+      ["💂", "guard"], ["🥷", "ninja"], ["👷", "construction worker"],
+      ["🫅", "person with crown royalty"], ["🤴", "prince"], ["👸", "princess"],
+      ["👳", "person turban"], ["👲", "person skullcap"], ["🧕", "woman headscarf hijab"],
+      ["🤵", "person in tuxedo"], ["👰", "person with veil bride"], ["🤰", "pregnant woman"],
+      ["🫄", "pregnant person"], ["🫃", "pregnant man"], ["🤱", "breastfeeding"],
+      ["👼", "baby angel cherub"], ["🎅", "santa claus christmas"], ["🤶", "mrs claus"],
+      ["🦸", "superhero"], ["🦹", "supervillain"], ["🧙", "mage wizard"],
+      ["🧚", "fairy"], ["🧛", "vampire"], ["🧜", "merperson mermaid"],
+      ["🧝", "elf"], ["🧞", "genie"], ["🧟", "zombie"],
+      ["🧌", "troll"], ["💆", "person getting massage"], ["💇", "person getting haircut"],
+      ["🚶", "walk pedestrian"], ["🧍", "person standing"], ["🧎", "person kneeling"],
+      ["🏃", "run running"], ["💃", "dancer woman dancing"], ["🕺", "dancer man dancing"],
+      ["🕴️", "person in suit levitating"], ["👯", "people with bunny ears party"], ["🧖", "sauna spa steam"],
+      ["🧗", "climbing rock"], ["🤺", "fencing"], ["🏇", "horse racing jockey"],
+      ["⛷️", "skier ski"], ["🏂", "snowboarder"], ["🏌️", "golfer golf"],
+      ["🏄", "surfer surfing"], ["🚣", "rowing boat"], ["🏊", "swimmer swimming"],
+      ["⛹️", "basketball player bouncing ball"], ["🏋️", "weight lifter gym workout"], ["🚴", "cyclist bike"],
+      ["🚵", "mountain biker"], ["🤸", "cartwheel gymnastics"], ["🤼", "wrestling"],
+      ["🤽", "water polo"], ["🤾", "handball"], ["🤹", "juggling"],
+      ["🧘", "meditate yoga lotus calm"], ["🛀", "bath bathing"], ["🛌", "sleep in bed"],
+      ["👭", "women holding hands"], ["👫", "woman and man holding hands couple"], ["👬", "men holding hands"],
+      ["💏", "kiss couple"], ["💑", "couple with heart"], ["👪", "family"],
+      ["🗣️", "speaking head talk"], ["👤", "bust silhouette person user"], ["👥", "busts silhouette people group"],
+      ["🫂", "people hugging"], ["👣", "footprints"],
+      // Animals & Nature
       ["🐶", "dog puppy pet"], ["🐱", "cat kitten pet"], ["🐭", "mouse"],
-      ["🐰", "rabbit bunny"], ["🦊", "fox"], ["🐻", "bear"],
-      ["🐼", "panda"], ["🐦", "bird"], ["🦉", "owl night wise"],
-      ["🐝", "bee"], ["🦋", "butterfly"], ["🐢", "turtle slow"],
-      ["🐠", "fish tropical"], ["🐳", "whale ocean"], ["🦁", "lion"],
-
-      // Food & drink
-      ["🍎", "apple fruit"], ["🍌", "banana fruit"], ["🍓", "strawberry fruit"],
-      ["🍇", "grapes fruit"], ["🍊", "orange fruit citrus"], ["🍉", "watermelon fruit"],
-      ["🥑", "avocado food"], ["🥦", "broccoli vegetable"], ["🥕", "carrot vegetable"],
-      ["🍞", "bread food"], ["🧀", "cheese food"], ["🥚", "egg food"],
-      ["🥗", "salad healthy food"], ["🍜", "noodles ramen food"], ["🍣", "sushi food"],
-      ["🍚", "rice food"], ["🥩", "meat steak food"], ["🍲", "stew soup food"],
-      ["🥤", "drink cup soda"], ["🍷", "wine drink"], ["🧊", "ice cold"],
-      ["🍫", "chocolate sweet"], ["🍦", "ice cream sweet"], ["🥂", "cheers celebrate drink"],
-
-      // Objects, tools & symbols
-      ["🗓️", "calendar schedule planner"], ["📋", "clipboard list"], ["🗒️", "notepad list"],
-      ["📊", "bar chart data"], ["📄", "document page file"], ["📁", "folder files"],
-      ["🗂️", "folders organize"], ["🗄️", "file cabinet archive"], ["📎", "paperclip attach"],
-      ["✂️", "scissors cut"], ["📏", "ruler measure"], ["🖊️", "pen write"],
-      ["🖍️", "crayon draw"], ["🖌️", "paintbrush art"], ["🎨", "art palette paint"],
-      ["🔍", "search magnify find"], ["🔎", "search zoom"], ["🔔", "bell notification"],
-      ["🔕", "bell off mute"], ["📢", "announce megaphone"], ["💬", "speech bubble chat"],
-      ["📨", "email message inbox"], ["📮", "postbox mail"], ["☎️", "phone call"],
-      ["⌨️", "keyboard typing"], ["🖱️", "mouse click"], ["🖨️", "printer"],
-      ["💾", "save floppy disk"], ["🔋", "battery power"], ["🔌", "plug power"],
-      ["⚙️", "settings gear config"], ["🔧", "wrench tool fix"], ["🔨", "hammer tool build"],
-      ["🧰", "toolbox tools"], ["🧪", "test tube science experiment"], ["🔬", "microscope science"],
-      ["🧬", "dna science biology"], ["💊", "pill medicine health"], ["🩺", "stethoscope health"],
-      ["🛏️", "bed sleep rest"], ["🚿", "shower bathroom"], ["🧹", "broom clean chores"],
-      ["🧺", "laundry basket chores"], ["🛒", "shopping cart buy"], ["🎬", "movie film clapper"],
-      ["📺", "tv television"], ["🎤", "microphone sing"], ["🎸", "guitar music"],
-      ["🎹", "piano music"], ["🥁", "drum music"], ["♟️", "chess strategy game"],
-      ["🎲", "dice game random"], ["🧩", "puzzle piece"], ["🏅", "medal award"],
-      ["🥇", "gold medal first win"], ["🚀", "rocket launch fast"], ["⛵", "sailboat travel"],
-      ["🚆", "train travel"], ["🚌", "bus travel"], ["🛴", "scooter travel"],
-      ["⛺", "tent camping outdoors"], ["🏖️", "beach vacation"], ["⛰️", "mountain hike outdoors"],
-      ["🏫", "school building"], ["🏥", "hospital health"], ["🏦", "bank money"],
-      ["⚡", "lightning fast energy"], ["♻️", "recycle green"], ["🔗", "link chain url"],
-      ["📶", "signal wifi bars"], ["🧠", "brain think mind"], ["👁️", "eye watch see"],
-      ["🕯️", "candle calm"], ["🪞", "mirror reflect"], ["🧿", "protection charm"],
-      ["➕", "plus add"], ["➖", "minus remove"], ["⚠️", "warning caution"],
+      ["🐹", "hamster"], ["🐰", "rabbit bunny"], ["🦊", "fox"],
+      ["🐻", "bear"], ["🐼", "panda"], ["🐻‍❄️", "polar bear"],
+      ["🐨", "koala"], ["🐯", "tiger face"], ["🦁", "lion"],
+      ["🐮", "cow face"], ["🐷", "pig face"], ["🐽", "pig nose"],
+      ["🐸", "frog"], ["🐵", "monkey face"], ["🐒", "monkey"],
+      ["🦍", "gorilla"], ["🦧", "orangutan"], ["🐕", "dog"],
+      ["🦮", "guide dog"], ["🐩", "poodle"], ["🐺", "wolf"],
+      ["🦝", "raccoon"], ["🐈", "cat"], ["🐈‍⬛", "black cat"],
+      ["🐅", "tiger"], ["🐆", "leopard"], ["🐴", "horse face"],
+      ["🫎", "moose"], ["🫏", "donkey"], ["🐎", "horse racing"],
+      ["🦄", "unicorn"], ["🦓", "zebra"], ["🦌", "deer"],
+      ["🦬", "bison buffalo"], ["🐂", "ox"], ["🐃", "water buffalo"],
+      ["🐄", "cow"], ["🐖", "pig"], ["🐗", "boar"],
+      ["🐏", "ram"], ["🐑", "sheep ewe"], ["🐐", "goat"],
+      ["🐪", "camel"], ["🐫", "two hump camel"], ["🦙", "llama alpaca"],
+      ["🦒", "giraffe"], ["🐘", "elephant"], ["🦣", "mammoth"],
+      ["🦏", "rhinoceros"], ["🦛", "hippopotamus"], ["🐁", "mouse small"],
+      ["🐀", "rat"], ["🐿️", "chipmunk squirrel"], ["🦔", "hedgehog"],
+      ["🦇", "bat"], ["🐦", "bird"], ["🐤", "baby chick"],
+      ["🐣", "hatching chick"], ["🐥", "front facing chick"], ["🦆", "duck"],
+      ["🦢", "swan"], ["🦅", "eagle"], ["🦉", "owl night wise"],
+      ["🦤", "dodo"], ["🪶", "feather"], ["🦩", "flamingo"],
+      ["🦚", "peacock"], ["🦜", "parrot"], ["🪽", "wing"],
+      ["🪿", "goose"], ["🐧", "penguin"], ["🐊", "crocodile alligator"],
+      ["🐢", "turtle slow"], ["🦎", "lizard gecko"], ["🐍", "snake"],
+      ["🐲", "dragon face"], ["🐉", "dragon"], ["🦕", "sauropod dinosaur"],
+      ["🦖", "t-rex dinosaur"], ["🐳", "whale spouting"], ["🐋", "whale"],
+      ["🐬", "dolphin"], ["🦭", "seal"], ["🐟", "fish"],
+      ["🐠", "tropical fish"], ["🐡", "blowfish pufferfish"], ["🦈", "shark"],
+      ["🐙", "octopus"], ["🐚", "shell spiral"], ["🪸", "coral"],
+      ["🪼", "jellyfish"], ["🦀", "crab"], ["🦞", "lobster"],
+      ["🦐", "shrimp"], ["🦑", "squid"], ["🦪", "oyster"],
+      ["🐌", "snail"], ["🦋", "butterfly"], ["🐛", "bug caterpillar"],
+      ["🐜", "ant"], ["🐝", "bee honeybee"], ["🪲", "beetle"],
+      ["🐞", "ladybug"], ["🦗", "cricket"], ["🪳", "cockroach"],
+      ["🕷️", "spider"], ["🕸️", "spider web"], ["🦂", "scorpion"],
+      ["🦟", "mosquito"], ["🪰", "fly"], ["🪱", "worm"],
+      ["🦠", "microbe germ virus bacteria"], ["💐", "bouquet flowers"], ["🌸", "cherry blossom spring"],
+      ["💮", "white flower"], ["🪷", "lotus"], ["🏵️", "rosette"],
+      ["🌹", "rose"], ["🥀", "wilted flower"], ["🌺", "hibiscus"],
+      ["🌻", "sunflower"], ["🌼", "blossom daisy"], ["🌷", "tulip"],
+      ["🪻", "hyacinth"], ["🌱", "seedling plant sprout grow"], ["🪴", "potted plant"],
+      ["🌲", "evergreen tree"], ["🌳", "deciduous tree"], ["🌴", "palm tree"],
+      ["🌵", "cactus"], ["🌾", "sheaf of rice grain"], ["🌿", "herb leaf"],
+      ["☘️", "shamrock"], ["🍀", "four leaf clover luck"], ["🍁", "maple leaf autumn canada"],
+      ["🍂", "fallen leaves autumn"], ["🍃", "leaf fluttering wind"], ["🪹", "empty nest"],
+      ["🪺", "nest with eggs"], ["🍄", "mushroom"], ["🌍", "earth globe europe africa world"],
+      ["🌎", "earth globe americas world"], ["🌏", "earth globe asia australia world"], ["🌐", "globe meridians internet web"],
+      ["🌑", "new moon"], ["🌒", "waxing crescent moon"], ["🌓", "first quarter moon"],
+      ["🌔", "waxing gibbous moon"], ["🌕", "full moon"], ["🌖", "waning gibbous moon"],
+      ["🌗", "last quarter moon"], ["🌘", "waning crescent moon"], ["🌙", "crescent moon night"],
+      ["🌚", "new moon face"], ["🌛", "first quarter moon face"], ["🌜", "last quarter moon face"],
+      ["🌡️", "thermometer temperature"], ["☀️", "sun sunny clear weather"], ["🌝", "full moon face"],
+      ["🌞", "sun with face"], ["🪐", "ringed planet saturn"], ["⭐", "star"],
+      ["🌟", "glowing star sparkle"], ["🌠", "shooting star wish"], ["🌌", "milky way galaxy"],
+      ["☁️", "cloud weather"], ["⛅", "sun behind cloud partly cloudy"], ["⛈️", "thunder cloud rain storm"],
+      ["🌤️", "sun behind small cloud"], ["🌥️", "sun behind large cloud"], ["🌦️", "sun behind rain cloud"],
+      ["🌧️", "rain cloud"], ["🌨️", "snow cloud"], ["🌩️", "lightning cloud"],
+      ["🌪️", "tornado twister"], ["🌫️", "fog"], ["🌬️", "wind face blowing"],
+      ["🌀", "cyclone hurricane"], ["🌈", "rainbow"], ["🌂", "closed umbrella"],
+      ["☂️", "umbrella"], ["☔", "umbrella rain drops"], ["⛱️", "umbrella on ground beach"],
+      ["⚡", "high voltage lightning fast energy"], ["❄️", "snowflake cold winter"], ["☃️", "snowman with snow"],
+      ["⛄", "snowman"], ["☄️", "comet"], ["🔥", "fire flame hot lit"],
+      ["💧", "droplet water"], ["🌊", "wave ocean sea water"],
+      // Food & Drink
+      ["🍇", "grapes"], ["🍈", "melon"], ["🍉", "watermelon"],
+      ["🍊", "tangerine orange citrus"], ["🍋", "lemon"], ["🍌", "banana"],
+      ["🍍", "pineapple"], ["🥭", "mango"], ["🍎", "red apple"],
+      ["🍏", "green apple"], ["🍐", "pear"], ["🍑", "peach"],
+      ["🍒", "cherries"], ["🍓", "strawberry"], ["🫐", "blueberries"],
+      ["🥝", "kiwi"], ["🍅", "tomato"], ["🫒", "olive"],
+      ["🥥", "coconut"], ["🥑", "avocado"], ["🍆", "eggplant aubergine"],
+      ["🥔", "potato"], ["🥕", "carrot"], ["🌽", "corn"],
+      ["🌶️", "hot pepper chili spicy"], ["🫑", "bell pepper"], ["🥒", "cucumber"],
+      ["🥬", "leafy green lettuce"], ["🥦", "broccoli"], ["🧄", "garlic"],
+      ["🧅", "onion"], ["🥜", "peanuts"], ["🫘", "beans"],
+      ["🌰", "chestnut"], ["🫚", "ginger"], ["🫛", "pea pod"],
+      ["🍞", "bread"], ["🥐", "croissant"], ["🥖", "baguette"],
+      ["🫓", "flatbread"], ["🥨", "pretzel"], ["🥯", "bagel"],
+      ["🥞", "pancakes"], ["🧇", "waffle"], ["🧀", "cheese"],
+      ["🍖", "meat on bone"], ["🍗", "poultry leg chicken"], ["🥩", "cut of meat steak"],
+      ["🥓", "bacon"], ["🍔", "hamburger burger"], ["🍟", "french fries"],
+      ["🍕", "pizza"], ["🌭", "hot dog"], ["🥪", "sandwich"],
+      ["🌮", "taco"], ["🌯", "burrito"], ["🫔", "tamale"],
+      ["🥙", "stuffed flatbread"], ["🧆", "falafel"], ["🥚", "egg"],
+      ["🍳", "cooking fried egg"], ["🥘", "shallow pan of food paella"], ["🍲", "pot of food stew"],
+      ["🫕", "fondue"], ["🥣", "bowl with spoon cereal"], ["🥗", "green salad healthy"],
+      ["🍿", "popcorn"], ["🧈", "butter"], ["🧂", "salt"],
+      ["🥫", "canned food"], ["🍱", "bento box"], ["🍘", "rice cracker"],
+      ["🍙", "rice ball onigiri"], ["🍚", "cooked rice"], ["🍛", "curry rice"],
+      ["🍜", "steaming bowl ramen noodles"], ["🍝", "spaghetti pasta"], ["🍠", "roasted sweet potato"],
+      ["🍢", "oden"], ["🍣", "sushi"], ["🍤", "fried shrimp tempura"],
+      ["🍥", "fish cake"], ["🥮", "moon cake"], ["🍡", "dango"],
+      ["🥟", "dumpling"], ["🥠", "fortune cookie"], ["🥡", "takeout box"],
+      ["🍦", "soft ice cream"], ["🍧", "shaved ice"], ["🍨", "ice cream"],
+      ["🍩", "doughnut donut"], ["🍪", "cookie biscuit"], ["🎂", "birthday cake"],
+      ["🍰", "shortcake slice"], ["🧁", "cupcake"], ["🥧", "pie"],
+      ["🍫", "chocolate bar"], ["🍬", "candy sweet"], ["🍭", "lollipop"],
+      ["🍮", "custard pudding"], ["🍯", "honey pot"], ["🍼", "baby bottle milk"],
+      ["🥛", "glass of milk"], ["☕", "coffee hot beverage"], ["🫖", "teapot"],
+      ["🍵", "tea green"], ["🍶", "sake"], ["🍾", "bottle popping champagne celebrate"],
+      ["🍷", "wine glass"], ["🍸", "cocktail martini"], ["🍹", "tropical drink"],
+      ["🍺", "beer mug"], ["🍻", "clinking beer mugs cheers"], ["🥂", "clinking glasses cheers toast"],
+      ["🥃", "tumbler whiskey"], ["🫗", "pouring liquid"], ["🥤", "cup with straw soda"],
+      ["🧋", "bubble tea boba"], ["🧃", "beverage box juice"], ["🧉", "mate"],
+      ["🧊", "ice cube cold"], ["🥢", "chopsticks"], ["🍽️", "fork knife plate dining"],
+      ["🍴", "fork and knife"], ["🥄", "spoon"],
+      // Activity
+      ["🎃", "jack o lantern pumpkin halloween"], ["🎄", "christmas tree"], ["🎆", "fireworks"],
+      ["🎇", "sparkler"], ["🧨", "firecracker"], ["✨", "sparkles shine magic"],
+      ["🎈", "balloon party"], ["🎉", "party popper celebrate confetti"], ["🎊", "confetti ball"],
+      ["🎋", "tanabata tree"], ["🎍", "pine decoration"], ["🎎", "japanese dolls"],
+      ["🎏", "carp streamer"], ["🎐", "wind chime"], ["🎑", "moon viewing ceremony"],
+      ["🧧", "red envelope"], ["🎀", "ribbon bow"], ["🎁", "gift present wrapped"],
+      ["🎗️", "reminder ribbon"], ["🎟️", "admission ticket"], ["🎫", "ticket"],
+      ["🎖️", "military medal"], ["🏆", "trophy win champion"], ["🏅", "sports medal award"],
+      ["🥇", "1st place gold medal first"], ["🥈", "2nd place silver medal second"], ["🥉", "3rd place bronze medal third"],
+      ["⚽", "soccer ball football"], ["⚾", "baseball"], ["🥎", "softball"],
+      ["🏀", "basketball"], ["🏐", "volleyball"], ["🏈", "american football"],
+      ["🏉", "rugby"], ["🎾", "tennis"], ["🥏", "flying disc frisbee"],
+      ["🎳", "bowling"], ["🏏", "cricket game"], ["🏑", "field hockey"],
+      ["🏒", "ice hockey"], ["🥍", "lacrosse"], ["🏓", "ping pong table tennis"],
+      ["🏸", "badminton"], ["🥊", "boxing glove"], ["🥋", "martial arts uniform karate"],
+      ["🥅", "goal net"], ["⛳", "flag in hole golf"], ["⛸️", "ice skate"],
+      ["🎣", "fishing pole"], ["🤿", "diving mask"], ["🎽", "running shirt"],
+      ["🎿", "skis"], ["🛷", "sled"], ["🥌", "curling stone"],
+      ["🎯", "direct hit bullseye target goal"], ["🪀", "yo-yo"], ["🪁", "kite"],
+      ["🎱", "pool 8 ball billiards"], ["🔮", "crystal ball fortune"], ["🪄", "magic wand"],
+      ["🎮", "video game controller"], ["🕹️", "joystick"], ["🎰", "slot machine"],
+      ["🎲", "game die dice random"], ["🧩", "puzzle piece jigsaw"], ["🧸", "teddy bear"],
+      ["🪅", "pinata"], ["🪩", "mirror ball disco"], ["🪆", "nesting dolls"],
+      ["♠️", "spade suit"], ["♥️", "heart suit"], ["♦️", "diamond suit"],
+      ["♣️", "club suit"], ["♟️", "chess pawn strategy"], ["🃏", "joker card"],
+      ["🀄", "mahjong"], ["🎴", "flower playing cards"], ["🎭", "performing arts theatre masks"],
+      ["🖼️", "framed picture art"], ["🎨", "artist palette paint art"], ["🧵", "thread spool sewing"],
+      ["🪡", "sewing needle"], ["🧶", "yarn knitting"], ["🪢", "knot"],
+      // Travel & Places
+      ["🗺️", "world map travel"], ["🧭", "compass direction navigate"], ["🏔️", "snow capped mountain"],
+      ["⛰️", "mountain"], ["🌋", "volcano"], ["🗻", "mount fuji"],
+      ["🏕️", "camping tent"], ["🏖️", "beach umbrella vacation"], ["🏜️", "desert"],
+      ["🏝️", "desert island tropical"], ["🏞️", "national park nature"], ["🏟️", "stadium"],
+      ["🏛️", "classical building museum"], ["🏗️", "building construction"], ["🧱", "brick"],
+      ["🪨", "rock"], ["🪵", "wood log"], ["🛖", "hut"],
+      ["🏘️", "houses"], ["🏚️", "derelict house"], ["🏠", "house home"],
+      ["🏡", "house with garden"], ["🏢", "office building work"], ["🏣", "japanese post office"],
+      ["🏤", "post office"], ["🏥", "hospital"], ["🏦", "bank"],
+      ["🏨", "hotel"], ["🏩", "love hotel"], ["🏪", "convenience store"],
+      ["🏫", "school"], ["🏬", "department store"], ["🏭", "factory"],
+      ["🏯", "japanese castle"], ["🏰", "castle"], ["💒", "wedding chapel"],
+      ["🗼", "tokyo tower"], ["🗽", "statue of liberty"], ["⛪", "church"],
+      ["🕌", "mosque"], ["🛕", "hindu temple"], ["🕍", "synagogue"],
+      ["⛩️", "shinto shrine"], ["🕋", "kaaba"], ["⛲", "fountain"],
+      ["⛺", "tent camping"], ["🌁", "foggy"], ["🌃", "night with stars"],
+      ["🏙️", "cityscape city skyline"], ["🌄", "sunrise over mountains"], ["🌅", "sunrise"],
+      ["🌆", "cityscape at dusk"], ["🌇", "sunset"], ["🌉", "bridge at night"],
+      ["♨️", "hot springs onsen"], ["🎠", "carousel horse"], ["🛝", "playground slide"],
+      ["🎡", "ferris wheel"], ["🎢", "roller coaster"], ["💈", "barber pole"],
+      ["🎪", "circus tent"], ["🚂", "locomotive train"], ["🚃", "railway car"],
+      ["🚄", "high speed train bullet"], ["🚅", "bullet train"], ["🚆", "train"],
+      ["🚇", "metro subway"], ["🚈", "light rail"], ["🚉", "station"],
+      ["🚊", "tram"], ["🚝", "monorail"], ["🚞", "mountain railway"],
+      ["🚋", "tram car"], ["🚌", "bus"], ["🚍", "oncoming bus"],
+      ["🚎", "trolleybus"], ["🚐", "minibus van"], ["🚑", "ambulance"],
+      ["🚒", "fire engine"], ["🚓", "police car"], ["🚔", "oncoming police car"],
+      ["🚕", "taxi"], ["🚖", "oncoming taxi"], ["🚗", "car automobile drive"],
+      ["🚘", "oncoming automobile"], ["🚙", "sport utility vehicle suv"], ["🛻", "pickup truck"],
+      ["🚚", "delivery truck"], ["🚛", "articulated lorry semi"], ["🚜", "tractor"],
+      ["🏎️", "racing car"], ["🏍️", "motorcycle"], ["🛵", "motor scooter"],
+      ["🦽", "manual wheelchair"], ["🦼", "motorized wheelchair"], ["🛺", "auto rickshaw tuk tuk"],
+      ["🚲", "bicycle bike"], ["🛴", "kick scooter"], ["🛹", "skateboard"],
+      ["🛼", "roller skate"], ["🚏", "bus stop"], ["🛣️", "motorway highway"],
+      ["🛤️", "railway track"], ["🛢️", "oil drum"], ["⛽", "fuel pump gas station"],
+      ["🛞", "wheel tire"], ["🚨", "police car light siren alert"], ["🚥", "horizontal traffic light"],
+      ["🚦", "vertical traffic light"], ["🛑", "stop sign"], ["🚧", "construction barrier"],
+      ["⚓", "anchor"], ["🛟", "ring buoy life"], ["⛵", "sailboat"],
+      ["🛶", "canoe"], ["🚤", "speedboat"], ["🛳️", "passenger ship"],
+      ["⛴️", "ferry"], ["🛥️", "motor boat"], ["🚢", "ship"],
+      ["✈️", "airplane travel flight"], ["🛩️", "small airplane"], ["🛫", "airplane departure takeoff"],
+      ["🛬", "airplane arrival landing"], ["🪂", "parachute"], ["💺", "seat"],
+      ["🚁", "helicopter"], ["🚟", "suspension railway"], ["🚠", "mountain cableway"],
+      ["🚡", "aerial tramway"], ["🛰️", "satellite"], ["🚀", "rocket launch fast"],
+      ["🛸", "flying saucer ufo"], ["🛎️", "bellhop bell"], ["🧳", "luggage suitcase"],
+      ["⌛", "hourglass done"], ["⏳", "hourglass not done time"], ["⌚", "watch"],
+      ["⏰", "alarm clock time"], ["⏱️", "stopwatch"], ["⏲️", "timer clock"],
+      ["🕰️", "mantelpiece clock"],
+      // Objects
+      ["👓", "glasses"], ["🕶️", "sunglasses"], ["🥽", "goggles"],
+      ["🥼", "lab coat"], ["🦺", "safety vest"], ["👔", "necktie"],
+      ["👕", "t-shirt"], ["👖", "jeans"], ["🧣", "scarf"],
+      ["🧤", "gloves"], ["🧥", "coat"], ["🧦", "socks"],
+      ["👗", "dress"], ["👘", "kimono"], ["🥻", "sari"],
+      ["🩱", "one piece swimsuit"], ["🩲", "briefs"], ["🩳", "shorts"],
+      ["👙", "bikini"], ["👚", "woman clothes"], ["🪭", "folding hand fan"],
+      ["👛", "purse"], ["👜", "handbag"], ["👝", "clutch bag"],
+      ["🛍️", "shopping bags"], ["🎒", "backpack school"], ["🩴", "thong sandal flip flop"],
+      ["👞", "man shoe"], ["👟", "running shoe sneaker"], ["🥾", "hiking boot"],
+      ["🥿", "flat shoe"], ["👠", "high heel"], ["👡", "woman sandal"],
+      ["🩰", "ballet shoes"], ["👢", "woman boot"], ["🪮", "hair pick comb"],
+      ["👑", "crown king queen royal"], ["👒", "woman hat"], ["🎩", "top hat"],
+      ["🎓", "graduation cap education"], ["🧢", "billed cap"], ["🪖", "military helmet"],
+      ["⛑️", "rescue worker helmet"], ["📿", "prayer beads"], ["💄", "lipstick makeup"],
+      ["💍", "ring engagement"], ["💎", "gem stone diamond"], ["🔇", "muted speaker"],
+      ["🔈", "speaker low volume"], ["🔉", "speaker medium volume"], ["🔊", "speaker high volume loud"],
+      ["📢", "loudspeaker announce"], ["📣", "megaphone cheer"], ["📯", "postal horn"],
+      ["🔔", "bell notification"], ["🔕", "bell with slash mute"], ["🎼", "musical score"],
+      ["🎵", "musical note music"], ["🎶", "musical notes music"], ["🎙️", "studio microphone podcast"],
+      ["🎚️", "level slider"], ["🎛️", "control knobs"], ["🎤", "microphone sing karaoke"],
+      ["🎧", "headphone music listen"], ["📻", "radio"], ["🎷", "saxophone"],
+      ["🪗", "accordion"], ["🎸", "guitar"], ["🎹", "musical keyboard piano"],
+      ["🎺", "trumpet"], ["🎻", "violin"], ["🪕", "banjo"],
+      ["🥁", "drum"], ["🪘", "long drum"], ["🪇", "maracas"],
+      ["🪈", "flute"], ["📱", "mobile phone smartphone"], ["📲", "mobile phone with arrow"],
+      ["☎️", "telephone"], ["📞", "telephone receiver call"], ["📟", "pager"],
+      ["📠", "fax machine"], ["🔋", "battery power"], ["🪫", "low battery"],
+      ["🔌", "electric plug power"], ["💻", "laptop computer work"], ["🖥️", "desktop computer"],
+      ["🖨️", "printer"], ["⌨️", "keyboard typing"], ["🖱️", "computer mouse click"],
+      ["🖲️", "trackball"], ["💽", "computer disk minidisc"], ["💾", "floppy disk save"],
+      ["💿", "optical disk cd"], ["📀", "dvd"], ["🧮", "abacus"],
+      ["🎥", "movie camera film"], ["🎞️", "film frames"], ["📽️", "film projector"],
+      ["🎬", "clapper board movie action"], ["📺", "television tv"], ["📷", "camera photo"],
+      ["📸", "camera with flash"], ["📹", "video camera"], ["📼", "videocassette vhs"],
+      ["🔍", "magnifying glass search find left"], ["🔎", "magnifying glass search right"], ["🕯️", "candle"],
+      ["💡", "light bulb idea"], ["🔦", "flashlight torch"], ["🏮", "red paper lantern"],
+      ["🪔", "diya lamp"], ["📔", "notebook decorative cover"], ["📕", "closed book"],
+      ["📖", "open book reading"], ["📗", "green book"], ["📘", "blue book"],
+      ["📙", "orange book"], ["📚", "books reading study library"], ["📓", "notebook"],
+      ["📒", "ledger"], ["📃", "page with curl"], ["📜", "scroll"],
+      ["📄", "page document file"], ["📰", "newspaper news"], ["🗞️", "rolled up newspaper"],
+      ["📑", "bookmark tabs"], ["🔖", "bookmark"], ["🏷️", "label tag"],
+      ["💰", "money bag"], ["🪙", "coin"], ["💴", "yen banknote"],
+      ["💵", "dollar banknote money cash"], ["💶", "euro banknote"], ["💷", "pound banknote"],
+      ["💸", "money with wings spend"], ["💳", "credit card payment"], ["🧾", "receipt"],
+      ["💹", "chart increasing yen"], ["✉️", "envelope email mail"], ["📧", "e-mail"],
+      ["📨", "incoming envelope"], ["📩", "envelope with arrow"], ["📤", "outbox tray send"],
+      ["📥", "inbox tray receive"], ["📦", "package box parcel shipping"], ["📫", "closed mailbox raised flag"],
+      ["📪", "closed mailbox lowered flag"], ["📬", "open mailbox raised flag"], ["📭", "open mailbox lowered flag"],
+      ["📮", "postbox"], ["🗳️", "ballot box vote"], ["✏️", "pencil write"],
+      ["✒️", "black nib pen"], ["🖋️", "fountain pen"], ["🖊️", "pen"],
+      ["🖌️", "paintbrush"], ["🖍️", "crayon"], ["📝", "memo note write"],
+      ["💼", "briefcase business work"], ["📁", "file folder"], ["📂", "open file folder"],
+      ["🗂️", "card index dividers organize"], ["📅", "calendar date"], ["📆", "tear off calendar"],
+      ["🗒️", "spiral notepad list"], ["🗓️", "spiral calendar schedule planner"], ["📇", "card index"],
+      ["📈", "chart increasing growth up"], ["📉", "chart decreasing down"], ["📊", "bar chart data stats"],
+      ["📋", "clipboard list"], ["📌", "pushpin pin"], ["📍", "round pushpin location"],
+      ["📎", "paperclip attach"], ["🖇️", "linked paperclips"], ["📏", "straight ruler measure"],
+      ["📐", "triangular ruler"], ["✂️", "scissors cut"], ["🗃️", "card file box"],
+      ["🗄️", "file cabinet archive"], ["🗑️", "wastebasket trash delete bin"], ["🔒", "locked secure"],
+      ["🔓", "unlocked"], ["🔏", "locked with pen"], ["🔐", "locked with key"],
+      ["🔑", "key unlock"], ["🗝️", "old key"], ["🔨", "hammer tool build"],
+      ["🪓", "axe"], ["⛏️", "pick"], ["⚒️", "hammer and pick"],
+      ["🛠️", "hammer and wrench tools"], ["🗡️", "dagger"], ["⚔️", "crossed swords battle"],
+      ["💣", "bomb"], ["🪃", "boomerang"], ["🏹", "bow and arrow archery"],
+      ["🛡️", "shield protect"], ["🪚", "carpentry saw"], ["🔧", "wrench tool fix"],
+      ["🪛", "screwdriver"], ["🔩", "nut and bolt"], ["⚙️", "gear settings config"],
+      ["🗜️", "clamp"], ["⚖️", "balance scale justice"], ["🦯", "white cane"],
+      ["🔗", "link chain url"], ["⛓️", "chains"], ["🪝", "hook"],
+      ["🧰", "toolbox tools"], ["🧲", "magnet"], ["🪜", "ladder"],
+      ["⚗️", "alembic chemistry"], ["🧪", "test tube science experiment"], ["🧫", "petri dish"],
+      ["🧬", "dna science biology genetics"], ["🔬", "microscope science"], ["🔭", "telescope astronomy"],
+      ["📡", "satellite antenna signal"], ["💉", "syringe injection vaccine"], ["🩸", "drop of blood"],
+      ["💊", "pill medicine health"], ["🩹", "adhesive bandage plaster"], ["🩼", "crutch"],
+      ["🩺", "stethoscope health doctor"], ["🩻", "x-ray"], ["🚪", "door"],
+      ["🛗", "elevator"], ["🪞", "mirror reflect"], ["🪟", "window"],
+      ["🛏️", "bed sleep"], ["🛋️", "couch and lamp sofa"], ["🪑", "chair seat"],
+      ["🚽", "toilet"], ["🪠", "plunger"], ["🚿", "shower"],
+      ["🛁", "bathtub"], ["🪤", "mouse trap"], ["🪒", "razor"],
+      ["🧴", "lotion bottle"], ["🧷", "safety pin"], ["🧹", "broom clean sweep chores"],
+      ["🧺", "basket laundry"], ["🧻", "roll of paper toilet"], ["🪣", "bucket"],
+      ["🧼", "soap wash"], ["🫧", "bubbles"], ["🪥", "toothbrush"],
+      ["🧽", "sponge"], ["🧯", "fire extinguisher"], ["🛒", "shopping cart buy"],
+      ["🚬", "cigarette"], ["⚰️", "coffin"], ["🪦", "headstone grave"],
+      ["⚱️", "funeral urn"], ["🗿", "moai statue"], ["🪧", "placard sign protest"],
+      ["🪪", "identification card id"],
+      // Symbols
+      ["🏧", "atm sign"], ["🚮", "litter bin sign"], ["🚰", "potable water"],
+      ["♿", "wheelchair accessible"], ["🚹", "mens room"], ["🚺", "womens room"],
+      ["🚻", "restroom"], ["🚼", "baby symbol"], ["🚾", "water closet wc"],
+      ["🛂", "passport control"], ["🛃", "customs"], ["🛄", "baggage claim"],
+      ["🛅", "left luggage"], ["⚠️", "warning caution alert"], ["🚸", "children crossing"],
+      ["⛔", "no entry"], ["🚫", "prohibited forbidden no"], ["🚳", "no bicycles"],
+      ["🚭", "no smoking"], ["🚯", "no littering"], ["🚱", "non potable water"],
+      ["🚷", "no pedestrians"], ["📵", "no mobile phones"], ["🔞", "no one under eighteen"],
+      ["☢️", "radioactive"], ["☣️", "biohazard"], ["⬆️", "up arrow"],
+      ["↗️", "up right arrow"], ["➡️", "right arrow"], ["↘️", "down right arrow"],
+      ["⬇️", "down arrow"], ["↙️", "down left arrow"], ["⬅️", "left arrow"],
+      ["↖️", "up left arrow"], ["↕️", "up down arrow"], ["↔️", "left right arrow"],
+      ["↩️", "right arrow curving left reply"], ["↪️", "left arrow curving right forward"], ["⤴️", "right arrow curving up"],
+      ["⤵️", "right arrow curving down"], ["🔃", "clockwise vertical arrows reload"], ["🔄", "counterclockwise arrows refresh sync repeat"],
+      ["🔙", "back arrow"], ["🔚", "end arrow"], ["🔛", "on arrow"],
+      ["🔜", "soon arrow"], ["🔝", "top arrow up"], ["🛐", "place of worship"],
+      ["⚛️", "atom symbol atomic science physics"], ["🕉️", "om hindu"], ["✡️", "star of david"],
+      ["☸️", "wheel of dharma"], ["☯️", "yin yang balance"], ["✝️", "latin cross"],
+      ["☦️", "orthodox cross"], ["☪️", "star and crescent"], ["☮️", "peace symbol"],
+      ["🕎", "menorah"], ["🔯", "six pointed star"], ["🪯", "khanda sikh"],
+      ["♈", "aries zodiac"], ["♉", "taurus zodiac"], ["♊", "gemini zodiac"],
+      ["♋", "cancer zodiac"], ["♌", "leo zodiac"], ["♍", "virgo zodiac"],
+      ["♎", "libra zodiac"], ["♏", "scorpio zodiac"], ["♐", "sagittarius zodiac"],
+      ["♑", "capricorn zodiac"], ["♒", "aquarius zodiac"], ["♓", "pisces zodiac"],
+      ["⛎", "ophiuchus zodiac"], ["🔀", "shuffle tracks random"], ["🔁", "repeat loop"],
+      ["🔂", "repeat single track"], ["▶️", "play button"], ["⏩", "fast forward"],
+      ["⏭️", "next track skip"], ["⏯️", "play or pause"], ["◀️", "reverse play back"],
+      ["⏪", "fast reverse rewind"], ["⏮️", "last track previous"], ["🔼", "upwards button"],
+      ["⏫", "fast up double"], ["🔽", "downwards button"], ["⏬", "fast down double"],
+      ["⏸️", "pause button"], ["⏹️", "stop button"], ["⏺️", "record button"],
+      ["⏏️", "eject button"], ["🎦", "cinema"], ["🔅", "dim button brightness low"],
+      ["🔆", "bright button brightness high"], ["📶", "antenna bars signal wifi"], ["📳", "vibration mode"],
+      ["📴", "mobile phone off"], ["♀️", "female sign woman"], ["♂️", "male sign man"],
+      ["⚧️", "transgender symbol"], ["✖️", "multiply times"], ["➕", "plus add"],
+      ["➖", "minus subtract remove"], ["➗", "divide"], ["🟰", "heavy equals"],
+      ["♾️", "infinity forever"], ["‼️", "double exclamation"], ["⁉️", "exclamation question"],
+      ["❓", "question mark"], ["❔", "white question mark"], ["❕", "white exclamation"],
+      ["❗", "exclamation mark important"], ["〰️", "wavy dash"], ["💱", "currency exchange"],
+      ["💲", "heavy dollar sign"], ["⚕️", "medical symbol"], ["♻️", "recycle green environment"],
+      ["⚜️", "fleur de lis"], ["🔱", "trident"], ["📛", "name badge"],
+      ["🔰", "japanese symbol for beginner"], ["⭕", "hollow red circle"], ["✅", "check mark button done complete yes"],
+      ["☑️", "check box with check done"], ["✔️", "check mark tick"], ["❌", "cross mark no wrong cancel"],
+      ["❎", "cross mark button"], ["➰", "curly loop"], ["➿", "double curly loop"],
+      ["〽️", "part alternation mark"], ["✳️", "eight spoked asterisk"], ["✴️", "eight pointed star"],
+      ["❇️", "sparkle"], ["™️", "trade mark"], ["©️", "copyright"],
+      ["®️", "registered"], ["#️⃣", "keycap hash number"], ["*️⃣", "keycap asterisk"],
+      ["0️⃣", "keycap zero"], ["1️⃣", "keycap one"], ["2️⃣", "keycap two"],
+      ["3️⃣", "keycap three"], ["4️⃣", "keycap four"], ["5️⃣", "keycap five"],
+      ["6️⃣", "keycap six"], ["7️⃣", "keycap seven"], ["8️⃣", "keycap eight"],
+      ["9️⃣", "keycap nine"], ["🔟", "keycap ten"], ["🔠", "input latin uppercase abcd"],
+      ["🔡", "input latin lowercase abcd"], ["🔢", "input numbers 1234"], ["🔣", "input symbols"],
+      ["🔤", "input latin letters abc"], ["🅰️", "a button blood type"], ["🆎", "ab button blood type"],
+      ["🅱️", "b button blood type"], ["🆑", "cl button"], ["🆒", "cool button"],
+      ["🆓", "free button"], ["ℹ️", "information info"], ["🆔", "id button"],
+      ["Ⓜ️", "circled m"], ["🆕", "new button"], ["🆖", "ng button"],
+      ["🅾️", "o button blood type"], ["🆗", "ok button"], ["🅿️", "p button parking"],
+      ["🆘", "sos button help emergency"], ["🆙", "up button"], ["🆚", "vs button versus"],
       ["🔴", "red circle dot"], ["🟠", "orange circle dot"], ["🟡", "yellow circle dot"],
       ["🟢", "green circle dot"], ["🔵", "blue circle dot"], ["🟣", "purple circle dot"],
-      ["⚫", "black circle dot"], ["⚪", "white circle dot"], ["🟤", "brown circle dot"],
-      ["🔺", "red triangle up"], ["🔻", "red triangle down"], ["🔶", "orange diamond"],
-      ["💯", "hundred perfect score"], ["🆕", "new"], ["🆗", "ok"],
-      ["🔝", "top up"], ["🔄", "refresh sync repeat"], ["♾️", "infinity forever"]
+      ["🟤", "brown circle dot"], ["⚫", "black circle dot"], ["⚪", "white circle dot"],
+      ["🟥", "red square"], ["🟧", "orange square"], ["🟨", "yellow square"],
+      ["🟩", "green square"], ["🟦", "blue square"], ["🟪", "purple square"],
+      ["🟫", "brown square"], ["⬛", "black large square"], ["⬜", "white large square"],
+      ["◼️", "black medium square"], ["◻️", "white medium square"], ["▪️", "black small square"],
+      ["▫️", "white small square"], ["🔶", "large orange diamond"], ["🔷", "large blue diamond"],
+      ["🔸", "small orange diamond"], ["🔹", "small blue diamond"], ["🔺", "red triangle up"],
+      ["🔻", "red triangle down"], ["💠", "diamond with a dot"], ["🔘", "radio button"],
+      ["🔳", "white square button"], ["🔲", "black square button"],
+      // Flags
+      ["🏁", "chequered flag finish race"], ["🚩", "triangular flag"], ["🎌", "crossed flags japan"],
+      ["🏴", "black flag"], ["🏳️", "white flag surrender"], ["🏳️‍🌈", "rainbow flag pride lgbt"],
+      ["🏳️‍⚧️", "transgender flag"], ["🏴‍☠️", "pirate flag jolly roger"], ["🇦🇷", "flag argentina"],
+      ["🇦🇺", "flag australia"], ["🇦🇹", "flag austria"], ["🇧🇩", "flag bangladesh"],
+      ["🇧🇪", "flag belgium"], ["🇧🇷", "flag brazil"], ["🇧🇬", "flag bulgaria"],
+      ["🇨🇦", "flag canada"], ["🇨🇱", "flag chile"], ["🇨🇳", "flag china"],
+      ["🇨🇴", "flag colombia"], ["🇭🇷", "flag croatia"], ["🇨🇿", "flag czechia czech republic"],
+      ["🇩🇰", "flag denmark"], ["🇪🇬", "flag egypt"], ["🇪🇪", "flag estonia"],
+      ["🇫🇮", "flag finland"], ["🇫🇷", "flag france"], ["🇩🇪", "flag germany"],
+      ["🇬🇷", "flag greece"], ["🇭🇰", "flag hong kong"], ["🇭🇺", "flag hungary"],
+      ["🇮🇸", "flag iceland"], ["🇮🇳", "flag india"], ["🇮🇩", "flag indonesia"],
+      ["🇮🇪", "flag ireland"], ["🇮🇱", "flag israel"], ["🇮🇹", "flag italy"],
+      ["🇯🇵", "flag japan"], ["🇰🇪", "flag kenya"], ["🇰🇷", "flag south korea"],
+      ["🇱🇻", "flag latvia"], ["🇱🇹", "flag lithuania"], ["🇱🇺", "flag luxembourg"],
+      ["🇲🇾", "flag malaysia"], ["🇲🇽", "flag mexico"], ["🇲🇦", "flag morocco"],
+      ["🇳🇱", "flag netherlands holland"], ["🇳🇿", "flag new zealand"], ["🇳🇬", "flag nigeria"],
+      ["🇳🇴", "flag norway"], ["🇵🇰", "flag pakistan"], ["🇵🇪", "flag peru"],
+      ["🇵🇭", "flag philippines"], ["🇵🇱", "flag poland"], ["🇵🇹", "flag portugal"],
+      ["🇶🇦", "flag qatar"], ["🇷🇴", "flag romania"], ["🇷🇺", "flag russia"],
+      ["🇸🇦", "flag saudi arabia"], ["🇷🇸", "flag serbia"], ["🇸🇬", "flag singapore"],
+      ["🇸🇰", "flag slovakia"], ["🇸🇮", "flag slovenia"], ["🇿🇦", "flag south africa"],
+      ["🇪🇸", "flag spain"], ["🇸🇪", "flag sweden"], ["🇨🇭", "flag switzerland"],
+      ["🇹🇼", "flag taiwan"], ["🇹🇭", "flag thailand"], ["🇹🇷", "flag turkey turkiye"],
+      ["🇺🇦", "flag ukraine"], ["🇦🇪", "flag united arab emirates uae"], ["🇬🇧", "flag united kingdom uk britain"],
+      ["🇺🇸", "flag united states usa america"], ["🇻🇳", "flag vietnam"], ["🇪🇺", "flag european union eu"]
     ];
 
     function persistWidgetIcons() { storageSet(WIDGET_ICON_STORAGE_KEY, JSON.stringify(WIDGET_ICONS)); }
@@ -7945,10 +8353,9 @@
     listContainer.addEventListener("touchcancel", finishTouch);
   }
 
-  // Mirrors the tree engine's table — see its copy for why "Default" exists.
-  const STATUS_PRESETS = ["Default", "To-do", "In progress", "Complete"];
+  // Mirrors the tree engine's table.
+  const STATUS_PRESETS = ["To-do", "In progress", "Complete"];
   const STATUS_COLORS = {
-    "Default": { bg: "#e7ecff", text: "#2952cc", dot: "#cdd8fb" },
     "To-do": { bg: "#e3e3e3", text: "#555555", dot: "#8a8a8a" },
     "In progress": { bg: "#faecd8", text: "#9a6708", dot: "#d9a441" },
     "Complete": { bg: "#dcf1e4", text: "#1a7f4e", dot: "#4caf6d" }
@@ -9824,14 +10231,20 @@
 
   function renderTasks() {
     taskListEl.innerHTML = "";
-    const unscheduled = tasks.filter(function (t) { return !t.due; });
+    // Every task, dated or not. This list used to be the *un*scheduled ones
+    // only, on the theory that anything with a due date already showed on the
+    // grid above; it's now the single place to see them all, so a dated task
+    // appears in both. The local variable keeps its name because the
+    // drag-to-reorder code below indexes into it throughout.
+    // A copy, not `tasks` itself: the drag-reorder handler below splices this
+    // array and then sorts `tasks` from the resulting order — aliasing the two
+    // would make that sort read an order map it had already applied.
+    const unscheduled = tasks.slice();
     if (!unscheduled.length) {
-      if (!tasks.length) {
-        const empty = document.createElement("div");
-        empty.className = "cal-empty";
-        empty.textContent = "No open tasks.";
-        taskListEl.appendChild(empty);
-      }
+      const empty = document.createElement("div");
+      empty.className = "cal-empty";
+      empty.textContent = "No open tasks.";
+      taskListEl.appendChild(empty);
       return;
     }
 
@@ -10234,9 +10647,24 @@
     return { wrap: wrap, input: inp };
   }
 
-  function panelActions(onSave, saveLabel) {
+  // `nsId` is passed only when editing something that already exists; it adds
+  // a Delete button that goes through deleteGoogleItem — the same path the
+  // task row's own delete button and the subpage's Delete use, so events and
+  // tasks are both handled and the tree/grid/list all refresh together.
+  function panelActions(onSave, saveLabel, nsId) {
     const row = document.createElement("div");
     row.className = "cal-panel-actions";
+    if (nsId) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "cal-panel-delete";
+      del.textContent = "Delete";
+      del.addEventListener("click", function () {
+        closePanel();
+        deleteGoogleItem(nsId, "");
+      });
+      row.appendChild(del);
+    }
     const cancel = document.createElement("button");
     cancel.type = "button";
     cancel.className = "cal-panel-cancel";
@@ -10515,7 +10943,7 @@
         btn.textContent = existing ? "Save" : "Create";
         showError(String(e.message || e));
       }
-    }, existing ? "Save" : "Create"));
+    }, existing ? "Save" : "Create", nsId));
     // preventScroll: the dialog can overflow, and a plain focus() would
     // scroll the heading out of view.
     title.input.focus({ preventScroll: true });
@@ -10585,7 +11013,7 @@
         btn.textContent = existing ? "Save" : "Create";
         showError(String(e.message || e));
       }
-    }, existing ? "Save" : "Create"));
+    }, existing ? "Save" : "Create", nsId));
     // preventScroll: the dialog can overflow, and a plain focus() would
     // scroll the heading out of view.
     title.input.focus({ preventScroll: true });
