@@ -412,12 +412,14 @@
     overflow-wrap: break-word; word-break: break-word;
   }
 
-  .example-row { margin-top: 8px; padding-top: 8px; border-top: 1px solid #cccccc; }
+  /* No divider rule above the example — the spacing alone separates it from
+     the headword, and the example text is full-black like the rest of the card. */
+  .example-row { margin-top: 8px; padding-top: 8px; }
   .example-char-row { flex-wrap: wrap; gap: 5px; }
   .example-char-unit { }
-  .example-pinyin, .example-jyutping { font-size: 9px; color: #666666; line-height: 1.1; }
+  .example-pinyin, .example-jyutping { font-size: 9px; color: #000000; line-height: 1.1; }
   .example-hanzi { font-size: 14px; font-weight: normal; color: #000000; line-height: 1.2; }
-  .example-translation { font-size: 11px; color: #666666; font-style: italic; margin-top: 4px; }
+  .example-translation { font-size: 11px; color: #000000; font-style: italic; margin-top: 4px; }
 
   .add-btn {
     align-self: stretch; width: 100%; margin-top: 8px; padding: 8px 12px;
@@ -724,7 +726,7 @@
     font-size: 13px; color: #000000;
   }
   .cal-viewtoggle button + button { border-left: 1px solid #000000; }
-  .cal-viewtoggle button.active { background: #4285F4; color: #ffffff; }
+  .cal-viewtoggle button.active { background: #000000; color: #ffffff; }
   .cal-create-btn {
     flex: 0 0 auto; padding: 5px 11px;
     border: none; border-radius: 9px; background: #4285F4; color: #ffffff;
@@ -857,7 +859,7 @@
   .cal-daycell:hover { border-color: #000000; }
   .cal-daycell.other-month { opacity: 0.35; }
   .cal-daycell.today .cal-daynum {
-    background: #4285F4; color: #ffffff; border-radius: 50%;
+    background: #000000; color: #ffffff; border-radius: 50%;
     width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   }
   .cal-daynum { font-size: 11px; font-weight: bold; color: #000000; }
@@ -895,18 +897,21 @@
     font-size: 11px; font-weight: bold; text-align: center; color: #000000;
     padding: 2px 0 4px; border-bottom: 1px solid #000000; cursor: pointer;
   }
-  .cal-tg-dayhead.today { color: #4285F4; }
+  .cal-tg-dayhead.today { color: #000000; }
   .cal-tg-hourlabel {
     font-size: 10px; color: #000000; opacity: 0.55; text-align: right;
     padding: 0 4px 0 0; height: 26px; line-height: 1;
   }
   .cal-tg-slot { height: 26px; border-top: 1px solid #ececec; position: relative; min-width: 0; }
   .cal-tg-slot.daystart { border-left: 1px solid #ececec; }
+  /* Neutral by default. The old blue (#e7ecff / #2952cc / #cdd8fb) is no
+     longer forced on every untagged event — it's now the "Default" entry in
+     STATUS_COLORS, so you can still pick that look deliberately. */
   .cal-tg-event {
     position: absolute; left: 1px; right: 1px; z-index: 1;
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
-    background: #e7ecff; color: #2952cc; overflow: hidden;
-    border: 1px solid #cdd8fb;
+    background: #ffffff; color: #000000; overflow: hidden;
+    border: 1px solid #d5d5d5;
   }
   .cal-allday-row {
     display: flex; flex-wrap: wrap; gap: 3px; padding-bottom: 6px; margin-bottom: 4px;
@@ -925,8 +930,8 @@
   }
   .cal-taskrow:hover { border-color: #4285F4; }
   .cal-taskrow.dragging { opacity: 0.4; }
-  .cal-taskrow.drag-over-top { box-shadow: inset 0 2px 0 0 #4285F4; }
-  .cal-taskrow.drag-over-bottom { box-shadow: inset 0 -2px 0 0 #4285F4; }
+  .cal-taskrow.drag-over-top { box-shadow: inset 0 2px 0 0 #000000; }
+  .cal-taskrow.drag-over-bottom { box-shadow: inset 0 -2px 0 0 #000000; }
   .cal-taskrow-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
   .cal-taskrow-title {
     flex: 1 1 auto; font-size: 13px; color: #000000; min-width: 0;
@@ -1824,20 +1829,30 @@
   /* Sits after the tagbar (see .node's flex order below) so it reads as an
      extension of the card's own content — a sticky note attached to the
      bottom of the task, not a separate surface floating below it. */
-  .notepad-wrap{order:5;margin:10px 0 0 0;padding-top:8px;border-top:1px solid #eef1f5}
-  /* Height is driven entirely by autoGrowNotepad() (see wireNotepadTextareas),
-     which sets an explicit pixel height from scrollHeight on every render and
-     keystroke — same approach as .sticky-note-body on the dashboard. Hence
-     resize:none (a manual drag would immediately be overwritten anyway) and
-     overflow:hidden with no max-height, so notes never get their own
-     scrollbar; the card simply grows. min-height gives an empty note a
-     comfortable click target — autoGrowNotepad can only ever grow past it. */
-  .notepad-textarea{
-    width:100%;box-sizing:border-box;font-family:inherit;font-size:12px;
-    color:var(--ink);border:none;border-radius:3px;background:transparent;
-    padding:0;resize:none;overflow:hidden;min-height:36px;cursor:text;
+  /* Detached from the card's layout entirely — absolutely positioned just
+     below it, the same trick .timer-popup uses. That's what lets the note be
+     resized to any size, including wider than the 260px card, without the
+     card itself changing width or height. The card raises its own z-index
+     while its note is open (.node.notes-open) so the note floats over the
+     cards after it rather than being painted under them. */
+  .notepad-wrap{
+    position:absolute;left:0;top:100%;margin-top:6px;z-index:5;
   }
-  .notepad-textarea:focus{outline:none}
+  /* resize:both gives the note its own drag handle; the chosen size is saved
+     on the node (notepadW/notepadH) so it survives re-renders and reloads.
+     autoGrowNotepad() still grows an un-resized note to fit its content, but
+     never shrinks it below this default box and never overrides a size the
+     user set by hand — see wireNotepadTextareas. */
+  .notepad-textarea{
+    width:300px;height:130px;min-width:140px;min-height:70px;
+    box-sizing:border-box;font-family:inherit;font-size:12px;
+    color:var(--ink);background:#ffffff;cursor:text;
+    border:1px solid #e3e8ef;border-radius:7px;padding:7px 9px;
+    resize:both;overflow:auto;
+    box-shadow:0 3px 12px rgba(23,32,42,.10);
+  }
+  .notepad-textarea:focus{outline:none;border-color:var(--accent)}
+  .node.notes-open{z-index:5}
 
   /* ---------- dragging a connector between root tasks ---------- */
   /* The handle sits at its own card's vertical midpoint. drawLinks() anchors
@@ -1860,6 +1875,15 @@
   }
   .link-handle.left{left:-11px}
   .link-handle.right{right:-11px}
+  /* Vertical counterparts, for cards stacked one above another (the main
+     board stacks its roots in a column). Same drag mechanism — only the
+     anchor edge differs — so these override the horizontal rule's top:50%
+     and re-centre horizontally instead. */
+  .link-handle.top,.link-handle.bottom{
+    left:50%;top:auto;transform:translateX(-50%);
+  }
+  .link-handle.top{top:-11px;transform:translate(-50%,-50%)}
+  .link-handle.bottom{bottom:-11px;transform:translate(-50%,50%)}
   .node.drop-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
   svg.drag-preview-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .drag-preview-line{stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-dasharray:5 4}
@@ -1871,6 +1895,19 @@
      `links` array, so unlike a hand-drawn link they can't be clicked away —
      hence no pointer events and no hover affordance. */
   .link-line.auto-link{pointer-events:none;cursor:default}
+  /* Momentary leader line drawn from a timer popup back to the card it
+     belongs to, so it's obvious which task a floating popup is timing. Purely
+     decorative and short-lived — it fades itself out and is removed. Separate
+     from, and independent of, the persistent .timer-running-hl highlight. */
+  svg.timer-leader-layer{
+    position:fixed;left:0;top:0;width:100%;height:100%;
+    pointer-events:none;overflow:visible;z-index:199;
+  }
+  .timer-leader-line{
+    stroke:#9aa7b8;stroke-width:2;stroke-linecap:round;stroke-dasharray:5 4;
+    opacity:1;transition:opacity .6s ease;
+  }
+  .timer-leader-line.fading{opacity:0}
 
   /* "Show Branches" off: the CSS org-chart connectors between a parent and
      its children disappear, and .link-handle drags take over below the root
@@ -1981,7 +2018,12 @@
     .act.ai:hover{background:var(--accent);color:#fff}
     .act.tags:hover{background:var(--accent);color:#fff}
     .timer-play-pause:hover,.timer-reset:hover{background:var(--accent);color:#fff}
+    /* The connector dots only appear once you're on the card — without this
+       they were invisible hotspots you had to already know about. */
+    .node:hover .link-handle::after{opacity:.55}
+    .link-handle:hover::after{opacity:1;background:var(--accent);transform:translate(-50%,-50%) scale(1.35)}
   }
+  .link-handle.active::after{opacity:1;background:var(--accent)}
 </style>
 </head>
 <body>
@@ -1997,8 +2039,7 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
   </button>
   <div class="branch-settings-pop" id="branchSettingsPop">
-    <label><input type="checkbox" id="branchShowBranches"><span>Show Branches<br><small style="color:#7a8699">Lines from each task to its own subtasks</small></span></label>
-    <label><input type="checkbox" id="branchShowRootBranches"><span>Show Branches for top level<br><small style="color:#7a8699">Connect this page's top-level tasks in order</small></span></label>
+    <label><input type="checkbox" id="branchAutoBranch"><span>Auto Branch</span></label>
     <div class="branch-settings-confirm" id="branchSettingsConfirm">
       <p>Where should this apply?</p>
       <button class="btn primary" type="button" id="branchApplyAll">Apply to all</button>
@@ -2084,7 +2125,12 @@
   var cancelEdit = false;
   var dragState = null;   // in-progress drag-to-link state (not persisted)
   var currentParentId = null; // null = main board; otherwise the id of the root task whose children we're viewing as a subpage (not persisted)
-  var notepadOpenIds = {}; // id -> true while that node's notepad textarea is expanded (not persisted, purely a UI toggle)
+  // id -> explicit open/closed state for that node's notepad. Notes are OPEN
+  // by default, so an ABSENT key means open and only an explicit `false`
+  // closes one — hence isNotepadOpen() rather than reading the map directly.
+  // Not persisted; it's view state, like the other toggles here.
+  var notepadOpenIds = {};
+  function isNotepadOpen(id){ return notepadOpenIds[id] !== false; }
   var timerPopupOpenIds = {}; // id -> true while that node's timer popup is showing (not persisted, purely a UI toggle)
   var timerPopupPos = {}; // id -> {left,top} once a popup has been manually dragged; cleared when it's closed, so reopening re-anchors to the clock button
   // id -> true while that node's tag pills are revealed. Tags are hidden by
@@ -2100,26 +2146,25 @@
   // rather than folded into the {roots,links} blob so that a settings write
   // can never race with, or corrupt, the actual task tree.
   //
-  //   showBranches      — lines below the root row. ON (the default) is the
-  //                       tree's existing CSS org-chart connectors; OFF hides
-  //                       them and enables .link-handle dragging on child
-  //                       cards, the same mechanism the root row already has.
-  //   showRootBranches  — the root row only. OFF (the default) is today's
-  //                       behavior: hand-drawn links only. ON additionally
-  //                       draws one connector between each pair of adjacent
-  //                       roots, derived from sibling order.
+  //   autoBranch — ON (the default) draws every automatic line: the CSS
+  //     org-chart connectors from each parent to its children, AND a
+  //     connector between each pair of adjacent root cards. OFF draws no
+  //     automatic lines at any level.
   //
-  // perSubtree[parentId] holds a subpage's own override of either flag ("apply
-  // to just this one"); "apply to all" writes the defaults and clears every
-  // override, so it genuinely means everywhere.
+  // Drawing links BY HAND (the .link-handle drags) is deliberately not gated
+  // by this at all — it stays available either way, which is why nothing here
+  // is consulted when deciding whether to render handles.
+  //
+  // perSubtree[parentId] holds a subpage's own override ("apply to just this
+  // one"); "apply to all" writes the default and clears every override, so it
+  // genuinely means everywhere.
   var BRANCH_SETTINGS_KEY = "gtask-branch-settings-v1";
-  var branchSettings = { showBranches: true, showRootBranches: false, perSubtree: {} };
+  var branchSettings = { autoBranch: true, perSubtree: {} };
 
   function effectiveBranchSettings(){
     var o = (currentParentId && branchSettings.perSubtree[currentParentId]) || {};
     return {
-      showBranches: typeof o.showBranches === "boolean" ? o.showBranches : branchSettings.showBranches,
-      showRootBranches: typeof o.showRootBranches === "boolean" ? o.showRootBranches : branchSettings.showRootBranches
+      autoBranch: typeof o.autoBranch === "boolean" ? o.autoBranch : branchSettings.autoBranch
     };
   }
 
@@ -2134,9 +2179,19 @@
       if(!raw) return;
       var parsed = JSON.parse(raw);
       if(!parsed || typeof parsed !== "object") return;
-      if(typeof parsed.showBranches === "boolean") branchSettings.showBranches = parsed.showBranches;
-      if(typeof parsed.showRootBranches === "boolean") branchSettings.showRootBranches = parsed.showRootBranches;
-      if(parsed.perSubtree && typeof parsed.perSubtree === "object") branchSettings.perSubtree = parsed.perSubtree;
+      if(typeof parsed.autoBranch === "boolean") branchSettings.autoBranch = parsed.autoBranch;
+      // Settings written before the two flags were merged into one: a saved
+      // file only has meaning for the below-root lines, so that flag carries over.
+      else if(typeof parsed.showBranches === "boolean") branchSettings.autoBranch = parsed.showBranches;
+      if(parsed.perSubtree && typeof parsed.perSubtree === "object"){
+        branchSettings.perSubtree = {};
+        Object.keys(parsed.perSubtree).forEach(function(k){
+          var o = parsed.perSubtree[k] || {};
+          var v = typeof o.autoBranch === "boolean" ? o.autoBranch
+                : typeof o.showBranches === "boolean" ? o.showBranches : null;
+          if(v !== null) branchSettings.perSubtree[k] = { autoBranch: v };
+        });
+      }
     }catch(e){}
   }
 
@@ -2150,8 +2205,7 @@
       btn: document.getElementById("branchSettingsBtn"),
       pop: document.getElementById("branchSettingsPop"),
       confirm: document.getElementById("branchSettingsConfirm"),
-      branches: document.getElementById("branchShowBranches"),
-      rootBranches: document.getElementById("branchShowRootBranches")
+      autoBranch: document.getElementById("branchAutoBranch")
     };
   }
 
@@ -2159,8 +2213,7 @@
     var el = branchSettingsEls();
     if(!el.pop || !el.btn) return;
     var eff = effectiveBranchSettings();
-    el.branches.checked = eff.showBranches;
-    el.rootBranches.checked = eff.showRootBranches;
+    el.autoBranch.checked = eff.autoBranch;
     el.confirm.classList.remove("open");
     el.pop.classList.add("open");
     var r = el.btn.getBoundingClientRect();
@@ -2181,15 +2234,14 @@
 
   function applyBranchSettings(scope){
     var el = branchSettingsEls();
-    if(!el.branches) return;
-    var next = { showBranches: !!el.branches.checked, showRootBranches: !!el.rootBranches.checked };
+    if(!el.autoBranch) return;
+    var next = { autoBranch: !!el.autoBranch.checked };
     if(scope === "one" && currentParentId){
       branchSettings.perSubtree[currentParentId] = next;
     }else{
       // "Apply to all" has to clear the per-subpage overrides too, or pages
       // that were customized earlier would quietly ignore the new default.
-      branchSettings.showBranches = next.showBranches;
-      branchSettings.showRootBranches = next.showRootBranches;
+      branchSettings.autoBranch = next.autoBranch;
       branchSettings.perSubtree = {};
     }
     saveBranchSettings();
@@ -2204,9 +2256,7 @@
       e.stopPropagation();
       if(el.pop.classList.contains("open")) closeBranchSettings(); else openBranchSettings();
     });
-    [el.branches, el.rootBranches].forEach(function(cb){
-      cb.addEventListener("change", function(){ el.confirm.classList.add("open"); });
-    });
+    el.autoBranch.addEventListener("change", function(){ el.confirm.classList.add("open"); });
     document.getElementById("branchApplyAll").addEventListener("click", function(){ applyBranchSettings("all"); });
     document.getElementById("branchApplyOne").addEventListener("click", function(){ applyBranchSettings("one"); });
     document.addEventListener("pointerdown", function(e){
@@ -2504,23 +2554,15 @@
     var c = findContainer(id);
     return (c && c.parent) ? c.parent.id : null;
   }
-  // drops `id`'s links only if it actually landed under a different parent
-  // than it started with — a plain reorder among the same siblings (on the
-  // main board OR inside a subpage) should never disturb existing links.
-  function stripLinksIfReparented(id, originalParentId){
-    if(parentIdOf(id) !== originalParentId) stripRootLinks(id);
-  }
-
-  // links only make sense between root-level tasks; drop any that reference
-  // a node once it's no longer at the root.
-  // Exception: with "Show Branches" off, hand-drawn links are the ONLY
-  // connectors below the root row too, so a card moving between parents must
-  // keep them — discarding them there would silently erase the user's own
-  // lines on an ordinary drag-reorder.
-  function stripRootLinks(id){
-    if(!effectiveBranchSettings().showBranches) return;
-    links = links.filter(function(l){ return l.a!==id && l.b!==id; });
-  }
+  // Hand-drawn links used to be a root-row-only feature, so moving a card
+  // under a different parent dropped them. They're now valid between any two
+  // cards at any level and in any direction, and are never automatic — so a
+  // link is always something the user drew deliberately, and a drag-reorder
+  // has no business deleting it. (Deleting the card itself still clears its
+  // links; see the "del" branch in handle().) Kept as a no-op rather than
+  // removed so the two call sites in the card-drag code still read as the
+  // deliberate decision not to touch links there.
+  function stripLinksIfReparented(id, originalParentId){ /* links now survive reparenting */ }
 
   function nodeById(id){
     var f = locate(id);
@@ -2633,8 +2675,14 @@
   // Always available (no duration gate) — the toggle button itself lives in
   // .actions alongside add/del; this builds only the expanding textarea.
   function buildNotepadHtml(n){
-    if(!notepadOpenIds[n.id]) return "";
-    return '<div class="notepad-wrap"><textarea class="notepad-textarea" data-id="'+n.id+'" placeholder="Notes">'+
+    if(!isNotepadOpen(n.id)) return "";
+    // A hand-resized note carries its own size; everything else falls back to
+    // the default box in the stylesheet.
+    var sizeStyle = "";
+    if(n.notepadW) sizeStyle += "width:" + n.notepadW + "px;";
+    if(n.notepadH) sizeStyle += "height:" + n.notepadH + "px;";
+    return '<div class="notepad-wrap"><textarea class="notepad-textarea" data-id="'+n.id+'" placeholder="Notes"'+
+      (sizeStyle ? ' style="'+sizeStyle+'"' : '')+'>'+
       escapeForTextareaHtml(n.notepadText)+'</textarea></div>';
   }
 
@@ -2643,20 +2691,16 @@
       ? '<div class="edit" contenteditable="true" data-id="'+n.id+'" data-placeholder="Title">'+(n.text||"")+'</div>'
       : '<div class="text" data-act="edit" data-id="'+n.id+'">'+(n.text||"")+'</div>';
 
-    var leftHandle = '<button class="link-handle left" data-handle="left" data-id="'+n.id+'" title="Drag to link"></button>';
-    var rightHandle = '<button class="link-handle right" data-handle="right" data-id="'+n.id+'" title="Drag to link"></button>';
-    var handles;
-    if(isRoot){
-      handles = (showLeft ? leftHandle : '') + (showRight ? rightHandle : '');
-    }else if(!effectiveBranchSettings().showBranches){
-      // With automatic branches off, a card below the root row is linked by
-      // hand exactly like a root is. Both handles are always present here
-      // rather than being suppressed at the ends of a row, since a child can
-      // legitimately link in either direction (to a sibling, or back up).
-      handles = leftHandle + rightHandle;
-    }else{
-      handles = '';
+    // Every card carries all four connector handles, at every level, whether
+    // or not automatic branches are switched on: drawing a link by hand is
+    // always available and is deliberately not gated by the Auto Branch
+    // setting. Left/right suit cards sitting side by side, top/bottom suit
+    // ones stacked in a column (the main board's roots) — which pair you use
+    // is just which edge you drag from.
+    function handleHtml(side){
+      return '<button class="link-handle '+side+'" data-handle="'+side+'" data-id="'+n.id+'" title="Drag to link"></button>';
     }
+    var handles = handleHtml("left") + handleHtml("right") + handleHtml("top") + handleHtml("bottom");
 
     var card =
       // .tags-shown drives the tagbar's visibility purely in CSS rather than
@@ -2664,13 +2708,13 @@
       // separate module appends it after the fact and rebuilds it whenever
       // tag data changes — so a class on the card is the only handle that
       // survives those rebuilds.
-      '<div class="node'+(n.done?' done':'')+(drillable?' drillable':'')+(tagsOpenIds[n.id]?' tags-shown':'')+'"'+
+      '<div class="node'+(n.done?' done':'')+(drillable?' drillable':'')+(tagsOpenIds[n.id]?' tags-shown':'')+(isNotepadOpen(n.id)?' notes-open':'')+'"'+
         ' data-id="'+n.id+'" data-root="'+(isRoot?'true':'false')+'"'+
         (drillable?' data-act="drill"':'')+'>'+
         handles+
         '<div class="actions">'+
           '<button class="act tags'+(tagsOpenIds[n.id]?' mini-expanded':'')+'" data-act="tags-toggle" data-id="'+n.id+'" title="Tags">'+ICON.tag+'</button>'+
-          '<button class="act notepad'+(notepadOpenIds[n.id]?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Notes">'+ICON.note+'</button>'+
+          '<button class="act notepad'+(isNotepadOpen(n.id)?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Notes">'+ICON.note+'</button>'+
           buildTimerButtonHtml(n)+
           '<button class="act ai'+(aiPendingIds[n.id]?' thinking':'')+'" data-act="ai" data-id="'+n.id+'" title="Ask AI">'+ICON.sparkle+'</button>'+
           (drillable ? '' : '<button class="act add" data-act="add" data-id="'+n.id+'" title="Add subtask">'+ICON.plus+'</button>')+
@@ -2745,9 +2789,10 @@
       '</div>';
     }
 
-    // .no-branches drops the CSS org-chart connectors between a parent and
-    // its children; renderNode() puts drag handles on those cards instead.
-    var branchClass = effectiveBranchSettings().showBranches ? '' : ' no-branches';
+    // Auto Branch off => .no-branches, which drops the CSS org-chart
+    // connectors between a parent and its children. Hand-drawn links are
+    // unaffected either way; every card keeps its drag handles regardless.
+    var branchClass = effectiveBranchSettings().autoBranch ? '' : ' no-branches';
     var bodyHtml = list.length
       ? '<div class="tree '+(onSubpage?'subpage':'mainboard')+branchClass+'"><ul>'+
           list.map(function(r, i){ return renderNode(r, true, i>0, i<list.length-1, !onSubpage, !onSubpage); }).join("")+
@@ -2770,6 +2815,8 @@
     // (display:none suspends rendering) — so the pills would be missing on
     // exactly the render that matters, the one that opens a subpage.
     if(window.__unbleepRefreshTagbars) window.__unbleepRefreshTagbars();
+    // Before drawLinks(), which measures each card's final on-screen position.
+    reserveNoteSpace(stage);
     // Must run after the tagbar injection above, not before: the tagbar
     // pills (Task Type/Depth/Duration) grow each card's actual height, and
     // drawLinks() anchors its lines to each card's live getBoundingClientRect().
@@ -2818,6 +2865,61 @@
     });
   }
 
+  // An open note is position:absolute, so it takes up no layout space and the
+  // rows beneath a card would be drawn straight through it — with notes open
+  // by default on every node, that buried most of the tree. Pushing the card
+  // down by the note's height keeps the stack readable while leaving the
+  // CARD's own width and height untouched (this is margin, not size), which
+  // is what lets the note be resized to anything without reflowing the card.
+  // Sideways overflow is left alone on purpose: a note wider than its card is
+  // the point, and it simply floats over what's beside it.
+  function reserveNoteSpace(container){
+    Array.prototype.forEach.call(container.querySelectorAll(".node"), function(card){
+      var wrap = card.querySelector(".notepad-wrap");
+      card.style.marginBottom = wrap ? (wrap.offsetHeight + 10) + "px" : "";
+    });
+  }
+
+  /* ---------- momentary timer leader line ----------
+     Independent of the running-highlight above: this fires on the click that
+     opens a timer popup and just points out, briefly, which card the popup
+     belongs to. Drawn in viewport coordinates because the popup is
+     position:fixed and lives on <body>, while the card scrolls inside
+     .canvas — one shared layer, replaced each time rather than accumulating. */
+  var timerLeaderTimers = [];
+  function clearTimerLeader(){
+    timerLeaderTimers.forEach(clearTimeout);
+    timerLeaderTimers = [];
+    var doc = getDoc();
+    var old = doc.querySelector("svg.timer-leader-layer");
+    if(old) old.remove();
+  }
+
+  function showTimerLeaderLine(id){
+    clearTimerLeader();
+    var doc = getDoc();
+    var pop = doc.querySelector('.timer-popup[data-id="'+id+'"]');
+    var card = doc.querySelector('.node[data-id="'+id+'"]');
+    if(!pop || !card) return;
+    var pr = pop.getBoundingClientRect(), cr = card.getBoundingClientRect();
+
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svg = doc.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "timer-leader-layer");
+    var line = doc.createElementNS(svgNS, "line");
+    line.setAttribute("class", "timer-leader-line");
+    line.setAttribute("x1", pr.left + pr.width/2);
+    line.setAttribute("y1", pr.top + pr.height/2);
+    line.setAttribute("x2", cr.left + cr.width/2);
+    line.setAttribute("y2", cr.top + cr.height/2);
+    svg.appendChild(line);
+    doc.body.appendChild(svg);
+
+    // Hold it briefly, then fade over the CSS transition before removing.
+    timerLeaderTimers.push(setTimeout(function(){ line.classList.add("fading"); }, 1200));
+    timerLeaderTimers.push(setTimeout(clearTimerLeader, 1900));
+  }
+
   // Debounced per-textarea autosave, deliberately bypassing render() (see
   // setNotepadTextQuiet's own comment for why). A small local debounce
   // rather than the parent document's debounce()/wireField() helpers, which
@@ -2842,6 +2944,28 @@
           if(t){ clearTimeout(t); t=null; }
           setNotepadTextQuiet(id, el.value); save();
         });
+        // resize:both writes width/height straight onto the element's style
+        // with no event of its own, so the drag is caught on release by
+        // comparing against the size we last rendered. Storing it on the node
+        // is what makes a resize outlast the next render() (which rebuilds
+        // every textarea from scratch) and a reload.
+        // resize:both writes width/height straight onto the element's style
+        // with no event of its own, so a drag is detected by measuring before
+        // and after the press. Comparing against the size at mousedown (not
+        // against the stored size) is what keeps an ordinary click — which
+        // also fires mouseup — from being mistaken for a resize.
+        var pressW = 0, pressH = 0;
+        el.addEventListener("mousedown", function(){
+          pressW = el.offsetWidth; pressH = el.offsetHeight;
+        });
+        el.addEventListener("mouseup", function(){
+          if(el.offsetWidth === pressW && el.offsetHeight === pressH) return;
+          var f = locate(id);
+          if(!f) return;
+          f.node.notepadW = Math.round(el.offsetWidth);
+          f.node.notepadH = Math.round(el.offsetHeight);
+          save();
+        });
         autoGrowNotepad(el);
       })(areas[i]);
     }
@@ -2859,10 +2983,19 @@
   // leave it that way. Skipping instead is safe — render() rewires (and so
   // re-measures) every textarea, and the render that opens a subpage runs
   // with the host already visible.
+  // Only ever applies to a note the user hasn't sized by hand: once
+  // node.notepadH exists, that height is the user's decision and content
+  // scrolls inside it instead. It also never shrinks a note below the
+  // default box in the stylesheet — growing past it is the whole point.
   function autoGrowNotepad(el){
     if(!el.clientHeight && !el.offsetParent) return;
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
+    var f = locate(el.getAttribute("data-id"));
+    if(f && f.node.notepadH) return;
+    // Drop back to the stylesheet's default box first, so deleting text can
+    // shrink the note again rather than leaving it stuck at its high-water mark.
+    el.style.height = "";
+    var base = el.offsetHeight;
+    if(el.scrollHeight > base) el.style.height = el.scrollHeight + "px";
   }
 
   /* ---------- bullets in the notes field ----------
@@ -3312,12 +3445,12 @@
     var old = stage.querySelector("svg.links-layer");
     if(old) old.remove();
 
-    // Adjacent roots are joined automatically when "Show Branches for top
-    // level" is on. These are derived from sibling order rather than stored,
-    // so they're rebuilt from scratch here on every render and never touch
-    // the `links` array.
+    // Adjacent roots are joined automatically while Auto Branch is on — the
+    // row-level counterpart to the CSS connectors that same setting draws
+    // below the root row. Derived from sibling order rather than stored, so
+    // they're rebuilt here on every render and never touch the `links` array.
     var autoPairs = [];
-    if(effectiveBranchSettings().showRootBranches){
+    if(effectiveBranchSettings().autoBranch){
       var rootList = activeList();
       for(var i=0;i<rootList.length-1;i++) autoPairs.push({a:rootList[i].id, b:rootList[i+1].id});
     }
@@ -3335,18 +3468,35 @@
       var elB = stage.querySelector('.node[data-id="'+l.b+'"]');
       if(!elA || !elB) return;
       var ra = elA.getBoundingClientRect(), rb = elB.getBoundingClientRect();
-      // Anchor at the cards' vertical midpoint, but take the offset from the
-      // SHORTER of the two and apply it to both. Cards in a row are
-      // top-aligned, so an identical offset keeps the line perfectly level
-      // while still reading as centered — using each card's own midpoint
-      // instead would slant the line whenever two cards differ in height (a
-      // wrapped title, extra tag pills, notes left open).
-      var off = Math.min(ra.height, rb.height) / 2;
-      var ay = ra.top + off - stageRect.top;
-      var by = rb.top + off - stageRect.top;
-      var ax, bx;
-      if(ra.left < rb.left){ ax = ra.right - stageRect.left; bx = rb.left - stageRect.left; }
-      else { ax = ra.left - stageRect.left; bx = rb.right - stageRect.left; }
+      var ax, ay, bx, by;
+
+      // Which way the pair actually sits decides which edges the line joins.
+      // Cards stacked in a column (the main board's roots) barely differ
+      // horizontally, so a left/right anchor would double back on itself;
+      // measuring the gap on each axis picks the sensible one automatically,
+      // whichever handle the link happened to be dragged from.
+      var gapX = Math.max(ra.left - rb.right, rb.left - ra.right);
+      var gapY = Math.max(ra.top - rb.bottom, rb.top - ra.bottom);
+
+      if(gapY > gapX){
+        // Vertical: bottom-centre of the upper card to top-centre of the lower.
+        ax = ra.left + ra.width/2 - stageRect.left;
+        bx = rb.left + rb.width/2 - stageRect.left;
+        if(ra.top < rb.top){ ay = ra.bottom - stageRect.top; by = rb.top - stageRect.top; }
+        else { ay = ra.top - stageRect.top; by = rb.bottom - stageRect.top; }
+      }else{
+        // Horizontal: anchor at the cards' vertical midpoint, but take the
+        // offset from the SHORTER of the two and apply it to both. Cards in a
+        // row are top-aligned, so an identical offset keeps the line perfectly
+        // level while still reading as centered — using each card's own
+        // midpoint instead would slant the line whenever two cards differ in
+        // height (a wrapped title, extra tag pills, notes left open).
+        var off = Math.min(ra.height, rb.height) / 2;
+        ay = ra.top + off - stageRect.top;
+        by = rb.top + off - stageRect.top;
+        if(ra.left < rb.left){ ax = ra.right - stageRect.left; bx = rb.left - stageRect.left; }
+        else { ax = ra.left - stageRect.left; bx = rb.right - stageRect.left; }
+      }
 
       var line = getDoc().createElementNS(svgNS, "line");
       line.setAttribute("x1", ax); line.setAttribute("y1", ay);
@@ -3483,7 +3633,7 @@
       save(); render(); ensureTimerTickLoop();
     }
     else if(act==="timer-reset"){ resetTimerNode(f.node); save(); render(); }
-    else if(act==="notepad"){ notepadOpenIds[id] = !notepadOpenIds[id]; render(); }
+    else if(act==="notepad"){ notepadOpenIds[id] = !isNotepadOpen(id); render(); }
     else if(act==="tags-toggle"){ tagsOpenIds[id] = !tagsOpenIds[id]; render(); }
     else if(act==="ai"){
       // Open the note first and render, so the field is already on screen
@@ -3512,6 +3662,9 @@
       // stale drag position from a previous time this popup was shown.
       delete timerPopupPos[id];
       render();
+      // After render(), so the popup exists and has been positioned — the
+      // line is measured from where it actually landed.
+      if(timerPopupOpenIds[id]) showTimerLeaderLine(id); else clearTimerLeader();
     }
   }
 
@@ -3544,11 +3697,9 @@
 
   function dropTargetAt(clientX, clientY){
     var el = getDoc().elementFromPoint(clientX, clientY);
-    // Root-only while automatic branches are drawn below the root row; with
-    // them off, any card is a valid end for a hand-drawn link — that's the
-    // whole point of the "Show Branches" off mode.
-    var selector = effectiveBranchSettings().showBranches ? '.node[data-root="true"]' : '.node';
-    var card = el ? el.closest(selector) : null;
+    // Any card is a valid end for a hand-drawn link, at any level and
+    // whatever Auto Branch is set to — manual linking is never gated by it.
+    var card = el ? el.closest('.node') : null;
     if(card && card.getAttribute("data-id")===dragState.fromId) card = null; // no self-link
     return card;
   }
@@ -4702,8 +4853,12 @@
     });
   }
 
-  var STATUS_PRESETS = ["To-do", "In progress", "Complete"];
+  // "Default" is the blue that calendar events used to get unconditionally
+  // when they had no status. Events are neutral now, so this is how you opt
+  // back into that look deliberately.
+  var STATUS_PRESETS = ["Default", "To-do", "In progress", "Complete"];
   var STATUS_COLORS = {
+    "Default": { bg: "#e7ecff", text: "#2952cc", dot: "#cdd8fb" },
     "To-do": { bg: "#e3e3e3", text: "#555555", dot: "#8a8a8a" },
     "In progress": { bg: "#faecd8", text: "#9a6708", dot: "#d9a441" },
     "Complete": { bg: "#dcf1e4", text: "#1a7f4e", dot: "#4caf6d" }
@@ -6137,6 +6292,35 @@
         });
       }
 
+      // Clicking the empty space under the note starts the next line, instead
+      // of just dropping the caret at the end of the last one. Without this,
+      // a note that is still only its (bold, first-line) title gives you
+      // nowhere to click to begin the body — you had to put the caret in the
+      // title and press Enter. Clicking on existing text is untouched; this
+      // only fires below the last line's baseline.
+      editorEl.addEventListener("mousedown", function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        const text = editorEl.textContent;
+        if (!text) return; // empty note: the placeholder click already lands on line 1
+        const contentRange = document.createRange();
+        contentRange.selectNodeContents(editorEl);
+        const bottom = contentRange.getBoundingClientRect().bottom;
+        if (e.clientY <= bottom) return; // clicked on the text itself
+        e.preventDefault();
+        // A trailing newline is what actually creates the line to land on.
+        if (!/\n$/.test(text)) {
+          editorEl.textContent = text + "\n";
+          editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        editorEl.focus();
+        const end = document.createRange();
+        end.selectNodeContents(editorEl);
+        end.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(end);
+      });
+
       (async function loadContent() {
         let text = await storageGet(storageKey);
         if (text == null && opts.migrate) {
@@ -6621,7 +6805,79 @@
       ["🏃", "run exercise"], ["🚴", "bike cycling"], ["✈️", "airplane travel flight"],
       ["🚗", "car travel drive"], ["🏠", "house home"], ["🏢", "office building work"],
       ["🌍", "earth world globe"], ["🗺️", "map travel"], ["🧭", "compass direction"],
-      ["🔑", "key unlock"], ["🔒", "lock secure"], ["📦", "box package"]
+      ["🔑", "key unlock"], ["🔒", "lock secure"], ["📦", "box package"],
+
+      // People & activity
+      ["🧑", "person people"], ["👤", "person user profile"], ["👥", "people group team"],
+      ["👶", "baby child"], ["🧒", "child kid"], ["👦", "boy child"],
+      ["👧", "girl child"], ["👨", "man person"], ["👩", "woman person"],
+      ["🧓", "older person elderly"], ["👪", "family"], ["🤱", "baby feeding family"],
+      ["🧑‍🍳", "cook chef food"], ["🧑‍⚕️", "doctor health medical"], ["🧑‍🏫", "teacher school"],
+      ["🧑‍💻", "developer coding work"], ["🧑‍🎓", "student graduate school"], ["🧑‍🔧", "mechanic repair"],
+      ["🕺", "dance man"], ["💃", "dance woman"], ["🏊", "swim exercise"],
+      ["🚶", "walk"], ["🧗", "climb exercise"], ["⛷️", "ski snow sport"],
+      ["🏂", "snowboard sport"], ["🏄", "surf sport"], ["🤸", "cartwheel gymnastics"],
+      ["🛌", "sleep bed rest"], ["🧖", "sauna spa relax"], ["💇", "haircut salon"],
+
+      // Nature, weather & animals
+      ["🌞", "sun sunny weather"], ["🌝", "moon face"], ["🌙", "moon night crescent"],
+      ["⭐", "star"], ["🌟", "glowing star sparkle"], ["✨", "sparkles shine magic"],
+      ["☀️", "sun weather clear"], ["⛅", "partly cloudy weather"], ["☁️", "cloud weather"],
+      ["🌧️", "rain weather"], ["⛈️", "storm thunder weather"], ["🌨️", "snow weather"],
+      ["❄️", "snowflake cold winter"], ["🌈", "rainbow"], ["🔥", "fire hot flame"],
+      ["💧", "water drop"], ["🌊", "wave ocean sea"], ["🌪️", "tornado storm"],
+      ["🌱", "seedling plant grow"], ["🌿", "herb plant leaf"], ["🍀", "clover luck"],
+      ["🌳", "tree nature"], ["🌵", "cactus plant"], ["🌷", "tulip flower"],
+      ["🌸", "blossom flower spring"], ["🌻", "sunflower flower"], ["🍁", "maple leaf autumn"],
+      ["🐶", "dog puppy pet"], ["🐱", "cat kitten pet"], ["🐭", "mouse"],
+      ["🐰", "rabbit bunny"], ["🦊", "fox"], ["🐻", "bear"],
+      ["🐼", "panda"], ["🐦", "bird"], ["🦉", "owl night wise"],
+      ["🐝", "bee"], ["🦋", "butterfly"], ["🐢", "turtle slow"],
+      ["🐠", "fish tropical"], ["🐳", "whale ocean"], ["🦁", "lion"],
+
+      // Food & drink
+      ["🍎", "apple fruit"], ["🍌", "banana fruit"], ["🍓", "strawberry fruit"],
+      ["🍇", "grapes fruit"], ["🍊", "orange fruit citrus"], ["🍉", "watermelon fruit"],
+      ["🥑", "avocado food"], ["🥦", "broccoli vegetable"], ["🥕", "carrot vegetable"],
+      ["🍞", "bread food"], ["🧀", "cheese food"], ["🥚", "egg food"],
+      ["🥗", "salad healthy food"], ["🍜", "noodles ramen food"], ["🍣", "sushi food"],
+      ["🍚", "rice food"], ["🥩", "meat steak food"], ["🍲", "stew soup food"],
+      ["🥤", "drink cup soda"], ["🍷", "wine drink"], ["🧊", "ice cold"],
+      ["🍫", "chocolate sweet"], ["🍦", "ice cream sweet"], ["🥂", "cheers celebrate drink"],
+
+      // Objects, tools & symbols
+      ["🗓️", "calendar schedule planner"], ["📋", "clipboard list"], ["🗒️", "notepad list"],
+      ["📊", "bar chart data"], ["📄", "document page file"], ["📁", "folder files"],
+      ["🗂️", "folders organize"], ["🗄️", "file cabinet archive"], ["📎", "paperclip attach"],
+      ["✂️", "scissors cut"], ["📏", "ruler measure"], ["🖊️", "pen write"],
+      ["🖍️", "crayon draw"], ["🖌️", "paintbrush art"], ["🎨", "art palette paint"],
+      ["🔍", "search magnify find"], ["🔎", "search zoom"], ["🔔", "bell notification"],
+      ["🔕", "bell off mute"], ["📢", "announce megaphone"], ["💬", "speech bubble chat"],
+      ["📨", "email message inbox"], ["📮", "postbox mail"], ["☎️", "phone call"],
+      ["⌨️", "keyboard typing"], ["🖱️", "mouse click"], ["🖨️", "printer"],
+      ["💾", "save floppy disk"], ["🔋", "battery power"], ["🔌", "plug power"],
+      ["⚙️", "settings gear config"], ["🔧", "wrench tool fix"], ["🔨", "hammer tool build"],
+      ["🧰", "toolbox tools"], ["🧪", "test tube science experiment"], ["🔬", "microscope science"],
+      ["🧬", "dna science biology"], ["💊", "pill medicine health"], ["🩺", "stethoscope health"],
+      ["🛏️", "bed sleep rest"], ["🚿", "shower bathroom"], ["🧹", "broom clean chores"],
+      ["🧺", "laundry basket chores"], ["🛒", "shopping cart buy"], ["🎬", "movie film clapper"],
+      ["📺", "tv television"], ["🎤", "microphone sing"], ["🎸", "guitar music"],
+      ["🎹", "piano music"], ["🥁", "drum music"], ["♟️", "chess strategy game"],
+      ["🎲", "dice game random"], ["🧩", "puzzle piece"], ["🏅", "medal award"],
+      ["🥇", "gold medal first win"], ["🚀", "rocket launch fast"], ["⛵", "sailboat travel"],
+      ["🚆", "train travel"], ["🚌", "bus travel"], ["🛴", "scooter travel"],
+      ["⛺", "tent camping outdoors"], ["🏖️", "beach vacation"], ["⛰️", "mountain hike outdoors"],
+      ["🏫", "school building"], ["🏥", "hospital health"], ["🏦", "bank money"],
+      ["⚡", "lightning fast energy"], ["♻️", "recycle green"], ["🔗", "link chain url"],
+      ["📶", "signal wifi bars"], ["🧠", "brain think mind"], ["👁️", "eye watch see"],
+      ["🕯️", "candle calm"], ["🪞", "mirror reflect"], ["🧿", "protection charm"],
+      ["➕", "plus add"], ["➖", "minus remove"], ["⚠️", "warning caution"],
+      ["🔴", "red circle dot"], ["🟠", "orange circle dot"], ["🟡", "yellow circle dot"],
+      ["🟢", "green circle dot"], ["🔵", "blue circle dot"], ["🟣", "purple circle dot"],
+      ["⚫", "black circle dot"], ["⚪", "white circle dot"], ["🟤", "brown circle dot"],
+      ["🔺", "red triangle up"], ["🔻", "red triangle down"], ["🔶", "orange diamond"],
+      ["💯", "hundred perfect score"], ["🆕", "new"], ["🆗", "ok"],
+      ["🔝", "top up"], ["🔄", "refresh sync repeat"], ["♾️", "infinity forever"]
     ];
 
     function persistWidgetIcons() { storageSet(WIDGET_ICON_STORAGE_KEY, JSON.stringify(WIDGET_ICONS)); }
@@ -7689,8 +7945,10 @@
     listContainer.addEventListener("touchcancel", finishTouch);
   }
 
-  const STATUS_PRESETS = ["To-do", "In progress", "Complete"];
+  // Mirrors the tree engine's table — see its copy for why "Default" exists.
+  const STATUS_PRESETS = ["Default", "To-do", "In progress", "Complete"];
   const STATUS_COLORS = {
+    "Default": { bg: "#e7ecff", text: "#2952cc", dot: "#cdd8fb" },
     "To-do": { bg: "#e3e3e3", text: "#555555", dot: "#8a8a8a" },
     "In progress": { bg: "#faecd8", text: "#9a6708", dot: "#d9a441" },
     "Complete": { bg: "#dcf1e4", text: "#1a7f4e", dot: "#4caf6d" }
@@ -8866,8 +9124,10 @@
         line.textContent = fmtTime(e.start) + " " + e.title;
         box.appendChild(line);
 
-        // Only tall enough blocks get pills; short ones would clip them.
-        if (height >= 30 && meta && defs) {
+        // A normal 30-60 minute block is short but still has room for a row of
+        // pills, so the gate is only there to keep sub-20px slivers readable;
+        // .cal-tg-event-pills wraps and shrinks rather than clipping.
+        if (height >= 18 && meta && defs) {
           const pills = document.createElement("div");
           pills.className = "cal-tg-event-pills";
           [["status", defs.status], ["taskType", defs.taskType], ["workDepth", defs.workDepth]].forEach(function (pair) {
@@ -8880,6 +9140,17 @@
             pill.style.background = c.bg;
             pill.style.color = c.text;
             pill.textContent = value;
+            pills.appendChild(pill);
+          });
+          // Freeform tags (Location, Habit Stacking) have no preset colour
+          // table — they render in the pill's own neutral styling.
+          [["location", "Location"], ["habitStacking", "Habit Stacking"]].forEach(function (pair) {
+            const value = meta[pair[0]];
+            if (!value) return;
+            const pill = document.createElement("span");
+            pill.className = "tag-pill";
+            pill.textContent = value;
+            pill.title = pair[1] + ": " + value;
             pills.appendChild(pill);
           });
           // No Duration pill here: the block's own height already spans the
