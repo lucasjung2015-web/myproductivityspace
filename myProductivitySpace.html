@@ -145,7 +145,7 @@
 
   .link-add-item { display: flex; align-items: center; }
   .link-add-btn {
-    width: 26px; height: 26px; border: 1px dashed #9099a8; border-radius: 6px;
+    width: 26px; height: 26px; border: 1px solid #9099a8; border-radius: 6px;
     background: transparent; color: #666666; font-size: 15px; cursor: pointer;
     display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
     font-family: inherit;
@@ -216,7 +216,25 @@
   /* A slot is the width-resizable unit placed in the row; it holds one
      widget, or several stacked vertically (with a row-resizer between
      each) once widgets have been dropped on top of one another. */
-  .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s ease; }
+  .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s ease; position: relative; }
+  /* Section-level hide: one control for the whole vertical stack in this slot,
+     revealed by hovering anywhere over it. Pinned top-centre so it can't
+     collide with the per-widget cluster (top-right) or a widget title (top-
+     left), and absolutely positioned so it never takes a row of its own. */
+  .section-hide-btn {
+    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+    z-index: 6; display: flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border: none; border-radius: 6px;
+    background: #ffffff; color: #6b6b6b; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.14);
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-size: 11px; font-weight: 600; line-height: 1.5; white-space: nowrap;
+    opacity: 0; transition: opacity 0.15s ease;
+  }
+  .col-slot:hover .section-hide-btn,
+  .section-hide-btn:focus { opacity: 1; }
+  .section-hide-btn:hover { color: #000000; background: #f2f2f2; }
+  .section-hide-btn svg { width: 12px; height: 12px; flex: 0 0 auto; }
   .widget.dragging-col .col-slot { transition: none; }
   .col.collapsible-col-wrap { flex: 1 1 auto; min-height: 0; transition: flex 0.15s ease; }
   .widget.dragging-col .col.collapsible-col-wrap { transition: none; }
@@ -299,11 +317,8 @@
     padding: 8px 28px; flex: 0 0 auto; border-top: 1px solid #000000;
   }
   .collapsed-tabs-bar.has-tabs { display: flex; }
-  .collapsed-tabs-bar .collapsible-strip {
-    flex: 0 0 auto; flex-direction: row; width: auto; height: 32px; padding: 0 12px; gap: 8px;
-  }
-  .collapsed-tabs-bar .collapsible-strip-label { writing-mode: horizontal-tb; }
-  .collapsed-tabs-bar .collapsible-arrow { transform: rotate(90deg); }
+  /* Tab layout now lives on .collapsible-strip itself — a strip is only ever a
+     tab in this bar, so there's no in-row form left for this to override. */
 
   #gtaskSubpageHost iframe {
     flex: 1 1 auto; width: 100%; height: 100%; border: none; border-radius: 4px; display: block;
@@ -329,7 +344,13 @@
      each carry their own color control on the sublabel row instead. Same
      hover-reveal convention as .widget-header-controls, so the widget reads
      clean until you actually need one. */
-  .sublabel-row { display: flex; align-items: center; gap: 5px; }
+  /* justify-content:flex-end puts each box's own colour picker at the RIGHT of
+     its row, above the right edge of the box it recolours, rather than at the
+     left where it read as a bullet in front of the (now-removed) text label. */
+  .sublabel-row { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+  /* A row that still carries a text label keeps that label on the left, with
+     the picker pushed away to the right. */
+  .sublabel-row .sublabel { margin-right: auto; }
   .sublabel-row .sublabel { margin-bottom: 10px; }
   .sublabel-color-btn {
     opacity: 0; transition: opacity 0.15s ease; margin-top: 6px;
@@ -437,7 +458,6 @@
     flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto;
     display: flex; flex-direction: column;
   }
-  .collapsible-col-wrap.collapsed .collapsible-body { display: none; }
 
   .section-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -477,9 +497,12 @@
   }
   .collapse-btn:hover { background: #f5f5f5; }
   .collapse-btn { transition: transform 0.15s ease; }
-  .collapse-btn.mini-expanded { transform: rotate(90deg); }
   .col-delete-btn { color: #e03131; }
   .col-delete-btn:hover { background: #fdecea; color: #c92a2a; }
+  .widget-hide-btn { color: #6b6b6b; }
+  .widget-hide-btn:hover { background: #f2f2f2; color: #000000; }
+  .widget-fullscreen-btn { color: #6b6b6b; }
+  .widget-fullscreen-btn:hover { background: #f2f2f2; color: #000000; }
   .col-color-btn { color: #6b6b6b; }
   .col-color-btn:hover { background: #f2f2f2; color: #000000; }
   /* The button reads as a solid dot of the widget's own current color:
@@ -537,20 +560,35 @@
   .icon-emoji-btn:hover { background: #f2f2f2; }
   .icon-popover-empty { font-size: 12px; color: #999999; text-align: center; padding: 12px 0; grid-column: 1 / -1; }
 
+  /* A hidden widget's tab. Only ever rendered inside #collapsedTabsBar now —
+     hiding removes the widget from the grid outright rather than leaving a
+     narrow vertical strip in the row, so the old in-row, vertical-text form of
+     this element is gone and it's laid out purely as a horizontal tab. */
   .collapsible-strip {
     display: none;
-    flex: 0 0 32px; width: 32px;
-    flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-    padding: 14px 0; cursor: pointer; user-select: none;
+    flex: 0 0 auto; height: 32px; padding: 0 8px 0 10px; gap: 7px;
+    flex-direction: row; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none;
     border: 1px solid #000000; border-radius: 4px;
     font-size: 15px; font-weight: bold; color: #000000;
   }
   #collapsedTabsBar .collapsible-strip { display: flex; }
   .collapsible-strip:hover { background: #f5f5f5; }
-  .collapsible-arrow { font-size: 11px; display: inline-block; transition: transform 0.15s ease; }
-  .collapsible-strip-label {
-    writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: 0.5px;
+  .collapsible-strip-label { letter-spacing: 0.5px; }
+  /* The widget's own emoji, to the left of its label. Widgets with no icon set
+     carry the [hidden] attribute instead of a placeholder glyph — spelled out
+     explicitly because the display rule above would otherwise beat the
+     browser's default [hidden] { display: none }. */
+  .collapsible-tab-icon { font-size: 15px; line-height: 1; display: inline-block; }
+  .collapsible-tab-icon[hidden] { display: none; }
+  /* Replaces the old rotating ▶ chevron: this control unhides, and says so. */
+  .collapsible-unhide {
+    flex: 0 0 auto; padding: 2px 7px; border: none; border-radius: 4px;
+    background: #000000; color: #ffffff; cursor: pointer;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-size: 11px; font-weight: 600; line-height: 1.4;
   }
+  .collapsible-strip:hover .collapsible-unhide { background: #333333; }
 
   .summary-list {
     border: 1px solid #000000; border-radius: 4px; padding: 10px 12px;
@@ -675,6 +713,11 @@
      stay blue while the static one turned black. */
   #addReadingBtn, .add-task-btn[id$="AddBtn"] { background: #000000; }
   #addReadingBtn:hover, .add-task-btn[id$="AddBtn"]:hover { background: #222222; }
+  /* "Connect Google Calendar" is black-on-white-text like every other primary
+     action now — it used to be the one deliberate exception that kept
+     .add-task-btn's blue. */
+  #calConnectBtn { background: #000000; color: #ffffff; }
+  #calConnectBtn:hover { background: #222222; }
   #mainTasksList { display: flex; flex-direction: column; gap: 10px; }
 
   #readingListBox { border: none; padding: 10px 0 0 0; flex: 1 1 0; min-height: 60px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -702,10 +745,7 @@
     .char-row { flex-wrap: wrap; }
     .example-char-row { flex-wrap: wrap; }
 
-    .collapsible-strip { flex: 1 1 auto; flex-direction: row; width: auto; height: 32px; padding: 0 14px; gap: 8px; }
-    .collapsible-strip-label { writing-mode: horizontal-tb; }
-    .collapsible-arrow { transform: rotate(90deg); }
-    .collapsible-col-wrap.collapsed .collapsible-arrow { transform: rotate(270deg); }
+    .collapsible-strip { flex: 1 1 auto; padding: 0 14px; }
   }
 
   /* ---------- Calendar column ---------- */
@@ -829,6 +869,11 @@
   }
   .cal-widget-btn:hover { border-color: #4285F4; color: #4285F4; }
   .cal-widget-icon { display: flex; }
+  /* The Branches AI mark is wide rather than square, and is deliberately shown
+     at full card width instead of being squeezed into the 18px box the old
+     line-art tree icon used. */
+  .cal-widget-btn { width: 92px; }
+  .branches-ai-icon svg { width: 62px; height: auto; display: block; }
   .cal-panel-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .cal-panel-actions button {
     padding: 5px 11px; border-radius: 9px;
@@ -914,9 +959,9 @@
   }
   .cal-tg-slot { height: 26px; border-top: 1px solid #ececec; position: relative; min-width: 0; }
   .cal-tg-slot.daystart { border-left: 1px solid #ececec; }
-  /* Solid black with white text is the default look for anything with no
-     status set; a status colour overrides all three properties inline
-     (see renderTimeGrid). */
+  /* Solid black with white text, unconditionally — a status tag never
+     recolours the box itself, only its own pill inside it (see
+     renderTimeGrid). */
   .cal-tg-event {
     position: absolute; left: 1px; right: 1px; z-index: 1;
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
@@ -1055,6 +1100,47 @@
      by the overlay and have to be hidden explicitly. */
   body.subpage-fullscreen-mode #alwaysOnTopBtn,
   body.subpage-fullscreen-mode #addWidgetBtn {
+    display: none !important;
+  }
+
+  /* ---------- one widget maximized over the whole page ----------
+     A CSS class toggle rather than the real Fullscreen API, exactly like
+     body.subpage-fullscreen-mode above — the thing being maximized is a grid
+     child in the middle of the document, not a top-level overlay. Only ever one
+     widget at a time: a maximized widget's stack-mates are hidden behind it
+     (the page is fully covered) rather than maximized alongside it. */
+  body.widget-fullscreen-mode { overflow: hidden; }
+  body.widget-fullscreen-mode .col.collapsible-col-wrap.widget-maximized {
+    position: fixed; inset: 0; z-index: 2000;
+    width: auto !important; height: auto !important; max-width: none;
+    flex: 1 1 auto !important; margin: 0; padding: 16px 20px;
+    background: #ffffff; border-radius: 0; overflow: auto;
+  }
+  /* Its own controls stay visible without hovering, so the way back out is
+     always on screen. */
+  body.widget-fullscreen-mode .widget-maximized .widget-header-controls { opacity: 1; }
+  /* The Full screen button becomes a labelled Exit button while maximized —
+     that's the "visible button inside the maximized widget" that reverses it. */
+  body.widget-fullscreen-mode .widget-maximized .widget-fullscreen-btn {
+    width: auto; padding: 0 8px; gap: 5px;
+    background: #000000; color: #ffffff; border-radius: 6px;
+  }
+  body.widget-fullscreen-mode .widget-maximized .widget-fullscreen-btn::after {
+    content: "Exit full screen"; font-size: 11px; font-weight: 600;
+  }
+  /* Everything else is hidden outright rather than merely covered: the
+     maximized widget's siblings share its stacking context, and #alwaysOnTopBtn
+     / #addWidgetBtn are position:fixed at z-index 3000, above it. */
+  body.widget-fullscreen-mode .page-title,
+  body.widget-fullscreen-mode .date-header,
+  body.widget-fullscreen-mode .links-row,
+  body.widget-fullscreen-mode .collapsed-tabs-bar,
+  body.widget-fullscreen-mode .col-resizer,
+  body.widget-fullscreen-mode .row-resizer,
+  body.widget-fullscreen-mode .section-hide-btn,
+  body.widget-fullscreen-mode .col.collapsible-col-wrap:not(.widget-maximized),
+  body.widget-fullscreen-mode #alwaysOnTopBtn,
+  body.widget-fullscreen-mode #addWidgetBtn {
     display: none !important;
   }
 
@@ -1234,6 +1320,13 @@
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/></svg></span>
       <span class="add-widget-label">Google Calendar</span>
     </button>
+    <!-- Its own entry, separate from Google Calendar: the two used to be added
+         and removed as an inseparable pair even though they're independent
+         widgets sharing one sign-in. -->
+    <button type="button" class="add-widget-card" data-add-type="tasks">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.2 8.9l-6.3 6.3a1.2 1.2 0 0 1-1.7 0L6.8 12.8a1.2 1.2 0 0 1 1.7-1.7l1.55 1.55 5.45-5.45a1.2 1.2 0 0 1 1.7 1.7z"/></svg></span>
+      <span class="add-widget-label">Google Tasks</span>
+    </button>
     <button type="button" class="add-widget-card" data-add-type="page">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg></span>
       <span class="add-widget-label">Page</span>
@@ -1278,9 +1371,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="cal" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="cal" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="cal" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="cal" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="cal" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="cal" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="calCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
 
@@ -1314,8 +1407,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="calStrip">
-      <span class="collapsible-arrow" id="calArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="cal" hidden></span>
       <span class="collapsible-strip-label">Calendar</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1325,14 +1419,14 @@
       <div class="section-header">
         <div class="section-header-title-group">
           <button type="button" class="widget-icon-btn" data-icon-btn="unschedTasks" title="Add icon"><span class="widget-icon-display" data-icon-display="unschedTasks"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
-          <span class="section-header-title" title="Tasks with no due date — everything dated appears on the calendar above">Tasks</span>
+          <span class="section-header-title" title="Your Google Tasks list — everything with a due date also appears on the calendar">Google Tasks</span>
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="unschedTasks" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="unschedTasks" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="unschedTasks" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="unschedTasks" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="unschedTasks" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="unschedTasks" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="unschedTasksCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="unschedTasksWidgetBody">
@@ -1340,8 +1434,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="unschedTasksStrip">
-      <span class="collapsible-arrow" id="unschedTasksArrow">&#9654;</span>
-      <span class="collapsible-strip-label">Tasks</span>
+      <span class="collapsible-tab-icon" data-tab-icon="unschedTasks" hidden></span>
+      <span class="collapsible-strip-label">Google Tasks</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1356,9 +1451,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="readingList" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="readingList" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="readingList" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="readingList" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="readingList" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="readingList" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="readingListCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="readingListWidgetBody">
@@ -1369,8 +1464,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="readingListStrip">
-      <span class="collapsible-arrow" id="readingListArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="readingList" hidden></span>
       <span class="collapsible-strip-label">Reading</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1384,9 +1480,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="atomicHabits" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="atomicHabits" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="atomicHabits" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="atomicHabits" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="atomicHabits" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="atomicHabits" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="atomicHabitsCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="atomicHabitsWidgetBody">
@@ -1397,8 +1493,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="atomicHabitsStrip">
-      <span class="collapsible-arrow" id="atomicHabitsArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="atomicHabits" hidden></span>
       <span class="collapsible-strip-label">Atomic Habits</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1412,9 +1509,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="affirmations" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="affirmations" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="affirmations" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="affirmations" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="affirmations" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="affirmations" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="affirmationsCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="affirmationsWidgetBody">
@@ -1425,8 +1522,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="affirmationsStrip">
-      <span class="collapsible-arrow" id="affirmationsArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="affirmations" hidden></span>
       <span class="collapsible-strip-label">Affirmations</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1440,12 +1538,13 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="vocab" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="vocab" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="vocabCollapseBtn" title="Collapse to side">&#9654;</button>
-          <!-- Sits last, at the right end of the row — unlike every other
-               widget, where the colour button is second. -->
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="vocab" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="vocab" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+          <!-- Sits at the right-hand end of the row rather than second, unlike
+               every other widget — but still ahead of Delete, which is last
+               everywhere so a misclick can't destroy a section. -->
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
       <div class="widget-body" id="vocabWidgetBody">
@@ -1463,8 +1562,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="vocabStrip">
-      <span class="collapsible-arrow" id="vocabArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="vocab" hidden></span>
       <span class="collapsible-strip-label">Vocabulary</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 </div>
@@ -1664,6 +1764,15 @@
 
   /* ---------- subpage (viewing a root task's own children as a full page,
      in place of the main board, rather than in a modal overlay) ---------- */
+  /* Product mark, top-left, above the task title: the page you're on is
+     "Branches AI", the heading below it is whichever task you opened. */
+  .branches-brand{
+    display:flex;align-items:center;gap:10px;
+    flex:0 0 auto;padding:2px 0 12px;color:var(--ink);
+  }
+  .branches-brand svg{width:74px;height:auto;display:block;flex:0 0 auto}
+  .branches-brand-text{font-size:16px;font-weight:800;letter-spacing:.2px;white-space:nowrap}
+
   .subpage-bar{
     display:flex;align-items:center;gap:14px;
     width:100%;padding:2px 0 22px;
@@ -1710,8 +1819,13 @@
     padding:22px 0 0 0;position:relative;display:table;margin:0 auto;
     border-spacing:0;
   }
+  /* 17px of padding each side puts 34px of air between two adjacent sibling
+     cards — a deliberately loose layout, still close enough that each card
+     reads as hanging off its own elbow. The 22px elbow height above is left
+     alone: parent→child spacing is already ul padding-top + li padding-top =
+     44px, so raising it too would pull children away from their branches. */
   .tree li{
-    list-style:none;position:relative;padding:22px 9px 0;
+    list-style:none;position:relative;padding:22px 17px 0;
     display:table-cell;vertical-align:top;
   }
   .tree li::before,.tree li::after{
@@ -1737,7 +1851,7 @@
      below the last one) instead of side-by-side like the subpage does */
   .tree.mainboard>ul{
     display:flex;flex-direction:column;align-items:flex-start;
-    width:100%;gap:20px;
+    width:100%;gap:34px;
   }
   .tree.mainboard>ul>li{display:block;width:100%;padding:0}
 
@@ -1861,13 +1975,38 @@
      user set by hand — see wireNotepadTextareas. */
   .notepad-textarea{
     width:300px;height:130px;min-width:140px;min-height:70px;
-    box-sizing:border-box;font-family:inherit;font-size:12px;
+    box-sizing:border-box;font-family:inherit;font-size:14px;
+    /* display:block so the wrap sizes exactly to the box — an inline textarea
+       leaves a few px of line-box below it, which the bottom grips would then
+       float away from. */
+    display:block;
     color:var(--ink);background:#ffffff;cursor:text;
     border:1px solid #e3e8ef;border-radius:7px;padding:7px 9px;
     resize:both;overflow:auto;
     box-shadow:0 3px 12px rgba(23,32,42,.10);
   }
   .notepad-textarea:focus{outline:none;border-color:var(--accent)}
+  /* resize:both only ever offers the bottom-RIGHT corner, so the other grips
+     are our own: a full-height strip down each side plus a bottom-left corner.
+     The left-edge ones move the box's left edge outward as well as resizing it
+     (see notepadX), which is why the wrap can sit at a negative offset. */
+  .notepad-resize{
+    position:absolute;z-index:6;touch-action:none;
+    background:transparent;
+  }
+  .notepad-resize.left,.notepad-resize.right{
+    top:0;bottom:14px;width:7px;cursor:ew-resize;
+  }
+  .notepad-resize.left{left:-3px}
+  .notepad-resize.right{right:-3px}
+  .notepad-resize.bl{
+    left:-3px;bottom:-3px;width:14px;height:14px;cursor:nesw-resize;
+  }
+  /* Faint edge tint on hover so the invisible strips are discoverable. */
+  @media (hover:hover){
+    .notepad-resize:hover{background:var(--accent-soft)}
+  }
+  .notepad-wrap.resizing .notepad-textarea{user-select:none}
   .node.notes-open{z-index:5}
 
   /* ---------- dragging a connector between root tasks ---------- */
@@ -1898,7 +2037,12 @@
   .link-handle.top,.link-handle.bottom{
     left:50%;top:auto;transform:translateX(-50%);
   }
-  .link-handle.top{top:-11px;transform:translate(-50%,-50%)}
+  /* Lifted clear of the .actions row, which is itself pulled up to top:-11px
+     and runs the full width of the card — at -11px the two overlapped and the
+     hover buttons swallowed the drag. The 34px card gap leaves room for it.
+     Root-row cards don't get a top handle at all (renderNode), so nothing
+     here can end up floating above the first row with nothing to reach. */
+  .link-handle.top{top:-30px;transform:translate(-50%,-50%)}
   .link-handle.bottom{bottom:-11px;transform:translate(-50%,50%)}
   .node.drop-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
   /* Dragging back onto a card you're already connected to removes that
@@ -1958,7 +2102,10 @@
   .autobranch-toggle{
     flex:0 0 auto;align-self:flex-start;margin-top:1px;white-space:nowrap;
   }
-  .btn.autobranch-toggle.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.autobranch-toggle.on{background:#000000;border-color:#000000;color:#ffffff}
+  @media (hover:hover){
+    .btn.autobranch-toggle.on:hover{background:#222222;border-color:#222222;color:#ffffff}
+  }
 
   /* ---------- dragging a task card onto / next to another task ---------- */
   .node{cursor:grab}
@@ -2207,6 +2354,16 @@
     var ca = findContainer(a), cb = findContainer(b);
     if(!ca || !cb || ca.list !== rootList || cb.list !== rootList) return false;
     return Math.abs(ca.index - cb.index) === 1;
+  }
+
+  // Auto Branch only ever ADDS a line where there isn't one already: a pair the
+  // user joined by hand keeps its own hand-drawn link and gets no automatic
+  // line on top of it. Without this, switching Auto Branch on would paint a
+  // second connector over every manual link it happened to agree with, and
+  // retracing that pair would remove only one of the two — which reads as Auto
+  // Branch having overwritten the manual branch.
+  function autoBranchSuppressed(a, b){
+    return isAutoPairRemoved(a, b) || !!manualLinkBetween(a, b);
   }
 
   function connectionBetween(a, b){
@@ -2663,9 +2820,17 @@
     var sizeStyle = "";
     if(n.notepadW) sizeStyle += "width:" + n.notepadW + "px;";
     if(n.notepadH) sizeStyle += "height:" + n.notepadH + "px;";
-    return '<div class="notepad-wrap"><textarea class="notepad-textarea" data-id="'+n.id+'" placeholder="Notes"'+
+    // notepadX is how far the box's left edge has been dragged out past the
+    // card's own left edge (always <= 0). Only the left-side grips write it.
+    var wrapStyle = n.notepadX ? ' style="left:'+n.notepadX+'px"' : '';
+    var grip = function(kind){
+      return '<span class="notepad-resize '+kind+'" data-resize="'+kind+'" data-id="'+n.id+'"></span>';
+    };
+    return '<div class="notepad-wrap"'+wrapStyle+'><textarea class="notepad-textarea" data-id="'+n.id+'" placeholder="Docs"'+
       (sizeStyle ? ' style="'+sizeStyle+'"' : '')+'>'+
-      escapeForTextareaHtml(n.notepadText)+'</textarea></div>';
+      escapeForTextareaHtml(n.notepadText)+'</textarea>'+
+      grip("left")+grip("right")+grip("bl")+
+      '</div>';
   }
 
   function renderNode(n, isRoot, showLeft, showRight, drillable, hideChildren){
@@ -2673,16 +2838,19 @@
       ? '<div class="edit" contenteditable="true" data-id="'+n.id+'" data-placeholder="Title">'+(n.text||"")+'</div>'
       : '<div class="text" data-act="edit" data-id="'+n.id+'">'+(n.text||"")+'</div>';
 
-    // Every card carries all four connector handles, at every level, whether
-    // or not automatic branches are switched on: drawing a link by hand is
-    // always available and is deliberately not gated by the Auto Branch
-    // setting. Left/right suit cards sitting side by side, top/bottom suit
-    // ones stacked in a column (the main board's roots) — which pair you use
-    // is just which edge you drag from.
+    // Every card carries connector handles at every level, whether or not
+    // automatic branches are switched on: drawing a link by hand is always
+    // available and is deliberately not gated by the Auto Branch setting.
+    // Left/right suit cards sitting side by side, top/bottom suit ones stacked
+    // in a column (the main board's roots) — which pair you use is just which
+    // edge you drag from. The one exception is the TOP handle on a root-row
+    // card: there is nothing above the first row for it to reach, so it's
+    // omitted rather than left as a dead grip competing with .actions.
     function handleHtml(side){
       return '<button class="link-handle '+side+'" data-handle="'+side+'" data-id="'+n.id+'" title="Drag to link"></button>';
     }
-    var handles = handleHtml("left") + handleHtml("right") + handleHtml("top") + handleHtml("bottom");
+    var handles = handleHtml("left") + handleHtml("right") +
+      (isRoot ? "" : handleHtml("top")) + handleHtml("bottom");
 
     var card =
       // .tags-shown drives the tagbar's visibility purely in CSS rather than
@@ -2694,11 +2862,14 @@
         ' data-id="'+n.id+'" data-root="'+(isRoot?'true':'false')+'"'+
         (drillable?' data-act="drill"':'')+'>'+
         handles+
+        // Ordered by how often they're reached for: AI and Docs first, then
+        // Timer, then Tags. "+" and "x" keep their fixed places at the end so
+        // the two destructive/structural buttons never move under the cursor.
         '<div class="actions">'+
-          '<button class="act tags'+(tagsOpenIds[n.id]?' mini-expanded':'')+'" data-act="tags-toggle" data-id="'+n.id+'" title="Tags">'+ICON.tag+'</button>'+
-          '<button class="act notepad'+(isNotepadOpen(n.id)?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Notes">'+ICON.note+'</button>'+
-          buildTimerButtonHtml(n)+
           '<button class="act ai'+(aiPendingIds[n.id]?' thinking':'')+'" data-act="ai" data-id="'+n.id+'" title="Ask AI">'+ICON.sparkle+'</button>'+
+          '<button class="act notepad'+(isNotepadOpen(n.id)?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Docs">'+ICON.note+'</button>'+
+          buildTimerButtonHtml(n)+
+          '<button class="act tags'+(tagsOpenIds[n.id]?' mini-expanded':'')+'" data-act="tags-toggle" data-id="'+n.id+'" title="Tags">'+ICON.tag+'</button>'+
           (drillable ? '' : '<button class="act add" data-act="add" data-id="'+n.id+'" title="Add subtask">'+ICON.plus+'</button>')+
           '<button class="act del" data-act="del" data-id="'+n.id+'" title="Delete branch">'+ICON.x+'</button>'+
         '</div>'+
@@ -2717,16 +2888,40 @@
       // that child's <li> (the ::before/::after elbows belong to it). If every
       // child is hidden, the <ul>'s own vertical stub would be left dangling
       // in mid-air, so the list gets marked too.
-      var allChildrenCut = n.children.every(function(c){ return isAutoPairRemoved(n.id, c.id); });
+      var allChildrenCut = n.children.every(function(c){ return autoBranchSuppressed(n.id, c.id); });
       childrenHtml = '<ul'+(allChildrenCut ? ' class="no-auto-stub"' : '')+'>'+
         n.children.map(function(c){ return renderNode(c, false, false, false, false, false); }).join("")+
       '</ul>';
     }
     // isRoot cards sit in the top row, which has no elbows of its own — the
     // class only matters for a child li.
-    var liClass = (!isRoot && isAutoPairRemoved(parentIdOf(n.id) || "", n.id)) ? ' class="no-auto-branch"' : '';
+    var liClass = (!isRoot && autoBranchSuppressed(parentIdOf(n.id) || "", n.id)) ? ' class="no-auto-branch"' : '';
     return '<li'+liClass+'>'+card+childrenHtml+'</li>';
   }
+
+  // The Branches AI mark. Inline SVG (rather than the supplied JPEG) so it
+  // scales cleanly, follows currentColor, and carries no white backing slab.
+  // Kept as its own copy here because this frame is a separate document from
+  // the dashboard's own copy of the same mark.
+  var BRANCHES_AI_LOGO =
+    '<svg viewBox="0 0 100 41" fill="none" aria-hidden="true">' +
+      '<path d="M20.4 19.5 V33 Q20.4 38 25.4 38 H74.6 Q79.6 38 79.6 33 V19.5" ' +
+        'stroke="currentColor" stroke-width="5.6" stroke-linecap="round"/>' +
+      '<rect x="0" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<rect x="58.2" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<path fill="#ffffff" d="M20.4 2 Q21.62 7.98 27.6 9.2 Q21.62 10.42 20.4 16.4 ' +
+        'Q19.18 10.42 13.2 9.2 Q19.18 7.98 20.4 2 Z"/>' +
+      '<path fill="#ffffff" d="M29.5 11.2 Q30.08 14.02 32.9 14.6 Q30.08 15.18 29.5 18 ' +
+        'Q28.92 15.18 26.1 14.6 Q28.92 14.02 29.5 11.2 Z"/>' +
+      '<path fill="#ffffff" d="M78.6 2 Q79.82 7.98 85.8 9.2 Q79.82 10.42 78.6 16.4 ' +
+        'Q77.38 10.42 71.4 9.2 Q77.38 7.98 78.6 2 Z"/>' +
+      '<path fill="#ffffff" d="M87.7 11.2 Q88.28 14.02 91.1 14.6 Q88.28 15.18 87.7 18 ' +
+        'Q87.12 15.18 84.3 14.6 Q87.12 14.02 87.7 11.2 Z"/>' +
+    '</svg>';
+
+  var BRANCHES_BRAND_HTML =
+    '<div class="branches-brand"><span class="branches-brand-mark">' + BRANCHES_AI_LOGO +
+    '</span><span class="branches-brand-text">Branches AI</span></div>';
 
   // The subpage now replaces the main board's own content in-place (on the
   // same #stage, reusing all its existing render/drag/link wiring) instead
@@ -2766,7 +2961,8 @@
       // global on/off — one click applies everywhere and redraws the tree
       // that's already on screen (see toggleAutoBranch).
       var autoOn = effectiveBranchSettings().autoBranch;
-      barHtml = '<div class="subpage-bar">'+
+      barHtml = BRANCHES_BRAND_HTML +
+        '<div class="subpage-bar">'+
         '<button class="subpage-back" type="button" data-act="back" title="Back" aria-label="Back">'+ICON.back+'</button>'+
         '<div class="subpage-heading">'+headingHtml+'</div>'+
         '<button class="btn ghost autobranch-toggle'+(autoOn?' on':'')+'" type="button" data-act="auto-branch"'+
@@ -2887,6 +3083,24 @@
     if(old) old.remove();
   }
 
+  // The closest pair of points on two axis-aligned boxes, one axis at a time:
+  // where the boxes are separated on an axis the near edges win, and where they
+  // overlap the shared span's midpoint does — which collapses to a straight
+  // perpendicular line whenever the two are side by side or stacked, and to a
+  // short diagonal between the facing corners when they're diagonally apart.
+  function nearestEdgePoints(ra, rb){
+    function axis(aLo, aHi, bLo, bHi){
+      if(aHi < bLo) return [aHi, bLo];
+      if(bHi < aLo) return [aLo, bHi];
+      var lo = Math.max(aLo, bLo), hi = Math.min(aHi, bHi);
+      var mid = (lo + hi) / 2;
+      return [mid, mid];
+    }
+    var xs = axis(ra.left, ra.right, rb.left, rb.right);
+    var ys = axis(ra.top, ra.bottom, rb.top, rb.bottom);
+    return { ax: xs[0], ay: ys[0], bx: xs[1], by: ys[1] };
+  }
+
   function showTimerLeaderLine(id){
     clearTimerLeader();
     var doc = getDoc();
@@ -2894,16 +3108,17 @@
     var card = doc.querySelector('.node[data-id="'+id+'"]');
     if(!pop || !card) return;
     var pr = pop.getBoundingClientRect(), cr = card.getBoundingClientRect();
+    var pts = nearestEdgePoints(pr, cr);
 
     var svgNS = "http://www.w3.org/2000/svg";
     var svg = doc.createElementNS(svgNS, "svg");
     svg.setAttribute("class", "timer-leader-layer");
     var line = doc.createElementNS(svgNS, "line");
     line.setAttribute("class", "timer-leader-line");
-    line.setAttribute("x1", pr.left + pr.width/2);
-    line.setAttribute("y1", pr.top + pr.height/2);
-    line.setAttribute("x2", cr.left + cr.width/2);
-    line.setAttribute("y2", cr.top + cr.height/2);
+    line.setAttribute("x1", pts.ax);
+    line.setAttribute("y1", pts.ay);
+    line.setAttribute("x2", pts.bx);
+    line.setAttribute("y2", pts.by);
     svg.appendChild(line);
     doc.body.appendChild(svg);
 
@@ -2916,7 +3131,70 @@
   // setNotepadTextQuiet's own comment for why). A small local debounce
   // rather than the parent document's debounce()/wireField() helpers, which
   // live in a different script block/document and aren't reachable from here.
+  // The three non-native grips. resize:both already owns the bottom-right
+  // corner, so these mirror it on the sides it doesn't offer: a full-height
+  // strip down each edge plus the bottom-left corner. Both left-hand grips
+  // also slide the box's left edge outward past the card (node.notepadX),
+  // since a note anchored at left:0 can't otherwise grow leftward at all.
+  function wireNotepadResizeGrips(container){
+    var grips = container.querySelectorAll(".notepad-resize");
+    for(var i=0;i<grips.length;i++){
+      (function(grip){
+        var kind = grip.getAttribute("data-resize");
+        var id = grip.getAttribute("data-id");
+        grip.addEventListener("mousedown", function(e){
+          var wrap = grip.parentNode;
+          var ta = wrap.querySelector(".notepad-textarea");
+          if(!ta) return;
+          // Both stopped: this must not start a card drag or a text selection.
+          e.preventDefault();
+          e.stopPropagation();
+          var doc = getDoc();
+          var startX = e.clientX, startY = e.clientY;
+          var startW = ta.offsetWidth, startH = ta.offsetHeight;
+          var f = locate(id);
+          var startLeft = (f && f.node.notepadX) || 0;
+          var MIN_W = 140, MIN_H = 70;
+          wrap.classList.add("resizing");
+
+          function onMove(ev){
+            var dx = ev.clientX - startX, dy = ev.clientY - startY;
+            if(kind === "right"){
+              ta.style.width = Math.max(MIN_W, startW + dx) + "px";
+            }else{
+              // Left edge: width grows as the pointer moves left, and the wrap
+              // shifts by exactly the amount gained so the right edge holds
+              // still — otherwise the box would appear to slide rather than
+              // stretch.
+              var w = Math.max(MIN_W, startW - dx);
+              ta.style.width = w + "px";
+              wrap.style.left = (startLeft + (startW - w)) + "px";
+              if(kind === "bl") ta.style.height = Math.max(MIN_H, startH + dy) + "px";
+            }
+            ev.preventDefault();
+          }
+          function onUp(){
+            doc.removeEventListener("mousemove", onMove);
+            doc.removeEventListener("mouseup", onUp);
+            wrap.classList.remove("resizing");
+            // Re-locate rather than reusing `f`: the tree may have been saved
+            // and rebuilt between mousedown and mouseup.
+            var found = locate(id);
+            if(!found) return;
+            found.node.notepadW = Math.round(ta.offsetWidth);
+            found.node.notepadH = Math.round(ta.offsetHeight);
+            found.node.notepadX = Math.round(parseFloat(wrap.style.left) || 0);
+            save();
+          }
+          doc.addEventListener("mousemove", onMove);
+          doc.addEventListener("mouseup", onUp);
+        });
+      })(grips[i]);
+    }
+  }
+
   function wireNotepadTextareas(container){
+    wireNotepadResizeGrips(container);
     var areas = container.querySelectorAll(".notepad-textarea");
     for(var i=0;i<areas.length;i++){
       (function(el){
@@ -3152,6 +3430,18 @@
           popup.addEventListener("pointermove", onMove);
           popup.addEventListener("pointerup", onUp);
         });
+        // Double-click anywhere on the popup's own chrome flashes the leader
+        // line back to the card it belongs to. On dblclick rather than the
+        // click that opened it, so it's something you ask for when a floating
+        // popup has drifted away from its task rather than a flicker every
+        // time. Play/Pause and Reset are excluded, so a fast double-tap on
+        // those still just starts and stops the countdown as usual.
+        popup.addEventListener("dblclick", function(e){
+          if(e.target.closest("input,button")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          showTimerLeaderLine(id);
+        });
       })(popups[i]);
     }
   }
@@ -3297,11 +3587,85 @@
   // ever one container in practice (#stage) — the subpage renders into it
   // in place of the main board rather than in a separate overlay — but this
   // stays container-scoped since it's called fresh on every render().
+  /* ---------- bullets in the subpage heading ----------
+     The same plain-text "• " bullets the Docs field uses, but here the field is
+     a contenteditable rather than a textarea, so a "line" ends at the nearest
+     <br> (what execCommand("insertLineBreak") leaves behind) rather than at a
+     "\n". Everything before the caret is recovered by cloning that range and
+     swapping each <br> for a newline, which is far more robust than walking
+     sibling nodes by hand through whatever <b>/<a> markup the heading holds. */
+  function headingTextBeforeCaret(inp){
+    var doc = getDoc();
+    var sel = doc.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return null;
+    var r = sel.getRangeAt(0);
+    if(!inp.contains(r.startContainer)) return null;
+    var pre = doc.createRange();
+    pre.setStart(inp, 0);
+    pre.setEnd(r.startContainer, r.startOffset);
+    var holder = doc.createElement("div");
+    holder.appendChild(pre.cloneContents());
+    var brs = holder.querySelectorAll("br");
+    for(var i=0;i<brs.length;i++){
+      brs[i].parentNode.replaceChild(doc.createTextNode("\n"), brs[i]);
+    }
+    return holder.textContent;
+  }
+
+  function headingCaretLine(inp){
+    var before = headingTextBeforeCaret(inp);
+    if(before === null) return null;
+    return before.slice(before.lastIndexOf("\n") + 1);
+  }
+
+  // "- " or "* " typed at the very start of a line becomes "• ". Mid-sentence
+  // dashes are left alone.
+  function applyHeadingBulletShorthand(inp){
+    var doc = getDoc();
+    var sel = doc.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+    var r = sel.getRangeAt(0);
+    var node = r.startContainer, offset = r.startOffset;
+    if(node.nodeType !== 3 || offset < 2) return false;
+    var two = node.data.slice(offset - 2, offset);
+    if(two !== "- " && two !== "* ") return false;
+    if(headingCaretLine(inp) !== two) return false;
+    var range = doc.createRange();
+    range.setStart(node, offset - 2);
+    range.setEnd(node, offset);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    doc.execCommand("insertText", false, BULLET);
+    return true;
+  }
+
+  // Enter on a bullet line continues the list; Enter on an empty bullet ends it
+  // by clearing that bullet in place (the same escape the Docs textarea uses).
+  // Returns true when it handled the key itself.
+  function handleHeadingBulletEnter(inp){
+    var doc = getDoc();
+    var line = headingCaretLine(inp);
+    if(line === null) return false;
+    if(/^•\s*$/.test(line)){
+      for(var i=0;i<line.length;i++) doc.execCommand("delete");
+      return true;
+    }
+    if(line.charAt(0) === "•"){
+      doc.execCommand("insertLineBreak");
+      doc.execCommand("insertText", false, BULLET);
+      return true;
+    }
+    return false;
+  }
+
   function wireEditableInput(container){
     var inp = container.querySelector("div.edit");
     if(!inp) return;
     cancelEdit = false;
     placeCaretAtEnd(inp);
+    // Bullets and pasted links are both scoped to the subpage heading only —
+    // per-row task titles stay plain single-line fields.
+    var isHeading = isTitleEditor(inp);
     inp.addEventListener("keydown", function(e){
       var mod = e.metaKey || e.ctrlKey;
       if(mod && (e.key==="b" || e.key==="B")){
@@ -3309,12 +3673,16 @@
         getDoc().execCommand("bold");
       } else if(e.key==="Enter"){
         e.preventDefault();
+        if(isHeading && handleHeadingBulletEnter(inp)) return;
         getDoc().execCommand("insertLineBreak");
       } else if(e.key==="Escape"){
         cancelEdit = true; inp.blur();
       }
     });
-    var allowLinks = isTitleEditor(inp);
+    if(isHeading){
+      inp.addEventListener("input", function(){ applyHeadingBulletShorthand(inp); });
+    }
+    var allowLinks = isHeading;
     inp.addEventListener("paste", function(e){
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData("text/plain");
@@ -3497,8 +3865,9 @@
       var rootList = activeList();
       for(var i=0;i<rootList.length-1;i++){
         var pa = rootList[i].id, pb = rootList[i+1].id;
-        // Skip a pair the user retraced away — see removeConnection.
-        if(isAutoPairRemoved(pa, pb)) continue;
+        // Skip a pair the user retraced away, and any pair that already has a
+        // hand-drawn link of its own — see autoBranchSuppressed.
+        if(autoBranchSuppressed(pa, pb)) continue;
         autoPairs.push({a:pa, b:pb});
       }
     }
@@ -3712,9 +4081,10 @@
       // stale drag position from a previous time this popup was shown.
       delete timerPopupPos[id];
       render();
-      // After render(), so the popup exists and has been positioned — the
-      // line is measured from where it actually landed.
-      if(timerPopupOpenIds[id]) showTimerLeaderLine(id); else clearTimerLeader();
+      // Opening no longer draws the leader line — that's a double-click on the
+      // popup now (see wireTimerPopupDrag). Closing still clears any line left
+      // on screen, since its two endpoints are about to stop existing.
+      if(!timerPopupOpenIds[id]) clearTimerLeader();
     }
   }
 
@@ -5557,23 +5927,27 @@
       cal: "colCal-height", unschedTasks: "colUnschedTasks-height", readingList: "colReadingList-height",
       atomicHabits: "colAtomicHabits-height", affirmations: "colAffirmations-height", vocab: "colVocab-height"
     };
-    const COLLAPSE_STORAGE_KEY = {
-      cal: "cal-collapsed", unschedTasks: "unschedTasks-collapsed", readingList: "readingList-collapsed",
-      atomicHabits: "atomicHabits-collapsed", affirmations: "affirmations-collapsed", vocab: "vocab-collapsed"
-    };
-    // Reuses the two pre-existing preference keys for Reading List and
-    // Unscheduled Tasks so anyone who'd already collapsed either one keeps
-    // that state across this update.
-    const MINI_COLLAPSE_STORAGE_KEY = {
-      cal: "cal-mini-collapsed", unschedTasks: "unsched-tasks-mini-collapsed", readingList: "reading-list-mini-collapsed",
-      atomicHabits: "atomicHabits-mini-collapsed", affirmations: "affirmations-mini-collapsed", vocab: "vocab-mini-collapsed"
-    };
+    // Hidden state is keyed per widget id ("<id>-hidden", see hideStorageKey);
+    // the two older collapse preferences it replaces are deliberately NOT
+    // migrated — a widget that used to be mini-collapsed or collapsed-to-strip
+    // now simply starts visible, which is the safer default given hiding a
+    // widget removes it from the grid entirely.
     const MIN_COL = 200;
     const MIN_ROW = 80;
     const MANUALLY_RESIZED = {}; // Track which page ids have been manually row-dragged
 
     function widgetEl(id) { return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]'); }
-    function isCollapsed(id) { const el = widgetEl(id); return !!el && el.classList.contains("collapsed"); }
+    // ---- hidden state ----
+    // Replaces the two collapse notions this used to carry (an in-place
+    // mini-collapse that kept the header, and a per-slot collapse-to-strip).
+    // Hiding is per widget and total: the wrapper goes display:none and its tab
+    // moves to the bottom bar. The element itself stays put inside its slot,
+    // which is what lets unhiding restore it to the same position with all its
+    // live state (calendar view, notepad text, open popups) untouched.
+    const hidden = {};
+    function isHidden(id) { return !!hidden[id]; }
+    function slotAllHidden(slot) { return !!slot && slot.every(isHidden); }
+    function isCollapsed(id) { return isHidden(id); }
     function slotOf(id) {
       for (const slot of layout) { if (slot.indexOf(id) !== -1) return slot; }
       return null;
@@ -5608,9 +5982,9 @@
       const el = widgetEl(leaderId);
       const slotEl = el && el.parentElement;
       if (!slotEl || !slotEl.classList.contains("col-slot")) return;
-      const slot = slotOf(leaderId);
-      const collapsed = !!slot && isCollapsed(leaderId);
-      slotEl.style.flex = collapsed ? "0 0 0px" : "0 0 " + widths[leaderId] + "px";
+      // A slot whose every widget is hidden is display:none'd wholesale by
+      // applyHiddenState, so there's no collapsed-to-0px case to handle here.
+      slotEl.style.flex = "0 0 " + widths[leaderId] + "px";
     }
 
     // The last widget in a slot always absorbs whatever height its
@@ -5645,21 +6019,14 @@
       el.style.flex = isLast ? "1 1 auto" : "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
     }
 
-    // The ▶ strip-collapse control always collapses the whole section (its
-    // entire slot, including any widgets stacked below it), so only the
-    // slot's first ("leader") widget shows the button — whichever widget
-    // that is, it's always the rightmost control in that widget's hover
-    // cluster since it's the last one in the header markup. Also flags note
-    // widgets (see .note-widget in the stylesheet) so their section-header
-    // title stays hidden — that one's fixed by widget type, not by how it's
-    // currently arranged.
+    // Hide is per widget now, so — unlike the old per-slot collapse control —
+    // every widget shows its own, leader or not, and there's nothing to toggle
+    // here. Still flags note widgets (see .note-widget in the stylesheet) so
+    // their section-header title stays hidden; that one's fixed by widget type,
+    // not by how the widget is currently arranged.
     function updateWidgetChrome(id) {
       const el = widgetEl(id);
       if (!el) return;
-      const slot = slotOf(id);
-      const isLeader = !slot || slot[0] === id;
-      const stripBtn = document.getElementById(id + "CollapseBtn");
-      if (stripBtn) stripBtn.style.display = isLeader ? "" : "none";
       el.classList.toggle("note-widget", !!NOTE_WIDGETS[id]);
     }
 
@@ -5698,6 +6065,7 @@
           }
         });
 
+        slotEl.appendChild(buildSectionHideButton(slot));
         frag.appendChild(slotEl);
 
         if (slotIdx < layout.length - 1) {
@@ -5726,20 +6094,18 @@
         });
       });
 
-      updateResizerStates();
+      applyHiddenState();
     }
 
-    // A column-resizer is only draggable when the slot to its immediate
-    // left is visible AND at least one slot further right (skipping any
-    // fully-collapsed single-widget ones in between) is also visible to
-    // absorb the width change.
+    // A column-resizer is only draggable when there is a visible slot on its
+    // left AND at least one visible slot somewhere to its right to absorb the
+    // width change.
     function updateResizerStates() {
       const colResizers = Array.prototype.slice.call(widget.querySelectorAll(".col-resizer"));
-      function slotCollapsed(slot) { return isCollapsed(slot[0]); }
       colResizers.forEach(function (resizer, i) {
-        const leftCollapsed = slotCollapsed(layout[i]);
-        const rightAllCollapsed = layout.slice(i + 1).every(slotCollapsed);
-        resizer.classList.toggle("disabled", leftCollapsed || rightAllCollapsed);
+        const leftHidden = slotAllHidden(layout[i]);
+        const rightAllHidden = layout.slice(i + 1).every(slotAllHidden);
+        resizer.classList.toggle("disabled", leftHidden || rightAllHidden);
       });
     }
 
@@ -5836,110 +6202,223 @@
       WIDGET_IDS.forEach(applyWidgetIcon);
     })();
 
-    // ---- collapse toggles ----
-    // Collapsing a section moves its (leader's) strip out of the row
-    // entirely and into a shared bar pinned at the bottom, and shrinks that
-    // section's whole slot to 0px (rather than a 32px in-row strip) — the
-    // sections that stay expanded keep their exact same width, they just no
-    // longer have to share row space with narrow collapsed strips sitting
-    // beside them. This always acts on the entire slot, whether it holds
-    // one widget or several stacked ones — see updateWidgetChrome for why
-    // only the leader ever shows this button.
-    function makeCollapseToggle(id, wrapId, stripId, collapseBtnId) {
-      const wrap = document.getElementById(wrapId);
-      const strip = document.getElementById(stripId);
-      const collapseBtn = document.getElementById(collapseBtnId);
-      const storageKey = COLLAPSE_STORAGE_KEY[id];
+    /* ---------- hide / unhide ----------
+       One control per widget, replacing the two this used to have: an in-place
+       mini-collapse that kept the header visible, and a collapse-to-strip that
+       shrank a widget's whole slot. Hiding now takes the widget out of the grid
+       outright — display:none on its own wrapper and on the .row-resizer beside
+       it, so the surrounding flex layout reflows into the freed space — and
+       parks its tab in the bar at the bottom of the page. Unhiding is always
+       one tab, one widget, whether it got there from the per-widget button or
+       from a whole section being hidden at once. */
+    function tabFor(id) { return document.getElementById(id + "Strip"); }
+    function hideStorageKey(id) { return id + "-hidden"; }
 
-      function updateBarVisibility() {
-        collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
-      }
-
-      function setCollapsed(collapsed) {
-        wrap.classList.toggle("collapsed", collapsed);
-        applyWidth(id);
-        if (collapsed) {
-          if (strip.parentNode !== collapsedTabsBar) collapsedTabsBar.appendChild(strip);
-        } else {
-          if (strip.parentNode !== wrap) wrap.appendChild(strip);
-        }
-        updateBarVisibility();
-        updateResizerStates();
-      }
-
-      (async function loadState() {
-        const saved = await storageGet(storageKey);
-        setCollapsed(saved === "true");
-      })();
-
-      function onTrigger() {
-        const collapsed = !wrap.classList.contains("collapsed");
-        setCollapsed(collapsed);
-        storageSet(storageKey, collapsed ? "true" : "false");
-        if (!collapsed) {
-          // Textareas hidden while collapsed can't measure their content
-          // height; recalc now that they're visible again.
-          setTimeout(recalcAllTextareas, 0);
-        }
-      }
-
-      // The strip (now living in the bottom bar while collapsed) expands
-      // the section back; the small collapse button (visible only for the
-      // slot's leader widget — see updateWidgetChrome) collapses it.
-      strip.addEventListener("click", onTrigger);
-      collapseBtn.addEventListener("click", onTrigger);
+    function updateTabsBarVisibility() {
+      collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
     }
 
-    makeCollapseToggle("cal", "calColWrap", "calStrip", "calCollapseBtn");
-    makeCollapseToggle("unschedTasks", "unschedTasksColWrap", "unschedTasksStrip", "unschedTasksCollapseBtn");
-    makeCollapseToggle("readingList", "readingListColWrap", "readingListStrip", "readingListCollapseBtn");
-    makeCollapseToggle("atomicHabits", "atomicHabitsColWrap", "atomicHabitsStrip", "atomicHabitsCollapseBtn");
-    makeCollapseToggle("affirmations", "affirmationsColWrap", "affirmationsStrip", "affirmationsCollapseBtn");
-    makeCollapseToggle("vocab", "vocabColWrap", "vocabStrip", "vocabCollapseBtn");
+    // The tab shows the widget's own emoji to the left of its label; a widget
+    // with no icon set shows the label alone rather than a placeholder glyph.
+    function applyTabIcon(id) {
+      const tab = tabFor(id);
+      const iconEl = tab && tab.querySelector("[data-tab-icon]");
+      if (!iconEl) return;
+      const emoji = WIDGET_ICONS[id] || "";
+      iconEl.textContent = emoji;
+      iconEl.hidden = !emoji;
+    }
 
-    // ---- mini collapse (in-place, keeps the header visible — the ▲/▼
-    // toggle every widget has, distinct from the ▶ toggle above which tucks
-    // a whole standalone widget away into the bottom strip bar) ----
-    function makeMiniCollapseToggle(id) {
-      const btn = document.querySelector('[data-mini-collapse="' + id + '"]');
-      const body = document.getElementById(id + "WidgetBody");
-      if (!btn || !body) return;
-
-      function apply(collapsed) {
-        body.style.display = collapsed ? "none" : "";
-        btn.classList.toggle("mini-expanded", !collapsed);
-      }
-
-      (async function loadState() {
-        const saved = await storageGet(MINI_COLLAPSE_STORAGE_KEY[id]);
-        apply(saved === "true");
-      })();
-
-      btn.addEventListener("click", function () {
-        const collapsed = body.style.display !== "none";
-        apply(collapsed);
-        storageSet(MINI_COLLAPSE_STORAGE_KEY[id], collapsed ? "true" : "false");
-        if (!collapsed) {
-          // Textareas hidden while collapsed can't measure their content
-          // height; recalc now that they're visible again.
-          setTimeout(recalcAllTextareas, 0);
+    // Re-applies visibility across every widget, resizer and slot in one pass.
+    // Wholesale rather than patching just the widget that changed: hiding one
+    // widget can silence a row-resizer, a whole slot and a column-resizer at
+    // once, and there are only a handful of elements involved either way.
+    function applyHiddenState() {
+      WIDGET_IDS.forEach(function (id) {
+        // Skip anything not currently in the layout — a Calendar/Tasks widget
+        // that was "deleted" is parked in hiddenWidgetsPool (see hideWidget) and
+        // must not leave a tab behind for a widget that isn't on the board.
+        if (!slotOf(id)) return;
+        const el = widgetEl(id);
+        if (el) el.style.display = isHidden(id) ? "none" : "";
+        const tab = tabFor(id);
+        if (!tab) return;
+        if (isHidden(id)) {
+          if (tab.parentNode !== collapsedTabsBar) collapsedTabsBar.appendChild(tab);
+          applyTabIcon(id);
+        } else if (el && tab.parentNode !== el) {
+          el.appendChild(tab);
         }
+      });
+
+      // A row-resizer only earns its place with a visible widget on both sides
+      // of it; a slot with nothing visible left in it disappears entirely so
+      // the remaining slots reflow across its width.
+      Array.prototype.forEach.call(widget.querySelectorAll(".col-slot"), function (slotEl) {
+        const kids = Array.prototype.slice.call(slotEl.children);
+        function visibleWidget(el) {
+          return el.classList.contains("collapsible-col-wrap") && el.style.display !== "none";
+        }
+        let seenVisible = false;
+        kids.forEach(function (kid, i) {
+          if (kid.classList.contains("row-resizer")) {
+            const laterVisible = kids.slice(i + 1).some(visibleWidget);
+            kid.style.display = (seenVisible && laterVisible) ? "" : "none";
+          } else if (visibleWidget(kid)) {
+            seenVisible = true;
+          }
+        });
+        slotEl.style.display = seenVisible ? "" : "none";
+      });
+
+      Array.prototype.forEach.call(widget.querySelectorAll(".col-resizer"), function (resizer, i) {
+        const leftVisible = layout.slice(0, i + 1).some(function (s) { return !slotAllHidden(s); });
+        const rightVisible = layout.slice(i + 1).some(function (s) { return !slotAllHidden(s); });
+        resizer.style.display = (leftVisible && rightVisible) ? "" : "none";
+      });
+
+      updateTabsBarVisibility();
+      updateResizerStates();
+    }
+
+    function setHidden(id, value) {
+      hidden[id] = !!value;
+      storageSet(hideStorageKey(id), value ? "true" : "false");
+      if (value && maximizedId === id) setMaximized(null);
+      applyHiddenState();
+      if (!value) {
+        // A textarea inside a display:none widget reports scrollHeight 0 and so
+        // can't size itself; re-measure now that it's back on screen.
+        setTimeout(recalcAllTextareas, 0);
+      }
+    }
+
+    // Hides every widget in one slot. Each lands as its own separate tab, so
+    // restoring is still one tab at a time — a section is a convenient way to
+    // hide several at once, not a group that travels together.
+    function hideSection(slot) {
+      slot.slice().forEach(function (id) {
+        hidden[id] = true;
+        storageSet(hideStorageKey(id), "true");
+        if (maximizedId === id) setMaximized(null);
+      });
+      applyHiddenState();
+    }
+
+    const HIDE_ICON_SVG =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M3 3l18 18"/>' +
+      '<path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/>' +
+      '<path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/>' +
+      '<path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
+    function buildSectionHideButton(slot) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "section-hide-btn";
+      btn.title = "Hide every widget in this section";
+      btn.setAttribute("aria-label", "Hide this section");
+      btn.innerHTML = HIDE_ICON_SVG + "<span>Hide section</span>";
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        hideSection(slot);
+      });
+      return btn;
+    }
+
+    function wireHideButton(btn) {
+      if (!btn) return;
+      const id = btn.getAttribute("data-hide-col");
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setHidden(id, true);
       });
     }
 
-    WIDGET_IDS.forEach(makeMiniCollapseToggle);
+    // The whole tab unhides, so the "Unhide" button inside it needs no listener
+    // of its own — its click bubbles up to here.
+    function wireTab(id) {
+      const tab = tabFor(id);
+      if (!tab) return;
+      tab.addEventListener("click", function () { setHidden(id, false); });
+    }
+
+    async function loadHiddenState(id) {
+      const saved = await storageGet(hideStorageKey(id));
+      if (saved === "true") {
+        hidden[id] = true;
+        applyHiddenState();
+      }
+    }
+
+    function wireWidgetVisibility(id, el) {
+      wireHideButton((el || document).querySelector('[data-hide-col="' + id + '"]'));
+      wireFullscreenButton((el || document).querySelector('[data-fullscreen-col="' + id + '"]'));
+      wireTab(id);
+      loadHiddenState(id);
+    }
+
+    /* ---------- one widget maximized over the whole page ----------
+       A CSS class toggle rather than the real Fullscreen API, matching
+       body.subpage-fullscreen-mode — the element being maximized is a grid child
+       mid-document, not a top-level overlay. Only one widget is ever maximized:
+       its stack-mates stay hidden behind it until it's exited, rather than being
+       maximized alongside it. */
+    let maximizedId = null;
+
+    function setMaximized(id) {
+      if (maximizedId) {
+        const prev = widgetEl(maximizedId);
+        if (prev) prev.classList.remove("widget-maximized");
+      }
+      maximizedId = id || null;
+      document.body.classList.toggle("widget-fullscreen-mode", !!maximizedId);
+      if (maximizedId) {
+        const el = widgetEl(maximizedId);
+        if (el) el.classList.add("widget-maximized");
+      }
+      // The widget just changed size by a lot in either direction.
+      setTimeout(recalcAllTextareas, 0);
+    }
+
+    function wireFullscreenButton(btn) {
+      if (!btn) return;
+      const id = btn.getAttribute("data-fullscreen-col");
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setMaximized(maximizedId === id ? null : id);
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && maximizedId) setMaximized(null);
+    });
+
+    // The hyperlink Menu widget is built by its own script module, which can't
+    // reach in here — but it's a grid widget like any other and so gets the same
+    // Full screen control. Only that one: Menu has no .collapsible-strip to be
+    // parked in the tab bar, and it already has its own Remove/re-add flow via
+    // the "+" menu, so it deliberately doesn't take a Hide button (which would
+    // strand it with no tab to come back from).
+    window.__wireWidgetFullscreen = function (el) {
+      if (el) wireFullscreenButton(el.querySelector("[data-fullscreen-col]"));
+    };
+
+    WIDGET_IDS.forEach(function (id) { wireWidgetVisibility(id); });
 
     // ---- width resize (drag the wall between two slots) ----
     // Sum of the on-screen width (+ its own 20px handle) of every visible
     // slot other than the one led by `excludeLeaderId` — used to work out
-    // how far the slot actually being dragged is allowed to grow.
+    // how far the slot actually being dragged is allowed to grow. A slot counts
+    // as taking up width unless EVERY widget in it is hidden: a slot whose
+    // leader alone is hidden is still on screen, stretched by its siblings.
     function reservedWidth(excludeLeaderId) {
       let w = 0;
       layout.forEach(function (slot) {
         const leaderId = slot[0];
         if (leaderId === excludeLeaderId) return;
-        const collapsed = isCollapsed(leaderId);
-        if (!collapsed) w += widths[leaderId] + 20;
+        if (!slotAllHidden(slot)) w += widths[leaderId] + 20;
       });
       return w;
     }
@@ -6466,9 +6945,9 @@
             '<div class="widget-header-controls">' +
               '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
               '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+              '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+              '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
               '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-              '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-              '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
             '</div>' +
           '</div>' +
           '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -6479,8 +6958,9 @@
           '</div>' +
         '</div>' +
         '<div class="collapsible-strip" id="' + id + 'Strip">' +
-          '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+          '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
           '<span class="collapsible-strip-label">Page</span>' +
+          '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
         '</div>';
       return wrap;
     }
@@ -6501,8 +6981,6 @@
       if (DEFAULT_HEIGHT[id] == null) DEFAULT_HEIGHT[id] = type === "vocab" ? 260 : (type === "readingList" ? 220 : (type === "calView" ? 300 : 320));
       if (!WIDTH_STORAGE_KEY[id]) WIDTH_STORAGE_KEY[id] = "col" + id + "-width";
       if (!HEIGHT_STORAGE_KEY[id]) HEIGHT_STORAGE_KEY[id] = "col" + id + "-height";
-      if (!COLLAPSE_STORAGE_KEY[id]) COLLAPSE_STORAGE_KEY[id] = id + "-collapsed";
-      if (!MINI_COLLAPSE_STORAGE_KEY[id]) MINI_COLLAPSE_STORAGE_KEY[id] = id + "-mini-collapsed";
       if (type === "page") {
         NOTE_WIDGETS[id] = true;
         if (MANUALLY_RESIZED[id] == null) MANUALLY_RESIZED[id] = false;
@@ -6530,8 +7008,7 @@
         // built-ins by the static top-level calls elsewhere in this
         // script — only a freshly-built instance needs them wired here.
         if (!opts.alreadyWired) {
-          makeCollapseToggle(id, id + "ColWrap", id + "Strip", id + "CollapseBtn");
-          makeMiniCollapseToggle(id);
+          wireWidgetVisibility(id, el);
           wireDragHandle(el.querySelector(".col-drag-handle"));
           wireDeleteButton(el.querySelector("[data-delete-col]"));
           // querySelectorAll, not querySelector: a vocab mirror carries three
@@ -6560,6 +7037,8 @@
 
     function deleteDynamicWidget(id) {
       const type = dynamicWidgets[id] && dynamicWidgets[id].type;
+      if (maximizedId === id) setMaximized(null);
+      delete hidden[id];
       removeFromLayout(id);
       delete dynamicWidgets[id];
       const idx = WIDGET_IDS.indexOf(id);
@@ -6585,12 +7064,18 @@
     function hideWidget(id) {
       const el = widgetEl(id);
       if (!el) return;
+      // The tab travels back inside the widget so parking it leaves nothing
+      // behind in the bottom bar, and its hidden flag is cleared so re-adding
+      // it from the "+" menu brings it back visible rather than pre-hidden.
       const strip = document.getElementById(id + "Strip");
       if (strip) el.appendChild(strip);
+      delete hidden[id];
+      storageSet(hideStorageKey(id), "false");
+      if (maximizedId === id) setMaximized(null);
       removeFromLayout(id);
       persistLayout();
       hiddenWidgetsPool.appendChild(el);
-      collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
+      updateTabsBarVisibility();
       render();
     }
 
@@ -7302,6 +7787,9 @@
         display.innerHTML = DEFAULT_ICON_SVG;
         btn.classList.remove("has-icon");
       }
+      // The widget's hidden-tab copy of the same icon (see applyTabIcon), so
+      // changing an icon updates the tab too rather than only the live widget.
+      applyTabIcon(id);
     }
 
     function setWidgetIcon(id, emoji) {
@@ -7449,11 +7937,8 @@
     function flashWidget(id) {
       const el = widgetEl(id);
       if (!el) return;
-      const leaderSlot = slotOf(id);
-      if (leaderSlot && leaderSlot[0] === id && isCollapsed(id)) {
-        const btn = document.getElementById(id + "CollapseBtn");
-        if (btn) btn.click();
-      }
+      // Nothing to flash while it's hidden — unhide it first.
+      if (isHidden(id)) setHidden(id, false);
       el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
       el.classList.add("widget-flash");
       setTimeout(function () { el.classList.remove("widget-flash"); }, 900);
@@ -7497,25 +7982,40 @@
         return;
       }
 
-      // The original Calendar/Unscheduled Tasks pair carries the one real
-      // Google sign-in — deleting it only hides it (see hideWidget), so if
-      // it's currently missing, bring it (and its pair) straight back
-      // rather than creating a second OAuth connection. If it's already on
-      // the board, add another read-only calendar view instead (see
-      // buildExtraCalendarWidgetEl) — it reuses the existing connection, so
-      // any number of these can exist without signing in again.
-      if (type === "cal") {
-        if (!slotOf("cal")) {
-          layout.push(["cal"]);
-          if (!slotOf("unschedTasks")) layout.push(["unschedTasks"]);
+      // Google Calendar and Google Tasks are separate widgets that happen to
+      // share the one real Google sign-in. Each is added, removed and re-added
+      // entirely on its own — they used to travel as an inseparable pair, so
+      // adding either one dragged the other back onto the board with it.
+      //
+      // Deleting one only hides it (see hideWidget), so if it's currently off
+      // the board, bring that widget straight back rather than creating a
+      // second OAuth connection. For Calendar specifically, if it's already
+      // there, add another read-only calendar view instead (see
+      // buildExtraCalendarWidgetEl) — that reuses the existing connection, so
+      // any number of those can exist without signing in again. There is only
+      // ever one Google Tasks list, so that one just gets brought back into
+      // view.
+      function restoreSingleton(widgetId) {
+        if (!slotOf(widgetId)) {
+          layout.push([widgetId]);
           persistLayout();
           render();
-          flashWidget("cal");
-          if (slotOf("unschedTasks")) flashWidget("unschedTasks");
-        } else {
+        }
+        flashWidget(widgetId);
+      }
+
+      if (type === "cal") {
+        if (slotOf("cal")) {
           const id = createDynamicWidgetInstance("calView");
           flashWidget(id);
+        } else {
+          restoreSingleton("cal");
         }
+        return;
+      }
+
+      if (type === "tasks") {
+        restoreSingleton("unschedTasks");
       }
     });
 
@@ -7819,9 +8319,9 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-            '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-            '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -7836,8 +8336,9 @@
         '</div>' +
       '</div>' +
       '<div class="collapsible-strip" id="' + id + 'Strip">' +
-        '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
         '<span class="collapsible-strip-label"></span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
       '</div>';
     wrap.querySelector(".section-header-title").textContent = title;
     wrap.querySelector(".collapsible-strip-label").textContent = title;
@@ -8786,9 +9287,9 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-            '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-            '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -8799,8 +9300,9 @@
         '</div>' +
       '</div>' +
       '<div class="collapsible-strip" id="' + id + 'Strip">' +
-        '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
         '<span class="collapsible-strip-label"></span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
       '</div>';
     wrap.querySelector(".section-header-title").textContent = title;
     wrap.querySelector(".collapsible-strip-label").textContent = title;
@@ -9517,14 +10019,11 @@
         box.style.top = (startMin / 60) * HOUR_H + "px";
         box.style.height = height + "px";
 
-        const statusColor = meta && meta.status && defs && defs.status.colors[meta.status];
-        if (statusColor) {
-          // Recolour the whole block to its status, so tag state reads at a
-          // glance across the grid rather than needing a per-event look.
-          box.style.background = statusColor.bg;
-          box.style.color = statusColor.text;
-          box.style.borderColor = statusColor.dot || statusColor.text;
-        }
+        // Deliberately NOT recoloured by status: the block keeps its own black
+        // /white styling whatever its tags say, and status colour lives only on
+        // the Status pill rendered inside it (see the pills row below). One
+        // event box therefore always looks like every other event box, and
+        // colour means "this pill", never "this whole event".
 
         const line = document.createElement("div");
         line.className = "cal-tg-event-title";
@@ -10240,13 +10739,9 @@
     // array and then sorts `tasks` from the resulting order — aliasing the two
     // would make that sort read an order map it had already applied.
     const unscheduled = tasks.slice();
-    if (!unscheduled.length) {
-      const empty = document.createElement("div");
-      empty.className = "cal-empty";
-      empty.textContent = "No open tasks.";
-      taskListEl.appendChild(empty);
-      return;
-    }
+    // No empty-state text: an empty list just reads as an empty widget, which
+    // is quieter than a line of grey copy stating the obvious.
+    if (!unscheduled.length) return;
 
     let draggedId = null;
     taskListEl.ondragover = function (e) {
@@ -10713,17 +11208,30 @@
 
   /* ---------------- the Widgets section ----------------
      Sits directly under Tags in both settings panels. Currently a single
-     entry — Tree Diagram — which is the way into the subtask/subpage view now
+     entry — Branches AI — which is the way into the subtask/subpage view now
      that clicking an item opens this panel instead of drilling straight in.
      Only rendered for items that already exist: an unsaved event/task has no
      namespaced id for the tree engine to key a subtree off yet. */
-  const TREE_DIAGRAM_ICON =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
-    'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
-    '<rect x="9" y="2" width="6" height="5" rx="1.5"/>' +
-    '<rect x="2" y="17" width="6" height="5" rx="1.5"/>' +
-    '<rect x="16" y="17" width="6" height="5" rx="1.5"/>' +
-    '<path d="M12 7v4M5 17v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/></svg>';
+  // The Branches AI mark: two sparkle-filled nodes joined by a branch. Drawn as
+  // inline SVG rather than embedded as the source bitmap so it stays crisp at
+  // any size, inherits currentColor, and keeps a transparent background — the
+  // supplied artwork is a flat black-on-white JPEG, which would show as a white
+  // slab anywhere the surface behind it isn't white.
+  const BRANCHES_AI_LOGO =
+    '<svg viewBox="0 0 100 41" fill="none" aria-hidden="true">' +
+      '<path d="M20.4 19.5 V33 Q20.4 38 25.4 38 H74.6 Q79.6 38 79.6 33 V19.5" ' +
+        'stroke="currentColor" stroke-width="5.6" stroke-linecap="round"/>' +
+      '<rect x="0" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<rect x="58.2" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<path fill="#ffffff" d="M20.4 2 Q21.62 7.98 27.6 9.2 Q21.62 10.42 20.4 16.4 ' +
+        'Q19.18 10.42 13.2 9.2 Q19.18 7.98 20.4 2 Z"/>' +
+      '<path fill="#ffffff" d="M29.5 11.2 Q30.08 14.02 32.9 14.6 Q30.08 15.18 29.5 18 ' +
+        'Q28.92 15.18 26.1 14.6 Q28.92 14.02 29.5 11.2 Z"/>' +
+      '<path fill="#ffffff" d="M78.6 2 Q79.82 7.98 85.8 9.2 Q79.82 10.42 78.6 16.4 ' +
+        'Q77.38 10.42 71.4 9.2 Q77.38 7.98 78.6 2 Z"/>' +
+      '<path fill="#ffffff" d="M87.7 11.2 Q88.28 14.02 91.1 14.6 Q88.28 15.18 87.7 18 ' +
+        'Q87.12 15.18 84.3 14.6 Q87.12 14.02 87.7 11.2 Z"/>' +
+    '</svg>';
 
   function buildWidgetsSection(nsId, title) {
     const wrap = document.createElement("div");
@@ -10738,10 +11246,10 @@
     btn.className = "cal-widget-btn";
     btn.title = "Open this item's subtask tree";
     const icon = document.createElement("span");
-    icon.className = "cal-widget-icon";
-    icon.innerHTML = TREE_DIAGRAM_ICON;
+    icon.className = "cal-widget-icon branches-ai-icon";
+    icon.innerHTML = BRANCHES_AI_LOGO;
     const text = document.createElement("span");
-    text.textContent = "Tree Diagram";
+    text.textContent = "Branches AI";
     btn.appendChild(icon);
     btn.appendChild(text);
     btn.addEventListener("click", function () {
@@ -11163,9 +11671,9 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-            '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-            '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -11179,8 +11687,9 @@
         '</div>' +
       '</div>' +
       '<div class="collapsible-strip" id="' + id + 'Strip">' +
-        '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
         '<span class="collapsible-strip-label">Google Calendar</span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
       '</div>';
     return wrap;
   }
@@ -11315,6 +11824,8 @@
   var DRAG_HANDLE_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
   var EDIT_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   var TRASH_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+  // Matches the Full screen control every other widget carries.
+  var FULLSCREEN_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg>';
 
   var links = [];
   // type: "top" | "bottom" (floating full-width bar above/below the grid) |
@@ -11577,6 +12088,7 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="menu" title="Drag to reorder this menu">' + DRAG_HANDLE_SVG + '</button>' +
             '<button type="button" class="collapse-btn links-edit-btn" title="Edit links">' + EDIT_ICON_SVG + '</button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="menu" title="Full screen" aria-label="Full screen">' + FULLSCREEN_ICON_SVG + '</button>' +
             '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove menu">' + TRASH_ICON_SVG + '</button>' +
           '</div>' +
         '</div>' +
@@ -11584,6 +12096,8 @@
       '</div>';
     wireEditBtn(el);
     wireRemoveBtn(el);
+    // Wired by the widget-layout script, which owns the maximized state.
+    if (window.__wireWidgetFullscreen) window.__wireWidgetFullscreen(el);
     return el;
   }
 
