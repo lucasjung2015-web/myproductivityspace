@@ -145,7 +145,7 @@
 
   .link-add-item { display: flex; align-items: center; }
   .link-add-btn {
-    width: 26px; height: 26px; border: 1px dashed #9099a8; border-radius: 6px;
+    width: 26px; height: 26px; border: 1px solid #9099a8; border-radius: 6px;
     background: transparent; color: #666666; font-size: 15px; cursor: pointer;
     display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
     font-family: inherit;
@@ -244,7 +244,25 @@
   /* A slot is the width-resizable unit placed in the row; it holds one
      widget, or several stacked vertically (with a row-resizer between
      each) once widgets have been dropped on top of one another. */
-  .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s ease; }
+  .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s ease; position: relative; }
+  /* Section-level hide: one control for the whole vertical stack in this slot,
+     revealed by hovering anywhere over it. Pinned top-centre so it can't
+     collide with the per-widget cluster (top-right) or a widget title (top-
+     left), and absolutely positioned so it never takes a row of its own. */
+  .section-hide-btn {
+    position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
+    z-index: 6; display: flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border: none; border-radius: 6px;
+    background: #ffffff; color: #6b6b6b; cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,.14);
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-size: 11px; font-weight: 600; line-height: 1.5; white-space: nowrap;
+    opacity: 0; transition: opacity 0.15s ease;
+  }
+  .col-slot:hover .section-hide-btn,
+  .section-hide-btn:focus { opacity: 1; }
+  .section-hide-btn:hover { color: #000000; background: #f2f2f2; }
+  .section-hide-btn svg { width: 12px; height: 12px; flex: 0 0 auto; }
   .widget.dragging-col .col-slot { transition: none; }
   .col.collapsible-col-wrap { flex: 1 1 auto; min-height: 0; transition: flex 0.15s ease; }
   .widget.dragging-col .col.collapsible-col-wrap { transition: none; }
@@ -321,25 +339,14 @@
      just relocated since a note widget's title is the note's own first line
      rather than a separate header field. */
   .col.collapsible-col-wrap.note-widget .sticky-note > .widget-icon-btn { margin-top: 1px; }
-  /* Mini-collapsed state for a note widget (see makeMiniCollapseToggle's
-     `isNote` branch): clip to the note-editor's own first line — matching
-     :first-line's bold styling below — instead of display:none-ing the
-     whole widget-body, so the note's "title" (its first line) stays visible
-     the same way every other widget's header title does while collapsed. */
-  .col.collapsible-col-wrap.note-widget .widget-body.mini-body-collapsed .note-editor {
-    max-height: 1.4em; overflow: hidden;
-  }
 
   .collapsed-tabs-bar {
     display: none; flex-direction: row; flex-wrap: wrap; gap: 8px;
     padding: 8px 28px; flex: 0 0 auto; border-top: 1px solid #000000;
   }
   .collapsed-tabs-bar.has-tabs { display: flex; }
-  .collapsed-tabs-bar .collapsible-strip {
-    flex: 0 0 auto; flex-direction: row; width: auto; height: 32px; padding: 0 12px; gap: 8px;
-  }
-  .collapsed-tabs-bar .collapsible-strip-label { writing-mode: horizontal-tb; }
-  .collapsed-tabs-bar .collapsible-arrow { transform: rotate(90deg); }
+  /* Tab layout now lives on .collapsible-strip itself — a strip is only ever a
+     tab in this bar, so there's no in-row form left for this to override. */
 
   #gtaskSubpageHost iframe {
     flex: 1 1 auto; width: 100%; height: 100%; border: none; border-radius: 4px; display: block;
@@ -365,7 +372,13 @@
      each carry their own color control on the sublabel row instead. Same
      hover-reveal convention as .widget-header-controls, so the widget reads
      clean until you actually need one. */
-  .sublabel-row { display: flex; align-items: center; gap: 5px; }
+  /* justify-content:flex-end puts each box's own colour picker at the RIGHT of
+     its row, above the right edge of the box it recolours, rather than at the
+     left where it read as a bullet in front of the (now-removed) text label. */
+  .sublabel-row { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+  /* A row that still carries a text label keeps that label on the left, with
+     the picker pushed away to the right. */
+  .sublabel-row .sublabel { margin-right: auto; }
   .sublabel-row .sublabel { margin-bottom: 10px; }
   .sublabel-color-btn {
     opacity: 0; transition: opacity 0.15s ease; margin-top: 6px;
@@ -473,7 +486,6 @@
     flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto;
     display: flex; flex-direction: column;
   }
-  .collapsible-col-wrap.collapsed .collapsible-body { display: none; }
 
   .section-header {
     display: flex; align-items: center; justify-content: space-between;
@@ -513,9 +525,12 @@
   }
   .collapse-btn:hover { background: #f5f5f5; }
   .collapse-btn { transition: transform 0.15s ease; }
-  .collapse-btn.mini-expanded { transform: rotate(90deg); }
   .col-delete-btn { color: #e03131; }
   .col-delete-btn:hover { background: #fdecea; color: #c92a2a; }
+  .widget-hide-btn { color: #6b6b6b; }
+  .widget-hide-btn:hover { background: #f2f2f2; color: #000000; }
+  .widget-fullscreen-btn { color: #6b6b6b; }
+  .widget-fullscreen-btn:hover { background: #f2f2f2; color: #000000; }
   .col-color-btn { color: #6b6b6b; }
   .col-color-btn:hover { background: #f2f2f2; color: #000000; }
   /* The button reads as a solid dot of the widget's own current color:
@@ -573,20 +588,35 @@
   .icon-emoji-btn:hover { background: #f2f2f2; }
   .icon-popover-empty { font-size: 12px; color: #999999; text-align: center; padding: 12px 0; grid-column: 1 / -1; }
 
+  /* A hidden widget's tab. Only ever rendered inside #collapsedTabsBar now —
+     hiding removes the widget from the grid outright rather than leaving a
+     narrow vertical strip in the row, so the old in-row, vertical-text form of
+     this element is gone and it's laid out purely as a horizontal tab. */
   .collapsible-strip {
     display: none;
-    flex: 0 0 32px; width: 32px;
-    flex-direction: column; align-items: center; justify-content: center; gap: 10px;
-    padding: 14px 0; cursor: pointer; user-select: none;
+    flex: 0 0 auto; height: 32px; padding: 0 8px 0 10px; gap: 7px;
+    flex-direction: row; align-items: center; justify-content: center;
+    cursor: pointer; user-select: none;
     border: 1px solid #000000; border-radius: 4px;
     font-size: 15px; font-weight: bold; color: #000000;
   }
   #collapsedTabsBar .collapsible-strip { display: flex; }
   .collapsible-strip:hover { background: #f5f5f5; }
-  .collapsible-arrow { font-size: 11px; display: inline-block; transition: transform 0.15s ease; }
-  .collapsible-strip-label {
-    writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: 0.5px;
+  .collapsible-strip-label { letter-spacing: 0.5px; }
+  /* The widget's own emoji, to the left of its label. Widgets with no icon set
+     carry the [hidden] attribute instead of a placeholder glyph — spelled out
+     explicitly because the display rule above would otherwise beat the
+     browser's default [hidden] { display: none }. */
+  .collapsible-tab-icon { font-size: 15px; line-height: 1; display: inline-block; }
+  .collapsible-tab-icon[hidden] { display: none; }
+  /* Replaces the old rotating ▶ chevron: this control unhides, and says so. */
+  .collapsible-unhide {
+    flex: 0 0 auto; padding: 2px 7px; border: none; border-radius: 4px;
+    background: #000000; color: #ffffff; cursor: pointer;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-size: 11px; font-weight: 600; line-height: 1.4;
   }
+  .collapsible-strip:hover .collapsible-unhide { background: #333333; }
 
   .summary-list {
     border: 1px solid #000000; border-radius: 4px; padding: 10px 12px;
@@ -620,10 +650,10 @@
     display: flex; align-items: center; justify-content: center;
   }
   .task-star svg {
-    width: 16px; height: 16px; stroke: #4285F4; stroke-width: 1.6;
+    width: 16px; height: 16px; stroke: #000000; stroke-width: 1.6;
     stroke-linejoin: round; fill: none; transition: fill 0.15s ease; display: block;
   }
-  .task-star.done svg { fill: #4285F4; }
+  .task-star.done svg { fill: #000000; }
   .task-title {
     flex: 1 1 auto; min-width: 0; font-weight: normal; color: #000000;
     cursor: text; outline: none; word-break: break-word; line-height: 1.15; font-size: 13px;
@@ -646,23 +676,23 @@
   }
   .tag-remove-btn:hover { color: #e8595a; }
   .tag-add-btn {
-    border: 1px dashed #cccccc; background: transparent; color: #777777;
+    border: 1px solid #cccccc; background: transparent; color: #777777;
     border-radius: 5px; padding: 2px 6px; font-size: 10.5px; font-weight: 600;
     cursor: pointer; line-height: 1.4;
   }
   .tag-add-btn:hover { border-color: #4285F4; color: #4285F4; }
   .status-select-empty {
-    border: 1px dashed #cccccc !important; color: #777777 !important;
+    border: 1px solid #cccccc !important; color: #777777 !important;
     background: transparent !important; font-weight: 600;
   }
   .status-select-empty:hover { border-color: #4285F4 !important; color: #4285F4 !important; }
   .duration-editor-empty {
-    display: inline-flex; border: 1px dashed #cccccc !important; background: transparent !important;
+    display: inline-flex; border: 1px solid #cccccc !important; background: transparent !important;
   }
   .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #4285F4 !important; }
   .inline-text-input {
     width: 90px; font-size: 10.5px; font-family: inherit; color: #000000; font-weight: 600;
-    border: 1px dashed #cccccc; border-radius: 5px; padding: 2px 6px; outline: none;
+    border: 1px solid #cccccc; border-radius: 5px; padding: 2px 6px; outline: none;
     background: transparent;
   }
   .inline-text-input::placeholder { color: #999999; }
@@ -711,6 +741,11 @@
      stay blue while the static one turned black. */
   #addReadingBtn, .add-task-btn[id$="AddBtn"] { background: #000000; }
   #addReadingBtn:hover, .add-task-btn[id$="AddBtn"]:hover { background: #222222; }
+  /* "Connect Google Calendar" is black-on-white-text like every other primary
+     action now — it used to be the one deliberate exception that kept
+     .add-task-btn's blue. */
+  #calConnectBtn { background: #000000; color: #ffffff; }
+  #calConnectBtn:hover { background: #222222; }
   #mainTasksList { display: flex; flex-direction: column; gap: 10px; }
 
   #readingListBox { border: none; padding: 10px 0 0 0; flex: 1 1 0; min-height: 60px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -738,10 +773,7 @@
     .char-row { flex-wrap: wrap; }
     .example-char-row { flex-wrap: wrap; }
 
-    .collapsible-strip { flex: 1 1 auto; flex-direction: row; width: auto; height: 32px; padding: 0 14px; gap: 8px; }
-    .collapsible-strip-label { writing-mode: horizontal-tb; }
-    .collapsible-arrow { transform: rotate(90deg); }
-    .collapsible-col-wrap.collapsed .collapsible-arrow { transform: rotate(270deg); }
+    .collapsible-strip { flex: 1 1 auto; padding: 0 14px; }
   }
 
   /* ---------- Calendar column ---------- */
@@ -865,6 +897,11 @@
   }
   .cal-widget-btn:hover { border-color: #4285F4; color: #4285F4; }
   .cal-widget-icon { display: flex; }
+  /* The Branches AI mark is wide rather than square, and is deliberately shown
+     at full card width instead of being squeezed into the 18px box the old
+     line-art tree icon used. */
+  .cal-widget-btn { width: 92px; }
+  .branches-ai-icon svg { width: 62px; height: auto; display: block; }
   .cal-panel-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .cal-panel-actions button {
     padding: 5px 11px; border-radius: 9px;
@@ -872,6 +909,13 @@
   }
   .cal-panel-save { border: none; background: #4285F4; color: #ffffff; font-weight: 600; }
   .cal-panel-cancel { border: 1px solid #000000; background: transparent; color: #000000; }
+  /* Only present when editing something that already exists. margin-right:auto
+     pushes it to the far left, away from Cancel/Save, so it can't be hit by
+     someone reaching for either. */
+  .cal-panel-delete {
+    margin-right: auto; border: 1px solid #c0392b; background: transparent; color: #c0392b;
+  }
+  .cal-panel-delete:hover { background: #c0392b; color: #ffffff; }
   .cal-panel-error { font-size: 13px; color: #c0392b; }
 
   .cal-viewport {
@@ -899,14 +943,17 @@
     width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   }
   .cal-daynum { font-size: 11px; font-weight: bold; color: #000000; }
+  /* Same default as .cal-tg-event: black with white text until a status
+     colour is set. Events and tasks share it — the status dot inside the
+     chip is what distinguishes state, not the chip's own colour. */
   .cal-chip {
     font-size: 10px; line-height: 1.25; padding: 1px 3px; border-radius: 3px;
-    background: #e7ecff; color: #2952cc; cursor: pointer;
+    background: #000000; color: #ffffff; cursor: pointer;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     display: flex; align-items: center; gap: 3px; min-width: 0;
   }
-  .cal-chip:hover { filter: brightness(0.94); }
-  .cal-chip.task { background: #faecd8; color: #9a6708; }
+  .cal-chip:hover { filter: brightness(1.35); }
+  .cal-chip.task { background: #000000; color: #ffffff; }
   .cal-chip.more { background: transparent; color: #000000; opacity: 0.6; cursor: default; display: block; }
   /* Tag state on the grid: month cells have no room for full pills, so status
      shows as a dot and the subtask count as a small suffix. */
@@ -940,14 +987,14 @@
   }
   .cal-tg-slot { height: 26px; border-top: 1px solid #ececec; position: relative; min-width: 0; }
   .cal-tg-slot.daystart { border-left: 1px solid #ececec; }
-  /* Neutral by default. The old blue (#e7ecff / #2952cc / #cdd8fb) is no
-     longer forced on every untagged event — it's now the "Default" entry in
-     STATUS_COLORS, so you can still pick that look deliberately. */
+  /* Solid black with white text, unconditionally — a status tag never
+     recolours the box itself, only its own pill inside it (see
+     renderTimeGrid). */
   .cal-tg-event {
     position: absolute; left: 1px; right: 1px; z-index: 1;
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
-    background: #ffffff; color: #000000; overflow: hidden;
-    border: 1px solid #d5d5d5;
+    background: #000000; color: #ffffff; overflow: hidden;
+    border: 1px solid #000000;
   }
   .cal-allday-row {
     display: flex; flex-wrap: wrap; gap: 3px; padding-bottom: 6px; margin-bottom: 4px;
@@ -1053,7 +1100,7 @@
   .cal-tagbar .tag-add-btn, .cal-tagbar select, .cal-tagbar input {
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
     font-size: 10px; padding: 1px 5px; border-radius: 999px;
-    border: 1px dashed #b3bfcd; background: transparent; color: #777777;
+    border: 1px solid #b3bfcd; background: transparent; color: #777777;
     cursor: pointer; max-width: 110px;
   }
   .cal-tagbar input { border-radius: 4px; cursor: text; color: #000000; }
@@ -1081,6 +1128,47 @@
      by the overlay and have to be hidden explicitly. */
   body.subpage-fullscreen-mode #alwaysOnTopBtn,
   body.subpage-fullscreen-mode #addWidgetBtn {
+    display: none !important;
+  }
+
+  /* ---------- one widget maximized over the whole page ----------
+     A CSS class toggle rather than the real Fullscreen API, exactly like
+     body.subpage-fullscreen-mode above — the thing being maximized is a grid
+     child in the middle of the document, not a top-level overlay. Only ever one
+     widget at a time: a maximized widget's stack-mates are hidden behind it
+     (the page is fully covered) rather than maximized alongside it. */
+  body.widget-fullscreen-mode { overflow: hidden; }
+  body.widget-fullscreen-mode .col.collapsible-col-wrap.widget-maximized {
+    position: fixed; inset: 0; z-index: 2000;
+    width: auto !important; height: auto !important; max-width: none;
+    flex: 1 1 auto !important; margin: 0; padding: 16px 20px;
+    background: #ffffff; border-radius: 0; overflow: auto;
+  }
+  /* Its own controls stay visible without hovering, so the way back out is
+     always on screen. */
+  body.widget-fullscreen-mode .widget-maximized .widget-header-controls { opacity: 1; }
+  /* The Full screen button becomes a labelled Exit button while maximized —
+     that's the "visible button inside the maximized widget" that reverses it. */
+  body.widget-fullscreen-mode .widget-maximized .widget-fullscreen-btn {
+    width: auto; padding: 0 8px; gap: 5px;
+    background: #000000; color: #ffffff; border-radius: 6px;
+  }
+  body.widget-fullscreen-mode .widget-maximized .widget-fullscreen-btn::after {
+    content: "Exit full screen"; font-size: 11px; font-weight: 600;
+  }
+  /* Everything else is hidden outright rather than merely covered: the
+     maximized widget's siblings share its stacking context, and #alwaysOnTopBtn
+     / #addWidgetBtn are position:fixed at z-index 3000, above it. */
+  body.widget-fullscreen-mode .page-title,
+  body.widget-fullscreen-mode .date-header,
+  body.widget-fullscreen-mode .links-row,
+  body.widget-fullscreen-mode .collapsed-tabs-bar,
+  body.widget-fullscreen-mode .col-resizer,
+  body.widget-fullscreen-mode .row-resizer,
+  body.widget-fullscreen-mode .section-hide-btn,
+  body.widget-fullscreen-mode .col.collapsible-col-wrap:not(.widget-maximized),
+  body.widget-fullscreen-mode #alwaysOnTopBtn,
+  body.widget-fullscreen-mode #addWidgetBtn {
     display: none !important;
   }
 
@@ -1260,6 +1348,13 @@
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/></svg></span>
       <span class="add-widget-label">Google Calendar</span>
     </button>
+    <!-- Its own entry, separate from Google Calendar: the two used to be added
+         and removed as an inseparable pair even though they're independent
+         widgets sharing one sign-in. -->
+    <button type="button" class="add-widget-card" data-add-type="tasks">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.2 8.9l-6.3 6.3a1.2 1.2 0 0 1-1.7 0L6.8 12.8a1.2 1.2 0 0 1 1.7-1.7l1.55 1.55 5.45-5.45a1.2 1.2 0 0 1 1.7 1.7z"/></svg></span>
+      <span class="add-widget-label">Google Tasks</span>
+    </button>
     <button type="button" class="add-widget-card" data-add-type="page">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg></span>
       <span class="add-widget-label">Page</span>
@@ -1304,9 +1399,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="cal" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="cal" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="cal" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="cal" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="cal" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="cal" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="calCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
 
@@ -1340,8 +1435,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="calStrip">
-      <span class="collapsible-arrow" id="calArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="cal" hidden></span>
       <span class="collapsible-strip-label">Calendar</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1351,14 +1447,14 @@
       <div class="section-header">
         <div class="section-header-title-group">
           <button type="button" class="widget-icon-btn" data-icon-btn="unschedTasks" title="Add icon"><span class="widget-icon-display" data-icon-display="unschedTasks"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg></span></button>
-          <span class="section-header-title" title="Tasks with no due date — everything dated appears on the calendar above">Tasks</span>
+          <span class="section-header-title" title="Your Google Tasks list — everything with a due date also appears on the calendar">Google Tasks</span>
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="unschedTasks" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="unschedTasks" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="unschedTasks" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="unschedTasks" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="unschedTasks" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="unschedTasks" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="unschedTasksCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="unschedTasksWidgetBody">
@@ -1366,8 +1462,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="unschedTasksStrip">
-      <span class="collapsible-arrow" id="unschedTasksArrow">&#9654;</span>
-      <span class="collapsible-strip-label">Tasks</span>
+      <span class="collapsible-tab-icon" data-tab-icon="unschedTasks" hidden></span>
+      <span class="collapsible-strip-label">Google Tasks</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1382,9 +1479,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="readingList" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="readingList" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="readingList" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="readingList" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="readingList" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="readingList" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="readingListCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="readingListWidgetBody">
@@ -1395,8 +1492,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="readingListStrip">
-      <span class="collapsible-arrow" id="readingListArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="readingList" hidden></span>
       <span class="collapsible-strip-label">Reading</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1410,9 +1508,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="atomicHabits" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="atomicHabits" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="atomicHabits" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="atomicHabits" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="atomicHabits" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="atomicHabits" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="atomicHabitsCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="atomicHabitsWidgetBody">
@@ -1423,8 +1521,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="atomicHabitsStrip">
-      <span class="collapsible-arrow" id="atomicHabitsArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="atomicHabits" hidden></span>
       <span class="collapsible-strip-label">Atomic Habits</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1438,9 +1537,9 @@
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="affirmations" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="affirmations" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="affirmations" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="affirmations" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="affirmations" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="affirmations" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="affirmationsCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="affirmationsWidgetBody">
@@ -1451,8 +1550,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="affirmationsStrip">
-      <span class="collapsible-arrow" id="affirmationsArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="affirmations" hidden></span>
       <span class="collapsible-strip-label">Affirmations</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 
@@ -1466,10 +1566,13 @@
         </div>
         <div class="widget-header-controls">
           <button type="button" class="col-drag-handle" data-drag-col="vocab" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>
+          <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="vocab" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
+          <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="vocab" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+          <!-- Sits at the right-hand end of the row rather than second, unlike
+               every other widget — but still ahead of Delete, which is last
+               everywhere so a misclick can't destroy a section. -->
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
-          <button type="button" class="collapse-btn" data-mini-collapse="vocab" title="Collapse">&#9654;</button>
-          <button type="button" class="collapse-btn" id="vocabCollapseBtn" title="Collapse to side">&#9654;</button>
         </div>
       </div>
       <div class="widget-body" id="vocabWidgetBody">
@@ -1487,8 +1590,9 @@
       </div>
     </div>
     <div class="collapsible-strip" id="vocabStrip">
-      <span class="collapsible-arrow" id="vocabArrow">&#9654;</span>
+      <span class="collapsible-tab-icon" data-tab-icon="vocab" hidden></span>
       <span class="collapsible-strip-label">Vocabulary</span>
+      <button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>
     </div>
   </div>
 </div>
@@ -1576,23 +1680,23 @@
   }
   .tag-remove-btn:hover { color: #e8595a; }
   .tag-add-btn {
-    border: 1px dashed #cfd8e2; background: transparent; color: #7a8699;
+    border: 1px solid #cfd8e2; background: transparent; color: #7a8699;
     border-radius: 5px; padding: 2px 6px; font-size: 10.5px; font-weight: 600;
     font-family: Arial, Helvetica, sans-serif; cursor: pointer; line-height: 1.4;
   }
   .tag-add-btn:hover { border-color: #4285F4; color: #4285F4; }
   .status-select-empty {
-    border: 1px dashed #cfd8e2 !important; color: #7a8699 !important;
+    border: 1px solid #cfd8e2 !important; color: #7a8699 !important;
     background: transparent !important; font-weight: 600;
   }
   .status-select-empty:hover { border-color: #4285F4 !important; color: #4285F4 !important; }
   .duration-editor-empty {
-    display: inline-flex; border: 1px dashed #cfd8e2 !important; background: transparent !important;
+    display: inline-flex; border: 1px solid #cfd8e2 !important; background: transparent !important;
   }
   .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #4285F4 !important; }
   .inline-text-input {
     width: 90px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; color: #000; font-weight: 600;
-    border: 1px dashed #cfd8e2; border-radius: 5px; padding: 2px 6px; outline: none;
+    border: 1px solid #cfd8e2; border-radius: 5px; padding: 2px 6px; outline: none;
     background: transparent;
   }
   .inline-text-input::placeholder { color: #9aa7b8; }
@@ -1688,6 +1792,15 @@
 
   /* ---------- subpage (viewing a root task's own children as a full page,
      in place of the main board, rather than in a modal overlay) ---------- */
+  /* Product mark, top-left, above the task title: the page you're on is
+     "Branches AI", the heading below it is whichever task you opened. */
+  .branches-brand{
+    display:flex;align-items:center;gap:10px;
+    flex:0 0 auto;padding:2px 0 12px;color:var(--ink);
+  }
+  .branches-brand svg{width:74px;height:auto;display:block;flex:0 0 auto}
+  .branches-brand-text{font-size:16px;font-weight:800;letter-spacing:.2px;white-space:nowrap}
+
   .subpage-bar{
     display:flex;align-items:center;gap:14px;
     width:100%;padding:2px 0 22px;
@@ -1701,6 +1814,10 @@
   .subpage-back svg{ width:20px; height:20px; display:block; }
   .subpage-heading{flex:1 1 auto;font-size:20px;font-weight:800;color:var(--ink);word-break:break-word}
   .subpage-heading b,.subpage-heading strong{font-weight:800}
+  /* Links exist only in this heading — see sanitizeHtml's allowLinks. Plain
+     click still opens the title for editing; Cmd/Ctrl+click follows the link,
+     the same modifier the dashboard's note editor uses for its own links. */
+  .subpage-heading a{color:var(--accent);text-decoration:underline;cursor:text}
   .subpage-heading .placeholder{color:#9aa7b8;font-weight:600}
   .subpage-heading .text,.subpage-heading .edit{
     font-size:20px;font-weight:800;line-height:1.3;padding:0;background:transparent;min-height:auto;
@@ -1730,8 +1847,13 @@
     padding:22px 0 0 0;position:relative;display:table;margin:0 auto;
     border-spacing:0;
   }
+  /* 17px of padding each side puts 34px of air between two adjacent sibling
+     cards — a deliberately loose layout, still close enough that each card
+     reads as hanging off its own elbow. The 22px elbow height above is left
+     alone: parent→child spacing is already ul padding-top + li padding-top =
+     44px, so raising it too would pull children away from their branches. */
   .tree li{
-    list-style:none;position:relative;padding:22px 9px 0;
+    list-style:none;position:relative;padding:22px 17px 0;
     display:table-cell;vertical-align:top;
   }
   .tree li::before,.tree li::after{
@@ -1757,7 +1879,7 @@
      below the last one) instead of side-by-side like the subpage does */
   .tree.mainboard>ul{
     display:flex;flex-direction:column;align-items:flex-start;
-    width:100%;gap:20px;
+    width:100%;gap:34px;
   }
   .tree.mainboard>ul>li{display:block;width:100%;padding:0}
 
@@ -1780,8 +1902,8 @@
     cursor:pointer;padding:0;display:grid;place-items:center;transition:transform .15s;
   }
   
-  .check svg{width:16px;height:16px;stroke:#4285F4;stroke-width:1.6;stroke-linejoin:round;fill:none;transition:fill .15s;display:block}
-  .node.done .check svg{fill:#4285F4}
+  .check svg{width:16px;height:16px;stroke:#000000;stroke-width:1.6;stroke-linejoin:round;fill:none;transition:fill .15s;display:block}
+  .node.done .check svg{fill:#000000}
   .text{
     flex:1 1 auto;font-size:14px;line-height:1.35;color:var(--ink);
     cursor:text;word-break:break-word;padding:1px 0;min-height:19px;
@@ -1881,13 +2003,38 @@
      user set by hand — see wireNotepadTextareas. */
   .notepad-textarea{
     width:300px;height:130px;min-width:140px;min-height:70px;
-    box-sizing:border-box;font-family:inherit;font-size:12px;
+    box-sizing:border-box;font-family:inherit;font-size:14px;
+    /* display:block so the wrap sizes exactly to the box — an inline textarea
+       leaves a few px of line-box below it, which the bottom grips would then
+       float away from. */
+    display:block;
     color:var(--ink);background:#ffffff;cursor:text;
     border:1px solid #e3e8ef;border-radius:7px;padding:7px 9px;
     resize:both;overflow:auto;
     box-shadow:0 3px 12px rgba(23,32,42,.10);
   }
   .notepad-textarea:focus{outline:none;border-color:var(--accent)}
+  /* resize:both only ever offers the bottom-RIGHT corner, so the other grips
+     are our own: a full-height strip down each side plus a bottom-left corner.
+     The left-edge ones move the box's left edge outward as well as resizing it
+     (see notepadX), which is why the wrap can sit at a negative offset. */
+  .notepad-resize{
+    position:absolute;z-index:6;touch-action:none;
+    background:transparent;
+  }
+  .notepad-resize.left,.notepad-resize.right{
+    top:0;bottom:14px;width:7px;cursor:ew-resize;
+  }
+  .notepad-resize.left{left:-3px}
+  .notepad-resize.right{right:-3px}
+  .notepad-resize.bl{
+    left:-3px;bottom:-3px;width:14px;height:14px;cursor:nesw-resize;
+  }
+  /* Faint edge tint on hover so the invisible strips are discoverable. */
+  @media (hover:hover){
+    .notepad-resize:hover{background:var(--accent-soft)}
+  }
+  .notepad-wrap.resizing .notepad-textarea{user-select:none}
   .node.notes-open{z-index:5}
 
   /* ---------- dragging a connector between root tasks ---------- */
@@ -1918,11 +2065,21 @@
   .link-handle.top,.link-handle.bottom{
     left:50%;top:auto;transform:translateX(-50%);
   }
-  .link-handle.top{top:-11px;transform:translate(-50%,-50%)}
+  /* Lifted clear of the .actions row, which is itself pulled up to top:-11px
+     and runs the full width of the card — at -11px the two overlapped and the
+     hover buttons swallowed the drag. The 34px card gap leaves room for it.
+     Root-row cards don't get a top handle at all (renderNode), so nothing
+     here can end up floating above the first row with nothing to reach. */
+  .link-handle.top{top:-30px;transform:translate(-50%,-50%)}
   .link-handle.bottom{bottom:-11px;transform:translate(-50%,50%)}
   .node.drop-target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow)}
+  /* Dragging back onto a card you're already connected to removes that
+     connection rather than adding a second one — red says "let go here and
+     the line goes away". */
+  .node.drop-unlink{border-color:var(--danger);box-shadow:0 0 0 3px rgba(232,89,90,.22),var(--shadow)}
   svg.drag-preview-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .drag-preview-line{stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-dasharray:5 4}
+  .drag-preview-line.unlinking{stroke:var(--danger)}
   svg.links-layer{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
   .link-line{stroke:var(--line);stroke-width:2;stroke-linecap:round;pointer-events:stroke;cursor:pointer}
   .link-line:hover{stroke-width:3.5}
@@ -1952,6 +2109,12 @@
   .tree.no-branches li::after,
   .tree.no-branches ul ul::before{display:none}
 
+  /* One parent→child connector retraced away (see removeConnection), rather
+     than Auto Branch switched off for everything. */
+  .tree li.no-auto-branch::before,
+  .tree li.no-auto-branch::after{display:none}
+  .tree ul.no-auto-stub::before{display:none}
+
   /* ---------- running-timer highlight ---------- */
   /* The card whose timer is running, its floating popup, and — one level
      only — its direct parent, which gets the lighter treatment so the
@@ -1960,38 +2123,17 @@
   .node.timer-running-parent-hl{border-color:var(--accent)}
   .timer-popup.timer-running-hl{box-shadow:0 0 0 2px var(--accent),0 4px 14px rgba(23,32,42,.12),0 12px 32px rgba(23,32,42,.16)}
 
-  /* ---------- branch settings (gear, top-right of the subpage) ---------- */
-  /* The top-right corner, one row down from #pipToggle's exact spot. That
-     first row is fully occupied: the subpage bar's own "+ Add a subtask" and
-     delete buttons run to the frame's right edge, and the Dashboard paints
-     its "+" (add widget) and pop-out buttons on top of this frame there at
-     z-index 3000. Sitting just beneath all of it keeps the gear in the same
-     corner without ever being covered or crowding the bar. */
-  #branchSettingsBtn{
-    position:fixed;top:56px;right:14px;z-index:9999;width:34px;height:34px;
-    border-radius:50%;border:1px solid #dbe2ec;background:#fff;color:#5b6675;
-    cursor:pointer;display:none;place-items:center;padding:0;
-    box-shadow:0 2px 8px rgba(23,32,42,.14);
+  /* ---------- Auto Branch toggle ----------
+     A plain global on/off, rendered in the subpage bar immediately left of
+     the "+ Add a subtask" button (see render()). No popover and no scoping
+     prompt — one setting, applied everywhere. */
+  .autobranch-toggle{
+    flex:0 0 auto;align-self:flex-start;margin-top:1px;white-space:nowrap;
   }
-  #branchSettingsBtn.visible{display:grid}
-  #branchSettingsBtn:hover{color:var(--ink);border-color:#c3cede}
-  #branchSettingsBtn svg{width:17px;height:17px}
-  .branch-settings-pop{
-    position:fixed;z-index:10000;display:none;background:#fff;border-radius:10px;
-    padding:12px 14px;min-width:236px;
-    box-shadow:0 4px 14px rgba(23,32,42,.12),0 12px 32px rgba(23,32,42,.16);
-    font-size:12.5px;color:var(--ink);
+  .btn.autobranch-toggle.on{background:#000000;border-color:#000000;color:#ffffff}
+  @media (hover:hover){
+    .btn.autobranch-toggle.on:hover{background:#222222;border-color:#222222;color:#ffffff}
   }
-  .branch-settings-pop.open{display:block}
-  .branch-settings-pop label{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer;line-height:1.35}
-  .branch-settings-pop input[type=checkbox]{margin:2px 0 0 0;flex:0 0 auto;cursor:pointer}
-  .branch-settings-confirm{
-    display:none;margin-top:10px;padding-top:10px;border-top:1px solid #eef1f5;
-  }
-  .branch-settings-confirm.open{display:block}
-  .branch-settings-confirm p{margin:0 0 8px 0;color:var(--muted);font-size:11.5px}
-  .branch-settings-confirm .btn{width:100%;justify-content:center;margin-bottom:6px}
-  .branch-settings-confirm .btn:last-child{margin-bottom:0}
 
   /* ---------- dragging a task card onto / next to another task ---------- */
   .node{cursor:grab}
@@ -2066,23 +2208,6 @@
   <button id="pipToggle" aria-label="Pin window" title="Pop out as an always-on-top window" style="position:fixed;top:10px;right:10px;z-index:9999;width:34px;height:34px;border-radius:50%;border:1px solid #b3bfcd;background:#fff;box-shadow:0 1px 2px rgba(23,32,42,.06),0 6px 20px rgba(23,32,42,.08);cursor:pointer;display:flex;align-items:center;justify-content:center;">
     <svg viewBox="0 0 24 24" width="15" height="15" fill="#111" stroke="#111" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"><path d="M8 5 L8 19 L18 12 Z"/></svg>
   </button>
-  <!-- Branch-line settings. Takes the same top-right corner as #pipToggle,
-       which is hidden whenever this app is embedded in the Dashboard (see
-       the injected "#pipToggle{display:none!important}" rule above), so the
-       two never collide in practice. Shown only while a subpage is open —
-       render() owns the .visible class. -->
-  <button id="branchSettingsBtn" type="button" aria-label="Branch settings" title="Branch settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-  </button>
-  <div class="branch-settings-pop" id="branchSettingsPop">
-    <label><input type="checkbox" id="branchAutoBranch"><span>Auto Branch</span></label>
-    <div class="branch-settings-confirm" id="branchSettingsConfirm">
-      <p>Where should this apply?</p>
-      <button class="btn primary" type="button" id="branchApplyAll">Apply to all</button>
-      <button class="btn ghost" type="button" id="branchApplyOne">Apply to just this one</button>
-    </div>
-  </div>
-
   <div id="app-root">
   <!-- The standalone root-task board (and its "Add a task" button) is gone:
        root tasks now come from Google Tasks, created in the Dashboard's
@@ -2161,12 +2286,12 @@
   var cancelEdit = false;
   var dragState = null;   // in-progress drag-to-link state (not persisted)
   var currentParentId = null; // null = main board; otherwise the id of the root task whose children we're viewing as a subpage (not persisted)
-  // id -> explicit open/closed state for that node's notepad. Notes are OPEN
-  // by default, so an ABSENT key means open and only an explicit `false`
-  // closes one — hence isNotepadOpen() rather than reading the map directly.
-  // Not persisted; it's view state, like the other toggles here.
+  // id -> true while that node's notepad is expanded. Closed by default: a
+  // card shows its note only once the Notes hover button is clicked. Not
+  // persisted; it's view state, like the other toggles here. Read through
+  // isNotepadOpen() rather than directly, so the default lives in one place.
   var notepadOpenIds = {};
-  function isNotepadOpen(id){ return notepadOpenIds[id] !== false; }
+  function isNotepadOpen(id){ return !!notepadOpenIds[id]; }
   var timerPopupOpenIds = {}; // id -> true while that node's timer popup is showing (not persisted, purely a UI toggle)
   var timerPopupPos = {}; // id -> {left,top} once a popup has been manually dragged; cleared when it's closed, so reopening re-anchors to the clock button
   // id -> true while that node's tag pills are revealed. Tags are hidden by
@@ -2178,31 +2303,30 @@
   var tagsOpenIds = {};
   var aiPendingIds = {}; // id -> true while an AI reply is in flight, so the button can't be fired twice (not persisted)
 
-  // Branch-line settings (the gear, top-right). Kept in their own storage key
-  // rather than folded into the {roots,links} blob so that a settings write
-  // can never race with, or corrupt, the actual task tree.
+  // Auto Branch: one global on/off, driven by the toggle button in the
+  // subpage bar. ON (the default) draws every automatic line — the CSS
+  // org-chart connectors from each parent to its children, AND a connector
+  // between each pair of adjacent root cards. OFF draws none, at any level.
   //
-  //   autoBranch — ON (the default) draws every automatic line: the CSS
-  //     org-chart connectors from each parent to its children, AND a
-  //     connector between each pair of adjacent root cards. OFF draws no
-  //     automatic lines at any level.
+  // Kept in its own storage key rather than folded into the {roots,links}
+  // blob so that a settings write can never race with, or corrupt, the tree.
   //
-  // Drawing links BY HAND (the .link-handle drags) is deliberately not gated
-  // by this at all — it stays available either way, which is why nothing here
-  // is consulted when deciding whether to render handles.
+  // Drawing and removing links BY HAND (the .link-handle drags) is
+  // deliberately not gated by this at all — both stay available either way,
+  // which is why nothing here is consulted when rendering handles.
   //
-  // perSubtree[parentId] holds a subpage's own override ("apply to just this
-  // one"); "apply to all" writes the default and clears every override, so it
-  // genuinely means everywhere.
+  // removedAutoPairs holds the individual automatic connections the user has
+  // retraced away (see removeConnection). Auto lines aren't stored anywhere —
+  // they're derived from sibling order and parent/child structure on every
+  // render — so suppressing one has to be recorded as its own fact. Keyed by
+  // the two node ids sorted and joined, so direction never matters.
   var BRANCH_SETTINGS_KEY = "gtask-branch-settings-v1";
-  var branchSettings = { autoBranch: true, perSubtree: {} };
+  var branchSettings = { autoBranch: true, removedAutoPairs: {} };
 
-  function effectiveBranchSettings(){
-    var o = (currentParentId && branchSettings.perSubtree[currentParentId]) || {};
-    return {
-      autoBranch: typeof o.autoBranch === "boolean" ? o.autoBranch : branchSettings.autoBranch
-    };
-  }
+  function effectiveBranchSettings(){ return { autoBranch: !!branchSettings.autoBranch }; }
+
+  function autoPairKey(a, b){ return [String(a), String(b)].sort().join("|"); }
+  function isAutoPairRemoved(a, b){ return !!branchSettings.removedAutoPairs[autoPairKey(a, b)]; }
 
   async function saveBranchSettings(){
     await window.storage.set(BRANCH_SETTINGS_KEY, JSON.stringify(branchSettings), true);
@@ -2216,90 +2340,98 @@
       var parsed = JSON.parse(raw);
       if(!parsed || typeof parsed !== "object") return;
       if(typeof parsed.autoBranch === "boolean") branchSettings.autoBranch = parsed.autoBranch;
-      // Settings written before the two flags were merged into one: a saved
-      // file only has meaning for the below-root lines, so that flag carries over.
+      // Settings written before the flags were merged into one. A per-subpage
+      // override (`perSubtree`) no longer exists — Auto Branch is global now —
+      // so an old file's overrides are simply dropped, not migrated.
       else if(typeof parsed.showBranches === "boolean") branchSettings.autoBranch = parsed.showBranches;
-      if(parsed.perSubtree && typeof parsed.perSubtree === "object"){
-        branchSettings.perSubtree = {};
-        Object.keys(parsed.perSubtree).forEach(function(k){
-          var o = parsed.perSubtree[k] || {};
-          var v = typeof o.autoBranch === "boolean" ? o.autoBranch
-                : typeof o.showBranches === "boolean" ? o.showBranches : null;
-          if(v !== null) branchSettings.perSubtree[k] = { autoBranch: v };
-        });
+      if(parsed.removedAutoPairs && typeof parsed.removedAutoPairs === "object"){
+        branchSettings.removedAutoPairs = parsed.removedAutoPairs;
       }
     }catch(e){}
   }
 
-  /* ---------- branch settings popover ---------- */
-  // Nothing is committed as the checkboxes are ticked: the change reveals the
-  // confirm row, and only "Apply to all" / "Apply to just this one" writes.
-  // Dismissing the popover without choosing therefore discards the edit, and
-  // reopening re-reads the settings actually in force.
-  function branchSettingsEls(){
-    return {
-      btn: document.getElementById("branchSettingsBtn"),
-      pop: document.getElementById("branchSettingsPop"),
-      confirm: document.getElementById("branchSettingsConfirm"),
-      autoBranch: document.getElementById("branchAutoBranch")
-    };
-  }
+  /* ---------- retrace-to-remove ----------
+     Dragging from a card's handle back onto a card it is already connected to
+     removes that connection instead of making a second one. It's the only way
+     to remove an automatic line (those are pointer-events:none, so the
+     click-a-line handler never sees them), and it lets one auto line go
+     without switching Auto Branch off everywhere.
 
-  function openBranchSettings(){
-    var el = branchSettingsEls();
-    if(!el.pop || !el.btn) return;
-    var eff = effectiveBranchSettings();
-    el.autoBranch.checked = eff.autoBranch;
-    el.confirm.classList.remove("open");
-    el.pop.classList.add("open");
-    var r = el.btn.getBoundingClientRect();
-    var pr = el.pop.getBoundingClientRect();
-    el.pop.style.top = (r.bottom + 8) + "px";
-    el.pop.style.left = Math.max(8, Math.min(r.right - pr.width, window.innerWidth - pr.width - 8)) + "px";
-  }
-
-  // Returns whether it actually closed anything, so Escape can tell if it
-  // consumed the keypress.
-  function closeBranchSettings(){
-    var el = branchSettingsEls();
-    if(!el.pop || !el.pop.classList.contains("open")) return false;
-    el.pop.classList.remove("open");
-    el.confirm.classList.remove("open");
-    return true;
-  }
-
-  function applyBranchSettings(scope){
-    var el = branchSettingsEls();
-    if(!el.autoBranch) return;
-    var next = { autoBranch: !!el.autoBranch.checked };
-    if(scope === "one" && currentParentId){
-      branchSettings.perSubtree[currentParentId] = next;
-    }else{
-      // "Apply to all" has to clear the per-subpage overrides too, or pages
-      // that were customized earlier would quietly ignore the new default.
-      branchSettings.autoBranch = next.autoBranch;
-      branchSettings.perSubtree = {};
+     Returns true if something was removed, so the drag handler knows not to
+     fall through to creating a link. */
+  function manualLinkBetween(a, b){
+    for(var i=0;i<links.length;i++){
+      var l = links[i];
+      if((l.a===a && l.b===b) || (l.a===b && l.b===a)) return l;
     }
-    saveBranchSettings();
-    closeBranchSettings();
-    render();
+    return null;
   }
 
-  function wireBranchSettings(){
-    var el = branchSettingsEls();
-    if(!el.btn || !el.pop) return;
-    el.btn.addEventListener("click", function(e){
-      e.stopPropagation();
-      if(el.pop.classList.contains("open")) closeBranchSettings(); else openBranchSettings();
+  // An automatic connection exists between two cards when Auto Branch is on
+  // and they are either adjacent in the same sibling row (the SVG root-row
+  // lines) or a parent and one of its own children (the CSS org-chart
+  // connectors) — and it hasn't already been retraced away.
+  function autoConnectionBetween(a, b){
+    if(!effectiveBranchSettings().autoBranch) return false;
+    if(isAutoPairRemoved(a, b)) return false;
+    if(parentIdOf(a) === b || parentIdOf(b) === a) return true;
+    // Sibling adjacency only counts in the top row: drawLinks derives its
+    // auto lines from activeList(), and deeper siblings are joined to their
+    // parent by the CSS connectors rather than to each other.
+    var rootList = activeList();
+    var ca = findContainer(a), cb = findContainer(b);
+    if(!ca || !cb || ca.list !== rootList || cb.list !== rootList) return false;
+    return Math.abs(ca.index - cb.index) === 1;
+  }
+
+  // Auto Branch only ever ADDS a line where there isn't one already: a pair the
+  // user joined by hand keeps its own hand-drawn link and gets no automatic
+  // line on top of it. Without this, switching Auto Branch on would paint a
+  // second connector over every manual link it happened to agree with, and
+  // retracing that pair would remove only one of the two — which reads as Auto
+  // Branch having overwritten the manual branch.
+  function autoBranchSuppressed(a, b){
+    return isAutoPairRemoved(a, b) || !!manualLinkBetween(a, b);
+  }
+
+  function connectionBetween(a, b){
+    if(a === b) return false;
+    return !!manualLinkBetween(a, b) || autoConnectionBetween(a, b);
+  }
+
+  // Deleting a card drops any retraced-away pairs that mentioned it, so the
+  // settings blob doesn't accumulate keys for ids that no longer exist.
+  function forgetRemovedAutoPairsFor(id){
+    var changed = false;
+    Object.keys(branchSettings.removedAutoPairs).forEach(function(key){
+      if(key.split("|").indexOf(String(id)) === -1) return;
+      delete branchSettings.removedAutoPairs[key];
+      changed = true;
     });
-    el.autoBranch.addEventListener("change", function(){ el.confirm.classList.add("open"); });
-    document.getElementById("branchApplyAll").addEventListener("click", function(){ applyBranchSettings("all"); });
-    document.getElementById("branchApplyOne").addEventListener("click", function(){ applyBranchSettings("one"); });
-    document.addEventListener("pointerdown", function(e){
-      if(!el.pop.classList.contains("open")) return;
-      if(e.target.closest && (e.target.closest("#branchSettingsPop") || e.target.closest("#branchSettingsBtn"))) return;
-      closeBranchSettings();
-    });
+    if(changed) saveBranchSettings();
+  }
+
+  function removeConnection(a, b){
+    var manual = manualLinkBetween(a, b);
+    if(manual){
+      links = links.filter(function(l){ return l !== manual; });
+      return true;
+    }
+    if(autoConnectionBetween(a, b)){
+      branchSettings.removedAutoPairs[autoPairKey(a, b)] = true;
+      saveBranchSettings();
+      return true;
+    }
+    return false;
+  }
+
+  // Flips Auto Branch for every subpage at once and redraws immediately, so
+  // the whole tree that's already on screen gains or loses its lines on the
+  // spot rather than only newly-added cards picking up the change.
+  function toggleAutoBranch(){
+    branchSettings.autoBranch = !branchSettings.autoBranch;
+    saveBranchSettings();
+    render();
   }
 
   // the list "Add a task" and the top-level render loop operate on: the
@@ -2507,7 +2639,6 @@
       var ae = document.activeElement;
       if(ae && ae.closest && ae.closest("div.edit,.timer-duration-input,.notepad-textarea")) return;
       var closedSomething = false;
-      if(closeBranchSettings()) closedSomething = true;
       Object.keys(timerPopupOpenIds).forEach(function(id){
         if(!timerPopupOpenIds[id]) return;
         delete timerPopupOpenIds[id];
@@ -2717,9 +2848,17 @@
     var sizeStyle = "";
     if(n.notepadW) sizeStyle += "width:" + n.notepadW + "px;";
     if(n.notepadH) sizeStyle += "height:" + n.notepadH + "px;";
-    return '<div class="notepad-wrap"><textarea class="notepad-textarea" data-id="'+n.id+'" placeholder="Notes"'+
+    // notepadX is how far the box's left edge has been dragged out past the
+    // card's own left edge (always <= 0). Only the left-side grips write it.
+    var wrapStyle = n.notepadX ? ' style="left:'+n.notepadX+'px"' : '';
+    var grip = function(kind){
+      return '<span class="notepad-resize '+kind+'" data-resize="'+kind+'" data-id="'+n.id+'"></span>';
+    };
+    return '<div class="notepad-wrap"'+wrapStyle+'><textarea class="notepad-textarea" data-id="'+n.id+'" placeholder="Docs"'+
       (sizeStyle ? ' style="'+sizeStyle+'"' : '')+'>'+
-      escapeForTextareaHtml(n.notepadText)+'</textarea></div>';
+      escapeForTextareaHtml(n.notepadText)+'</textarea>'+
+      grip("left")+grip("right")+grip("bl")+
+      '</div>';
   }
 
   function renderNode(n, isRoot, showLeft, showRight, drillable, hideChildren){
@@ -2727,16 +2866,19 @@
       ? '<div class="edit" contenteditable="true" data-id="'+n.id+'" data-placeholder="Title">'+(n.text||"")+'</div>'
       : '<div class="text" data-act="edit" data-id="'+n.id+'">'+(n.text||"")+'</div>';
 
-    // Every card carries all four connector handles, at every level, whether
-    // or not automatic branches are switched on: drawing a link by hand is
-    // always available and is deliberately not gated by the Auto Branch
-    // setting. Left/right suit cards sitting side by side, top/bottom suit
-    // ones stacked in a column (the main board's roots) — which pair you use
-    // is just which edge you drag from.
+    // Every card carries connector handles at every level, whether or not
+    // automatic branches are switched on: drawing a link by hand is always
+    // available and is deliberately not gated by the Auto Branch setting.
+    // Left/right suit cards sitting side by side, top/bottom suit ones stacked
+    // in a column (the main board's roots) — which pair you use is just which
+    // edge you drag from. The one exception is the TOP handle on a root-row
+    // card: there is nothing above the first row for it to reach, so it's
+    // omitted rather than left as a dead grip competing with .actions.
     function handleHtml(side){
       return '<button class="link-handle '+side+'" data-handle="'+side+'" data-id="'+n.id+'" title="Drag to link"></button>';
     }
-    var handles = handleHtml("left") + handleHtml("right") + handleHtml("top") + handleHtml("bottom");
+    var handles = handleHtml("left") + handleHtml("right") +
+      (isRoot ? "" : handleHtml("top")) + handleHtml("bottom");
 
     var card =
       // .tags-shown drives the tagbar's visibility purely in CSS rather than
@@ -2748,11 +2890,14 @@
         ' data-id="'+n.id+'" data-root="'+(isRoot?'true':'false')+'"'+
         (drillable?' data-act="drill"':'')+'>'+
         handles+
+        // Ordered by how often they're reached for: AI and Docs first, then
+        // Timer, then Tags. "+" and "x" keep their fixed places at the end so
+        // the two destructive/structural buttons never move under the cursor.
         '<div class="actions">'+
-          '<button class="act tags'+(tagsOpenIds[n.id]?' mini-expanded':'')+'" data-act="tags-toggle" data-id="'+n.id+'" title="Tags">'+ICON.tag+'</button>'+
-          '<button class="act notepad'+(isNotepadOpen(n.id)?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Notes">'+ICON.note+'</button>'+
-          buildTimerButtonHtml(n)+
           '<button class="act ai'+(aiPendingIds[n.id]?' thinking':'')+'" data-act="ai" data-id="'+n.id+'" title="Ask AI">'+ICON.sparkle+'</button>'+
+          '<button class="act notepad'+(isNotepadOpen(n.id)?' mini-expanded':'')+'" data-act="notepad" data-id="'+n.id+'" title="Docs">'+ICON.note+'</button>'+
+          buildTimerButtonHtml(n)+
+          '<button class="act tags'+(tagsOpenIds[n.id]?' mini-expanded':'')+'" data-act="tags-toggle" data-id="'+n.id+'" title="Tags">'+ICON.tag+'</button>'+
           (drillable ? '' : '<button class="act add" data-act="add" data-id="'+n.id+'" title="Add subtask">'+ICON.plus+'</button>')+
           '<button class="act del" data-act="del" data-id="'+n.id+'" title="Delete branch">'+ICON.x+'</button>'+
         '</div>'+
@@ -2767,10 +2912,44 @@
 
     var childrenHtml = "";
     if(!hideChildren && n.children.length){
-      childrenHtml = '<ul>'+n.children.map(function(c){ return renderNode(c, false, false, false, false, false); }).join("")+'</ul>';
+      // A parent→child connector the user retraced away is hidden by marking
+      // that child's <li> (the ::before/::after elbows belong to it). If every
+      // child is hidden, the <ul>'s own vertical stub would be left dangling
+      // in mid-air, so the list gets marked too.
+      var allChildrenCut = n.children.every(function(c){ return autoBranchSuppressed(n.id, c.id); });
+      childrenHtml = '<ul'+(allChildrenCut ? ' class="no-auto-stub"' : '')+'>'+
+        n.children.map(function(c){ return renderNode(c, false, false, false, false, false); }).join("")+
+      '</ul>';
     }
-    return '<li>'+card+childrenHtml+'</li>';
+    // isRoot cards sit in the top row, which has no elbows of its own — the
+    // class only matters for a child li.
+    var liClass = (!isRoot && autoBranchSuppressed(parentIdOf(n.id) || "", n.id)) ? ' class="no-auto-branch"' : '';
+    return '<li'+liClass+'>'+card+childrenHtml+'</li>';
   }
+
+  // The Branches AI mark. Inline SVG (rather than the supplied JPEG) so it
+  // scales cleanly, follows currentColor, and carries no white backing slab.
+  // Kept as its own copy here because this frame is a separate document from
+  // the dashboard's own copy of the same mark.
+  var BRANCHES_AI_LOGO =
+    '<svg viewBox="0 0 100 41" fill="none" aria-hidden="true">' +
+      '<path d="M20.4 19.5 V33 Q20.4 38 25.4 38 H74.6 Q79.6 38 79.6 33 V19.5" ' +
+        'stroke="currentColor" stroke-width="5.6" stroke-linecap="round"/>' +
+      '<rect x="0" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<rect x="58.2" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<path fill="#ffffff" d="M20.4 2 Q21.62 7.98 27.6 9.2 Q21.62 10.42 20.4 16.4 ' +
+        'Q19.18 10.42 13.2 9.2 Q19.18 7.98 20.4 2 Z"/>' +
+      '<path fill="#ffffff" d="M29.5 11.2 Q30.08 14.02 32.9 14.6 Q30.08 15.18 29.5 18 ' +
+        'Q28.92 15.18 26.1 14.6 Q28.92 14.02 29.5 11.2 Z"/>' +
+      '<path fill="#ffffff" d="M78.6 2 Q79.82 7.98 85.8 9.2 Q79.82 10.42 78.6 16.4 ' +
+        'Q77.38 10.42 71.4 9.2 Q77.38 7.98 78.6 2 Z"/>' +
+      '<path fill="#ffffff" d="M87.7 11.2 Q88.28 14.02 91.1 14.6 Q88.28 15.18 87.7 18 ' +
+        'Q87.12 15.18 84.3 14.6 Q87.12 14.02 87.7 11.2 Z"/>' +
+    '</svg>';
+
+  var BRANCHES_BRAND_HTML =
+    '<div class="branches-brand"><span class="branches-brand-mark">' + BRANCHES_AI_LOGO +
+    '</span><span class="branches-brand-text">Branches AI</span></div>';
 
   // The subpage now replaces the main board's own content in-place (on the
   // same #stage, reusing all its existing render/drag/link wiring) instead
@@ -2783,20 +2962,12 @@
       currentParentId = null;
     }
 
-    // The branch-settings gear belongs to the subpage, so it appears and
-    // disappears with one — including on the empty state below, which is
-    // still a subpage and can still have its branches configured.
-    var gear = document.getElementById("branchSettingsBtn");
-
     // No main board any more. With no task open there is nothing to draw —
     // the Dashboard keeps this whole frame hidden in that state anyway.
     if(currentParentId===null){
       stage.innerHTML = "";
-      if(gear) gear.classList.remove("visible");
-      closeBranchSettings();
       return;
     }
-    if(gear) gear.classList.add("visible");
 
     var onSubpage = true;
     var list = activeList();
@@ -2814,9 +2985,18 @@
       // have "subtasks" conceptually, so their subpage calls the same action
       // "Add a task" instead.
       var addLabel = String(currentParentId).indexOf("event:") === 0 ? "Add a task" : "Add a subtask";
-      barHtml = '<div class="subpage-bar">'+
+      // Auto Branch sits immediately left of the add button. It's a plain
+      // global on/off — one click applies everywhere and redraws the tree
+      // that's already on screen (see toggleAutoBranch).
+      var autoOn = effectiveBranchSettings().autoBranch;
+      barHtml = BRANCHES_BRAND_HTML +
+        '<div class="subpage-bar">'+
         '<button class="subpage-back" type="button" data-act="back" title="Back" aria-label="Back">'+ICON.back+'</button>'+
         '<div class="subpage-heading">'+headingHtml+'</div>'+
+        '<button class="btn ghost autobranch-toggle'+(autoOn?' on':'')+'" type="button" data-act="auto-branch"'+
+          ' aria-pressed="'+(autoOn?'true':'false')+'" title="'+(autoOn?'Auto Branch is on':'Auto Branch is off')+'">'+
+          'Auto Branch'+
+        '</button>'+
         '<button class="btn primary subpage-add" type="button" data-act="add-root" title="'+addLabel+'">'+
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'+
           addLabel+
@@ -2931,6 +3111,24 @@
     if(old) old.remove();
   }
 
+  // The closest pair of points on two axis-aligned boxes, one axis at a time:
+  // where the boxes are separated on an axis the near edges win, and where they
+  // overlap the shared span's midpoint does — which collapses to a straight
+  // perpendicular line whenever the two are side by side or stacked, and to a
+  // short diagonal between the facing corners when they're diagonally apart.
+  function nearestEdgePoints(ra, rb){
+    function axis(aLo, aHi, bLo, bHi){
+      if(aHi < bLo) return [aHi, bLo];
+      if(bHi < aLo) return [aLo, bHi];
+      var lo = Math.max(aLo, bLo), hi = Math.min(aHi, bHi);
+      var mid = (lo + hi) / 2;
+      return [mid, mid];
+    }
+    var xs = axis(ra.left, ra.right, rb.left, rb.right);
+    var ys = axis(ra.top, ra.bottom, rb.top, rb.bottom);
+    return { ax: xs[0], ay: ys[0], bx: xs[1], by: ys[1] };
+  }
+
   function showTimerLeaderLine(id){
     clearTimerLeader();
     var doc = getDoc();
@@ -2938,16 +3136,17 @@
     var card = doc.querySelector('.node[data-id="'+id+'"]');
     if(!pop || !card) return;
     var pr = pop.getBoundingClientRect(), cr = card.getBoundingClientRect();
+    var pts = nearestEdgePoints(pr, cr);
 
     var svgNS = "http://www.w3.org/2000/svg";
     var svg = doc.createElementNS(svgNS, "svg");
     svg.setAttribute("class", "timer-leader-layer");
     var line = doc.createElementNS(svgNS, "line");
     line.setAttribute("class", "timer-leader-line");
-    line.setAttribute("x1", pr.left + pr.width/2);
-    line.setAttribute("y1", pr.top + pr.height/2);
-    line.setAttribute("x2", cr.left + cr.width/2);
-    line.setAttribute("y2", cr.top + cr.height/2);
+    line.setAttribute("x1", pts.ax);
+    line.setAttribute("y1", pts.ay);
+    line.setAttribute("x2", pts.bx);
+    line.setAttribute("y2", pts.by);
     svg.appendChild(line);
     doc.body.appendChild(svg);
 
@@ -2960,7 +3159,70 @@
   // setNotepadTextQuiet's own comment for why). A small local debounce
   // rather than the parent document's debounce()/wireField() helpers, which
   // live in a different script block/document and aren't reachable from here.
+  // The three non-native grips. resize:both already owns the bottom-right
+  // corner, so these mirror it on the sides it doesn't offer: a full-height
+  // strip down each edge plus the bottom-left corner. Both left-hand grips
+  // also slide the box's left edge outward past the card (node.notepadX),
+  // since a note anchored at left:0 can't otherwise grow leftward at all.
+  function wireNotepadResizeGrips(container){
+    var grips = container.querySelectorAll(".notepad-resize");
+    for(var i=0;i<grips.length;i++){
+      (function(grip){
+        var kind = grip.getAttribute("data-resize");
+        var id = grip.getAttribute("data-id");
+        grip.addEventListener("mousedown", function(e){
+          var wrap = grip.parentNode;
+          var ta = wrap.querySelector(".notepad-textarea");
+          if(!ta) return;
+          // Both stopped: this must not start a card drag or a text selection.
+          e.preventDefault();
+          e.stopPropagation();
+          var doc = getDoc();
+          var startX = e.clientX, startY = e.clientY;
+          var startW = ta.offsetWidth, startH = ta.offsetHeight;
+          var f = locate(id);
+          var startLeft = (f && f.node.notepadX) || 0;
+          var MIN_W = 140, MIN_H = 70;
+          wrap.classList.add("resizing");
+
+          function onMove(ev){
+            var dx = ev.clientX - startX, dy = ev.clientY - startY;
+            if(kind === "right"){
+              ta.style.width = Math.max(MIN_W, startW + dx) + "px";
+            }else{
+              // Left edge: width grows as the pointer moves left, and the wrap
+              // shifts by exactly the amount gained so the right edge holds
+              // still — otherwise the box would appear to slide rather than
+              // stretch.
+              var w = Math.max(MIN_W, startW - dx);
+              ta.style.width = w + "px";
+              wrap.style.left = (startLeft + (startW - w)) + "px";
+              if(kind === "bl") ta.style.height = Math.max(MIN_H, startH + dy) + "px";
+            }
+            ev.preventDefault();
+          }
+          function onUp(){
+            doc.removeEventListener("mousemove", onMove);
+            doc.removeEventListener("mouseup", onUp);
+            wrap.classList.remove("resizing");
+            // Re-locate rather than reusing `f`: the tree may have been saved
+            // and rebuilt between mousedown and mouseup.
+            var found = locate(id);
+            if(!found) return;
+            found.node.notepadW = Math.round(ta.offsetWidth);
+            found.node.notepadH = Math.round(ta.offsetHeight);
+            found.node.notepadX = Math.round(parseFloat(wrap.style.left) || 0);
+            save();
+          }
+          doc.addEventListener("mousemove", onMove);
+          doc.addEventListener("mouseup", onUp);
+        });
+      })(grips[i]);
+    }
+  }
+
   function wireNotepadTextareas(container){
+    wireNotepadResizeGrips(container);
     var areas = container.querySelectorAll(".notepad-textarea");
     for(var i=0;i<areas.length;i++){
       (function(el){
@@ -3191,6 +3453,18 @@
           popup.addEventListener("pointermove", onMove);
           popup.addEventListener("pointerup", onUp);
         });
+        // Double-click anywhere on the popup's own chrome flashes the leader
+        // line back to the card it belongs to. On dblclick rather than the
+        // click that opened it, so it's something you ask for when a floating
+        // popup has drifted away from its task rather than a flicker every
+        // time. Play/Pause and Reset are excluded, so a fast double-tap on
+        // those still just starts and stops the countdown as usual.
+        popup.addEventListener("dblclick", function(e){
+          if(e.target.closest("input,button")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          showTimerLeaderLine(id);
+        });
       })(popups[i]);
     }
   }
@@ -3336,11 +3610,85 @@
   // ever one container in practice (#stage) — the subpage renders into it
   // in place of the main board rather than in a separate overlay — but this
   // stays container-scoped since it's called fresh on every render().
+  /* ---------- bullets in the subpage heading ----------
+     The same plain-text "• " bullets the Docs field uses, but here the field is
+     a contenteditable rather than a textarea, so a "line" ends at the nearest
+     <br> (what execCommand("insertLineBreak") leaves behind) rather than at a
+     "\n". Everything before the caret is recovered by cloning that range and
+     swapping each <br> for a newline, which is far more robust than walking
+     sibling nodes by hand through whatever <b>/<a> markup the heading holds. */
+  function headingTextBeforeCaret(inp){
+    var doc = getDoc();
+    var sel = doc.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return null;
+    var r = sel.getRangeAt(0);
+    if(!inp.contains(r.startContainer)) return null;
+    var pre = doc.createRange();
+    pre.setStart(inp, 0);
+    pre.setEnd(r.startContainer, r.startOffset);
+    var holder = doc.createElement("div");
+    holder.appendChild(pre.cloneContents());
+    var brs = holder.querySelectorAll("br");
+    for(var i=0;i<brs.length;i++){
+      brs[i].parentNode.replaceChild(doc.createTextNode("\n"), brs[i]);
+    }
+    return holder.textContent;
+  }
+
+  function headingCaretLine(inp){
+    var before = headingTextBeforeCaret(inp);
+    if(before === null) return null;
+    return before.slice(before.lastIndexOf("\n") + 1);
+  }
+
+  // "- " or "* " typed at the very start of a line becomes "• ". Mid-sentence
+  // dashes are left alone.
+  function applyHeadingBulletShorthand(inp){
+    var doc = getDoc();
+    var sel = doc.getSelection();
+    if(!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+    var r = sel.getRangeAt(0);
+    var node = r.startContainer, offset = r.startOffset;
+    if(node.nodeType !== 3 || offset < 2) return false;
+    var two = node.data.slice(offset - 2, offset);
+    if(two !== "- " && two !== "* ") return false;
+    if(headingCaretLine(inp) !== two) return false;
+    var range = doc.createRange();
+    range.setStart(node, offset - 2);
+    range.setEnd(node, offset);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    doc.execCommand("insertText", false, BULLET);
+    return true;
+  }
+
+  // Enter on a bullet line continues the list; Enter on an empty bullet ends it
+  // by clearing that bullet in place (the same escape the Docs textarea uses).
+  // Returns true when it handled the key itself.
+  function handleHeadingBulletEnter(inp){
+    var doc = getDoc();
+    var line = headingCaretLine(inp);
+    if(line === null) return false;
+    if(/^•\s*$/.test(line)){
+      for(var i=0;i<line.length;i++) doc.execCommand("delete");
+      return true;
+    }
+    if(line.charAt(0) === "•"){
+      doc.execCommand("insertLineBreak");
+      doc.execCommand("insertText", false, BULLET);
+      return true;
+    }
+    return false;
+  }
+
   function wireEditableInput(container){
     var inp = container.querySelector("div.edit");
     if(!inp) return;
     cancelEdit = false;
     placeCaretAtEnd(inp);
+    // Bullets and pasted links are both scoped to the subpage heading only —
+    // per-row task titles stay plain single-line fields.
+    var isHeading = isTitleEditor(inp);
     inp.addEventListener("keydown", function(e){
       var mod = e.metaKey || e.ctrlKey;
       if(mod && (e.key==="b" || e.key==="B")){
@@ -3348,14 +3696,30 @@
         getDoc().execCommand("bold");
       } else if(e.key==="Enter"){
         e.preventDefault();
+        if(isHeading && handleHeadingBulletEnter(inp)) return;
         getDoc().execCommand("insertLineBreak");
       } else if(e.key==="Escape"){
         cancelEdit = true; inp.blur();
       }
     });
+    if(isHeading){
+      inp.addEventListener("input", function(){ applyHeadingBulletShorthand(inp); });
+    }
+    var allowLinks = isHeading;
     inp.addEventListener("paste", function(e){
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData("text/plain");
+      // Pasting a URL over highlighted text in the subpage heading turns that
+      // text into the link, rather than replacing it with the raw URL.
+      if(allowLinks){
+        var url = pastedUrl(text);
+        var sel = getDoc().getSelection();
+        if(url && sel && sel.rangeCount && !sel.isCollapsed){
+          getDoc().execCommand("createLink", false, url);
+          inp.dispatchEvent(new Event("input", {bubbles:true}));
+          return;
+        }
+      }
       getDoc().execCommand("insertText", false, text);
     });
     // Live-sync every keystroke into the actual data model (and its own
@@ -3367,7 +3731,7 @@
       var found = locate(id);
       if(!found) return;
       pushUndo();
-      found.node.text = sanitizeHtml(inp.innerHTML);
+      found.node.text = sanitizeHtml(inp.innerHTML, allowLinks);
       save();
     });
     inp.addEventListener("blur", function(){
@@ -3388,7 +3752,7 @@
         }
       } else {
         var found2 = locate(id);
-        if(found2){ found2.node.text = sanitizeHtml(inp.innerHTML); } // final sync, already live-synced per keystroke above
+        if(found2){ found2.node.text = sanitizeHtml(inp.innerHTML, allowLinks); } // final sync, already live-synced per keystroke above
       }
       editingId = null; editStartText = null; save(); render();
       // Renaming the subpage heading renames the underlying Google Task.
@@ -3429,8 +3793,36 @@
 
   // strips a contenteditable div's HTML down to only <b>/<strong>/<br>, with no attributes,
   // so it's always safe to store and re-inject directly into the DOM.
-  function sanitizeHtml(html){
-    var allowed = {b:1, strong:1, br:1};
+  /* ---------- hyperlinks in the subpage heading ----------
+     Only the heading (the div.edit bound to the open task's own text) can
+     carry links. Per-row task titles and the dashboard's widget names are
+     deliberately excluded — a URL pasted there stays plain text. */
+  function isTitleEditor(el){ return !!(el && el.closest && el.closest(".subpage-heading")); }
+
+  // Anything not http(s)/mailto — javascript:, data:, vbscript: — is refused
+  // rather than escaped, since these strings end up in a live href.
+  function safeLinkHref(raw){
+    var href = String(raw || "").trim();
+    if(!href) return null;
+    if(/^(https?:|mailto:)/i.test(href)) return href;
+    // A bare domain typed or pasted without a scheme is treated as https.
+    if(/^www\.[^\s]+$/i.test(href)) return "https://" + href;
+    return null;
+  }
+
+  // What counts as "a URL was pasted" for the wrap-the-selection behaviour.
+  function pastedUrl(text){
+    var t = String(text || "").trim();
+    if(!t || /\s/.test(t)) return null;   // a sentence containing a URL isn't one
+    return safeLinkHref(t);
+  }
+
+  // allowLinks additionally keeps <a href> — passed only when sanitizing the
+  // subpage heading (see isTitleEditor). Ordinary card titles stay
+  // link-free, so a URL pasted onto a task row can never become a live
+  // anchor there.
+  function sanitizeHtml(html, allowLinks){
+    var allowed = allowLinks ? {b:1, strong:1, br:1, a:1} : {b:1, strong:1, br:1};
     var container = getDoc().createElement("div");
     container.innerHTML = html;
 
@@ -3440,8 +3832,19 @@
         var next = child.nextSibling;
         if(child.nodeType===1){
           var tag = child.tagName.toLowerCase();
+          // Read href before the attribute strip below wipes it, and only
+          // put it back if the scheme is one we're willing to render.
+          var keptHref = (allowLinks && tag==="a") ? safeLinkHref(child.getAttribute("href")) : null;
           while(child.attributes && child.attributes.length){
             child.removeAttribute(child.attributes[0].name);
+          }
+          if(keptHref){
+            child.setAttribute("href", keptHref);
+            child.setAttribute("target", "_blank");
+            child.setAttribute("rel", "noopener noreferrer");
+          } else if(tag==="a"){
+            // An anchor with nothing safe to point at is just text.
+            tag = "a-stripped";
           }
           clean(child);
           if(!allowed[tag]){
@@ -3483,7 +3886,13 @@
     var autoPairs = [];
     if(effectiveBranchSettings().autoBranch){
       var rootList = activeList();
-      for(var i=0;i<rootList.length-1;i++) autoPairs.push({a:rootList[i].id, b:rootList[i+1].id});
+      for(var i=0;i<rootList.length-1;i++){
+        var pa = rootList[i].id, pb = rootList[i+1].id;
+        // Skip a pair the user retraced away, and any pair that already has a
+        // hand-drawn link of its own — see autoBranchSuppressed.
+        if(autoBranchSuppressed(pa, pb)) continue;
+        autoPairs.push({a:pa, b:pb});
+      }
     }
     if(!links.length && !autoPairs.length) return;
 
@@ -3558,7 +3967,7 @@
     var inp = getDoc().querySelector('div.edit[data-id="'+editingId+'"]');
     if(inp){
       var found = locate(editingId);
-      if(found){ found.node.text = sanitizeHtml(inp.innerHTML); }
+      if(found){ found.node.text = sanitizeHtml(inp.innerHTML, isTitleEditor(inp)); }
     }
     editingId = null; editStartText = null;
   }
@@ -3620,6 +4029,7 @@
       pushUndo();
       var r = node(""); activeList().push(r); editingId = r.id; save(); render(); centerScroll(); scrollTaskIntoView(r.id); return;
     }
+    if(act==="auto-branch"){ toggleAutoBranch(); return; }
     if(act==="back"){
       currentParentId = null; editingId = null; editStartText = null; render(); notifyParentFullscreen(); return;
     }
@@ -3646,6 +4056,7 @@
       pushUndo();
       f.list.splice(f.index,1);
       links = links.filter(function(l){ return l.a!==id && l.b!==id; });
+      forgetRemovedAutoPairsFor(id);
       if(id===currentParentId) currentParentId = null; // the subpage we were viewing just got deleted
       save(); render(); notifyParentFullscreen();
     }
@@ -3693,9 +4104,10 @@
       // stale drag position from a previous time this popup was shown.
       delete timerPopupPos[id];
       render();
-      // After render(), so the popup exists and has been positioned — the
-      // line is measured from where it actually landed.
-      if(timerPopupOpenIds[id]) showTimerLeaderLine(id); else clearTimerLeader();
+      // Opening no longer draws the leader line — that's a double-click on the
+      // popup now (see wireTimerPopupDrag). Closing still clears any line left
+      // on screen, since its two endpoints are about to stop existing.
+      if(!timerPopupOpenIds[id]) clearTimerLeader();
     }
   }
 
@@ -3744,9 +4156,15 @@
 
     var card = dropTargetAt(e.clientX, e.clientY);
     if(card !== dragState.hoverEl){
-      if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target");
+      if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target", "drop-unlink");
       dragState.hoverEl = card;
-      if(card) card.classList.add("drop-target");
+      if(card){
+        // Retracing an existing connection removes it, so the hover state
+        // has to say which of the two is about to happen.
+        var unlink = connectionBetween(dragState.fromId, card.getAttribute("data-id"));
+        card.classList.add(unlink ? "drop-unlink" : "drop-target");
+        dragState.line.classList.toggle("unlinking", unlink);
+      }
     }
   }
 
@@ -3756,10 +4174,18 @@
     getDoc().removeEventListener("pointerup", onDragEnd);
 
     var card = dropTargetAt(e.clientX, e.clientY);
-    if(card){ pushUndo(); addLink(dragState.fromId, card.getAttribute("data-id")); save(); }
+    if(card){
+      var toId = card.getAttribute("data-id");
+      pushUndo();
+      // Retrace-to-remove first; only an unconnected pair creates a link.
+      // addLink is itself a toggle, but going through removeConnection keeps
+      // manual and automatic connections on the same gesture.
+      if(!removeConnection(dragState.fromId, toId)) addLink(dragState.fromId, toId);
+      save();
+    }
 
     dragState.svg.remove();
-    if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target");
+    if(dragState.hoverEl) dragState.hoverEl.classList.remove("drop-target", "drop-unlink");
     dragState = null;
     render();
   }
@@ -4082,6 +4508,16 @@
     var h = e.target.closest(".link-handle");
     if(h){ e.preventDefault(); startDrag(h, e); return; }
 
+    // Cmd/Ctrl+click a link in the subpage heading to follow it. Without the
+    // modifier the click falls through to "edit", so a fully-linked title is
+    // still editable — the same trade-off the dashboard's note editor makes.
+    var anchor = e.target.closest(".subpage-heading a[href]");
+    if(anchor && (e.metaKey || e.ctrlKey)){
+      e.preventDefault();
+      window.open(anchor.getAttribute("href"), "_blank", "noopener");
+      return;
+    }
+
     // Act on pointerdown, not click. Reason: if another node's text is still
     // being edited, a plain click would first blur that field (triggering its
     // own re-render) before the click event finishes resolving — which could
@@ -4154,7 +4590,6 @@
   // specific Google Task via __unbleepOpenGTask() — there is no main board.
   var loaded = Promise.all([load(), loadBranchSettings()]).then(function(){
     try{ window.history.replaceState({parentId:null}, ""); }catch(e){}
-    wireBranchSettings();
     render();
     document.getElementById("stage").classList.add("fade");
     // A reload can land with a timer already running from before — resume
@@ -4884,12 +5319,8 @@
     });
   }
 
-  // "Default" is the blue that calendar events used to get unconditionally
-  // when they had no status. Events are neutral now, so this is how you opt
-  // back into that look deliberately.
-  var STATUS_PRESETS = ["Default", "To-do", "In progress", "Complete"];
+  var STATUS_PRESETS = ["To-do", "In progress", "Complete"];
   var STATUS_COLORS = {
-    "Default": { bg: "#e7ecff", text: "#2952cc", dot: "#cdd8fb" },
     "To-do": { bg: "#e3e3e3", text: "#555555", dot: "#8a8a8a" },
     "In progress": { bg: "#faecd8", text: "#9a6708", dot: "#d9a441" },
     "Complete": { bg: "#dcf1e4", text: "#1a7f4e", dot: "#4caf6d" }
@@ -5519,23 +5950,27 @@
       cal: "colCal-height", unschedTasks: "colUnschedTasks-height", readingList: "colReadingList-height",
       atomicHabits: "colAtomicHabits-height", affirmations: "colAffirmations-height", vocab: "colVocab-height"
     };
-    const COLLAPSE_STORAGE_KEY = {
-      cal: "cal-collapsed", unschedTasks: "unschedTasks-collapsed", readingList: "readingList-collapsed",
-      atomicHabits: "atomicHabits-collapsed", affirmations: "affirmations-collapsed", vocab: "vocab-collapsed"
-    };
-    // Reuses the two pre-existing preference keys for Reading List and
-    // Unscheduled Tasks so anyone who'd already collapsed either one keeps
-    // that state across this update.
-    const MINI_COLLAPSE_STORAGE_KEY = {
-      cal: "cal-mini-collapsed", unschedTasks: "unsched-tasks-mini-collapsed", readingList: "reading-list-mini-collapsed",
-      atomicHabits: "atomicHabits-mini-collapsed", affirmations: "affirmations-mini-collapsed", vocab: "vocab-mini-collapsed"
-    };
+    // Hidden state is keyed per widget id ("<id>-hidden", see hideStorageKey);
+    // the two older collapse preferences it replaces are deliberately NOT
+    // migrated — a widget that used to be mini-collapsed or collapsed-to-strip
+    // now simply starts visible, which is the safer default given hiding a
+    // widget removes it from the grid entirely.
     const MIN_COL = 200;
     const MIN_ROW = 80;
     const MANUALLY_RESIZED = {}; // Track which page ids have been manually row-dragged
 
     function widgetEl(id) { return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]'); }
-    function isCollapsed(id) { const el = widgetEl(id); return !!el && el.classList.contains("collapsed"); }
+    // ---- hidden state ----
+    // Replaces the two collapse notions this used to carry (an in-place
+    // mini-collapse that kept the header, and a per-slot collapse-to-strip).
+    // Hiding is per widget and total: the wrapper goes display:none and its tab
+    // moves to the bottom bar. The element itself stays put inside its slot,
+    // which is what lets unhiding restore it to the same position with all its
+    // live state (calendar view, notepad text, open popups) untouched.
+    const hidden = {};
+    function isHidden(id) { return !!hidden[id]; }
+    function slotAllHidden(slot) { return !!slot && slot.every(isHidden); }
+    function isCollapsed(id) { return isHidden(id); }
     function slotOf(id) {
       for (const slot of layout) { if (slot.indexOf(id) !== -1) return slot; }
       return null;
@@ -5570,9 +6005,9 @@
       const el = widgetEl(leaderId);
       const slotEl = el && el.parentElement;
       if (!slotEl || !slotEl.classList.contains("col-slot")) return;
-      const slot = slotOf(leaderId);
-      const collapsed = !!slot && isCollapsed(leaderId);
-      slotEl.style.flex = collapsed ? "0 0 0px" : "0 0 " + widths[leaderId] + "px";
+      // A slot whose every widget is hidden is display:none'd wholesale by
+      // applyHiddenState, so there's no collapsed-to-0px case to handle here.
+      slotEl.style.flex = "0 0 " + widths[leaderId] + "px";
     }
 
     // The last widget in a slot always absorbs whatever height its
@@ -5607,21 +6042,14 @@
       el.style.flex = isLast ? "1 1 auto" : "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
     }
 
-    // The ▶ strip-collapse control always collapses the whole section (its
-    // entire slot, including any widgets stacked below it), so only the
-    // slot's first ("leader") widget shows the button — whichever widget
-    // that is, it's always the rightmost control in that widget's hover
-    // cluster since it's the last one in the header markup. Also flags note
-    // widgets (see .note-widget in the stylesheet) so their section-header
-    // title stays hidden — that one's fixed by widget type, not by how it's
-    // currently arranged.
+    // Hide is per widget now, so — unlike the old per-slot collapse control —
+    // every widget shows its own, leader or not, and there's nothing to toggle
+    // here. Still flags note widgets (see .note-widget in the stylesheet) so
+    // their section-header title stays hidden; that one's fixed by widget type,
+    // not by how the widget is currently arranged.
     function updateWidgetChrome(id) {
       const el = widgetEl(id);
       if (!el) return;
-      const slot = slotOf(id);
-      const isLeader = !slot || slot[0] === id;
-      const stripBtn = document.getElementById(id + "CollapseBtn");
-      if (stripBtn) stripBtn.style.display = isLeader ? "" : "none";
       el.classList.toggle("note-widget", !!NOTE_WIDGETS[id]);
     }
 
@@ -5660,6 +6088,7 @@
           }
         });
 
+        slotEl.appendChild(buildSectionHideButton(slot));
         frag.appendChild(slotEl);
 
         if (slotIdx < layout.length - 1) {
@@ -5688,20 +6117,18 @@
         });
       });
 
-      updateResizerStates();
+      applyHiddenState();
     }
 
-    // A column-resizer is only draggable when the slot to its immediate
-    // left is visible AND at least one slot further right (skipping any
-    // fully-collapsed single-widget ones in between) is also visible to
-    // absorb the width change.
+    // A column-resizer is only draggable when there is a visible slot on its
+    // left AND at least one visible slot somewhere to its right to absorb the
+    // width change.
     function updateResizerStates() {
       const colResizers = Array.prototype.slice.call(widget.querySelectorAll(".col-resizer"));
-      function slotCollapsed(slot) { return isCollapsed(slot[0]); }
       colResizers.forEach(function (resizer, i) {
-        const leftCollapsed = slotCollapsed(layout[i]);
-        const rightAllCollapsed = layout.slice(i + 1).every(slotCollapsed);
-        resizer.classList.toggle("disabled", leftCollapsed || rightAllCollapsed);
+        const leftHidden = slotAllHidden(layout[i]);
+        const rightAllHidden = layout.slice(i + 1).every(slotAllHidden);
+        resizer.classList.toggle("disabled", leftHidden || rightAllHidden);
       });
     }
 
@@ -5798,124 +6225,223 @@
       WIDGET_IDS.forEach(applyWidgetIcon);
     })();
 
-    // ---- collapse toggles ----
-    // Collapsing a section moves its (leader's) strip out of the row
-    // entirely and into a shared bar pinned at the bottom, and shrinks that
-    // section's whole slot to 0px (rather than a 32px in-row strip) — the
-    // sections that stay expanded keep their exact same width, they just no
-    // longer have to share row space with narrow collapsed strips sitting
-    // beside them. This always acts on the entire slot, whether it holds
-    // one widget or several stacked ones — see updateWidgetChrome for why
-    // only the leader ever shows this button.
-    function makeCollapseToggle(id, wrapId, stripId, collapseBtnId) {
-      const wrap = document.getElementById(wrapId);
-      const strip = document.getElementById(stripId);
-      const collapseBtn = document.getElementById(collapseBtnId);
-      const storageKey = COLLAPSE_STORAGE_KEY[id];
+    /* ---------- hide / unhide ----------
+       One control per widget, replacing the two this used to have: an in-place
+       mini-collapse that kept the header visible, and a collapse-to-strip that
+       shrank a widget's whole slot. Hiding now takes the widget out of the grid
+       outright — display:none on its own wrapper and on the .row-resizer beside
+       it, so the surrounding flex layout reflows into the freed space — and
+       parks its tab in the bar at the bottom of the page. Unhiding is always
+       one tab, one widget, whether it got there from the per-widget button or
+       from a whole section being hidden at once. */
+    function tabFor(id) { return document.getElementById(id + "Strip"); }
+    function hideStorageKey(id) { return id + "-hidden"; }
 
-      function updateBarVisibility() {
-        collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
-      }
-
-      function setCollapsed(collapsed) {
-        wrap.classList.toggle("collapsed", collapsed);
-        applyWidth(id);
-        if (collapsed) {
-          if (strip.parentNode !== collapsedTabsBar) collapsedTabsBar.appendChild(strip);
-        } else {
-          if (strip.parentNode !== wrap) wrap.appendChild(strip);
-        }
-        updateBarVisibility();
-        updateResizerStates();
-      }
-
-      (async function loadState() {
-        const saved = await storageGet(storageKey);
-        setCollapsed(saved === "true");
-      })();
-
-      function onTrigger() {
-        const collapsed = !wrap.classList.contains("collapsed");
-        setCollapsed(collapsed);
-        storageSet(storageKey, collapsed ? "true" : "false");
-        if (!collapsed) {
-          // Textareas hidden while collapsed can't measure their content
-          // height; recalc now that they're visible again.
-          setTimeout(recalcAllTextareas, 0);
-        }
-      }
-
-      // The strip (now living in the bottom bar while collapsed) expands
-      // the section back; the small collapse button (visible only for the
-      // slot's leader widget — see updateWidgetChrome) collapses it.
-      strip.addEventListener("click", onTrigger);
-      collapseBtn.addEventListener("click", onTrigger);
+    function updateTabsBarVisibility() {
+      collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
     }
 
-    makeCollapseToggle("cal", "calColWrap", "calStrip", "calCollapseBtn");
-    makeCollapseToggle("unschedTasks", "unschedTasksColWrap", "unschedTasksStrip", "unschedTasksCollapseBtn");
-    makeCollapseToggle("readingList", "readingListColWrap", "readingListStrip", "readingListCollapseBtn");
-    makeCollapseToggle("atomicHabits", "atomicHabitsColWrap", "atomicHabitsStrip", "atomicHabitsCollapseBtn");
-    makeCollapseToggle("affirmations", "affirmationsColWrap", "affirmationsStrip", "affirmationsCollapseBtn");
-    makeCollapseToggle("vocab", "vocabColWrap", "vocabStrip", "vocabCollapseBtn");
+    // The tab shows the widget's own emoji to the left of its label; a widget
+    // with no icon set shows the label alone rather than a placeholder glyph.
+    function applyTabIcon(id) {
+      const tab = tabFor(id);
+      const iconEl = tab && tab.querySelector("[data-tab-icon]");
+      if (!iconEl) return;
+      const emoji = WIDGET_ICONS[id] || "";
+      iconEl.textContent = emoji;
+      iconEl.hidden = !emoji;
+    }
 
-    // ---- mini collapse (in-place, keeps the header visible — the ▲/▼
-    // toggle every widget has, distinct from the ▶ toggle above which tucks
-    // a whole standalone widget away into the bottom strip bar) ----
-    function makeMiniCollapseToggle(id) {
-      const btn = document.querySelector('[data-mini-collapse="' + id + '"]');
-      const body = document.getElementById(id + "WidgetBody");
-      if (!btn || !body) return;
-
-      // A note widget (see NOTE_WIDGETS/.note-widget) has no header title of
-      // its own — the visible "title" is just the note's own bold first
-      // line, living inside this same .widget-body. display:none-ing the
-      // whole body like every other widget would take that first line with
-      // it, leaving the collapsed widget looking nameless. Clipping to one
-      // line height instead keeps that first line on screen and hides only
-      // what's below it — collapsing the content while the section's
-      // "title" (the note's first line) stays put, same as every other
-      // widget already does.
-      const isNote = !!NOTE_WIDGETS[id];
-      let collapsedNow = false;
-
-      function apply(collapsed) {
-        collapsedNow = collapsed;
-        if (isNote) body.classList.toggle("mini-body-collapsed", collapsed);
-        else body.style.display = collapsed ? "none" : "";
-        btn.classList.toggle("mini-expanded", !collapsed);
-      }
-
-      (async function loadState() {
-        const saved = await storageGet(MINI_COLLAPSE_STORAGE_KEY[id]);
-        apply(saved === "true");
-      })();
-
-      btn.addEventListener("click", function () {
-        const collapsed = !collapsedNow;
-        apply(collapsed);
-        storageSet(MINI_COLLAPSE_STORAGE_KEY[id], collapsed ? "true" : "false");
-        if (!collapsed) {
-          // Textareas hidden while collapsed can't measure their content
-          // height; recalc now that they're visible again.
-          setTimeout(recalcAllTextareas, 0);
+    // Re-applies visibility across every widget, resizer and slot in one pass.
+    // Wholesale rather than patching just the widget that changed: hiding one
+    // widget can silence a row-resizer, a whole slot and a column-resizer at
+    // once, and there are only a handful of elements involved either way.
+    function applyHiddenState() {
+      WIDGET_IDS.forEach(function (id) {
+        // Skip anything not currently in the layout — a Calendar/Tasks widget
+        // that was "deleted" is parked in hiddenWidgetsPool (see hideWidget) and
+        // must not leave a tab behind for a widget that isn't on the board.
+        if (!slotOf(id)) return;
+        const el = widgetEl(id);
+        if (el) el.style.display = isHidden(id) ? "none" : "";
+        const tab = tabFor(id);
+        if (!tab) return;
+        if (isHidden(id)) {
+          if (tab.parentNode !== collapsedTabsBar) collapsedTabsBar.appendChild(tab);
+          applyTabIcon(id);
+        } else if (el && tab.parentNode !== el) {
+          el.appendChild(tab);
         }
+      });
+
+      // A row-resizer only earns its place with a visible widget on both sides
+      // of it; a slot with nothing visible left in it disappears entirely so
+      // the remaining slots reflow across its width.
+      Array.prototype.forEach.call(widget.querySelectorAll(".col-slot"), function (slotEl) {
+        const kids = Array.prototype.slice.call(slotEl.children);
+        function visibleWidget(el) {
+          return el.classList.contains("collapsible-col-wrap") && el.style.display !== "none";
+        }
+        let seenVisible = false;
+        kids.forEach(function (kid, i) {
+          if (kid.classList.contains("row-resizer")) {
+            const laterVisible = kids.slice(i + 1).some(visibleWidget);
+            kid.style.display = (seenVisible && laterVisible) ? "" : "none";
+          } else if (visibleWidget(kid)) {
+            seenVisible = true;
+          }
+        });
+        slotEl.style.display = seenVisible ? "" : "none";
+      });
+
+      Array.prototype.forEach.call(widget.querySelectorAll(".col-resizer"), function (resizer, i) {
+        const leftVisible = layout.slice(0, i + 1).some(function (s) { return !slotAllHidden(s); });
+        const rightVisible = layout.slice(i + 1).some(function (s) { return !slotAllHidden(s); });
+        resizer.style.display = (leftVisible && rightVisible) ? "" : "none";
+      });
+
+      updateTabsBarVisibility();
+      updateResizerStates();
+    }
+
+    function setHidden(id, value) {
+      hidden[id] = !!value;
+      storageSet(hideStorageKey(id), value ? "true" : "false");
+      if (value && maximizedId === id) setMaximized(null);
+      applyHiddenState();
+      if (!value) {
+        // A textarea inside a display:none widget reports scrollHeight 0 and so
+        // can't size itself; re-measure now that it's back on screen.
+        setTimeout(recalcAllTextareas, 0);
+      }
+    }
+
+    // Hides every widget in one slot. Each lands as its own separate tab, so
+    // restoring is still one tab at a time — a section is a convenient way to
+    // hide several at once, not a group that travels together.
+    function hideSection(slot) {
+      slot.slice().forEach(function (id) {
+        hidden[id] = true;
+        storageSet(hideStorageKey(id), "true");
+        if (maximizedId === id) setMaximized(null);
+      });
+      applyHiddenState();
+    }
+
+    const HIDE_ICON_SVG =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M3 3l18 18"/>' +
+      '<path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/>' +
+      '<path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/>' +
+      '<path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+
+    function buildSectionHideButton(slot) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "section-hide-btn";
+      btn.title = "Hide every widget in this section";
+      btn.setAttribute("aria-label", "Hide this section");
+      btn.innerHTML = HIDE_ICON_SVG + "<span>Hide section</span>";
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        hideSection(slot);
+      });
+      return btn;
+    }
+
+    function wireHideButton(btn) {
+      if (!btn) return;
+      const id = btn.getAttribute("data-hide-col");
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setHidden(id, true);
       });
     }
 
-    WIDGET_IDS.forEach(makeMiniCollapseToggle);
+    // The whole tab unhides, so the "Unhide" button inside it needs no listener
+    // of its own — its click bubbles up to here.
+    function wireTab(id) {
+      const tab = tabFor(id);
+      if (!tab) return;
+      tab.addEventListener("click", function () { setHidden(id, false); });
+    }
+
+    async function loadHiddenState(id) {
+      const saved = await storageGet(hideStorageKey(id));
+      if (saved === "true") {
+        hidden[id] = true;
+        applyHiddenState();
+      }
+    }
+
+    function wireWidgetVisibility(id, el) {
+      wireHideButton((el || document).querySelector('[data-hide-col="' + id + '"]'));
+      wireFullscreenButton((el || document).querySelector('[data-fullscreen-col="' + id + '"]'));
+      wireTab(id);
+      loadHiddenState(id);
+    }
+
+    /* ---------- one widget maximized over the whole page ----------
+       A CSS class toggle rather than the real Fullscreen API, matching
+       body.subpage-fullscreen-mode — the element being maximized is a grid child
+       mid-document, not a top-level overlay. Only one widget is ever maximized:
+       its stack-mates stay hidden behind it until it's exited, rather than being
+       maximized alongside it. */
+    let maximizedId = null;
+
+    function setMaximized(id) {
+      if (maximizedId) {
+        const prev = widgetEl(maximizedId);
+        if (prev) prev.classList.remove("widget-maximized");
+      }
+      maximizedId = id || null;
+      document.body.classList.toggle("widget-fullscreen-mode", !!maximizedId);
+      if (maximizedId) {
+        const el = widgetEl(maximizedId);
+        if (el) el.classList.add("widget-maximized");
+      }
+      // The widget just changed size by a lot in either direction.
+      setTimeout(recalcAllTextareas, 0);
+    }
+
+    function wireFullscreenButton(btn) {
+      if (!btn) return;
+      const id = btn.getAttribute("data-fullscreen-col");
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        setMaximized(maximizedId === id ? null : id);
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && maximizedId) setMaximized(null);
+    });
+
+    // The hyperlink Menu widget is built by its own script module, which can't
+    // reach in here — but it's a grid widget like any other and so gets the same
+    // Full screen control. Only that one: Menu has no .collapsible-strip to be
+    // parked in the tab bar, and it already has its own Remove/re-add flow via
+    // the "+" menu, so it deliberately doesn't take a Hide button (which would
+    // strand it with no tab to come back from).
+    window.__wireWidgetFullscreen = function (el) {
+      if (el) wireFullscreenButton(el.querySelector("[data-fullscreen-col]"));
+    };
+
+    WIDGET_IDS.forEach(function (id) { wireWidgetVisibility(id); });
 
     // ---- width resize (drag the wall between two slots) ----
     // Sum of the on-screen width (+ its own 20px handle) of every visible
     // slot other than the one led by `excludeLeaderId` — used to work out
-    // how far the slot actually being dragged is allowed to grow.
+    // how far the slot actually being dragged is allowed to grow. A slot counts
+    // as taking up width unless EVERY widget in it is hidden: a slot whose
+    // leader alone is hidden is still on screen, stretched by its siblings.
     function reservedWidth(excludeLeaderId) {
       let w = 0;
       layout.forEach(function (slot) {
         const leaderId = slot[0];
         if (leaderId === excludeLeaderId) return;
-        const collapsed = isCollapsed(leaderId);
-        if (!collapsed) w += widths[leaderId] + 20;
+        if (!slotAllHidden(slot)) w += widths[leaderId] + 20;
       });
       return w;
     }
@@ -6442,9 +6968,9 @@
             '<div class="widget-header-controls">' +
               '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
               '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+              '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+              '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
               '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-              '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-              '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
             '</div>' +
           '</div>' +
           '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -6455,8 +6981,9 @@
           '</div>' +
         '</div>' +
         '<div class="collapsible-strip" id="' + id + 'Strip">' +
-          '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+          '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
           '<span class="collapsible-strip-label">Page</span>' +
+          '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
         '</div>';
       return wrap;
     }
@@ -6477,8 +7004,6 @@
       if (DEFAULT_HEIGHT[id] == null) DEFAULT_HEIGHT[id] = type === "vocab" ? 260 : (type === "readingList" ? 220 : (type === "calView" ? 300 : 320));
       if (!WIDTH_STORAGE_KEY[id]) WIDTH_STORAGE_KEY[id] = "col" + id + "-width";
       if (!HEIGHT_STORAGE_KEY[id]) HEIGHT_STORAGE_KEY[id] = "col" + id + "-height";
-      if (!COLLAPSE_STORAGE_KEY[id]) COLLAPSE_STORAGE_KEY[id] = id + "-collapsed";
-      if (!MINI_COLLAPSE_STORAGE_KEY[id]) MINI_COLLAPSE_STORAGE_KEY[id] = id + "-mini-collapsed";
       if (type === "page") {
         NOTE_WIDGETS[id] = true;
         if (MANUALLY_RESIZED[id] == null) MANUALLY_RESIZED[id] = false;
@@ -6506,8 +7031,7 @@
         // built-ins by the static top-level calls elsewhere in this
         // script — only a freshly-built instance needs them wired here.
         if (!opts.alreadyWired) {
-          makeCollapseToggle(id, id + "ColWrap", id + "Strip", id + "CollapseBtn");
-          makeMiniCollapseToggle(id);
+          wireWidgetVisibility(id, el);
           wireDragHandle(el.querySelector(".col-drag-handle"));
           wireDeleteButton(el.querySelector("[data-delete-col]"));
           // querySelectorAll, not querySelector: a vocab mirror carries three
@@ -6536,6 +7060,8 @@
 
     function deleteDynamicWidget(id) {
       const type = dynamicWidgets[id] && dynamicWidgets[id].type;
+      if (maximizedId === id) setMaximized(null);
+      delete hidden[id];
       removeFromLayout(id);
       delete dynamicWidgets[id];
       const idx = WIDGET_IDS.indexOf(id);
@@ -6561,12 +7087,18 @@
     function hideWidget(id) {
       const el = widgetEl(id);
       if (!el) return;
+      // The tab travels back inside the widget so parking it leaves nothing
+      // behind in the bottom bar, and its hidden flag is cleared so re-adding
+      // it from the "+" menu brings it back visible rather than pre-hidden.
       const strip = document.getElementById(id + "Strip");
       if (strip) el.appendChild(strip);
+      delete hidden[id];
+      storageSet(hideStorageKey(id), "false");
+      if (maximizedId === id) setMaximized(null);
       removeFromLayout(id);
       persistLayout();
       hiddenWidgetsPool.appendChild(el);
-      collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
+      updateTabsBarVisibility();
       render();
     }
 
@@ -6674,15 +7206,10 @@
       if (vocabBox) { applyVocabBoxColors(vocabBox[1]); return; }
       const el = widgetEl(id);
       if (!el) return;
-      if (isVocabWidget(el)) {
-        // Never tinted — see applyVocabBoxColors. Clearing rather than just
-        // skipping matters for a widget that was colored before this rule
-        // existed, or that stored a color while it was a different type.
-        el.classList.remove("widget-colored");
-        el.style.backgroundColor = "";
-        applyVocabBoxColors(id);
-        return;
-      }
+      // A vocab widget tints its section background from this button like any
+      // other widget; the English and Chinese box colours are separate
+      // controls that paint on top of whatever that background is.
+      if (isVocabWidget(el)) applyVocabBoxColors(id);
       const color = WIDGET_COLORS[id];
       const customColor = color && color.toUpperCase() !== "#FFFFFF";
       // Note widgets (Page/Atomic Habits/Affirmations) render their text —
@@ -6782,147 +7309,491 @@
     const WIDGET_ICONS = {};
     const DEFAULT_ICON_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>';
 
-    // A curated (not exhaustive) emoji set, each tagged with search keywords —
-    // enough to make the filter box useful without trying to ship a full
-    // Unicode emoji database in a single-file app.
+    // Full-keyboard emoji set, grouped the way Apple's picker groups them and
+    // tagged with search keywords for the filter box. The picker UI is
+    // unchanged — this only widens the dataset it searches.
     const EMOJI_LIST = [
-      ["😀", "grinning face smile happy"], ["😃", "smile happy joy"], ["😄", "smile happy laugh"],
-      ["😁", "grin happy"], ["😆", "laugh happy squint"], ["😅", "sweat smile relief"],
-      ["🤣", "rofl laugh funny"], ["😂", "joy laugh tears funny"], ["🙂", "smile slight"],
-      ["🙃", "upside down silly"], ["😉", "wink"], ["😊", "blush smile happy"],
-      ["😇", "angel innocent halo"], ["😍", "heart eyes love"], ["🥰", "love hearts smile"],
-      ["😘", "kiss love"], ["😋", "yum tasty tongue"], ["😛", "tongue playful"],
-      ["😜", "wink tongue silly"], ["🤪", "zany crazy silly"], ["🤩", "star struck excited"],
-      ["🥳", "party celebrate birthday"], ["😎", "cool sunglasses"], ["🤓", "nerd glasses"],
-      ["🧐", "monocle curious"], ["😏", "smirk"], ["😒", "unamused annoyed"],
-      ["😞", "disappointed sad"], ["😔", "pensive sad"], ["😟", "worried"],
-      ["😕", "confused"], ["🙁", "frown sad"], ["😣", "persevere struggle"],
-      ["😖", "confounded frustrated"], ["😫", "tired exhausted"], ["😩", "weary tired"],
-      ["🥺", "pleading puppy eyes"], ["😢", "cry sad tear"], ["😭", "sob cry"],
-      ["😤", "triumph angry huff"], ["😠", "angry mad"], ["😡", "rage angry mad"],
-      ["🤯", "mind blown shocked"], ["😳", "flushed embarrassed"], ["🥵", "hot sweat"],
-      ["🥶", "cold freezing"], ["😱", "scream fear shocked"], ["😨", "fearful scared"],
-      ["😰", "anxious sweat"], ["😥", "sad relief tear"], ["😓", "sweat downcast"],
-      ["🤗", "hug"], ["🤔", "thinking"], ["🤭", "giggle oops"],
-      ["🤫", "shh quiet secret"], ["🤥", "lying pinocchio"], ["😶", "no mouth blank"],
-      ["😐", "neutral"], ["😑", "expressionless"], ["😬", "grimace awkward"],
-      ["🙄", "eye roll"], ["😴", "sleep tired zzz"], ["🤤", "drool"],
-      ["😷", "mask sick"], ["🤒", "sick thermometer fever"], ["🤕", "hurt bandage injured"],
-      ["🥴", "woozy dizzy"], ["🤢", "nauseated sick"], ["🤮", "vomit sick"],
-      ["🥱", "yawn tired bored"], ["😈", "devil smile mischief"], ["👿", "devil angry"],
-      ["💀", "skull dead"], ["👻", "ghost halloween"], ["👽", "alien"],
-      ["🤖", "robot"], ["🎃", "pumpkin halloween"], ["😺", "cat smile"],
-      ["😻", "cat heart eyes love"], ["🙈", "see no evil monkey"], ["🙉", "hear no evil monkey"],
-      ["🙊", "speak no evil monkey"],
-      ["👍", "thumbs up like good"], ["👎", "thumbs down dislike bad"], ["👏", "clap applause"],
-      ["🙌", "raise hands celebrate"], ["🙏", "pray thanks please"], ["🤝", "handshake deal"],
-      ["💪", "muscle strong flex"], ["🤞", "fingers crossed luck"], ["✌️", "peace victory"],
-      ["👋", "wave hello bye"], ["👌", "ok okay perfect"], ["✍️", "writing"],
-      ["❤️", "heart love red"], ["🧡", "heart orange love"], ["💛", "heart yellow love"],
-      ["💚", "heart green love"], ["💙", "heart blue love"], ["💜", "heart purple love"],
-      ["🖤", "heart black love"], ["🤍", "heart white love"], ["💔", "broken heart sad"],
-      ["💯", "hundred perfect score"], ["🔥", "fire hot lit"], ["✨", "sparkles shiny magic"],
-      ["⭐", "star favorite"], ["🌟", "star glowing"], ["⚡", "lightning bolt energy"],
-      ["🌈", "rainbow"], ["☀️", "sun sunny weather"], ["🌙", "moon night"],
-      ["☁️", "cloud weather"], ["❄️", "snowflake cold winter"], ["🌊", "wave ocean water"],
-      ["🌸", "blossom flower spring"], ["🌻", "sunflower"], ["🌵", "cactus plant"],
-      ["🍀", "clover luck"], ["🌴", "palm tree tropical"], ["🍁", "maple leaf autumn"],
-      ["🐶", "dog puppy animal"], ["🐱", "cat kitten animal"], ["🦊", "fox animal"],
-      ["🐼", "panda animal"], ["🐸", "frog animal"], ["🐢", "turtle animal"],
-      ["🦋", "butterfly"], ["🐝", "bee insect"], ["🐳", "whale animal"],
-      ["🍎", "apple fruit food"], ["🍊", "orange fruit food"], ["🍋", "lemon fruit food"],
-      ["🍇", "grapes fruit food"], ["🍓", "strawberry fruit food"], ["🍑", "peach fruit food"],
-      ["🍕", "pizza food"], ["🍔", "burger food"], ["🍟", "fries food"],
-      ["🍩", "donut food sweet"], ["🍪", "cookie food sweet"], ["🎂", "cake birthday"],
-      ["☕", "coffee drink"], ["🍵", "tea drink"], ["🍺", "beer drink"],
-      ["📚", "books reading study"], ["📖", "book open reading"], ["📝", "note memo write"],
-      ["✏️", "pencil write"], ["📌", "pin"], ["📍", "location pin"],
-      ["📅", "calendar date"], ["⏰", "alarm clock time"], ["⏳", "hourglass time"],
-      ["✅", "check done complete"], ["☑️", "checkbox done"], ["❌", "cross no wrong"],
-      ["❗", "exclamation important"], ["❓", "question mark"], ["💡", "idea lightbulb"],
-      ["🎯", "target goal"], ["🏆", "trophy win"], ["🎁", "gift present"],
-      ["🎉", "party celebrate confetti"], ["🎈", "balloon party"], ["💰", "money dollar"],
-      ["💵", "money cash dollar"], ["💳", "credit card money"], ["📈", "chart growth up"],
-      ["📉", "chart decline down"], ["💻", "laptop computer work"], ["🖥️", "computer desktop"],
-      ["📱", "phone mobile"], ["📷", "camera photo"], ["🎵", "music note"],
-      ["🎧", "headphones music"], ["🎮", "game controller"], ["⚽", "soccer ball sport"],
-      ["🏀", "basketball sport"], ["🏋️", "gym workout exercise"], ["🧘", "meditate yoga calm"],
-      ["🏃", "run exercise"], ["🚴", "bike cycling"], ["✈️", "airplane travel flight"],
-      ["🚗", "car travel drive"], ["🏠", "house home"], ["🏢", "office building work"],
-      ["🌍", "earth world globe"], ["🗺️", "map travel"], ["🧭", "compass direction"],
-      ["🔑", "key unlock"], ["🔒", "lock secure"], ["📦", "box package"],
-
-      // People & activity
-      ["🧑", "person people"], ["👤", "person user profile"], ["👥", "people group team"],
-      ["👶", "baby child"], ["🧒", "child kid"], ["👦", "boy child"],
-      ["👧", "girl child"], ["👨", "man person"], ["👩", "woman person"],
-      ["🧓", "older person elderly"], ["👪", "family"], ["🤱", "baby feeding family"],
-      ["🧑‍🍳", "cook chef food"], ["🧑‍⚕️", "doctor health medical"], ["🧑‍🏫", "teacher school"],
-      ["🧑‍💻", "developer coding work"], ["🧑‍🎓", "student graduate school"], ["🧑‍🔧", "mechanic repair"],
-      ["🕺", "dance man"], ["💃", "dance woman"], ["🏊", "swim exercise"],
-      ["🚶", "walk"], ["🧗", "climb exercise"], ["⛷️", "ski snow sport"],
-      ["🏂", "snowboard sport"], ["🏄", "surf sport"], ["🤸", "cartwheel gymnastics"],
-      ["🛌", "sleep bed rest"], ["🧖", "sauna spa relax"], ["💇", "haircut salon"],
-
-      // Nature, weather & animals
-      ["🌞", "sun sunny weather"], ["🌝", "moon face"], ["🌙", "moon night crescent"],
-      ["⭐", "star"], ["🌟", "glowing star sparkle"], ["✨", "sparkles shine magic"],
-      ["☀️", "sun weather clear"], ["⛅", "partly cloudy weather"], ["☁️", "cloud weather"],
-      ["🌧️", "rain weather"], ["⛈️", "storm thunder weather"], ["🌨️", "snow weather"],
-      ["❄️", "snowflake cold winter"], ["🌈", "rainbow"], ["🔥", "fire hot flame"],
-      ["💧", "water drop"], ["🌊", "wave ocean sea"], ["🌪️", "tornado storm"],
-      ["🌱", "seedling plant grow"], ["🌿", "herb plant leaf"], ["🍀", "clover luck"],
-      ["🌳", "tree nature"], ["🌵", "cactus plant"], ["🌷", "tulip flower"],
-      ["🌸", "blossom flower spring"], ["🌻", "sunflower flower"], ["🍁", "maple leaf autumn"],
+      // Smileys & Emotion
+      ["😀", "grinning face smile happy"], ["😃", "smile happy joy open mouth"], ["😄", "smile happy laugh eyes"],
+      ["😁", "grin happy beaming"], ["😆", "laugh happy squint satisfied"], ["😅", "sweat smile relief nervous"],
+      ["🤣", "rofl laugh funny rolling floor"], ["😂", "joy laugh tears funny"], ["🙂", "smile slight"],
+      ["🙃", "upside down silly irony"], ["🫠", "melting hot sarcasm"], ["😉", "wink flirt"],
+      ["😊", "blush smile happy warm"], ["😇", "angel innocent halo"], ["🥰", "love hearts smile adore"],
+      ["😍", "heart eyes love crush"], ["🤩", "star struck excited amazed"], ["😘", "kiss love blow"],
+      ["😗", "kissing"], ["😚", "kissing closed eyes"], ["😙", "kissing smile"],
+      ["🥲", "smiling tear happy sad"], ["😋", "yum tasty tongue delicious"], ["😛", "tongue playful"],
+      ["😜", "wink tongue silly joke"], ["🤪", "zany crazy silly wild"], ["😝", "squint tongue"],
+      ["🤑", "money mouth rich dollar"], ["🤗", "hug hands open"], ["🤭", "giggle oops hand over mouth"],
+      ["🫢", "gasp shock hand over mouth"], ["🫣", "peeking eye shy"], ["🤫", "shh quiet secret"],
+      ["🤔", "thinking hmm consider"], ["🫡", "salute respect yes"], ["🤐", "zipper mouth silence"],
+      ["🤨", "raised eyebrow skeptical"], ["😐", "neutral blank"], ["😑", "expressionless"],
+      ["😶", "no mouth speechless"], ["🫥", "dotted line invisible hidden"], ["😏", "smirk sly"],
+      ["😒", "unamused annoyed"], ["🙄", "eye roll"], ["😬", "grimace awkward"],
+      ["🤥", "lying pinocchio"], ["😌", "relieved calm content"], ["😔", "pensive sad down"],
+      ["😪", "sleepy tired"], ["🤤", "drool"], ["😴", "sleep zzz tired"],
+      ["😷", "mask sick medical"], ["🤒", "sick thermometer fever"], ["🤕", "hurt bandage injured"],
+      ["🤢", "nauseated sick green"], ["🤮", "vomit sick"], ["🤧", "sneeze tissue"],
+      ["🥵", "hot sweat overheated"], ["🥶", "cold freezing"], ["🥴", "woozy dizzy drunk"],
+      ["😵", "dizzy knocked out"], ["🤯", "mind blown shocked exploding"], ["🤠", "cowboy hat"],
+      ["🥳", "party celebrate birthday"], ["🥸", "disguise glasses incognito"], ["😎", "cool sunglasses"],
+      ["🤓", "nerd glasses geek"], ["🧐", "monocle curious inspect"], ["😕", "confused"],
+      ["🫤", "diagonal mouth meh"], ["😟", "worried"], ["🙁", "frown sad slight"],
+      ["☹️", "frowning sad"], ["😮", "open mouth surprise"], ["😯", "hushed surprise"],
+      ["😲", "astonished shocked"], ["😳", "flushed embarrassed"], ["🥺", "pleading puppy eyes beg"],
+      ["🥹", "holding back tears emotional"], ["😦", "frowning open mouth"], ["😧", "anguished"],
+      ["😨", "fearful scared"], ["😰", "anxious sweat"], ["😥", "sad relief tear"],
+      ["😢", "cry sad tear"], ["😭", "sob cry loudly"], ["😱", "scream fear shocked"],
+      ["😖", "confounded frustrated"], ["😣", "persevere struggle"], ["😞", "disappointed sad"],
+      ["😓", "sweat downcast"], ["😩", "weary tired"], ["😫", "tired exhausted"],
+      ["🥱", "yawn bored tired"], ["😤", "triumph huff steam"], ["😡", "rage angry mad red"],
+      ["😠", "angry mad"], ["🤬", "cursing swearing symbols"], ["😈", "devil smile mischief"],
+      ["👿", "devil angry imp"], ["💀", "skull dead"], ["☠️", "skull crossbones danger poison"],
+      ["💩", "poop pile"], ["🤡", "clown"], ["👹", "ogre monster"],
+      ["👺", "goblin"], ["👻", "ghost halloween boo"], ["👽", "alien"],
+      ["👾", "alien monster game"], ["🤖", "robot"], ["😺", "cat smile"],
+      ["😸", "cat grin"], ["😹", "cat joy tears"], ["😻", "cat heart eyes love"],
+      ["😼", "cat smirk"], ["😽", "cat kiss"], ["🙀", "cat weary shocked"],
+      ["😿", "cat crying"], ["😾", "cat pouting"], ["🙈", "see no evil monkey"],
+      ["🙉", "hear no evil monkey"], ["🙊", "speak no evil monkey"], ["💋", "kiss mark lips"],
+      ["💌", "love letter"], ["💘", "heart arrow cupid"], ["💝", "heart ribbon gift"],
+      ["💖", "sparkling heart"], ["💗", "growing heart"], ["💓", "beating heart"],
+      ["💞", "revolving hearts"], ["💕", "two hearts"], ["❤️", "heart love red"],
+      ["🧡", "orange heart"], ["💛", "yellow heart"], ["💚", "green heart"],
+      ["💙", "blue heart"], ["💜", "purple heart"], ["🖤", "black heart"],
+      ["🤍", "white heart"], ["🤎", "brown heart"], ["💔", "broken heart"],
+      ["❤️‍🔥", "heart on fire passion"], ["❤️‍🩹", "mending heart healing"], ["💯", "hundred perfect score"],
+      ["💢", "anger symbol"], ["💥", "collision boom explosion"], ["💫", "dizzy star"],
+      ["💦", "sweat droplets water"], ["💨", "dash wind fast"], ["🕳️", "hole"],
+      ["💬", "speech bubble chat"], ["💭", "thought bubble"], ["🗯️", "angry speech bubble"],
+      ["💤", "zzz sleep"],
+      // People & Body
+      ["👋", "wave hello bye hand"], ["🤚", "raised back of hand"], ["🖐️", "hand fingers splayed"],
+      ["✋", "raised hand stop"], ["🖖", "vulcan salute spock"], ["🫱", "rightwards hand"],
+      ["🫲", "leftwards hand"], ["🫳", "palm down hand"], ["🫴", "palm up hand"],
+      ["👌", "ok okay perfect"], ["🤌", "pinched fingers italian"], ["🤏", "pinch small tiny"],
+      ["✌️", "peace victory"], ["🤞", "fingers crossed luck hope"], ["🫰", "finger heart love"],
+      ["🤟", "love you gesture"], ["🤘", "rock on horns"], ["🤙", "call me shaka"],
+      ["👈", "point left"], ["👉", "point right"], ["👆", "point up"],
+      ["🖕", "middle finger"], ["👇", "point down"], ["☝️", "index up"],
+      ["🫵", "point at viewer you"], ["👍", "thumbs up like good yes"], ["👎", "thumbs down dislike bad no"],
+      ["✊", "raised fist"], ["👊", "fist bump punch"], ["🤛", "left fist"],
+      ["🤜", "right fist"], ["👏", "clap applause bravo"], ["🙌", "raise hands celebrate praise"],
+      ["🫶", "heart hands love"], ["👐", "open hands"], ["🤲", "palms up together"],
+      ["🤝", "handshake deal agreement"], ["🙏", "pray thanks please namaste"], ["✍️", "writing hand"],
+      ["💅", "nail polish manicure"], ["🤳", "selfie"], ["💪", "muscle strong flex biceps"],
+      ["🦾", "mechanical arm prosthetic"], ["🦿", "mechanical leg prosthetic"], ["🦵", "leg"],
+      ["🦶", "foot"], ["👂", "ear listen"], ["🦻", "ear hearing aid"],
+      ["👃", "nose smell"], ["🧠", "brain think mind"], ["🫀", "anatomical heart organ"],
+      ["🫁", "lungs breathe"], ["🦷", "tooth dental"], ["🦴", "bone"],
+      ["👀", "eyes look watch"], ["👁️", "eye see"], ["👅", "tongue"],
+      ["👄", "mouth lips"], ["🫦", "biting lip"], ["👶", "baby infant"],
+      ["🧒", "child kid"], ["👦", "boy"], ["👧", "girl"],
+      ["🧑", "person adult"], ["👱", "person blond hair"], ["👨", "man"],
+      ["🧔", "person beard"], ["👩", "woman"], ["🧓", "older person elderly"],
+      ["👴", "old man"], ["👵", "old woman"], ["🙍", "person frowning"],
+      ["🙎", "person pouting"], ["🙅", "person gesturing no"], ["🙆", "person gesturing ok"],
+      ["💁", "person tipping hand info"], ["🙋", "person raising hand question"], ["🧏", "deaf person"],
+      ["🙇", "person bowing sorry"], ["🤦", "facepalm"], ["🤷", "shrug dunno"],
+      ["🧑‍⚕️", "health worker doctor nurse"], ["🧑‍🎓", "student graduate"], ["🧑‍🏫", "teacher professor"],
+      ["🧑‍⚖️", "judge justice"], ["🧑‍🌾", "farmer"], ["🧑‍🍳", "cook chef"],
+      ["🧑‍🔧", "mechanic repair"], ["🧑‍🏭", "factory worker"], ["🧑‍💼", "office worker business"],
+      ["🧑‍🔬", "scientist researcher"], ["🧑‍💻", "technologist developer coding"], ["🧑‍🎤", "singer artist"],
+      ["🧑‍🎨", "artist painter"], ["🧑‍✈️", "pilot"], ["🧑‍🚀", "astronaut space"],
+      ["🧑‍🚒", "firefighter"], ["👮", "police officer cop"], ["🕵️", "detective spy investigate"],
+      ["💂", "guard"], ["🥷", "ninja"], ["👷", "construction worker"],
+      ["🫅", "person with crown royalty"], ["🤴", "prince"], ["👸", "princess"],
+      ["👳", "person turban"], ["👲", "person skullcap"], ["🧕", "woman headscarf hijab"],
+      ["🤵", "person in tuxedo"], ["👰", "person with veil bride"], ["🤰", "pregnant woman"],
+      ["🫄", "pregnant person"], ["🫃", "pregnant man"], ["🤱", "breastfeeding"],
+      ["👼", "baby angel cherub"], ["🎅", "santa claus christmas"], ["🤶", "mrs claus"],
+      ["🦸", "superhero"], ["🦹", "supervillain"], ["🧙", "mage wizard"],
+      ["🧚", "fairy"], ["🧛", "vampire"], ["🧜", "merperson mermaid"],
+      ["🧝", "elf"], ["🧞", "genie"], ["🧟", "zombie"],
+      ["🧌", "troll"], ["💆", "person getting massage"], ["💇", "person getting haircut"],
+      ["🚶", "walk pedestrian"], ["🧍", "person standing"], ["🧎", "person kneeling"],
+      ["🏃", "run running"], ["💃", "dancer woman dancing"], ["🕺", "dancer man dancing"],
+      ["🕴️", "person in suit levitating"], ["👯", "people with bunny ears party"], ["🧖", "sauna spa steam"],
+      ["🧗", "climbing rock"], ["🤺", "fencing"], ["🏇", "horse racing jockey"],
+      ["⛷️", "skier ski"], ["🏂", "snowboarder"], ["🏌️", "golfer golf"],
+      ["🏄", "surfer surfing"], ["🚣", "rowing boat"], ["🏊", "swimmer swimming"],
+      ["⛹️", "basketball player bouncing ball"], ["🏋️", "weight lifter gym workout"], ["🚴", "cyclist bike"],
+      ["🚵", "mountain biker"], ["🤸", "cartwheel gymnastics"], ["🤼", "wrestling"],
+      ["🤽", "water polo"], ["🤾", "handball"], ["🤹", "juggling"],
+      ["🧘", "meditate yoga lotus calm"], ["🛀", "bath bathing"], ["🛌", "sleep in bed"],
+      ["👭", "women holding hands"], ["👫", "woman and man holding hands couple"], ["👬", "men holding hands"],
+      ["💏", "kiss couple"], ["💑", "couple with heart"], ["👪", "family"],
+      ["🗣️", "speaking head talk"], ["👤", "bust silhouette person user"], ["👥", "busts silhouette people group"],
+      ["🫂", "people hugging"], ["👣", "footprints"],
+      // Animals & Nature
       ["🐶", "dog puppy pet"], ["🐱", "cat kitten pet"], ["🐭", "mouse"],
-      ["🐰", "rabbit bunny"], ["🦊", "fox"], ["🐻", "bear"],
-      ["🐼", "panda"], ["🐦", "bird"], ["🦉", "owl night wise"],
-      ["🐝", "bee"], ["🦋", "butterfly"], ["🐢", "turtle slow"],
-      ["🐠", "fish tropical"], ["🐳", "whale ocean"], ["🦁", "lion"],
-
-      // Food & drink
-      ["🍎", "apple fruit"], ["🍌", "banana fruit"], ["🍓", "strawberry fruit"],
-      ["🍇", "grapes fruit"], ["🍊", "orange fruit citrus"], ["🍉", "watermelon fruit"],
-      ["🥑", "avocado food"], ["🥦", "broccoli vegetable"], ["🥕", "carrot vegetable"],
-      ["🍞", "bread food"], ["🧀", "cheese food"], ["🥚", "egg food"],
-      ["🥗", "salad healthy food"], ["🍜", "noodles ramen food"], ["🍣", "sushi food"],
-      ["🍚", "rice food"], ["🥩", "meat steak food"], ["🍲", "stew soup food"],
-      ["🥤", "drink cup soda"], ["🍷", "wine drink"], ["🧊", "ice cold"],
-      ["🍫", "chocolate sweet"], ["🍦", "ice cream sweet"], ["🥂", "cheers celebrate drink"],
-
-      // Objects, tools & symbols
-      ["🗓️", "calendar schedule planner"], ["📋", "clipboard list"], ["🗒️", "notepad list"],
-      ["📊", "bar chart data"], ["📄", "document page file"], ["📁", "folder files"],
-      ["🗂️", "folders organize"], ["🗄️", "file cabinet archive"], ["📎", "paperclip attach"],
-      ["✂️", "scissors cut"], ["📏", "ruler measure"], ["🖊️", "pen write"],
-      ["🖍️", "crayon draw"], ["🖌️", "paintbrush art"], ["🎨", "art palette paint"],
-      ["🔍", "search magnify find"], ["🔎", "search zoom"], ["🔔", "bell notification"],
-      ["🔕", "bell off mute"], ["📢", "announce megaphone"], ["💬", "speech bubble chat"],
-      ["📨", "email message inbox"], ["📮", "postbox mail"], ["☎️", "phone call"],
-      ["⌨️", "keyboard typing"], ["🖱️", "mouse click"], ["🖨️", "printer"],
-      ["💾", "save floppy disk"], ["🔋", "battery power"], ["🔌", "plug power"],
-      ["⚙️", "settings gear config"], ["🔧", "wrench tool fix"], ["🔨", "hammer tool build"],
-      ["🧰", "toolbox tools"], ["🧪", "test tube science experiment"], ["🔬", "microscope science"],
-      ["🧬", "dna science biology"], ["💊", "pill medicine health"], ["🩺", "stethoscope health"],
-      ["🛏️", "bed sleep rest"], ["🚿", "shower bathroom"], ["🧹", "broom clean chores"],
-      ["🧺", "laundry basket chores"], ["🛒", "shopping cart buy"], ["🎬", "movie film clapper"],
-      ["📺", "tv television"], ["🎤", "microphone sing"], ["🎸", "guitar music"],
-      ["🎹", "piano music"], ["🥁", "drum music"], ["♟️", "chess strategy game"],
-      ["🎲", "dice game random"], ["🧩", "puzzle piece"], ["🏅", "medal award"],
-      ["🥇", "gold medal first win"], ["🚀", "rocket launch fast"], ["⛵", "sailboat travel"],
-      ["🚆", "train travel"], ["🚌", "bus travel"], ["🛴", "scooter travel"],
-      ["⛺", "tent camping outdoors"], ["🏖️", "beach vacation"], ["⛰️", "mountain hike outdoors"],
-      ["🏫", "school building"], ["🏥", "hospital health"], ["🏦", "bank money"],
-      ["⚡", "lightning fast energy"], ["♻️", "recycle green"], ["🔗", "link chain url"],
-      ["📶", "signal wifi bars"], ["🧠", "brain think mind"], ["👁️", "eye watch see"],
-      ["🕯️", "candle calm"], ["🪞", "mirror reflect"], ["🧿", "protection charm"],
-      ["➕", "plus add"], ["➖", "minus remove"], ["⚠️", "warning caution"],
+      ["🐹", "hamster"], ["🐰", "rabbit bunny"], ["🦊", "fox"],
+      ["🐻", "bear"], ["🐼", "panda"], ["🐻‍❄️", "polar bear"],
+      ["🐨", "koala"], ["🐯", "tiger face"], ["🦁", "lion"],
+      ["🐮", "cow face"], ["🐷", "pig face"], ["🐽", "pig nose"],
+      ["🐸", "frog"], ["🐵", "monkey face"], ["🐒", "monkey"],
+      ["🦍", "gorilla"], ["🦧", "orangutan"], ["🐕", "dog"],
+      ["🦮", "guide dog"], ["🐩", "poodle"], ["🐺", "wolf"],
+      ["🦝", "raccoon"], ["🐈", "cat"], ["🐈‍⬛", "black cat"],
+      ["🐅", "tiger"], ["🐆", "leopard"], ["🐴", "horse face"],
+      ["🫎", "moose"], ["🫏", "donkey"], ["🐎", "horse racing"],
+      ["🦄", "unicorn"], ["🦓", "zebra"], ["🦌", "deer"],
+      ["🦬", "bison buffalo"], ["🐂", "ox"], ["🐃", "water buffalo"],
+      ["🐄", "cow"], ["🐖", "pig"], ["🐗", "boar"],
+      ["🐏", "ram"], ["🐑", "sheep ewe"], ["🐐", "goat"],
+      ["🐪", "camel"], ["🐫", "two hump camel"], ["🦙", "llama alpaca"],
+      ["🦒", "giraffe"], ["🐘", "elephant"], ["🦣", "mammoth"],
+      ["🦏", "rhinoceros"], ["🦛", "hippopotamus"], ["🐁", "mouse small"],
+      ["🐀", "rat"], ["🐿️", "chipmunk squirrel"], ["🦔", "hedgehog"],
+      ["🦇", "bat"], ["🐦", "bird"], ["🐤", "baby chick"],
+      ["🐣", "hatching chick"], ["🐥", "front facing chick"], ["🦆", "duck"],
+      ["🦢", "swan"], ["🦅", "eagle"], ["🦉", "owl night wise"],
+      ["🦤", "dodo"], ["🪶", "feather"], ["🦩", "flamingo"],
+      ["🦚", "peacock"], ["🦜", "parrot"], ["🪽", "wing"],
+      ["🪿", "goose"], ["🐧", "penguin"], ["🐊", "crocodile alligator"],
+      ["🐢", "turtle slow"], ["🦎", "lizard gecko"], ["🐍", "snake"],
+      ["🐲", "dragon face"], ["🐉", "dragon"], ["🦕", "sauropod dinosaur"],
+      ["🦖", "t-rex dinosaur"], ["🐳", "whale spouting"], ["🐋", "whale"],
+      ["🐬", "dolphin"], ["🦭", "seal"], ["🐟", "fish"],
+      ["🐠", "tropical fish"], ["🐡", "blowfish pufferfish"], ["🦈", "shark"],
+      ["🐙", "octopus"], ["🐚", "shell spiral"], ["🪸", "coral"],
+      ["🪼", "jellyfish"], ["🦀", "crab"], ["🦞", "lobster"],
+      ["🦐", "shrimp"], ["🦑", "squid"], ["🦪", "oyster"],
+      ["🐌", "snail"], ["🦋", "butterfly"], ["🐛", "bug caterpillar"],
+      ["🐜", "ant"], ["🐝", "bee honeybee"], ["🪲", "beetle"],
+      ["🐞", "ladybug"], ["🦗", "cricket"], ["🪳", "cockroach"],
+      ["🕷️", "spider"], ["🕸️", "spider web"], ["🦂", "scorpion"],
+      ["🦟", "mosquito"], ["🪰", "fly"], ["🪱", "worm"],
+      ["🦠", "microbe germ virus bacteria"], ["💐", "bouquet flowers"], ["🌸", "cherry blossom spring"],
+      ["💮", "white flower"], ["🪷", "lotus"], ["🏵️", "rosette"],
+      ["🌹", "rose"], ["🥀", "wilted flower"], ["🌺", "hibiscus"],
+      ["🌻", "sunflower"], ["🌼", "blossom daisy"], ["🌷", "tulip"],
+      ["🪻", "hyacinth"], ["🌱", "seedling plant sprout grow"], ["🪴", "potted plant"],
+      ["🌲", "evergreen tree"], ["🌳", "deciduous tree"], ["🌴", "palm tree"],
+      ["🌵", "cactus"], ["🌾", "sheaf of rice grain"], ["🌿", "herb leaf"],
+      ["☘️", "shamrock"], ["🍀", "four leaf clover luck"], ["🍁", "maple leaf autumn canada"],
+      ["🍂", "fallen leaves autumn"], ["🍃", "leaf fluttering wind"], ["🪹", "empty nest"],
+      ["🪺", "nest with eggs"], ["🍄", "mushroom"], ["🌍", "earth globe europe africa world"],
+      ["🌎", "earth globe americas world"], ["🌏", "earth globe asia australia world"], ["🌐", "globe meridians internet web"],
+      ["🌑", "new moon"], ["🌒", "waxing crescent moon"], ["🌓", "first quarter moon"],
+      ["🌔", "waxing gibbous moon"], ["🌕", "full moon"], ["🌖", "waning gibbous moon"],
+      ["🌗", "last quarter moon"], ["🌘", "waning crescent moon"], ["🌙", "crescent moon night"],
+      ["🌚", "new moon face"], ["🌛", "first quarter moon face"], ["🌜", "last quarter moon face"],
+      ["🌡️", "thermometer temperature"], ["☀️", "sun sunny clear weather"], ["🌝", "full moon face"],
+      ["🌞", "sun with face"], ["🪐", "ringed planet saturn"], ["⭐", "star"],
+      ["🌟", "glowing star sparkle"], ["🌠", "shooting star wish"], ["🌌", "milky way galaxy"],
+      ["☁️", "cloud weather"], ["⛅", "sun behind cloud partly cloudy"], ["⛈️", "thunder cloud rain storm"],
+      ["🌤️", "sun behind small cloud"], ["🌥️", "sun behind large cloud"], ["🌦️", "sun behind rain cloud"],
+      ["🌧️", "rain cloud"], ["🌨️", "snow cloud"], ["🌩️", "lightning cloud"],
+      ["🌪️", "tornado twister"], ["🌫️", "fog"], ["🌬️", "wind face blowing"],
+      ["🌀", "cyclone hurricane"], ["🌈", "rainbow"], ["🌂", "closed umbrella"],
+      ["☂️", "umbrella"], ["☔", "umbrella rain drops"], ["⛱️", "umbrella on ground beach"],
+      ["⚡", "high voltage lightning fast energy"], ["❄️", "snowflake cold winter"], ["☃️", "snowman with snow"],
+      ["⛄", "snowman"], ["☄️", "comet"], ["🔥", "fire flame hot lit"],
+      ["💧", "droplet water"], ["🌊", "wave ocean sea water"],
+      // Food & Drink
+      ["🍇", "grapes"], ["🍈", "melon"], ["🍉", "watermelon"],
+      ["🍊", "tangerine orange citrus"], ["🍋", "lemon"], ["🍌", "banana"],
+      ["🍍", "pineapple"], ["🥭", "mango"], ["🍎", "red apple"],
+      ["🍏", "green apple"], ["🍐", "pear"], ["🍑", "peach"],
+      ["🍒", "cherries"], ["🍓", "strawberry"], ["🫐", "blueberries"],
+      ["🥝", "kiwi"], ["🍅", "tomato"], ["🫒", "olive"],
+      ["🥥", "coconut"], ["🥑", "avocado"], ["🍆", "eggplant aubergine"],
+      ["🥔", "potato"], ["🥕", "carrot"], ["🌽", "corn"],
+      ["🌶️", "hot pepper chili spicy"], ["🫑", "bell pepper"], ["🥒", "cucumber"],
+      ["🥬", "leafy green lettuce"], ["🥦", "broccoli"], ["🧄", "garlic"],
+      ["🧅", "onion"], ["🥜", "peanuts"], ["🫘", "beans"],
+      ["🌰", "chestnut"], ["🫚", "ginger"], ["🫛", "pea pod"],
+      ["🍞", "bread"], ["🥐", "croissant"], ["🥖", "baguette"],
+      ["🫓", "flatbread"], ["🥨", "pretzel"], ["🥯", "bagel"],
+      ["🥞", "pancakes"], ["🧇", "waffle"], ["🧀", "cheese"],
+      ["🍖", "meat on bone"], ["🍗", "poultry leg chicken"], ["🥩", "cut of meat steak"],
+      ["🥓", "bacon"], ["🍔", "hamburger burger"], ["🍟", "french fries"],
+      ["🍕", "pizza"], ["🌭", "hot dog"], ["🥪", "sandwich"],
+      ["🌮", "taco"], ["🌯", "burrito"], ["🫔", "tamale"],
+      ["🥙", "stuffed flatbread"], ["🧆", "falafel"], ["🥚", "egg"],
+      ["🍳", "cooking fried egg"], ["🥘", "shallow pan of food paella"], ["🍲", "pot of food stew"],
+      ["🫕", "fondue"], ["🥣", "bowl with spoon cereal"], ["🥗", "green salad healthy"],
+      ["🍿", "popcorn"], ["🧈", "butter"], ["🧂", "salt"],
+      ["🥫", "canned food"], ["🍱", "bento box"], ["🍘", "rice cracker"],
+      ["🍙", "rice ball onigiri"], ["🍚", "cooked rice"], ["🍛", "curry rice"],
+      ["🍜", "steaming bowl ramen noodles"], ["🍝", "spaghetti pasta"], ["🍠", "roasted sweet potato"],
+      ["🍢", "oden"], ["🍣", "sushi"], ["🍤", "fried shrimp tempura"],
+      ["🍥", "fish cake"], ["🥮", "moon cake"], ["🍡", "dango"],
+      ["🥟", "dumpling"], ["🥠", "fortune cookie"], ["🥡", "takeout box"],
+      ["🍦", "soft ice cream"], ["🍧", "shaved ice"], ["🍨", "ice cream"],
+      ["🍩", "doughnut donut"], ["🍪", "cookie biscuit"], ["🎂", "birthday cake"],
+      ["🍰", "shortcake slice"], ["🧁", "cupcake"], ["🥧", "pie"],
+      ["🍫", "chocolate bar"], ["🍬", "candy sweet"], ["🍭", "lollipop"],
+      ["🍮", "custard pudding"], ["🍯", "honey pot"], ["🍼", "baby bottle milk"],
+      ["🥛", "glass of milk"], ["☕", "coffee hot beverage"], ["🫖", "teapot"],
+      ["🍵", "tea green"], ["🍶", "sake"], ["🍾", "bottle popping champagne celebrate"],
+      ["🍷", "wine glass"], ["🍸", "cocktail martini"], ["🍹", "tropical drink"],
+      ["🍺", "beer mug"], ["🍻", "clinking beer mugs cheers"], ["🥂", "clinking glasses cheers toast"],
+      ["🥃", "tumbler whiskey"], ["🫗", "pouring liquid"], ["🥤", "cup with straw soda"],
+      ["🧋", "bubble tea boba"], ["🧃", "beverage box juice"], ["🧉", "mate"],
+      ["🧊", "ice cube cold"], ["🥢", "chopsticks"], ["🍽️", "fork knife plate dining"],
+      ["🍴", "fork and knife"], ["🥄", "spoon"],
+      // Activity
+      ["🎃", "jack o lantern pumpkin halloween"], ["🎄", "christmas tree"], ["🎆", "fireworks"],
+      ["🎇", "sparkler"], ["🧨", "firecracker"], ["✨", "sparkles shine magic"],
+      ["🎈", "balloon party"], ["🎉", "party popper celebrate confetti"], ["🎊", "confetti ball"],
+      ["🎋", "tanabata tree"], ["🎍", "pine decoration"], ["🎎", "japanese dolls"],
+      ["🎏", "carp streamer"], ["🎐", "wind chime"], ["🎑", "moon viewing ceremony"],
+      ["🧧", "red envelope"], ["🎀", "ribbon bow"], ["🎁", "gift present wrapped"],
+      ["🎗️", "reminder ribbon"], ["🎟️", "admission ticket"], ["🎫", "ticket"],
+      ["🎖️", "military medal"], ["🏆", "trophy win champion"], ["🏅", "sports medal award"],
+      ["🥇", "1st place gold medal first"], ["🥈", "2nd place silver medal second"], ["🥉", "3rd place bronze medal third"],
+      ["⚽", "soccer ball football"], ["⚾", "baseball"], ["🥎", "softball"],
+      ["🏀", "basketball"], ["🏐", "volleyball"], ["🏈", "american football"],
+      ["🏉", "rugby"], ["🎾", "tennis"], ["🥏", "flying disc frisbee"],
+      ["🎳", "bowling"], ["🏏", "cricket game"], ["🏑", "field hockey"],
+      ["🏒", "ice hockey"], ["🥍", "lacrosse"], ["🏓", "ping pong table tennis"],
+      ["🏸", "badminton"], ["🥊", "boxing glove"], ["🥋", "martial arts uniform karate"],
+      ["🥅", "goal net"], ["⛳", "flag in hole golf"], ["⛸️", "ice skate"],
+      ["🎣", "fishing pole"], ["🤿", "diving mask"], ["🎽", "running shirt"],
+      ["🎿", "skis"], ["🛷", "sled"], ["🥌", "curling stone"],
+      ["🎯", "direct hit bullseye target goal"], ["🪀", "yo-yo"], ["🪁", "kite"],
+      ["🎱", "pool 8 ball billiards"], ["🔮", "crystal ball fortune"], ["🪄", "magic wand"],
+      ["🎮", "video game controller"], ["🕹️", "joystick"], ["🎰", "slot machine"],
+      ["🎲", "game die dice random"], ["🧩", "puzzle piece jigsaw"], ["🧸", "teddy bear"],
+      ["🪅", "pinata"], ["🪩", "mirror ball disco"], ["🪆", "nesting dolls"],
+      ["♠️", "spade suit"], ["♥️", "heart suit"], ["♦️", "diamond suit"],
+      ["♣️", "club suit"], ["♟️", "chess pawn strategy"], ["🃏", "joker card"],
+      ["🀄", "mahjong"], ["🎴", "flower playing cards"], ["🎭", "performing arts theatre masks"],
+      ["🖼️", "framed picture art"], ["🎨", "artist palette paint art"], ["🧵", "thread spool sewing"],
+      ["🪡", "sewing needle"], ["🧶", "yarn knitting"], ["🪢", "knot"],
+      // Travel & Places
+      ["🗺️", "world map travel"], ["🧭", "compass direction navigate"], ["🏔️", "snow capped mountain"],
+      ["⛰️", "mountain"], ["🌋", "volcano"], ["🗻", "mount fuji"],
+      ["🏕️", "camping tent"], ["🏖️", "beach umbrella vacation"], ["🏜️", "desert"],
+      ["🏝️", "desert island tropical"], ["🏞️", "national park nature"], ["🏟️", "stadium"],
+      ["🏛️", "classical building museum"], ["🏗️", "building construction"], ["🧱", "brick"],
+      ["🪨", "rock"], ["🪵", "wood log"], ["🛖", "hut"],
+      ["🏘️", "houses"], ["🏚️", "derelict house"], ["🏠", "house home"],
+      ["🏡", "house with garden"], ["🏢", "office building work"], ["🏣", "japanese post office"],
+      ["🏤", "post office"], ["🏥", "hospital"], ["🏦", "bank"],
+      ["🏨", "hotel"], ["🏩", "love hotel"], ["🏪", "convenience store"],
+      ["🏫", "school"], ["🏬", "department store"], ["🏭", "factory"],
+      ["🏯", "japanese castle"], ["🏰", "castle"], ["💒", "wedding chapel"],
+      ["🗼", "tokyo tower"], ["🗽", "statue of liberty"], ["⛪", "church"],
+      ["🕌", "mosque"], ["🛕", "hindu temple"], ["🕍", "synagogue"],
+      ["⛩️", "shinto shrine"], ["🕋", "kaaba"], ["⛲", "fountain"],
+      ["⛺", "tent camping"], ["🌁", "foggy"], ["🌃", "night with stars"],
+      ["🏙️", "cityscape city skyline"], ["🌄", "sunrise over mountains"], ["🌅", "sunrise"],
+      ["🌆", "cityscape at dusk"], ["🌇", "sunset"], ["🌉", "bridge at night"],
+      ["♨️", "hot springs onsen"], ["🎠", "carousel horse"], ["🛝", "playground slide"],
+      ["🎡", "ferris wheel"], ["🎢", "roller coaster"], ["💈", "barber pole"],
+      ["🎪", "circus tent"], ["🚂", "locomotive train"], ["🚃", "railway car"],
+      ["🚄", "high speed train bullet"], ["🚅", "bullet train"], ["🚆", "train"],
+      ["🚇", "metro subway"], ["🚈", "light rail"], ["🚉", "station"],
+      ["🚊", "tram"], ["🚝", "monorail"], ["🚞", "mountain railway"],
+      ["🚋", "tram car"], ["🚌", "bus"], ["🚍", "oncoming bus"],
+      ["🚎", "trolleybus"], ["🚐", "minibus van"], ["🚑", "ambulance"],
+      ["🚒", "fire engine"], ["🚓", "police car"], ["🚔", "oncoming police car"],
+      ["🚕", "taxi"], ["🚖", "oncoming taxi"], ["🚗", "car automobile drive"],
+      ["🚘", "oncoming automobile"], ["🚙", "sport utility vehicle suv"], ["🛻", "pickup truck"],
+      ["🚚", "delivery truck"], ["🚛", "articulated lorry semi"], ["🚜", "tractor"],
+      ["🏎️", "racing car"], ["🏍️", "motorcycle"], ["🛵", "motor scooter"],
+      ["🦽", "manual wheelchair"], ["🦼", "motorized wheelchair"], ["🛺", "auto rickshaw tuk tuk"],
+      ["🚲", "bicycle bike"], ["🛴", "kick scooter"], ["🛹", "skateboard"],
+      ["🛼", "roller skate"], ["🚏", "bus stop"], ["🛣️", "motorway highway"],
+      ["🛤️", "railway track"], ["🛢️", "oil drum"], ["⛽", "fuel pump gas station"],
+      ["🛞", "wheel tire"], ["🚨", "police car light siren alert"], ["🚥", "horizontal traffic light"],
+      ["🚦", "vertical traffic light"], ["🛑", "stop sign"], ["🚧", "construction barrier"],
+      ["⚓", "anchor"], ["🛟", "ring buoy life"], ["⛵", "sailboat"],
+      ["🛶", "canoe"], ["🚤", "speedboat"], ["🛳️", "passenger ship"],
+      ["⛴️", "ferry"], ["🛥️", "motor boat"], ["🚢", "ship"],
+      ["✈️", "airplane travel flight"], ["🛩️", "small airplane"], ["🛫", "airplane departure takeoff"],
+      ["🛬", "airplane arrival landing"], ["🪂", "parachute"], ["💺", "seat"],
+      ["🚁", "helicopter"], ["🚟", "suspension railway"], ["🚠", "mountain cableway"],
+      ["🚡", "aerial tramway"], ["🛰️", "satellite"], ["🚀", "rocket launch fast"],
+      ["🛸", "flying saucer ufo"], ["🛎️", "bellhop bell"], ["🧳", "luggage suitcase"],
+      ["⌛", "hourglass done"], ["⏳", "hourglass not done time"], ["⌚", "watch"],
+      ["⏰", "alarm clock time"], ["⏱️", "stopwatch"], ["⏲️", "timer clock"],
+      ["🕰️", "mantelpiece clock"],
+      // Objects
+      ["👓", "glasses"], ["🕶️", "sunglasses"], ["🥽", "goggles"],
+      ["🥼", "lab coat"], ["🦺", "safety vest"], ["👔", "necktie"],
+      ["👕", "t-shirt"], ["👖", "jeans"], ["🧣", "scarf"],
+      ["🧤", "gloves"], ["🧥", "coat"], ["🧦", "socks"],
+      ["👗", "dress"], ["👘", "kimono"], ["🥻", "sari"],
+      ["🩱", "one piece swimsuit"], ["🩲", "briefs"], ["🩳", "shorts"],
+      ["👙", "bikini"], ["👚", "woman clothes"], ["🪭", "folding hand fan"],
+      ["👛", "purse"], ["👜", "handbag"], ["👝", "clutch bag"],
+      ["🛍️", "shopping bags"], ["🎒", "backpack school"], ["🩴", "thong sandal flip flop"],
+      ["👞", "man shoe"], ["👟", "running shoe sneaker"], ["🥾", "hiking boot"],
+      ["🥿", "flat shoe"], ["👠", "high heel"], ["👡", "woman sandal"],
+      ["🩰", "ballet shoes"], ["👢", "woman boot"], ["🪮", "hair pick comb"],
+      ["👑", "crown king queen royal"], ["👒", "woman hat"], ["🎩", "top hat"],
+      ["🎓", "graduation cap education"], ["🧢", "billed cap"], ["🪖", "military helmet"],
+      ["⛑️", "rescue worker helmet"], ["📿", "prayer beads"], ["💄", "lipstick makeup"],
+      ["💍", "ring engagement"], ["💎", "gem stone diamond"], ["🔇", "muted speaker"],
+      ["🔈", "speaker low volume"], ["🔉", "speaker medium volume"], ["🔊", "speaker high volume loud"],
+      ["📢", "loudspeaker announce"], ["📣", "megaphone cheer"], ["📯", "postal horn"],
+      ["🔔", "bell notification"], ["🔕", "bell with slash mute"], ["🎼", "musical score"],
+      ["🎵", "musical note music"], ["🎶", "musical notes music"], ["🎙️", "studio microphone podcast"],
+      ["🎚️", "level slider"], ["🎛️", "control knobs"], ["🎤", "microphone sing karaoke"],
+      ["🎧", "headphone music listen"], ["📻", "radio"], ["🎷", "saxophone"],
+      ["🪗", "accordion"], ["🎸", "guitar"], ["🎹", "musical keyboard piano"],
+      ["🎺", "trumpet"], ["🎻", "violin"], ["🪕", "banjo"],
+      ["🥁", "drum"], ["🪘", "long drum"], ["🪇", "maracas"],
+      ["🪈", "flute"], ["📱", "mobile phone smartphone"], ["📲", "mobile phone with arrow"],
+      ["☎️", "telephone"], ["📞", "telephone receiver call"], ["📟", "pager"],
+      ["📠", "fax machine"], ["🔋", "battery power"], ["🪫", "low battery"],
+      ["🔌", "electric plug power"], ["💻", "laptop computer work"], ["🖥️", "desktop computer"],
+      ["🖨️", "printer"], ["⌨️", "keyboard typing"], ["🖱️", "computer mouse click"],
+      ["🖲️", "trackball"], ["💽", "computer disk minidisc"], ["💾", "floppy disk save"],
+      ["💿", "optical disk cd"], ["📀", "dvd"], ["🧮", "abacus"],
+      ["🎥", "movie camera film"], ["🎞️", "film frames"], ["📽️", "film projector"],
+      ["🎬", "clapper board movie action"], ["📺", "television tv"], ["📷", "camera photo"],
+      ["📸", "camera with flash"], ["📹", "video camera"], ["📼", "videocassette vhs"],
+      ["🔍", "magnifying glass search find left"], ["🔎", "magnifying glass search right"], ["🕯️", "candle"],
+      ["💡", "light bulb idea"], ["🔦", "flashlight torch"], ["🏮", "red paper lantern"],
+      ["🪔", "diya lamp"], ["📔", "notebook decorative cover"], ["📕", "closed book"],
+      ["📖", "open book reading"], ["📗", "green book"], ["📘", "blue book"],
+      ["📙", "orange book"], ["📚", "books reading study library"], ["📓", "notebook"],
+      ["📒", "ledger"], ["📃", "page with curl"], ["📜", "scroll"],
+      ["📄", "page document file"], ["📰", "newspaper news"], ["🗞️", "rolled up newspaper"],
+      ["📑", "bookmark tabs"], ["🔖", "bookmark"], ["🏷️", "label tag"],
+      ["💰", "money bag"], ["🪙", "coin"], ["💴", "yen banknote"],
+      ["💵", "dollar banknote money cash"], ["💶", "euro banknote"], ["💷", "pound banknote"],
+      ["💸", "money with wings spend"], ["💳", "credit card payment"], ["🧾", "receipt"],
+      ["💹", "chart increasing yen"], ["✉️", "envelope email mail"], ["📧", "e-mail"],
+      ["📨", "incoming envelope"], ["📩", "envelope with arrow"], ["📤", "outbox tray send"],
+      ["📥", "inbox tray receive"], ["📦", "package box parcel shipping"], ["📫", "closed mailbox raised flag"],
+      ["📪", "closed mailbox lowered flag"], ["📬", "open mailbox raised flag"], ["📭", "open mailbox lowered flag"],
+      ["📮", "postbox"], ["🗳️", "ballot box vote"], ["✏️", "pencil write"],
+      ["✒️", "black nib pen"], ["🖋️", "fountain pen"], ["🖊️", "pen"],
+      ["🖌️", "paintbrush"], ["🖍️", "crayon"], ["📝", "memo note write"],
+      ["💼", "briefcase business work"], ["📁", "file folder"], ["📂", "open file folder"],
+      ["🗂️", "card index dividers organize"], ["📅", "calendar date"], ["📆", "tear off calendar"],
+      ["🗒️", "spiral notepad list"], ["🗓️", "spiral calendar schedule planner"], ["📇", "card index"],
+      ["📈", "chart increasing growth up"], ["📉", "chart decreasing down"], ["📊", "bar chart data stats"],
+      ["📋", "clipboard list"], ["📌", "pushpin pin"], ["📍", "round pushpin location"],
+      ["📎", "paperclip attach"], ["🖇️", "linked paperclips"], ["📏", "straight ruler measure"],
+      ["📐", "triangular ruler"], ["✂️", "scissors cut"], ["🗃️", "card file box"],
+      ["🗄️", "file cabinet archive"], ["🗑️", "wastebasket trash delete bin"], ["🔒", "locked secure"],
+      ["🔓", "unlocked"], ["🔏", "locked with pen"], ["🔐", "locked with key"],
+      ["🔑", "key unlock"], ["🗝️", "old key"], ["🔨", "hammer tool build"],
+      ["🪓", "axe"], ["⛏️", "pick"], ["⚒️", "hammer and pick"],
+      ["🛠️", "hammer and wrench tools"], ["🗡️", "dagger"], ["⚔️", "crossed swords battle"],
+      ["💣", "bomb"], ["🪃", "boomerang"], ["🏹", "bow and arrow archery"],
+      ["🛡️", "shield protect"], ["🪚", "carpentry saw"], ["🔧", "wrench tool fix"],
+      ["🪛", "screwdriver"], ["🔩", "nut and bolt"], ["⚙️", "gear settings config"],
+      ["🗜️", "clamp"], ["⚖️", "balance scale justice"], ["🦯", "white cane"],
+      ["🔗", "link chain url"], ["⛓️", "chains"], ["🪝", "hook"],
+      ["🧰", "toolbox tools"], ["🧲", "magnet"], ["🪜", "ladder"],
+      ["⚗️", "alembic chemistry"], ["🧪", "test tube science experiment"], ["🧫", "petri dish"],
+      ["🧬", "dna science biology genetics"], ["🔬", "microscope science"], ["🔭", "telescope astronomy"],
+      ["📡", "satellite antenna signal"], ["💉", "syringe injection vaccine"], ["🩸", "drop of blood"],
+      ["💊", "pill medicine health"], ["🩹", "adhesive bandage plaster"], ["🩼", "crutch"],
+      ["🩺", "stethoscope health doctor"], ["🩻", "x-ray"], ["🚪", "door"],
+      ["🛗", "elevator"], ["🪞", "mirror reflect"], ["🪟", "window"],
+      ["🛏️", "bed sleep"], ["🛋️", "couch and lamp sofa"], ["🪑", "chair seat"],
+      ["🚽", "toilet"], ["🪠", "plunger"], ["🚿", "shower"],
+      ["🛁", "bathtub"], ["🪤", "mouse trap"], ["🪒", "razor"],
+      ["🧴", "lotion bottle"], ["🧷", "safety pin"], ["🧹", "broom clean sweep chores"],
+      ["🧺", "basket laundry"], ["🧻", "roll of paper toilet"], ["🪣", "bucket"],
+      ["🧼", "soap wash"], ["🫧", "bubbles"], ["🪥", "toothbrush"],
+      ["🧽", "sponge"], ["🧯", "fire extinguisher"], ["🛒", "shopping cart buy"],
+      ["🚬", "cigarette"], ["⚰️", "coffin"], ["🪦", "headstone grave"],
+      ["⚱️", "funeral urn"], ["🗿", "moai statue"], ["🪧", "placard sign protest"],
+      ["🪪", "identification card id"],
+      // Symbols
+      ["🏧", "atm sign"], ["🚮", "litter bin sign"], ["🚰", "potable water"],
+      ["♿", "wheelchair accessible"], ["🚹", "mens room"], ["🚺", "womens room"],
+      ["🚻", "restroom"], ["🚼", "baby symbol"], ["🚾", "water closet wc"],
+      ["🛂", "passport control"], ["🛃", "customs"], ["🛄", "baggage claim"],
+      ["🛅", "left luggage"], ["⚠️", "warning caution alert"], ["🚸", "children crossing"],
+      ["⛔", "no entry"], ["🚫", "prohibited forbidden no"], ["🚳", "no bicycles"],
+      ["🚭", "no smoking"], ["🚯", "no littering"], ["🚱", "non potable water"],
+      ["🚷", "no pedestrians"], ["📵", "no mobile phones"], ["🔞", "no one under eighteen"],
+      ["☢️", "radioactive"], ["☣️", "biohazard"], ["⬆️", "up arrow"],
+      ["↗️", "up right arrow"], ["➡️", "right arrow"], ["↘️", "down right arrow"],
+      ["⬇️", "down arrow"], ["↙️", "down left arrow"], ["⬅️", "left arrow"],
+      ["↖️", "up left arrow"], ["↕️", "up down arrow"], ["↔️", "left right arrow"],
+      ["↩️", "right arrow curving left reply"], ["↪️", "left arrow curving right forward"], ["⤴️", "right arrow curving up"],
+      ["⤵️", "right arrow curving down"], ["🔃", "clockwise vertical arrows reload"], ["🔄", "counterclockwise arrows refresh sync repeat"],
+      ["🔙", "back arrow"], ["🔚", "end arrow"], ["🔛", "on arrow"],
+      ["🔜", "soon arrow"], ["🔝", "top arrow up"], ["🛐", "place of worship"],
+      ["⚛️", "atom symbol atomic science physics"], ["🕉️", "om hindu"], ["✡️", "star of david"],
+      ["☸️", "wheel of dharma"], ["☯️", "yin yang balance"], ["✝️", "latin cross"],
+      ["☦️", "orthodox cross"], ["☪️", "star and crescent"], ["☮️", "peace symbol"],
+      ["🕎", "menorah"], ["🔯", "six pointed star"], ["🪯", "khanda sikh"],
+      ["♈", "aries zodiac"], ["♉", "taurus zodiac"], ["♊", "gemini zodiac"],
+      ["♋", "cancer zodiac"], ["♌", "leo zodiac"], ["♍", "virgo zodiac"],
+      ["♎", "libra zodiac"], ["♏", "scorpio zodiac"], ["♐", "sagittarius zodiac"],
+      ["♑", "capricorn zodiac"], ["♒", "aquarius zodiac"], ["♓", "pisces zodiac"],
+      ["⛎", "ophiuchus zodiac"], ["🔀", "shuffle tracks random"], ["🔁", "repeat loop"],
+      ["🔂", "repeat single track"], ["▶️", "play button"], ["⏩", "fast forward"],
+      ["⏭️", "next track skip"], ["⏯️", "play or pause"], ["◀️", "reverse play back"],
+      ["⏪", "fast reverse rewind"], ["⏮️", "last track previous"], ["🔼", "upwards button"],
+      ["⏫", "fast up double"], ["🔽", "downwards button"], ["⏬", "fast down double"],
+      ["⏸️", "pause button"], ["⏹️", "stop button"], ["⏺️", "record button"],
+      ["⏏️", "eject button"], ["🎦", "cinema"], ["🔅", "dim button brightness low"],
+      ["🔆", "bright button brightness high"], ["📶", "antenna bars signal wifi"], ["📳", "vibration mode"],
+      ["📴", "mobile phone off"], ["♀️", "female sign woman"], ["♂️", "male sign man"],
+      ["⚧️", "transgender symbol"], ["✖️", "multiply times"], ["➕", "plus add"],
+      ["➖", "minus subtract remove"], ["➗", "divide"], ["🟰", "heavy equals"],
+      ["♾️", "infinity forever"], ["‼️", "double exclamation"], ["⁉️", "exclamation question"],
+      ["❓", "question mark"], ["❔", "white question mark"], ["❕", "white exclamation"],
+      ["❗", "exclamation mark important"], ["〰️", "wavy dash"], ["💱", "currency exchange"],
+      ["💲", "heavy dollar sign"], ["⚕️", "medical symbol"], ["♻️", "recycle green environment"],
+      ["⚜️", "fleur de lis"], ["🔱", "trident"], ["📛", "name badge"],
+      ["🔰", "japanese symbol for beginner"], ["⭕", "hollow red circle"], ["✅", "check mark button done complete yes"],
+      ["☑️", "check box with check done"], ["✔️", "check mark tick"], ["❌", "cross mark no wrong cancel"],
+      ["❎", "cross mark button"], ["➰", "curly loop"], ["➿", "double curly loop"],
+      ["〽️", "part alternation mark"], ["✳️", "eight spoked asterisk"], ["✴️", "eight pointed star"],
+      ["❇️", "sparkle"], ["™️", "trade mark"], ["©️", "copyright"],
+      ["®️", "registered"], ["#️⃣", "keycap hash number"], ["*️⃣", "keycap asterisk"],
+      ["0️⃣", "keycap zero"], ["1️⃣", "keycap one"], ["2️⃣", "keycap two"],
+      ["3️⃣", "keycap three"], ["4️⃣", "keycap four"], ["5️⃣", "keycap five"],
+      ["6️⃣", "keycap six"], ["7️⃣", "keycap seven"], ["8️⃣", "keycap eight"],
+      ["9️⃣", "keycap nine"], ["🔟", "keycap ten"], ["🔠", "input latin uppercase abcd"],
+      ["🔡", "input latin lowercase abcd"], ["🔢", "input numbers 1234"], ["🔣", "input symbols"],
+      ["🔤", "input latin letters abc"], ["🅰️", "a button blood type"], ["🆎", "ab button blood type"],
+      ["🅱️", "b button blood type"], ["🆑", "cl button"], ["🆒", "cool button"],
+      ["🆓", "free button"], ["ℹ️", "information info"], ["🆔", "id button"],
+      ["Ⓜ️", "circled m"], ["🆕", "new button"], ["🆖", "ng button"],
+      ["🅾️", "o button blood type"], ["🆗", "ok button"], ["🅿️", "p button parking"],
+      ["🆘", "sos button help emergency"], ["🆙", "up button"], ["🆚", "vs button versus"],
       ["🔴", "red circle dot"], ["🟠", "orange circle dot"], ["🟡", "yellow circle dot"],
       ["🟢", "green circle dot"], ["🔵", "blue circle dot"], ["🟣", "purple circle dot"],
-      ["⚫", "black circle dot"], ["⚪", "white circle dot"], ["🟤", "brown circle dot"],
-      ["🔺", "red triangle up"], ["🔻", "red triangle down"], ["🔶", "orange diamond"],
-      ["💯", "hundred perfect score"], ["🆕", "new"], ["🆗", "ok"],
-      ["🔝", "top up"], ["🔄", "refresh sync repeat"], ["♾️", "infinity forever"]
+      ["🟤", "brown circle dot"], ["⚫", "black circle dot"], ["⚪", "white circle dot"],
+      ["🟥", "red square"], ["🟧", "orange square"], ["🟨", "yellow square"],
+      ["🟩", "green square"], ["🟦", "blue square"], ["🟪", "purple square"],
+      ["🟫", "brown square"], ["⬛", "black large square"], ["⬜", "white large square"],
+      ["◼️", "black medium square"], ["◻️", "white medium square"], ["▪️", "black small square"],
+      ["▫️", "white small square"], ["🔶", "large orange diamond"], ["🔷", "large blue diamond"],
+      ["🔸", "small orange diamond"], ["🔹", "small blue diamond"], ["🔺", "red triangle up"],
+      ["🔻", "red triangle down"], ["💠", "diamond with a dot"], ["🔘", "radio button"],
+      ["🔳", "white square button"], ["🔲", "black square button"],
+      // Flags
+      ["🏁", "chequered flag finish race"], ["🚩", "triangular flag"], ["🎌", "crossed flags japan"],
+      ["🏴", "black flag"], ["🏳️", "white flag surrender"], ["🏳️‍🌈", "rainbow flag pride lgbt"],
+      ["🏳️‍⚧️", "transgender flag"], ["🏴‍☠️", "pirate flag jolly roger"], ["🇦🇷", "flag argentina"],
+      ["🇦🇺", "flag australia"], ["🇦🇹", "flag austria"], ["🇧🇩", "flag bangladesh"],
+      ["🇧🇪", "flag belgium"], ["🇧🇷", "flag brazil"], ["🇧🇬", "flag bulgaria"],
+      ["🇨🇦", "flag canada"], ["🇨🇱", "flag chile"], ["🇨🇳", "flag china"],
+      ["🇨🇴", "flag colombia"], ["🇭🇷", "flag croatia"], ["🇨🇿", "flag czechia czech republic"],
+      ["🇩🇰", "flag denmark"], ["🇪🇬", "flag egypt"], ["🇪🇪", "flag estonia"],
+      ["🇫🇮", "flag finland"], ["🇫🇷", "flag france"], ["🇩🇪", "flag germany"],
+      ["🇬🇷", "flag greece"], ["🇭🇰", "flag hong kong"], ["🇭🇺", "flag hungary"],
+      ["🇮🇸", "flag iceland"], ["🇮🇳", "flag india"], ["🇮🇩", "flag indonesia"],
+      ["🇮🇪", "flag ireland"], ["🇮🇱", "flag israel"], ["🇮🇹", "flag italy"],
+      ["🇯🇵", "flag japan"], ["🇰🇪", "flag kenya"], ["🇰🇷", "flag south korea"],
+      ["🇱🇻", "flag latvia"], ["🇱🇹", "flag lithuania"], ["🇱🇺", "flag luxembourg"],
+      ["🇲🇾", "flag malaysia"], ["🇲🇽", "flag mexico"], ["🇲🇦", "flag morocco"],
+      ["🇳🇱", "flag netherlands holland"], ["🇳🇿", "flag new zealand"], ["🇳🇬", "flag nigeria"],
+      ["🇳🇴", "flag norway"], ["🇵🇰", "flag pakistan"], ["🇵🇪", "flag peru"],
+      ["🇵🇭", "flag philippines"], ["🇵🇱", "flag poland"], ["🇵🇹", "flag portugal"],
+      ["🇶🇦", "flag qatar"], ["🇷🇴", "flag romania"], ["🇷🇺", "flag russia"],
+      ["🇸🇦", "flag saudi arabia"], ["🇷🇸", "flag serbia"], ["🇸🇬", "flag singapore"],
+      ["🇸🇰", "flag slovakia"], ["🇸🇮", "flag slovenia"], ["🇿🇦", "flag south africa"],
+      ["🇪🇸", "flag spain"], ["🇸🇪", "flag sweden"], ["🇨🇭", "flag switzerland"],
+      ["🇹🇼", "flag taiwan"], ["🇹🇭", "flag thailand"], ["🇹🇷", "flag turkey turkiye"],
+      ["🇺🇦", "flag ukraine"], ["🇦🇪", "flag united arab emirates uae"], ["🇬🇧", "flag united kingdom uk britain"],
+      ["🇺🇸", "flag united states usa america"], ["🇻🇳", "flag vietnam"], ["🇪🇺", "flag european union eu"]
     ];
 
     function persistWidgetIcons() { storageSet(WIDGET_ICON_STORAGE_KEY, JSON.stringify(WIDGET_ICONS)); }
@@ -6939,6 +7810,9 @@
         display.innerHTML = DEFAULT_ICON_SVG;
         btn.classList.remove("has-icon");
       }
+      // The widget's hidden-tab copy of the same icon (see applyTabIcon), so
+      // changing an icon updates the tab too rather than only the live widget.
+      applyTabIcon(id);
     }
 
     function setWidgetIcon(id, emoji) {
@@ -7086,11 +7960,8 @@
     function flashWidget(id) {
       const el = widgetEl(id);
       if (!el) return;
-      const leaderSlot = slotOf(id);
-      if (leaderSlot && leaderSlot[0] === id && isCollapsed(id)) {
-        const btn = document.getElementById(id + "CollapseBtn");
-        if (btn) btn.click();
-      }
+      // Nothing to flash while it's hidden — unhide it first.
+      if (isHidden(id)) setHidden(id, false);
       el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
       el.classList.add("widget-flash");
       setTimeout(function () { el.classList.remove("widget-flash"); }, 900);
@@ -7134,25 +8005,40 @@
         return;
       }
 
-      // The original Calendar/Unscheduled Tasks pair carries the one real
-      // Google sign-in — deleting it only hides it (see hideWidget), so if
-      // it's currently missing, bring it (and its pair) straight back
-      // rather than creating a second OAuth connection. If it's already on
-      // the board, add another read-only calendar view instead (see
-      // buildExtraCalendarWidgetEl) — it reuses the existing connection, so
-      // any number of these can exist without signing in again.
-      if (type === "cal") {
-        if (!slotOf("cal")) {
-          layout.push(["cal"]);
-          if (!slotOf("unschedTasks")) layout.push(["unschedTasks"]);
+      // Google Calendar and Google Tasks are separate widgets that happen to
+      // share the one real Google sign-in. Each is added, removed and re-added
+      // entirely on its own — they used to travel as an inseparable pair, so
+      // adding either one dragged the other back onto the board with it.
+      //
+      // Deleting one only hides it (see hideWidget), so if it's currently off
+      // the board, bring that widget straight back rather than creating a
+      // second OAuth connection. For Calendar specifically, if it's already
+      // there, add another read-only calendar view instead (see
+      // buildExtraCalendarWidgetEl) — that reuses the existing connection, so
+      // any number of those can exist without signing in again. There is only
+      // ever one Google Tasks list, so that one just gets brought back into
+      // view.
+      function restoreSingleton(widgetId) {
+        if (!slotOf(widgetId)) {
+          layout.push([widgetId]);
           persistLayout();
           render();
-          flashWidget("cal");
-          if (slotOf("unschedTasks")) flashWidget("unschedTasks");
-        } else {
+        }
+        flashWidget(widgetId);
+      }
+
+      if (type === "cal") {
+        if (slotOf("cal")) {
           const id = createDynamicWidgetInstance("calView");
           flashWidget(id);
+        } else {
+          restoreSingleton("cal");
         }
+        return;
+      }
+
+      if (type === "tasks") {
+        restoreSingleton("unschedTasks");
       }
     });
 
@@ -7456,9 +8342,9 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-            '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-            '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -7473,8 +8359,9 @@
         '</div>' +
       '</div>' +
       '<div class="collapsible-strip" id="' + id + 'Strip">' +
-        '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
         '<span class="collapsible-strip-label"></span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
       '</div>';
     wrap.querySelector(".section-header-title").textContent = title;
     wrap.querySelector(".collapsible-strip-label").textContent = title;
@@ -7990,10 +8877,9 @@
     listContainer.addEventListener("touchcancel", finishTouch);
   }
 
-  // Mirrors the tree engine's table — see its copy for why "Default" exists.
-  const STATUS_PRESETS = ["Default", "To-do", "In progress", "Complete"];
+  // Mirrors the tree engine's table.
+  const STATUS_PRESETS = ["To-do", "In progress", "Complete"];
   const STATUS_COLORS = {
-    "Default": { bg: "#e7ecff", text: "#2952cc", dot: "#cdd8fb" },
     "To-do": { bg: "#e3e3e3", text: "#555555", dot: "#8a8a8a" },
     "In progress": { bg: "#faecd8", text: "#9a6708", dot: "#d9a441" },
     "Complete": { bg: "#dcf1e4", text: "#1a7f4e", dot: "#4caf6d" }
@@ -8424,9 +9310,9 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-            '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-            '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -8437,8 +9323,9 @@
         '</div>' +
       '</div>' +
       '<div class="collapsible-strip" id="' + id + 'Strip">' +
-        '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
         '<span class="collapsible-strip-label"></span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
       '</div>';
     wrap.querySelector(".section-header-title").textContent = title;
     wrap.querySelector(".collapsible-strip-label").textContent = title;
@@ -9155,14 +10042,11 @@
         box.style.top = (startMin / 60) * HOUR_H + "px";
         box.style.height = height + "px";
 
-        const statusColor = meta && meta.status && defs && defs.status.colors[meta.status];
-        if (statusColor) {
-          // Recolour the whole block to its status, so tag state reads at a
-          // glance across the grid rather than needing a per-event look.
-          box.style.background = statusColor.bg;
-          box.style.color = statusColor.text;
-          box.style.borderColor = statusColor.dot || statusColor.text;
-        }
+        // Deliberately NOT recoloured by status: the block keeps its own black
+        // /white styling whatever its tags say, and status colour lives only on
+        // the Status pill rendered inside it (see the pills row below). One
+        // event box therefore always looks like every other event box, and
+        // colour means "this pill", never "this whole event".
 
         const line = document.createElement("div");
         line.className = "cal-tg-event-title";
@@ -9869,16 +10753,18 @@
 
   function renderTasks() {
     taskListEl.innerHTML = "";
-    const unscheduled = tasks.filter(function (t) { return !t.due; });
-    if (!unscheduled.length) {
-      if (!tasks.length) {
-        const empty = document.createElement("div");
-        empty.className = "cal-empty";
-        empty.textContent = "No open tasks.";
-        taskListEl.appendChild(empty);
-      }
-      return;
-    }
+    // Every task, dated or not. This list used to be the *un*scheduled ones
+    // only, on the theory that anything with a due date already showed on the
+    // grid above; it's now the single place to see them all, so a dated task
+    // appears in both. The local variable keeps its name because the
+    // drag-to-reorder code below indexes into it throughout.
+    // A copy, not `tasks` itself: the drag-reorder handler below splices this
+    // array and then sorts `tasks` from the resulting order — aliasing the two
+    // would make that sort read an order map it had already applied.
+    const unscheduled = tasks.slice();
+    // No empty-state text: an empty list just reads as an empty widget, which
+    // is quieter than a line of grey copy stating the obvious.
+    if (!unscheduled.length) return;
 
     let draggedId = null;
     taskListEl.ondragover = function (e) {
@@ -10279,9 +11165,24 @@
     return { wrap: wrap, input: inp };
   }
 
-  function panelActions(onSave, saveLabel) {
+  // `nsId` is passed only when editing something that already exists; it adds
+  // a Delete button that goes through deleteGoogleItem — the same path the
+  // task row's own delete button and the subpage's Delete use, so events and
+  // tasks are both handled and the tree/grid/list all refresh together.
+  function panelActions(onSave, saveLabel, nsId) {
     const row = document.createElement("div");
     row.className = "cal-panel-actions";
+    if (nsId) {
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "cal-panel-delete";
+      del.textContent = "Delete";
+      del.addEventListener("click", function () {
+        closePanel();
+        deleteGoogleItem(nsId, "");
+      });
+      row.appendChild(del);
+    }
     const cancel = document.createElement("button");
     cancel.type = "button";
     cancel.className = "cal-panel-cancel";
@@ -10330,17 +11231,30 @@
 
   /* ---------------- the Widgets section ----------------
      Sits directly under Tags in both settings panels. Currently a single
-     entry — Tree Diagram — which is the way into the subtask/subpage view now
+     entry — Branches AI — which is the way into the subtask/subpage view now
      that clicking an item opens this panel instead of drilling straight in.
      Only rendered for items that already exist: an unsaved event/task has no
      namespaced id for the tree engine to key a subtree off yet. */
-  const TREE_DIAGRAM_ICON =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" ' +
-    'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
-    '<rect x="9" y="2" width="6" height="5" rx="1.5"/>' +
-    '<rect x="2" y="17" width="6" height="5" rx="1.5"/>' +
-    '<rect x="16" y="17" width="6" height="5" rx="1.5"/>' +
-    '<path d="M12 7v4M5 17v-2a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2"/></svg>';
+  // The Branches AI mark: two sparkle-filled nodes joined by a branch. Drawn as
+  // inline SVG rather than embedded as the source bitmap so it stays crisp at
+  // any size, inherits currentColor, and keeps a transparent background — the
+  // supplied artwork is a flat black-on-white JPEG, which would show as a white
+  // slab anywhere the surface behind it isn't white.
+  const BRANCHES_AI_LOGO =
+    '<svg viewBox="0 0 100 41" fill="none" aria-hidden="true">' +
+      '<path d="M20.4 19.5 V33 Q20.4 38 25.4 38 H74.6 Q79.6 38 79.6 33 V19.5" ' +
+        'stroke="currentColor" stroke-width="5.6" stroke-linecap="round"/>' +
+      '<rect x="0" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<rect x="58.2" y="0" width="41.8" height="19.5" rx="9.2" fill="currentColor"/>' +
+      '<path fill="#ffffff" d="M20.4 2 Q21.62 7.98 27.6 9.2 Q21.62 10.42 20.4 16.4 ' +
+        'Q19.18 10.42 13.2 9.2 Q19.18 7.98 20.4 2 Z"/>' +
+      '<path fill="#ffffff" d="M29.5 11.2 Q30.08 14.02 32.9 14.6 Q30.08 15.18 29.5 18 ' +
+        'Q28.92 15.18 26.1 14.6 Q28.92 14.02 29.5 11.2 Z"/>' +
+      '<path fill="#ffffff" d="M78.6 2 Q79.82 7.98 85.8 9.2 Q79.82 10.42 78.6 16.4 ' +
+        'Q77.38 10.42 71.4 9.2 Q77.38 7.98 78.6 2 Z"/>' +
+      '<path fill="#ffffff" d="M87.7 11.2 Q88.28 14.02 91.1 14.6 Q88.28 15.18 87.7 18 ' +
+        'Q87.12 15.18 84.3 14.6 Q87.12 14.02 87.7 11.2 Z"/>' +
+    '</svg>';
 
   function buildWidgetsSection(nsId, title) {
     const wrap = document.createElement("div");
@@ -10355,10 +11269,10 @@
     btn.className = "cal-widget-btn";
     btn.title = "Open this item's subtask tree";
     const icon = document.createElement("span");
-    icon.className = "cal-widget-icon";
-    icon.innerHTML = TREE_DIAGRAM_ICON;
+    icon.className = "cal-widget-icon branches-ai-icon";
+    icon.innerHTML = BRANCHES_AI_LOGO;
     const text = document.createElement("span");
-    text.textContent = "Tree Diagram";
+    text.textContent = "Branches AI";
     btn.appendChild(icon);
     btn.appendChild(text);
     btn.addEventListener("click", function () {
@@ -10560,7 +11474,7 @@
         btn.textContent = existing ? "Save" : "Create";
         showError(String(e.message || e));
       }
-    }, existing ? "Save" : "Create"));
+    }, existing ? "Save" : "Create", nsId));
     // preventScroll: the dialog can overflow, and a plain focus() would
     // scroll the heading out of view.
     title.input.focus({ preventScroll: true });
@@ -10630,7 +11544,7 @@
         btn.textContent = existing ? "Save" : "Create";
         showError(String(e.message || e));
       }
-    }, existing ? "Save" : "Create"));
+    }, existing ? "Save" : "Create", nsId));
     // preventScroll: the dialog can overflow, and a plain focus() would
     // scroll the heading out of view.
     title.input.focus({ preventScroll: true });
@@ -10780,9 +11694,9 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
             '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
-            '<button type="button" class="collapse-btn" data-mini-collapse="' + id + '" title="Collapse">&#9654;</button>' +
-            '<button type="button" class="collapse-btn" id="' + id + 'CollapseBtn" title="Collapse to side">&#9654;</button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -10796,8 +11710,9 @@
         '</div>' +
       '</div>' +
       '<div class="collapsible-strip" id="' + id + 'Strip">' +
-        '<span class="collapsible-arrow" id="' + id + 'Arrow">&#9654;</span>' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
         '<span class="collapsible-strip-label">Google Calendar</span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide">Unhide</button>' +
       '</div>';
     return wrap;
   }
@@ -10932,6 +11847,8 @@
   var DRAG_HANDLE_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
   var EDIT_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   var TRASH_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+  // Matches the Full screen control every other widget carries.
+  var FULLSCREEN_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg>';
 
   var links = [];
   // type: "top" | "bottom" (floating full-width bar above/below the grid) |
@@ -11299,6 +12216,7 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="menu" title="Drag to reorder this menu">' + DRAG_HANDLE_SVG + '</button>' +
             '<button type="button" class="collapse-btn links-edit-btn" title="Edit links">' + EDIT_ICON_SVG + '</button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="menu" title="Full screen" aria-label="Full screen">' + FULLSCREEN_ICON_SVG + '</button>' +
             '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove menu">' + TRASH_ICON_SVG + '</button>' +
           '</div>' +
         '</div>' +
@@ -11306,6 +12224,8 @@
       '</div>';
     wireEditBtn(el);
     wireRemoveBtn(el);
+    // Wired by the widget-layout script, which owns the maximized state.
+    if (window.__wireWidgetFullscreen) window.__wireWidgetFullscreen(el);
     return el;
   }
 
