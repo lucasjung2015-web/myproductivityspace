@@ -3874,39 +3874,17 @@
     var pad = function(n){ return (n<10?"0":"")+n; };
     return pad(h) + ":" + pad(m) + ":" + pad(r);
   }
-  // The Dashboard owns every alert that reaches outside this frame — the
-  // full-screen veil, the system notification, and the chime it schedules
-  // ahead of time — so it has to hear about anything that changes what is
-  // counting down, or a chime armed for a timer that has since been paused
-  // still goes off. Called from the four state transitions themselves
-  // rather than from their call sites, so both the in-frame buttons and the
-  // __unbleep*Timer bridges are covered without having to remember it at
-  // each one. `prime` is set only by Start, which is the one transition
-  // guaranteed to be a real click — the permission prompt and the
-  // AudioContext both need that user activation.
-  function notifyParentTimersChanged(prime){
-    try{
-      if(!window.parent || window.parent===window) return;
-      if(prime && window.parent.__unbleepPrimeTimerAlerts){
-        window.parent.__unbleepPrimeTimerAlerts();
-        return; // priming resyncs the alarms itself
-      }
-      if(window.parent.__unbleepTimersChanged) window.parent.__unbleepTimersChanged();
-    }catch(e){}
-  }
   function startTimerNode(n){
     var wasStarted = !!n.timerStarted;
     n.timerStarted = true;
     n.timerRemainingSeconds = wasStarted ? deriveTimerRemaining(n) : timerFullSeconds(n);
     n.timerRunning = true;
     n.timerStartedAtMs = Date.now();
-    notifyParentTimersChanged(true);
   }
   function pauseTimerNode(n){
     n.timerRemainingSeconds = deriveTimerRemaining(n);
     n.timerRunning = false;
     n.timerStartedAtMs = null;
-    notifyParentTimersChanged();
   }
   function resetTimerNode(n){
     n.timerRemainingSeconds = timerFullSeconds(n);
@@ -3915,13 +3893,11 @@
     // n.timerStarted is left true on purpose — Reset stays in the
     // play/pause+reset layout rather than collapsing back to a bare Start
     // button, matching a kitchen-timer mental model.
-    notifyParentTimersChanged();
   }
   function completeTimerNode(n){
     n.timerRemainingSeconds = 0;
     n.timerRunning = false;
     n.timerStartedAtMs = null;
-    notifyParentTimersChanged();
   }
   // Used only by the 1Hz tick loop, which must never touch render()/save()/
   // pushUndo() (see ensureTimerTickLoop below) — writing el.firstChild.data
@@ -6431,15 +6407,6 @@
   window.__unbleepGetTimerState = function(id){
     var r = nodeById(id);
     return r ? timerStateSnapshot(r) : null;
-  };
-  // Every countdown still running anywhere in the tree, with its true
-  // remaining seconds. The Dashboard schedules its out-of-tab chimes off
-  // this — it needs the whole set, not one node, because it re-arms all of
-  // them from scratch on any change (see resyncTimerAlarms there).
-  window.__unbleepGetRunningTimers = function(){
-    return collectRunningTimerNodes().map(function(n){
-      return { id:n.id, text:n.text||"Untitled", remaining: deriveTimerRemaining(n) };
-    });
   };
   window.__unbleepStartTimer = function(id){
     var r = nodeById(id); if(!r) return null;
@@ -14683,292 +14650,13 @@
     }, 1000);
   }
 
-  /* ---------- alerting past this tab ----------
-     The veil below is part of this document, so it only exists while this
-     tab is the one on screen. A timer finishing while the user is in
-     another tab, another window, or another app entirely would go
-     completely unseen until they happened to come back. Two things reach
-     further than the page:
-
-     - A system notification — the only thing the web platform can paint
-       outside the page. It lands over whatever the user is actually looking
-       at, and clicking it brings this tab forward to the veil.
-     - A chime scheduled on the Web Audio clock. This is about timing, not
-       just volume: Chrome throttles a hidden page's timers to once a MINUTE
-       once it has been hidden for five, so the 1Hz sweep that notices a
-       countdown hit 0:00 — and therefore both the notification and the veil
-       — can be up to a minute late in a long-backgrounded tab. Audio queued
-       ahead of time runs on the audio thread, which isn't throttled, so the
-       chime lands exactly on the second no matter what the tab is doing.
-
-     Both need user activation (a notification permission prompt, and an
-     AudioContext that would otherwise start suspended), so they are primed
-     from the click that STARTS a timer rather than on load — see
-     __unbleepPrimeTimerAlerts, called from the engine's startTimerNode. */
-  let timerAudioCtx = null;
-  let notifPermissionAsked = false;
-  const scheduledChimes = Object.create(null); // task id -> live audio nodes
-
-  function timerAudioReady() {
-    return !!timerAudioCtx && timerAudioCtx.state === "running";
-  }
-
-  // Task text is stored as (sanitized) HTML, so it can carry <b>/<br> — both
-  // the veil and the notification body are plain-text sinks and would
-  // otherwise show the markup literally.
+  // Task text is stored as (sanitized) HTML, so it can carry <b>/<br>. The
+  // veil sets it through textContent, which would otherwise show that markup
+  // literally — a bolded task name reading as "<b>Draft</b>".
   function plainTaskText(html) {
     const tmp = document.createElement("div");
     tmp.innerHTML = html || "";
     return (tmp.textContent || "").replace(/\s+/g, " ").trim();
-  }
-
-  function clearScheduledChimes() {
-    Object.keys(scheduledChimes).forEach(function (id) {
-      const nodes = scheduledChimes[id];
-      try { nodes.osc.stop(); } catch (e) {}
-      try { nodes.osc.disconnect(); nodes.gain.disconnect(); } catch (e) {}
-      delete scheduledChimes[id];
-    });
-  }
-
-  // Three short beeps, queued `seconds` from now. One oscillator held at
-  // silence and gated by its gain envelope, rather than three separate
-  // sources, so a single stop() call cancels the whole alarm when the timer
-  // it belongs to is paused or reset.
-  const CHIME_BEEPS = 3, CHIME_GAP = 0.45;
-  function scheduleTimerChime(id, seconds) {
-    if (!timerAudioReady()) return;
-    const ctx = timerAudioCtx;
-    const at = ctx.currentTime + Math.max(0, seconds);
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    gain.connect(ctx.destination);
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    osc.connect(gain);
-    for (let i = 0; i < CHIME_BEEPS; i++) {
-      const t = at + i * CHIME_GAP;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
-      gain.gain.setValueAtTime(0.25, t + 0.2);
-      gain.gain.linearRampToValueAtTime(0, t + 0.28);
-    }
-    osc.start(at);
-    osc.stop(at + CHIME_BEEPS * CHIME_GAP);
-    osc.onended = function () { delete scheduledChimes[id]; };
-    scheduledChimes[id] = { osc: osc, gain: gain };
-  }
-
-  // Re-arms every running countdown from scratch. Cheaper to reason about
-  // than diffing which one changed, and the engine hands back true remaining
-  // seconds derived from the wall clock, so re-arming is always correct
-  // even for timers that have been running since before this page loaded.
-  function resyncTimerAlarms() {
-    clearScheduledChimes();
-    if (!timerAudioReady()) return;
-    const w = frameWin();
-    let running = [];
-    try { running = (w && w.__unbleepGetRunningTimers) ? w.__unbleepGetRunningTimers() : []; } catch (e) {}
-    running.forEach(function (t) { scheduleTimerChime(t.id, t.remaining || 0); });
-  }
-  window.__unbleepTimersChanged = resyncTimerAlarms;
-
-  function primeTimerAudio() {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (Ctx && !timerAudioCtx) timerAudioCtx = new Ctx();
-      if (timerAudioCtx && timerAudioCtx.state === "suspended") {
-        timerAudioCtx.resume().then(resyncTimerAlarms, function () {});
-      }
-    } catch (e) {}
-    resyncTimerAlarms();
-  }
-
-  // A countdown that was already running when this page loaded — the usual
-  // case after a reload mid-timer — has no chime armed yet, because an
-  // AudioContext cannot start without user activation. So take the first
-  // gesture of any kind rather than leaving it unarmed until the next timer
-  // is started. Audio only: the notification permission prompt still waits
-  // for the deliberate act of starting a timer, so it never appears out of
-  // nowhere on a stray click.
-  document.addEventListener("pointerdown", primeTimerAudio, { once: true, capture: true });
-  document.addEventListener("keydown", primeTimerAudio, { once: true, capture: true });
-
-  // Called from the engine on Start (a real click, so there's user
-  // activation to spend), and again from the veil's own Stop button as a
-  // second chance in case the first prompt was never reached.
-  // Asks for notification permission on the NEXT gesture rather than this
-  // one. Both requestPermission() and requestWindow() want the same transient
-  // user activation, and asking for permission SPENDS it — which silently
-  // cost the floating window its one chance to open on the very first timer
-  // a user ever started, since openTimerFloat() then threw NotAllowedError
-  // into a catch. The float has first claim on the current gesture (it is the
-  // surface that actually floats above other apps); the prompt takes the one
-  // after, whenever that happens to be.
-  let notifPromptArmed = false;
-  function armNotificationPrompt() {
-    if (notifPermissionAsked || notifPromptArmed) return;
-    if (!("Notification" in window) || Notification.permission !== "default") return;
-    notifPromptArmed = true;
-    const ask = function () {
-      if (notifPermissionAsked) return;
-      notifPermissionAsked = true;
-      try { Notification.requestPermission(); } catch (e) {}
-    };
-    document.addEventListener("pointerdown", ask, { once: true, capture: true });
-    document.addEventListener("keydown", ask, { once: true, capture: true });
-  }
-
-  window.__unbleepPrimeTimerAlerts = function () {
-    primeTimerAudio();
-    // First claim on this gesture, and deliberately not awaited: this is the
-    // only moment the browser will let a floating window be opened at all
-    // (see openTimerFloat), and it must not be delayed or pre-empted.
-    openTimerFloat();
-    armNotificationPrompt();
-  };
-
-  /* ---------- floating always-on-top timer window ----------
-     The veil is part of this document, so it can only ever cover this tab.
-     The one surface a browser will float above other windows — and above
-     other applications, on whatever desktop/Space you're looking at — is a
-     Document Picture-in-Picture window. So a running timer gets one.
-
-     The catch, and the reason this opens at Start rather than at 0:00:
-     requestWindow() requires transient user activation. Verified directly —
-     calling it without a live gesture throws NotAllowedError, "Document PiP
-     requires user activation" — so a countdown finishing twenty-five minutes
-     later has no way to summon a window of its own. The window therefore
-     opens on the click that starts the timer and stays up for the duration,
-     showing the countdown, then turns red and becomes the alert when it
-     reaches zero. That is also why it is worth keeping open: a PiP window is
-     a VISIBLE window, so its own interval is never subject to the
-     background-tab throttling that can delay this page's 1Hz sweep by up to
-     a minute — it notices zero on the exact second even when this tab has
-     been hidden for hours.
-
-     Closing it is per-timer, not permanent: it will open again the next time
-     a timer is started, which is the only moment it is allowed to. */
-  let floatWin = null;
-  let floatTick = null;
-
-  function floatIsOpen() { return !!floatWin && !floatWin.closed; }
-
-  function closeTimerFloat() {
-    if (floatTick) { clearInterval(floatTick); floatTick = null; }
-    if (floatIsOpen()) { try { floatWin.close(); } catch (e) {} }
-    floatWin = null;
-  }
-
-  function buildFloatDocument(w) {
-    const style = w.document.createElement("style");
-    style.textContent =
-      "html,body{margin:0;height:100%;background:#ffffff;overflow:hidden;" +
-      "font-family:'Neue Montreal',Arial,Helvetica,sans-serif;color:#0a0a0a;-webkit-user-select:none;user-select:none}" +
-      "#wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px;box-sizing:border-box;text-align:center}" +
-      "#label{font-size:12px;font-weight:500;color:#666;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
-      "#clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}" +
-      "#stop{display:none;margin-top:6px;padding:7px 22px;border:0;border-radius:7px;background:#ff0000;color:#fff;" +
-      "font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
-      "#stop:hover{background:#cc0000}" +
-      /* Alert state: the whole window goes red so it reads as an alarm from
-         the corner of your eye, without needing to be read. */
-      "body.ringing{background:#ff0000;color:#ffffff}" +
-      "body.ringing #label{color:rgba(255,255,255,0.92)}" +
-      "body.ringing #clock{font-size:26px}" +
-      "body.ringing #stop{display:block;background:#ffffff;color:#ff0000}" +
-      "body.ringing #stop:hover{background:#f0f0f0}";
-    w.document.head.appendChild(style);
-    w.document.body.innerHTML =
-      '<div id="wrap"><div id="label"></div><div id="clock">00:00</div>' +
-      '<button type="button" id="stop">Stop</button></div>';
-    w.document.getElementById("stop").addEventListener("click", function () {
-      pendingTimerNotifications.shift();
-      renderTimerNotifBanner();
-      paintTimerFloat();
-    });
-  }
-
-  function fmtFloatClock(totalSeconds) {
-    const t = Math.max(0, Math.round(totalSeconds));
-    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
-    const pad = function (n) { return (n < 10 ? "0" : "") + n; };
-    return h ? h + ":" + pad(m) + ":" + pad(sec) : pad(m) + ":" + pad(sec);
-  }
-
-  // Single source of truth for what the float shows: a finished timer waiting
-  // to be acknowledged outranks a running one, so the alert is never hidden
-  // behind some other task's countdown.
-  function paintTimerFloat() {
-    if (!floatIsOpen()) return;
-    const doc = floatWin.document;
-    const label = doc.getElementById("label");
-    const clock = doc.getElementById("clock");
-    if (!label || !clock) return;
-
-    if (pendingTimerNotifications.length) {
-      const item = pendingTimerNotifications[0];
-      doc.body.classList.add("ringing");
-      label.textContent = plainTaskText(item.text) || "Untitled";
-      clock.textContent = "Timer";
-      return;
-    }
-    doc.body.classList.remove("ringing");
-
-    const w = frameWin();
-    let running = [];
-    try { running = (w && w.__unbleepGetRunningTimers) ? w.__unbleepGetRunningTimers() : []; } catch (e) {}
-    if (!running.length) { closeTimerFloat(); return; }
-    // Whichever finishes first is the one worth watching.
-    let soonest = running[0];
-    for (let i = 1; i < running.length; i++) {
-      if ((running[i].remaining || 0) < (soonest.remaining || 0)) soonest = running[i];
-    }
-    label.textContent = plainTaskText(soonest.text) || "Untitled";
-    clock.textContent = fmtFloatClock(soonest.remaining || 0);
-  }
-
-  // Opened only from the Start click — see the note above on user activation.
-  async function openTimerFloat() {
-    if (!("documentPictureInPicture" in window)) return;
-    if (floatIsOpen()) { paintTimerFloat(); return; }
-    // Only one PiP window is allowed per tab, and the always-on-top launcher
-    // uses the same API. If it is already floating the whole app, leave it
-    // be rather than replacing what the user deliberately opened — that copy
-    // shows its own veil anyway.
-    try { if (documentPictureInPicture.window) return; } catch (e) {}
-    let w = null;
-    try {
-      w = await documentPictureInPicture.requestWindow({ width: 240, height: 150 });
-    } catch (e) { return; } // no activation left, or the user declined
-    floatWin = w;
-    buildFloatDocument(w);
-    w.addEventListener("pagehide", function () {
-      if (floatTick) { clearInterval(floatTick); floatTick = null; }
-      floatWin = null;
-    });
-    paintTimerFloat();
-    if (floatTick) clearInterval(floatTick);
-    floatTick = setInterval(paintTimerFloat, 250);
-  }
-
-  function showTimerSystemNotification(item) {
-    try {
-      if (!("Notification" in window) || Notification.permission !== "granted") return;
-      const note = new Notification("Timer", {
-        body: plainTaskText(item.text) || "Untitled",
-        // Tagged per task so the separate copy of this page running inside
-        // the floating always-on-top window replaces this notification
-        // rather than stacking a duplicate of it on the OS.
-        tag: "unbleep-timer-" + item.id,
-        requireInteraction: true
-      });
-      note.addEventListener("click", function () {
-        try { window.focus(); } catch (e) {}
-        note.close();
-      });
-    } catch (e) {}
   }
 
   // Full-screen veil for a completed timer, naming just the task/subtask
@@ -15005,10 +14693,8 @@
     stopBtn.className = "timer-notif-stop";
     stopBtn.textContent = "Stop";
     stopBtn.addEventListener("click", function () {
-      if (window.__unbleepPrimeTimerAlerts) window.__unbleepPrimeTimerAlerts();
       pendingTimerNotifications.shift();
       renderTimerNotifBanner();
-      paintTimerFloat();
     });
     row.appendChild(head);
     row.appendChild(stopBtn);
@@ -15021,8 +14707,6 @@
   window.__unbleepTimerCompleted = function (item) {
     pendingTimerNotifications.push(item);
     renderTimerNotifBanner();
-    showTimerSystemNotification(item);
-    paintTimerFloat();
   };
 
   // Exposed so the fullscreen bridge can refresh after subpage edits — tags
