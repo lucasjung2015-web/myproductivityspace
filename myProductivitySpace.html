@@ -14798,15 +14798,160 @@
   // Called from the engine on Start (a real click, so there's user
   // activation to spend), and again from the veil's own Stop button as a
   // second chance in case the first prompt was never reached.
+  // Asks for notification permission on the NEXT gesture rather than this
+  // one. Both requestPermission() and requestWindow() want the same transient
+  // user activation, and asking for permission SPENDS it — which silently
+  // cost the floating window its one chance to open on the very first timer
+  // a user ever started, since openTimerFloat() then threw NotAllowedError
+  // into a catch. The float has first claim on the current gesture (it is the
+  // surface that actually floats above other apps); the prompt takes the one
+  // after, whenever that happens to be.
+  let notifPromptArmed = false;
+  function armNotificationPrompt() {
+    if (notifPermissionAsked || notifPromptArmed) return;
+    if (!("Notification" in window) || Notification.permission !== "default") return;
+    notifPromptArmed = true;
+    const ask = function () {
+      if (notifPermissionAsked) return;
+      notifPermissionAsked = true;
+      try { Notification.requestPermission(); } catch (e) {}
+    };
+    document.addEventListener("pointerdown", ask, { once: true, capture: true });
+    document.addEventListener("keydown", ask, { once: true, capture: true });
+  }
+
   window.__unbleepPrimeTimerAlerts = function () {
     primeTimerAudio();
-    try {
-      if (!notifPermissionAsked && "Notification" in window && Notification.permission === "default") {
-        notifPermissionAsked = true;
-        Notification.requestPermission();
-      }
-    } catch (e) {}
+    // First claim on this gesture, and deliberately not awaited: this is the
+    // only moment the browser will let a floating window be opened at all
+    // (see openTimerFloat), and it must not be delayed or pre-empted.
+    openTimerFloat();
+    armNotificationPrompt();
   };
+
+  /* ---------- floating always-on-top timer window ----------
+     The veil is part of this document, so it can only ever cover this tab.
+     The one surface a browser will float above other windows — and above
+     other applications, on whatever desktop/Space you're looking at — is a
+     Document Picture-in-Picture window. So a running timer gets one.
+
+     The catch, and the reason this opens at Start rather than at 0:00:
+     requestWindow() requires transient user activation. Verified directly —
+     calling it without a live gesture throws NotAllowedError, "Document PiP
+     requires user activation" — so a countdown finishing twenty-five minutes
+     later has no way to summon a window of its own. The window therefore
+     opens on the click that starts the timer and stays up for the duration,
+     showing the countdown, then turns red and becomes the alert when it
+     reaches zero. That is also why it is worth keeping open: a PiP window is
+     a VISIBLE window, so its own interval is never subject to the
+     background-tab throttling that can delay this page's 1Hz sweep by up to
+     a minute — it notices zero on the exact second even when this tab has
+     been hidden for hours.
+
+     Closing it is per-timer, not permanent: it will open again the next time
+     a timer is started, which is the only moment it is allowed to. */
+  let floatWin = null;
+  let floatTick = null;
+
+  function floatIsOpen() { return !!floatWin && !floatWin.closed; }
+
+  function closeTimerFloat() {
+    if (floatTick) { clearInterval(floatTick); floatTick = null; }
+    if (floatIsOpen()) { try { floatWin.close(); } catch (e) {} }
+    floatWin = null;
+  }
+
+  function buildFloatDocument(w) {
+    const style = w.document.createElement("style");
+    style.textContent =
+      "html,body{margin:0;height:100%;background:#ffffff;overflow:hidden;" +
+      "font-family:'Neue Montreal',Arial,Helvetica,sans-serif;color:#0a0a0a;-webkit-user-select:none;user-select:none}" +
+      "#wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px;box-sizing:border-box;text-align:center}" +
+      "#label{font-size:12px;font-weight:500;color:#666;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      "#clock{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}" +
+      "#stop{display:none;margin-top:6px;padding:7px 22px;border:0;border-radius:7px;background:#ff0000;color:#fff;" +
+      "font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
+      "#stop:hover{background:#cc0000}" +
+      /* Alert state: the whole window goes red so it reads as an alarm from
+         the corner of your eye, without needing to be read. */
+      "body.ringing{background:#ff0000;color:#ffffff}" +
+      "body.ringing #label{color:rgba(255,255,255,0.92)}" +
+      "body.ringing #clock{font-size:26px}" +
+      "body.ringing #stop{display:block;background:#ffffff;color:#ff0000}" +
+      "body.ringing #stop:hover{background:#f0f0f0}";
+    w.document.head.appendChild(style);
+    w.document.body.innerHTML =
+      '<div id="wrap"><div id="label"></div><div id="clock">00:00</div>' +
+      '<button type="button" id="stop">Stop</button></div>';
+    w.document.getElementById("stop").addEventListener("click", function () {
+      pendingTimerNotifications.shift();
+      renderTimerNotifBanner();
+      paintTimerFloat();
+    });
+  }
+
+  function fmtFloatClock(totalSeconds) {
+    const t = Math.max(0, Math.round(totalSeconds));
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), sec = t % 60;
+    const pad = function (n) { return (n < 10 ? "0" : "") + n; };
+    return h ? h + ":" + pad(m) + ":" + pad(sec) : pad(m) + ":" + pad(sec);
+  }
+
+  // Single source of truth for what the float shows: a finished timer waiting
+  // to be acknowledged outranks a running one, so the alert is never hidden
+  // behind some other task's countdown.
+  function paintTimerFloat() {
+    if (!floatIsOpen()) return;
+    const doc = floatWin.document;
+    const label = doc.getElementById("label");
+    const clock = doc.getElementById("clock");
+    if (!label || !clock) return;
+
+    if (pendingTimerNotifications.length) {
+      const item = pendingTimerNotifications[0];
+      doc.body.classList.add("ringing");
+      label.textContent = plainTaskText(item.text) || "Untitled";
+      clock.textContent = "Timer";
+      return;
+    }
+    doc.body.classList.remove("ringing");
+
+    const w = frameWin();
+    let running = [];
+    try { running = (w && w.__unbleepGetRunningTimers) ? w.__unbleepGetRunningTimers() : []; } catch (e) {}
+    if (!running.length) { closeTimerFloat(); return; }
+    // Whichever finishes first is the one worth watching.
+    let soonest = running[0];
+    for (let i = 1; i < running.length; i++) {
+      if ((running[i].remaining || 0) < (soonest.remaining || 0)) soonest = running[i];
+    }
+    label.textContent = plainTaskText(soonest.text) || "Untitled";
+    clock.textContent = fmtFloatClock(soonest.remaining || 0);
+  }
+
+  // Opened only from the Start click — see the note above on user activation.
+  async function openTimerFloat() {
+    if (!("documentPictureInPicture" in window)) return;
+    if (floatIsOpen()) { paintTimerFloat(); return; }
+    // Only one PiP window is allowed per tab, and the always-on-top launcher
+    // uses the same API. If it is already floating the whole app, leave it
+    // be rather than replacing what the user deliberately opened — that copy
+    // shows its own veil anyway.
+    try { if (documentPictureInPicture.window) return; } catch (e) {}
+    let w = null;
+    try {
+      w = await documentPictureInPicture.requestWindow({ width: 240, height: 150 });
+    } catch (e) { return; } // no activation left, or the user declined
+    floatWin = w;
+    buildFloatDocument(w);
+    w.addEventListener("pagehide", function () {
+      if (floatTick) { clearInterval(floatTick); floatTick = null; }
+      floatWin = null;
+    });
+    paintTimerFloat();
+    if (floatTick) clearInterval(floatTick);
+    floatTick = setInterval(paintTimerFloat, 250);
+  }
 
   function showTimerSystemNotification(item) {
     try {
@@ -14863,6 +15008,7 @@
       if (window.__unbleepPrimeTimerAlerts) window.__unbleepPrimeTimerAlerts();
       pendingTimerNotifications.shift();
       renderTimerNotifBanner();
+      paintTimerFloat();
     });
     row.appendChild(head);
     row.appendChild(stopBtn);
@@ -14876,6 +15022,7 @@
     pendingTimerNotifications.push(item);
     renderTimerNotifBanner();
     showTimerSystemNotification(item);
+    paintTimerFloat();
   };
 
   // Exposed so the fullscreen bridge can refresh after subpage edits — tags
