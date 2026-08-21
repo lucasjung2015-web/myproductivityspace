@@ -2296,6 +2296,18 @@
   .mps-field input:focus { border-color: var(--ink); }
   .mps-help { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
 
+  /* Sync state in the account row. A dot rather than a word alone because
+     it's read at a glance — the word is there for anyone who can't rely on
+     the colour. */
+  .mps-sync-dot {
+    flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ink-soft); margin-right: 7px;
+  }
+  .mps-sync-dot.is-synced  { background: #1a7f37; }
+  .mps-sync-dot.is-syncing { background: var(--ink-soft); }
+  .mps-sync-dot.is-offline { background: #9a6700; }
+  .mps-sync-dot.is-error   { background: #FF0000; }
+  .mps-sync-label { font-size: 12px; color: var(--ink-soft); margin-right: 12px; }
   .mps-card { border: 1px solid var(--hair); border-radius: 12px; padding: 14px; }
   .mps-cardgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .mps-section-title { font-size: 13px; font-weight: 700; color: var(--ink); margin: 18px 0 10px; }
@@ -2482,7 +2494,75 @@
     .ai-cursor { transition: none; }
     .ai-msg.is-streaming::after, .ai-thinking i, .ai-tool.is-running svg { animation: none; }
   }
+
+  /* ---------- auth gate ----------
+     Covers the board from first paint until a session exists AND hydration
+     has landed, so no widget is ever seen holding pre-hydration data — or,
+     on a shared browser, the previous account's. Declared here rather than
+     alongside the markup so the rules are parsed before the element exists
+     and it is opaque on its very first paint.
+
+     z-index outranks .mps-backdrop (4200) and the fixed corner button row
+     (3000): nothing behind this may be reachable, including the widget
+     controls that sit above ordinary content. */
+  #authGate {
+    position: fixed; inset: 0; z-index: 9000;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  #authGate[hidden] { display: none; }
+  #authGate .ag-mark { font-size: 22px; letter-spacing: -0.02em; color: var(--ink); font-weight: 700; }
+  #authGate .ag-mark .pt-prefix { font-weight: 400; color: var(--ink-soft); }
+  #authGate .ag-sub { font-size: 13px; color: var(--ink-soft); }
+  #authGate .ag-err {
+    font-size: 13px; color: var(--ink); max-width: 340px;
+    text-align: center; line-height: 1.5;
+  }
+  #authGate .ag-err[hidden] { display: none; }
+  /* The same solid-ink primary every other primary action in this app uses. */
+  #authGateBtn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 10px 18px; border: none; border-radius: 9px;
+    background: var(--ink); color: var(--bg);
+    font-family: inherit; font-weight: 600; font-size: 13.5px; cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s var(--ease-spring);
+  }
+  #authGateBtn:hover { background: #222222; }
+  #authGateBtn:active { transform: scale(0.97); }
+  #authGateBtn[hidden] { display: none; }
+  /* Indeterminate, because hydration has no measurable progress — one
+     request whose size isn't known until it lands. */
+  #authGate .ag-bar {
+    width: 160px; height: 2px; background: var(--hair);
+    border-radius: 2px; overflow: hidden;
+  }
+  #authGate .ag-bar[hidden] { display: none; }
+  #authGate .ag-bar i {
+    display: block; width: 40%; height: 100%;
+    background: var(--ink); animation: agSlide 1.1s infinite;
+  }
+  @keyframes agSlide { from { transform: translateX(-100%); } to { transform: translateX(350%); } }
+  @media (prefers-reduced-motion: reduce) {
+    #authGate .ag-bar i { animation: none; width: 100%; opacity: 0.35; }
+  }
 </style>
+
+<!-- Deliberately NOT hidden: the gate renders by default and is only ever
+     removed once a session and a completed hydration are confirmed. Failing
+     closed means a thrown error leaves the board covered rather than
+     exposed. -->
+<div id="authGate">
+  <div class="ag-mark"><span class="pt-prefix">my</span>ProductivitySpace</div>
+  <div class="ag-sub" id="authGateSub">Loading your board…</div>
+  <button type="button" id="authGateBtn" hidden>
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 11v2.9h4.1c-.2 1.1-1.4 3.2-4.1 3.2-2.5 0-4.5-2-4.5-4.6S9 7.9 11.5 7.9c1.4 0 2.3.6 2.9 1.1l2-1.9C15.1 5.9 13.5 5.2 11.5 5.2 7.6 5.2 4.4 8.4 4.4 12.3s3.2 7.1 7.1 7.1c4.1 0 6.8-2.9 6.8-6.9 0-.5 0-.9-.1-1.3H12z"/></svg>
+    Continue with Google
+  </button>
+  <div class="ag-bar" id="authGateBar"><i></i></div>
+  <div class="ag-err" id="authGateErr" hidden></div>
+</div>
 
 <div class="page-title"><span class="pt-prefix">my</span><span class="pt-main">Productivity</span><span class="pt-accent">Space</span></div>
 
@@ -7401,12 +7481,576 @@
 (function () {
   "use strict";
 
+  /* ================= auth + cloud sync =================
+     Positioned as the FIRST executing script in the outer document.
+     Everything from the <script type="text/plain"> above is inert sub-app
+     source, so the block right below this one — the storage layer — is the
+     first thing that consumes what this publishes, and it reads
+     window.__mpsSync on every storageGet/storageSet. Script blocks parse in
+     order with no await between them, so the object and its `ready` promise
+     are published SYNCHRONOUSLY here; the CDN load and all network work
+     happen afterwards, off the parse path.
+
+     The data model is a plain key/value mirror. Every value this app
+     persists is already a JSON string by the time it reaches storageSet, and
+     both documents (this one and the srcdoc iframe, which bridges to
+     window.parent.storageGet/Set) go through that one seam — so one table of
+     (user_id, key, value) mirrors the entire app without a single call site
+     elsewhere changing. */
+
+  // Public by design: the anon key is a client identifier, not a secret. Row
+  // Level Security on the kv table is the actual boundary, and the `anon`
+  // role has no policy at all — only `authenticated` does. The service_role
+  // key must never appear in this file.
+  const SUPABASE_URL = "__SUPABASE_URL__";
+  const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+
+  const DIRTY_KEY  = "daily-widget:__mpsDirty";
+  const CURSOR_KEY = "daily-widget:__mpsCursor";
+  const WRITER_KEY = "daily-widget:__mpsWriter";
+
+  const FLUSH_IDLE_MS = 1500;              // quiet period after the last write
+  const FLUSH_MAX_MS  = 8000;              // no key waits longer than this
+  const MAX_VALUE_BYTES = 4 * 1024 * 1024; // refuse before PostgREST does
+
+  /* This browser's identity, so the warm re-pull can skip rows it wrote
+     itself rather than round-tripping its own work back in. */
+  const WRITER_ID = (function () {
+    try {
+      let w = localStorage.getItem(WRITER_KEY);
+      if (!w) {
+        w = (window.crypto && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : String(Date.now()) + Math.random().toString(36).slice(2);
+        localStorage.setItem(WRITER_KEY, w);
+      }
+      return w;
+    } catch (e) { return "anon"; }
+  })();
+
+  let resolveReady;
+  const ready = new Promise(function (r) { resolveReady = r; });
+
+  /* The storage layer parses in the NEXT script block, so its raw tiers do
+     not exist yet. Hydration must not assume they will have appeared by the
+     time it runs: loadSupabase() resolves from cache in a microtask, and
+     microtasks run before the parser reaches the next <script>. Waiting on
+     an explicit handshake makes that ordering a fact rather than a race that
+     happens to win while the CDN is cold. */
+  let resolveTiers;
+  const tiersReady = new Promise(function (r) { resolveTiers = r; });
+  window.__mpsAttachTiers = function (t) {
+    window.__mpsTiers = t;
+    resolveTiers(t);
+  };
+
+  let sb = null, session = null, userId = null;
+  let status = "offline";
+  const statusListeners = [];
+
+  function setStatus(s) {
+    status = s;
+    statusListeners.forEach(function (fn) { try { fn(s); } catch (e) {} });
+  }
+
+  /* ---------------- the dirty set ----------------
+     The whole conflict story, and it needs no clocks:
+
+       a key is dirty  <=>  this browser holds changes it has not pushed
+       dirty    => local wins, and gets pushed
+       not dirty => server wins, and gets adopted
+
+     That is exact across offline edits, crashes and mid-flush closes, and it
+     avoids comparing a local timestamp against a server one — two people on
+     two laptops have two different wall clocks, and there is no local
+     updated_at in this app to compare with anyway.
+
+     Written straight to localStorage rather than through the storage layer:
+     it must survive a process kill, and it must be settable from inside
+     storageSet without recursing back into it. */
+  function readDirtySet() {
+    try {
+      const raw = localStorage.getItem(DIRTY_KEY);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch (e) { return new Set(); }
+  }
+  function writeDirtySet(set) {
+    try { localStorage.setItem(DIRTY_KEY, JSON.stringify(Array.from(set))); }
+    catch (e) {}
+  }
+  // Idempotent and cheap when the key is already dirty — it is called from
+  // the notes editor's per-keystroke path, so the no-op case has to be free.
+  function markDirty(key) {
+    const set = readDirtySet();
+    if (set.has(key)) return;
+    set.add(key);
+    writeDirtySet(set);
+  }
+  function clearDirty(key) {
+    const set = readDirtySet();
+    if (!set.delete(key)) return;
+    writeDirtySet(set);
+  }
+
+  function readCursor() {
+    try { return localStorage.getItem(CURSOR_KEY) || "1970-01-01T00:00:00Z"; }
+    catch (e) { return "1970-01-01T00:00:00Z"; }
+  }
+  function writeCursor(v) {
+    try { localStorage.setItem(CURSOR_KEY, v); } catch (e) {}
+  }
+
+  /* Regenerable caches are never synced. daily-vocab-api-v5:<date>:<config>
+     mints one key per day per config and nothing ever prunes them, so
+     syncing it would add a permanent row every day forever for a value the
+     Vocabulary widget will happily fetch again. */
+  function isSyncable(key) {
+    if (!key) return false;
+    if (key.indexOf("__mps") === 0) return false;
+    if (key.indexOf("daily-vocab-api-v5:") === 0) return false;
+    return true;
+  }
+
+  /* ---------------- the write queue ----------------
+     Two properties carry this:
+
+     (1) COALESCE BY KEY. `pending` is a Map, not a list, so the fifteen
+         save() calls one drag of a task subtree produces collapse into a
+         single entry for gtask-tree-v1 holding the last value. The sub-app
+         re-serialises the WHOLE forest on every save(), so the earlier
+         values are strict prefixes of the final one and dropping them loses
+         nothing at all.
+
+     (2) DEBOUNCE WITH A CEILING. A plain debounce starves under continuous
+         typing: every keystroke in a note refires the 300ms autosave, which
+         would refire the debounce forever and never write. FLUSH_MAX_MS is
+         what guarantees a write actually lands. */
+  const pending = new Map();
+  let flushTimer = null;
+  let flushing = false;
+  let oldestPendingAt = 0;
+  let retryDelay = 2000;
+
+  function queue(key, value) {
+    if (!session || !isSyncable(key)) return;
+    if (value && value.length > MAX_VALUE_BYTES) { setStatus("error"); return; }
+    pending.set(key, value);
+    // Synchronous, and the reason the unload path needs no heroics:
+    // sendBeacon cannot set an Authorization header and keepalive fetch caps
+    // bodies at 64KB (gtask-tree-v1 exceeds that), so neither can save us on
+    // close. But the value is already in localStorage from storageSet, and
+    // this marks it — so the next boot finds it dirty and pushes it.
+    markDirty(key);
+    if (!oldestPendingAt) oldestPendingAt = Date.now();
+    scheduleFlush();
+  }
+
+  function scheduleFlush() {
+    if (flushTimer) clearTimeout(flushTimer);
+    const age = Date.now() - (oldestPendingAt || Date.now());
+    const delay = Math.max(0, Math.min(FLUSH_IDLE_MS, FLUSH_MAX_MS - age));
+    flushTimer = setTimeout(function () { flush(); }, delay);
+  }
+
+  async function flush() {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (!sb || !session || !pending.size) { oldestPendingAt = 0; return; }
+    // Serialised: two overlapping upserts of the same key can commit out of
+    // order and leave the older value winning.
+    if (flushing) { scheduleFlush(); return; }
+    flushing = true;
+
+    const batch = [];
+    pending.forEach(function (v, k) {
+      batch.push({ user_id: userId, key: k, value: v, writer: WRITER_ID });
+    });
+    pending.clear();
+    oldestPendingAt = 0;
+    setStatus("syncing");
+
+    try {
+      // One request for every dirty key, not one request per key.
+      const res = await sb.from("kv").upsert(batch, { onConflict: "user_id,key" });
+      if (res.error) throw res.error;
+      // Only clear keys that were not re-dirtied while this was in flight.
+      batch.forEach(function (row) { if (!pending.has(row.key)) clearDirty(row.key); });
+      retryDelay = 2000;
+      setStatus(pending.size ? "syncing" : "synced");
+    } catch (e) {
+      // Requeue — but never over a newer value that landed mid-flight.
+      batch.forEach(function (row) {
+        if (!pending.has(row.key)) pending.set(row.key, row.value);
+      });
+      if (!oldestPendingAt) oldestPendingAt = Date.now();
+      setStatus("offline");
+      retryDelay = Math.min(retryDelay * 2, 60000);
+      setTimeout(function () { flush(); }, retryDelay);
+    } finally {
+      flushing = false;
+      if (pending.size && !flushTimer) scheduleFlush();
+    }
+  }
+
+  function flushNow() {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    return flush();
+  }
+
+  /* ---------------- hydration ----------------
+     Pull-all, not incremental. A cold boot on a fresh browser needs every
+     key anyway, so `updated_at > cursor` would degenerate into a full pull
+     with extra machinery; the payload is ~30-200 rows in one request.
+
+     NOTE the tier access below. This function must never call storageGet:
+     storageGet awaits `ready`, and this function is what resolves it. One
+     such call and the app hangs forever behind an opaque overlay with no
+     error at all. Reads go straight to the tiers, in the same local-wins
+     order storageGet itself uses. */
+  async function hydrate() {
+    setStatus("syncing");
+    const T = await tiersReady;
+
+    const dirty = readDirtySet();
+
+    // ---- 1. Pull everything of mine. RLS scopes this to my rows.
+    const res = await sb.from("kv").select("key,value,updated_at");
+    if (res.error) throw res.error;
+    const rows = res.data || [];
+
+    const serverKeys = new Set();
+    let cursor = readCursor();
+    for (const row of rows) {
+      serverKeys.add(row.key);
+      if (row.updated_at > cursor) cursor = row.updated_at;
+      // Local has unpushed work here, so local wins: don't adopt.
+      if (dirty.has(row.key)) continue;
+      T.localSet(row.key, row.value);
+      T.idbSet(row.key, row.value);          // fire and forget
+    }
+    writeCursor(cursor);
+
+    // ---- 2. Push whatever the server is missing, plus everything dirty.
+    // On a brand-new account this IS the one-time migration of this
+    // browser's existing board — same code path, no special case. For a new
+    // invitee on a clean browser it finds nothing and does nothing.
+    const localKeySet = new Set(T.localKeys());
+    (await T.idbKeys()).forEach(function (k) { localKeySet.add(k); });
+
+    const toPush = [];
+    for (const k of localKeySet) {
+      if (!isSyncable(k)) continue;
+      if (serverKeys.has(k) && !dirty.has(k)) continue;
+      // localGet before idbGet, deliberately: the notes editor's
+      // saveLocalNow() writes localStorage ONLY, on every keystroke and on
+      // pagehide, so its localStorage copy is routinely newer than its
+      // IndexedDB one. Reading the durable tier first would silently drop
+      // the last keystrokes of every note.
+      let v = T.localGet(k);
+      if (v == null) v = await T.idbGet(k);
+      if (v == null) continue;
+      toPush.push({ user_id: userId, key: k, value: v, writer: WRITER_ID });
+    }
+
+    if (toPush.length) {
+      const up = await sb.from("kv").upsert(toPush, { onConflict: "user_id,key" });
+      if (up.error) throw up.error;
+      toPush.forEach(function (r) { clearDirty(r.key); });
+    }
+    setStatus("synced");
+  }
+
+  /* Cheap cross-device pickup without a realtime subscription: on returning
+     to the tab after a while, adopt anything another device wrote. Values
+     land in the local tiers, so they show up on the next render or reload —
+     applying them into an already-rendered board would mean re-running every
+     widget's render path, and this app has no general mechanism for that. */
+  async function repull() {
+    if (!sb || !session) return;
+    const T = await tiersReady;
+    const dirty = readDirtySet();
+    try {
+      const res = await sb.from("kv")
+        .select("key,value,updated_at")
+        .gt("updated_at", readCursor())
+        .neq("writer", WRITER_ID);
+      if (res.error || !res.data) return;
+      let cursor = readCursor();
+      res.data.forEach(function (row) {
+        if (row.updated_at > cursor) cursor = row.updated_at;
+        if (dirty.has(row.key)) return;
+        T.localSet(row.key, row.value);
+        T.idbSet(row.key, row.value);
+      });
+      writeCursor(cursor);
+    } catch (e) {}
+  }
+
+  /* ---------------- google handoff ----------------
+     The Calendar/Tasks module keeps accessToken/tokenExpiry private to a
+     closure that parses much later than this block, so this cannot call
+     into it. It doesn't need to: that module's boot() already reads a
+     sessionStorage cache and goes straight to signed-in when it finds a
+     live token. Seeding that cache is the entire integration — not one line
+     inside the Google closure changes.
+
+     If provider_token is absent (a restored session rather than a fresh
+     callback, or the scopes were declined) the cache simply isn't seeded and
+     that module falls through to its own silent re-mint, and failing that to
+     its Connect button. The degradation path was already written. */
+  function seedGoogleProviderToken(sess) {
+    if (!sess || !sess.provider_token) return;
+    try {
+      sessionStorage.setItem("unbleep-gcal-token", JSON.stringify({
+        t: sess.provider_token,
+        // Same 120s early-renewal margin requestToken() applies, so a call
+        // can't start on a token that expires mid-flight.
+        e: Date.now() + (3600 - 120) * 1000
+      }));
+    } catch (e) {}
+  }
+
+  /* ---------------- the gate ----------------
+     Rendered by default and only ever removed on success — fail closed, so
+     a thrown error can never leave the board exposed. */
+  function gateEl(id) { return document.getElementById(id); }
+
+  function showGateSignIn() {
+    const bar = gateEl("authGateBar"), btn = gateEl("authGateBtn");
+    if (bar) bar.hidden = true;
+    if (btn) btn.hidden = false;
+    const sub = gateEl("authGateSub");
+    if (sub) sub.textContent = "Sign in to load your board";
+  }
+
+  function showGateError(msg) {
+    const bar = gateEl("authGateBar"), err = gateEl("authGateErr");
+    if (bar) bar.hidden = true;
+    // "Loading your board…" above an error message reads as a page that is
+    // still trying. It isn't.
+    const sub = gateEl("authGateSub");
+    if (sub) sub.hidden = true;
+    if (err) {
+      err.hidden = false;
+      // Supabase reports a rejected signup as a raw database string. Nobody
+      // needs to read "Database error saving new user" — the only way to
+      // reach it is an account that isn't on the allowlist.
+      err.textContent = /Database error|not_invited/i.test(String(msg || ""))
+        ? "You haven't been invited to this board."
+        : (msg || "Something went wrong signing in.");
+    }
+    const btn = gateEl("authGateBtn");
+    if (btn) btn.hidden = false;
+  }
+
+  function hideGate() {
+    const g = gateEl("authGate");
+    if (g) g.hidden = true;
+  }
+
+  async function signIn() {
+    if (!sb) return;
+    const btn = gateEl("authGateBtn");
+    if (btn) btn.hidden = true;
+    const bar = gateEl("authGateBar");
+    if (bar) bar.hidden = false;
+    try {
+      await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin + "/",
+          // The same two scopes the Calendar/Tasks module asks for, so one
+          // consent covers both the Supabase session and the Google APIs and
+          // there is no second "Connect Google Calendar" click.
+          scopes: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks",
+          queryParams: { access_type: "offline", prompt: "consent" }
+        }
+      });
+    } catch (e) { showGateError(e && e.message); }
+  }
+
+  /* Wiping local state is not optional. Keys live under one flat
+     "daily-widget:" prefix with no user component, so without this, two
+     invitees sharing a browser profile would hand each other their boards:
+     person B signs in, hydration finds person A's keys as "local, not on
+     server", and uploads A's entire board into B's account. */
+  function wipeLocalBoard() {
+    try {
+      const doomed = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf("daily-widget:") === 0 && k !== WRITER_KEY) doomed.push(k);
+      }
+      doomed.forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) {}
+    try { indexedDB.deleteDatabase("unbleep-lifeos"); } catch (e) {}
+  }
+
+  async function signOut(opts) {
+    // Push before anything below destroys local state.
+    setStatus("syncing");
+    try { await flushNow(); } catch (e) {}
+
+    // Unsynced work would not survive the wipe. Report it rather than
+    // silently discarding it; the caller decides.
+    const stillDirty = readDirtySet();
+    if (stillDirty.size && !(opts && opts.force)) {
+      return { unsynced: Array.from(stillDirty) };
+    }
+
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    pending.clear();
+    session = null; userId = null;
+
+    try { sessionStorage.removeItem("unbleep-gcal-token"); } catch (e) {}
+    try { if (window.__gcalSignOut) window.__gcalSignOut(); } catch (e) {}
+    try { if (sb) await sb.auth.signOut(); } catch (e) {}
+
+    wipeLocalBoard();
+
+    /* Reload rather than tearing down in place. This app is ~19.5k lines of
+       self-starting closures with no dispose story — a 1Hz timer interval, a
+       MutationObserver on body, a Document-PiP window that may be holding
+       the board in ANOTHER window, and the srcdoc iframe's own unload
+       handlers. Unwinding that by hand is a large permanently-fragile
+       surface; location.replace is correct and is one line. */
+    window.location.replace(window.location.origin + "/");
+    return { ok: true };
+  }
+
+  // Escape hatch for "this browser is right, the server is wrong" — marks
+  // every syncable local key dirty and pushes. The thing you want at 11pm.
+  async function forcePushAll() {
+    if (!session) return;
+    const T = await tiersReady;
+    const keys = new Set(T.localKeys());
+    (await T.idbKeys()).forEach(function (k) { keys.add(k); });
+    keys.forEach(function (k) {
+      if (!isSyncable(k)) return;
+      const v = T.localGet(k);
+      if (v != null) queue(k, v);
+    });
+    return flushNow();
+  }
+
+  /* Published synchronously, before the storage block below parses. Methods
+     are hoisted function declarations, so they are all callable already;
+     queue() no-ops harmlessly until a session exists. */
+  // One place the project ref lives. The AI panel is a separate closure that
+  // parses much later and reads this for its proxy endpoint.
+  window.__mpsFnUrl = SUPABASE_URL + "/functions/v1";
+
+  window.__mpsSync = {
+    ready: ready,
+    queue: queue,
+    markDirty: markDirty,
+    flushNow: flushNow,
+    forcePushAll: forcePushAll,
+    signOut: signOut,
+    user: function () { return session && session.user; },
+    status: function () { return status; },
+    onStatus: function (fn) { statusListeners.push(fn); fn(status); },
+    token: async function () {
+      if (!sb) return null;
+      // getSession refreshes the access token when it is close to expiry,
+      // which is what keeps the AI proxy authorised on a long-lived tab.
+      const r = await sb.auth.getSession();
+      return r.data && r.data.session ? r.data.session.access_token : null;
+    }
+  };
+
+  // Same lazy CDN injection the Google Identity script uses, for the same
+  // reason: this app has no bundler and no build step, and adding one for a
+  // single dependency would change the whole nature of the project. The UMD
+  // build specifically — every script here is a classic script.
+  function loadSupabase() {
+    return new Promise(function (resolve, reject) {
+      if (window.supabase && window.supabase.createClient) return resolve();
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+      s.async = true; s.defer = true;
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error("Could not load Supabase.")); };
+      document.head.appendChild(s);
+    });
+  }
+
+  (async function boot() {
+    const btn = gateEl("authGateBtn");
+    if (btn) btn.addEventListener("click", signIn);
+
+    if (SUPABASE_URL.indexOf("__SUPABASE") === 0) {
+      showGateError("Supabase isn't configured yet — set SUPABASE_URL and SUPABASE_ANON_KEY.");
+      return;
+    }
+
+    try {
+      await loadSupabase();
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,   // completes the ?code= handoff on load
+          flowType: "pkce"
+        }
+      });
+
+      // A signup blocked by the allowlist trigger comes back as an error in
+      // the URL hash, not as a thrown exception.
+      const hash = new URLSearchParams(String(window.location.hash || "").slice(1));
+      if (hash.get("error")) {
+        showGateError(hash.get("error_description") || hash.get("error"));
+        return;
+      }
+
+      const got = await sb.auth.getSession();
+      session = (got.data && got.data.session) || null;
+
+      // Signed out: `ready` is deliberately left pending forever. That
+      // freezes the widget engine and the calendar mid-boot behind the
+      // overlay, which is the safe direction — no half-drawn board, and no
+      // path where the app writes its first-run defaults while signed out
+      // and then migrates those bogus keys into the first account to log in.
+      if (!session) { showGateSignIn(); return; }
+      userId = session.user.id;
+
+      seedGoogleProviderToken(session);
+      await hydrate();
+
+      resolveReady();
+      hideGate();
+
+      // Flush on the way out. The existing autosave flushers already fire on
+      // these events; this rides along rather than adding its own listeners.
+      window.addEventListener("pagehide", function () { flushNow(); });
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") flushNow();
+        else repull();
+      });
+    } catch (e) {
+      // `ready` stays pending: fail closed.
+      showGateError(e && e.message);
+    }
+  })();
+})();
+</script>
+
+
+<script>
+(function () {
+  "use strict";
+
   // Suppress console output on the public artifact link — errors/warnings
   // from generation retries etc. are handled internally (fallback UI states)
   // and aren't meant to be visible to whoever opens the page.
-  ["log", "warn", "error", "info", "debug"].forEach(function (method) {
-    console[method] = function () {};
-  });
+  // Escape hatch: ?debug on the URL leaves the console intact. Without it,
+  // anything that goes wrong behind the sync layer or the auth gate fails
+  // completely silently, which makes those two — the only parts of this app
+  // with a network on the other side — the hardest things here to diagnose.
+  if (location.search.indexOf("debug") === -1) {
+    ["log", "warn", "error", "info", "debug"].forEach(function (method) {
+      console[method] = function () {};
+    });
+  }
 
   // Fallback vocabulary (used only if the daily AI generation fails). Always
   // this same fixed set regardless of how many words were requested for the
@@ -7498,6 +8142,40 @@
     });
   }
 
+  /* Every stored key, un-prefixed, from each tier. Nothing needed these
+     before: the app only ever asked for keys it already knew the name of.
+     Cloud sync is the first thing that has to answer "what is in here?"
+     without being told — it has to push keys whose names are generated at
+     runtime (note-content:<id>, list-items:<id>, <id>-hidden, and the rest),
+     and no registry of those exists anywhere. */
+  function localKeys() {
+    const out = [];
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && k.indexOf(STORE_PREFIX) === 0) out.push(k.slice(STORE_PREFIX.length));
+      }
+    } catch (e) {}
+    return out;
+  }
+
+  async function idbKeys() {
+    const db = await openPersistentDb();
+    if (!db) return [];
+    return new Promise(function (resolve) {
+      try {
+        const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).getAllKeys();
+        req.onsuccess = function () {
+          resolve((req.result || [])
+            .map(String)
+            .filter(function (k) { return k.indexOf(STORE_PREFIX) === 0; })
+            .map(function (k) { return k.slice(STORE_PREFIX.length); }));
+        };
+        req.onerror = function () { resolve([]); };
+      } catch (e) { resolve([]); }
+    });
+  }
+
   function localGet(key) {
     try { return window.localStorage.getItem(STORE_PREFIX + key); }
     catch (e) { return null; }
@@ -7508,6 +8186,21 @@
   }
 
   async function storageGet(key) {
+    /* Cloud-sync gate, and the reason no bootstrap order had to change.
+       Classic <script> blocks can't await each other, so the auth block that
+       parses just before this one cannot make this one wait. It doesn't need
+       to: every consumer of persisted state in this file already funnels
+       through this one already-async function, so stalling HERE stalls the
+       whole data-dependent boot. The widget engine's init() blocks on its
+       storageGet("dynamic-widgets"); the calendar's boot() blocks on its
+       storageGet("cal-view"). Hydration writes every server row into the two
+       local tiers BEFORE resolving this, so by the time any read gets past
+       it, local is already the merged truth — which is also why there is
+       deliberately no per-key network fallback below. Most reads on a fresh
+       board are misses, and a round trip each would serialise boot into
+       dozens of hops. */
+    if (window.__mpsSync) { try { await window.__mpsSync.ready; } catch (e) {} }
+
     // Prefer this browser's local value. This prevents a stale hosted-storage
     // value from overwriting newer work entered in the downloaded copy.
     const local = localGet(key);
@@ -7537,6 +8230,14 @@
     if (hasClaudeStorage) {
       try { await window.storage.set(key, text, true); } catch (e) {}
     }
+    /* Cloud mirror. Deliberately NOT awaited, and deliberately after both
+       local writes: this is the hot path for the Tasks sub-app's save(),
+       which has ~45 un-debounced call sites (mostly the idiom `save();
+       render();`, several firing in one tick) plus one on a 1Hz timer loop,
+       and it must never wait on a socket. queue() is synchronous and O(1) —
+       it drops the value into a Map and returns. The actual write is
+       debounced and coalesced by key on the other side. */
+    if (window.__mpsSync) { try { window.__mpsSync.queue(key, text); } catch (e) {} }
     await durableWrite;
   }
 
@@ -7544,6 +8245,23 @@
   // The embedded Tasks iframe uses window.storage.get/set directly.
   window.storageGet = storageGet;
   window.storageSet = storageSet;
+
+  /* The raw tiers, for the sync block alone. Hydration cannot go through
+     storageGet: that now awaits __mpsSync.ready, and hydration is what
+     resolves it — one call and the app hangs forever behind the auth
+     overlay with no error. So the cloud layer reads and writes the two
+     local tiers directly, in the same local-wins order storageGet uses.
+     Deliberately NOT window.storage-shaped: assigning window.storage here
+     would flip hasClaudeStorage true and put an awaited network call on
+     storageSet's hot path, which is exactly what this design avoids. */
+  const mpsTiers = {
+    localGet: localGet, localSet: localSet, localKeys: localKeys,
+    idbGet: idbGet, idbSet: idbSet, idbKeys: idbKeys
+  };
+  window.__mpsTiers = mpsTiers;
+  // Completes the handshake the sync block is waiting on. Guarded so this
+  // file still runs with that block removed entirely.
+  if (window.__mpsAttachTiers) window.__mpsAttachTiers(mpsTiers);
   if (!window.storage || typeof window.storage.get !== 'function') {
     window.storage = {
       get: async function (key) {
@@ -8926,7 +9644,20 @@
       let touched = false;
 
       function currentHtml() { return sanitizeNoteHtml(editorEl.innerHTML); }
-      function saveLocalNow() { localSet(storageKey, currentHtml()); }
+      function saveLocalNow() {
+        localSet(storageKey, currentHtml());
+        /* This path deliberately bypasses storageSet — it runs on every
+           keystroke and on pagehide, where a debounced write is too slow —
+           which means it also bypasses the cloud queue. Marking the key
+           dirty by hand is what closes that hole. Without it: the last
+           keystrokes before a tab closes land in localStorage, nothing
+           records them as unpushed, and the NEXT boot's hydration sees a
+           clean key and adopts the server copy straight over them. Silent
+           loss, roughly once a month, never reproducible. markDirty is
+           idempotent and free once the key is already dirty, so it is safe
+           on a per-keystroke path. */
+        if (window.__mpsSync) { try { window.__mpsSync.markDirty(storageKey); } catch (e) {} }
+      }
       registerLocalAutosaveFlusher(saveLocalNow);
 
       let saveTimer = null;
@@ -13055,6 +13786,26 @@
   // connection state instead of a hardcoded one. Everything else it lists is
   // a placeholder with no auth of its own yet.
   window.__gcalIsAuthed = function () { return !!authed; };
+
+  /* Sign-out for the Google side. accessToken/tokenExpiry/authed are private
+     to this closure and nothing ever reset them — until now the app had no
+     sign-out at all, so `authed` went true once and stayed true for the life
+     of the page. Exposed on window rather than called inline because the
+     auth/sync block that needs it parses thousands of lines before this one
+     and has no other way in. */
+  window.__gcalSignOut = function () {
+    try {
+      if (accessToken && window.google && window.google.accounts &&
+          window.google.accounts.oauth2) {
+        window.google.accounts.oauth2.revoke(accessToken, function () {});
+      }
+    } catch (e) {}
+    accessToken = null;
+    tokenExpiry = 0;
+    authed = false;
+    clearCachedToken();
+    try { showSignedIn(false); } catch (e) {}
+  };
 
   function showSignedIn(on) {
     signedOutEl.hidden = !!on;
@@ -18409,6 +19160,57 @@
     head.appendChild(xButton(closeConnections));
     root.appendChild(head);
 
+    /* Account row. This is the only place in the app that reports who you
+       are, whether your work has actually reached the server, and how to
+       leave — the board itself is deliberately chrome-free. It sits above
+       the connector list because it is the one connection that is not
+       optional: everything below it is per-widget, this is the session all
+       of them hang off. */
+    if (window.__mpsSync) {
+      root.appendChild(el("div", "mps-section-title", "Account"));
+      const acctWrap = el("div", "mps-card");
+      const acctRow = el("div", "mps-row");
+
+      const who = el("div", "mps-connector-name");
+      const u = window.__mpsSync.user();
+      who.textContent = (u && (u.email || u.id)) || "Not signed in";
+      who.style.flex = "1 1 auto";
+      acctRow.appendChild(who);
+
+      // Live sync state, so "did that save?" has an answer that isn't a
+      // guess. onStatus fires immediately with the current value.
+      const dot = el("span", "mps-sync-dot");
+      const label = el("span", "mps-sync-label");
+      window.__mpsSync.onStatus(function (s) {
+        dot.className = "mps-sync-dot is-" + s;
+        label.textContent = { synced: "Synced", syncing: "Syncing…",
+                              offline: "Offline", error: "Sync error" }[s] || s;
+      });
+      acctRow.appendChild(dot);
+      acctRow.appendChild(label);
+
+      const outBtn = el("button", "mps-btn", "Sign out");
+      outBtn.type = "button";
+      outBtn.addEventListener("click", async function () {
+        outBtn.disabled = true;
+        const r = await window.__mpsSync.signOut();
+        // signOut refuses rather than silently discarding unpushed work —
+        // signing out wipes this browser's copy, so anything that never
+        // reached the server would be gone for good.
+        if (r && r.unsynced) {
+          outBtn.disabled = false;
+          const ok = window.confirm(
+            r.unsynced.length + " change(s) haven't reached the server yet and " +
+            "will be lost. Sign out anyway?");
+          if (ok) await window.__mpsSync.signOut({ force: true });
+        }
+      });
+      acctRow.appendChild(outBtn);
+
+      acctWrap.appendChild(acctRow);
+      root.appendChild(acctWrap);
+    }
+
     root.appendChild(el("div", "mps-section-title", "Popular"));
     const popWrap = el("div", "mps-card");
     const popGrid = el("div", "mps-cardgrid");
@@ -18708,14 +19510,15 @@
   }
 
   /* ---------------- model transport ----------------
-     The key is held here, in the page, because this file is the whole app --
-     there is no server of ours to hide it behind. That makes it readable by
-     anyone who can read this file, so treat the file itself as the secret:
-     keep it out of public repos, and rotate the key if it ever leaves this
-     machine. Moving to a proxy later means pointing AI_API_URL elsewhere and
-     dropping the two key headers -- nothing else in this panel changes. */
-  const AI_API_KEY = "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";
-  const AI_API_URL = "https://api.anthropic.com/v1/messages";
+     The key used to live here, in the page, because this file was the whole
+     app and there was no server of ours to hide it behind. There is one now:
+     a Supabase Edge Function holds the real key and forwards to Anthropic,
+     authenticated by the caller's own Supabase session. So the key is gone
+     from this file entirely, and the panel is reachable only by someone the
+     board has already let in -- nobody who merely finds the URL can spend
+     against the account. This is exactly the swap the old comment here
+     described: point AI_API_URL elsewhere, drop the two key headers. */
+  const AI_API_URL = (window.__mpsFnUrl || "") + "/ai";
   // Sonnet is the deliberate pick for a sidebar: these are small, concrete
   // board edits and latency is felt on every one of them. One-line swap.
   const AI_MODEL = "claude-sonnet-5";
@@ -19046,13 +19849,20 @@
      and is only parseable once the block closes) and returned for the caller
      to execute. */
   async function streamTurn(apiMessages, onText) {
+    // The proxy authenticates the CALLER, not Anthropic — it holds the real
+    // key itself. getSession() (behind token()) refreshes an access token
+    // that is near expiry, which is what keeps a long-lived tab authorised.
+    const jwt = window.__mpsSync ? await window.__mpsSync.token() : null;
+    if (!jwt) throw new Error("Sign in to use the AI panel.");
+    // Raw fetch, deliberately: supabase-js's functions.invoke() buffers the
+    // whole response and cannot read a stream, which would turn the panel's
+    // token-by-token rendering back into one late block of text.
     const res = await fetch(AI_API_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": AI_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
+        "authorization": "Bearer " + jwt,
+        "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
         model: AI_MODEL,

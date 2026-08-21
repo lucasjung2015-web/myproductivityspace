@@ -1,0 +1,22 @@
+[build]
+  publish = "."
+  # The app file isn't named index.html, and renaming it in git would churn
+  # the whole project. One copy at build time keeps the served URL a bare "/",
+  # which is what has to match the OAuth redirect registered in two separate
+  # consoles — a rewrite rule would work too, but this has no edge cases.
+  command = "cp myProductivitySpace.html index.html"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Content-Type-Options = "nosniff"
+    # The board is entirely storage-driven, so a cached HTML shell would run
+    # stale code against a live schema.
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Deploy previews get random hostnames, which can never be registered as
+# OAuth redirect URLs — sign-in there would fail in a confusing way rather
+# than an obvious one. Better not to build them at all.
+[context.deploy-preview]
+  command = "echo 'deploy previews disabled: OAuth origins cannot be registered for random URLs'"

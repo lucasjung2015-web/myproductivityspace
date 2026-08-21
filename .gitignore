@@ -1,0 +1,11 @@
+# Generated at build time by netlify.toml's `cp` — the real file is
+# myProductivitySpace.html. Committing this would mean two copies drifting.
+index.html
+
+.DS_Store
+
+# Never commit secrets. The Supabase URL and ANON key belong in the HTML
+# (they are public by design; RLS is the boundary), but the service_role key
+# and the Anthropic key live in Supabase/Netlify env vars only.
+.env
+.env.*
