@@ -1560,6 +1560,17 @@
   .gt-pop-field.is-placeholder { color: #5f6368; }
   .gt-pop-field:hover { background: #d6dbe3; }
   .gt-pop-actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 18px; }
+  /* Removing the due date entirely, in the bottom-left corner of the picker.
+     margin-right:auto is what pushes it away from Cancel/Done, so the one
+     destructive control in here can't be hit by a stray click aimed at the
+     two it sits beside. */
+  .gt-pop-clear {
+    margin-right: auto; border: none; background: transparent; color: #000000;
+    cursor: pointer; padding: 7px; border-radius: 50%;
+    display: grid; place-items: center;
+  }
+  .gt-pop-clear svg { width: 18px; height: 18px; display: block; }
+  .gt-pop-clear:hover { background: #e3e9f5; }
   .gt-pop-cancel {
     border: none; background: transparent; color: #000000; cursor: pointer;
     font-family: inherit; font-size: 14px; font-weight: 600; padding: 9px 14px; border-radius: 999px;
@@ -2590,10 +2601,13 @@
       <div class="widget-body" id="calWidgetBody">
         <div id="calSignedOut">
           <button type="button" class="add-task-btn" id="calConnectBtn">Connect Google Calendar</button>
-          <!-- Deliberately empty: the signed-out state is the button and nothing
-               else. The element survives only as somewhere for TRANSIENT status
-               to land ("Opening Google sign-in…", an authorisation error) and
-               collapses again the moment it's cleared — see .cal-hint:empty. -->
+          <!-- Always empty: the signed-out state is the button and nothing else.
+               It used to carry transient status ("Opening Google sign-in…") and
+               authorisation errors ("Google sign-in was cancelled"), which meant
+               a line of prose about a window the user had just closed on purpose
+               sat under the button until the next attempt. The element itself
+               survives so the clearing writes in connect() have a target, and
+               .cal-hint:empty keeps it from leaving a gap. -->
           <div class="cal-hint" id="calAuthHint"></div>
         </div>
 
@@ -3141,7 +3155,7 @@
   .node{
     position:relative;z-index:1;width:196px;margin:0 auto;background:var(--card);
     border:1px solid #dbe2ec;border-radius:var(--radius);
-    box-shadow:var(--shadow);padding:11px 12px 12px;
+    box-shadow:var(--shadow);padding:20px 12px 12px;
     text-align:left;transition:border-color .15s,box-shadow .15s,transform .15s;
     /* Flex column so the notepad (order:5, see .notepad-wrap) always sorts
        after the tagbar regardless of DOM order — the tagbar is appended by
@@ -3464,7 +3478,7 @@
     position:absolute;z-index:50;pointer-events:none;opacity:.9;
     width:196px;background:var(--card);border:1.5px solid var(--accent);
     border-radius:var(--radius);box-shadow:var(--shadow);
-    padding:11px 12px 12px;font-size:14px;line-height:1.35;color:var(--ink);
+    padding:20px 12px 12px;font-size:14px;line-height:1.35;color:var(--ink);
     white-space:pre-wrap;word-break:break-word;
   }
   
@@ -12605,10 +12619,10 @@
       const layoutFixCss =
         "<style>" +
         "#app-root{display:flex;flex-direction:column;height:100%;min-height:0;}" +
-        ".node{width:min(260px,calc(100vw - 56px));min-width:min(260px,calc(100vw - 56px));max-width:min(260px,calc(100vw - 56px));flex:0 0 auto;padding:10px 12px 12px;}" +
+        ".node{width:min(260px,calc(100vw - 56px));min-width:min(260px,calc(100vw - 56px));max-width:min(260px,calc(100vw - 56px));flex:0 0 auto;padding:20px 12px 12px;}" +
         ".node-row{gap:7px;}" +
         ".text,div.edit{font-size:13px;line-height:1.05;min-height:14px;padding-top:0;padding-bottom:0;}" +
-        ".card-drag-ghost{width:min(260px,calc(100vw - 56px));min-width:min(260px,calc(100vw - 56px));max-width:min(260px,calc(100vw - 56px));padding:10px 12px 12px;line-height:1.05;}" +
+        ".card-drag-ghost{width:min(260px,calc(100vw - 56px));min-width:min(260px,calc(100vw - 56px));max-width:min(260px,calc(100vw - 56px));padding:20px 12px 12px;line-height:1.05;}" +
         ".tagbar{margin-top:2px;padding-top:2px;gap:2px;}" +
         ".subpage-tagbar{margin-top:-6px;padding-bottom:10px;}" +
         // Tree spacing is NOT overridden here any more. It used to be squeezed
@@ -12975,19 +12989,17 @@
       };
       tokenClient.error_callback = function (err) {
         // GIS reports these as raw machine codes ("popup_closed",
-        // "popup_failed_to_open"). They were being rendered verbatim under the
-        // Connect button, which showed the user a token name rather than a
-        // sentence. Closing the sign-in window is a deliberate act, not a
-        // failure worth narrating, so it carries the silent marker and the
-        // hint is simply cleared; the rest get plain English.
+        // "popup_failed_to_open"). None of them is shown to the user any more —
+        // the signed-out state is the Connect button alone, and a closed
+        // sign-in window is a deliberate act, not a failure worth narrating.
+        // The Error still carries a readable message for anything that logs or
+        // inspects the rejection.
         const type = (err && err.type) || "";
-        const e = new Error(
+        finish(reject, new Error(
           type === "popup_failed_to_open"
-            ? "Your browser blocked the Google sign-in window. Allow popups for this page and try again."
+            ? "Your browser blocked the Google sign-in window."
             : "Google sign-in was cancelled."
-        );
-        if (type !== "popup_failed_to_open") e.silent = true;
-        finish(reject, e);
+        ));
       };
       try {
         tokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
@@ -13068,18 +13080,19 @@
       extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
     } catch (e) {
       showSignedIn(false);
-      if (interactive) {
-        // e.silent marks the "user closed the window" case — the hint goes
-        // back to empty (and .cal-hint:empty collapses it) rather than
-        // leaving a message about something the user did on purpose.
-        authHint.textContent = e && e.silent ? "" : String((e && e.message) || e);
-      }
+      // Nothing is written into the hint on the way out, in either direction.
+      // Closing the sign-in window, or never opening it, is a thing the user
+      // did on purpose; narrating it back at them left a line of status text
+      // sitting under the Connect button where the button alone is the whole
+      // signed-out state. The error still propagates for callers that care.
+      authHint.textContent = "";
       throw e;
     }
   }
 
   connectBtn.addEventListener("click", function () {
-    authHint.textContent = "Opening Google sign-in…";
+    // No "Opening Google sign-in…" placeholder: Google's own window is the
+    // feedback, and the message outlived it on every cancelled attempt.
     connect(true).catch(function () {});
   });
 
@@ -13089,7 +13102,6 @@
   const gtaskConnectBtn = el("gtaskConnectBtn");
   if (gtaskConnectBtn) {
     gtaskConnectBtn.addEventListener("click", function () {
-      authHint.textContent = "Opening Google sign-in…";
       connect(true).catch(function () {});
     });
   }
@@ -13290,7 +13302,7 @@
 
     const wrap = document.createElement("div");
     wrap.className = "cal-timegrid" + (view === "week" ? " week" : "");
-    wrap.style.gridTemplateColumns = "34px repeat(" + days.length + ", minmax(0, 1fr))";
+    wrap.style.gridTemplateColumns = "46px repeat(" + days.length + ", minmax(0, 1fr))";
 
     // All-day strip above the hour grid. A task only belongs up here if it
     // has no due TIME — one with a specific time set shows inside its own
@@ -13329,7 +13341,9 @@
     for (let hour = 0; hour < 24; hour++) {
       const lab = document.createElement("div");
       lab.className = "cal-tg-hourlabel";
-      lab.textContent = hour === 0 ? "" : (hour % 12 || 12) + (hour < 12 ? "a" : "p");
+      // Spelled out — "1 PM", not "1p". The bare letter was a space-saving
+      // abbreviation of an abbreviation, and read as a typo more than a time.
+      lab.textContent = hour === 0 ? "" : (hour % 12 || 12) + (hour < 12 ? " AM" : " PM");
       wrap.appendChild(lab);
       days.forEach(function (day) {
         const slot = document.createElement("div");
@@ -14232,6 +14246,7 @@
     const composer = buildTaskComposer(editingDraft, {
       noNotes: true,
       deleteButton: true,
+      onChange: function () { syncDraft(); },
       onDelete: function () {
         editingTaskId = null;
         editingDraft = null;
@@ -14247,7 +14262,9 @@
     }
     composer.titleInput.addEventListener("input", syncDraft);
     // The date/repeat chips write straight into the hidden carrier inputs, so
-    // a click anywhere in the composer is the cue to re-read all of them.
+    // a click anywhere in the composer is the cue to re-read all of them. The
+    // popovers themselves report in through opts.onChange below, since they
+    // sit on <body> and their clicks never reach this element at all.
     composer.el.addEventListener("click", function () { setTimeout(syncDraft, 0); });
 
     function commit() { syncDraft(); saveTaskRowEdit(); }
@@ -14506,13 +14523,23 @@
       // ALSO open its full editor underneath it.
       if (t.due) {
         const rel = fmtRelativeDue(t.due);
-        const dueBits = [rel.text];
-        if (meta && meta.dueTime) dueBits.push(gtFmtTime(meta.dueTime));
         const dueEl = document.createElement("button");
         dueEl.type = "button";
         dueEl.className = "cal-taskrow-due" + (rel.overdue ? " is-overdue" : "");
         dueEl.innerHTML = GT_ICON.clock;
-        dueEl.appendChild(document.createTextNode(dueBits.join(", ")));
+        // gtFmtDueLabel names the day ("Today"/"Tomorrow"/"Yesterday"/"Aug 30")
+        // and fmtRelativeDue phrases the distance to it ("in 2 weeks"), which
+        // only reads better once the day is too far off to name. Either way the
+        // due TIME is appended after a comma, so a task due at 8:30 never shows
+        // up as a bare day — the same string the composer's own chip renders
+        // from the same helper, so the two surfaces can't phrase it differently.
+        const dueTimeStr = (meta && meta.dueTime) || "";
+        const near = rel.text === "Today" || rel.text === "Tomorrow" || rel.text === "Yesterday";
+        dueEl.appendChild(document.createTextNode(
+          near
+            ? gtFmtDueLabel(String(t.due).slice(0, 10), dueTimeStr)
+            : rel.text + (dueTimeStr ? ", " + gtFmtTime(dueTimeStr) : "")
+        ));
         dueEl.addEventListener("click", function (e) {
           e.stopPropagation();
           gtOpenDatePicker(dueEl, {
@@ -15684,7 +15711,8 @@
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     repeat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
     chevL: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
-    chevR: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>'
+    chevR: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>'
   };
 
   const GT_DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -15706,6 +15734,29 @@
     const d = parseYmd(ymdStr);
     const label = MON[d.getMonth()].slice(0, 3) + " " + d.getDate();
     return d.getFullYear() === new Date().getFullYear() ? label : label + ", " + d.getFullYear();
+  }
+
+  // The one phrasing every due-date label in this file uses: the day, then a
+  // comma, then the 12-hour time — "Today, 3:00 PM", "Tomorrow, 8:30 AM",
+  // "Aug 30, 8:30 AM". The nearby days are named rather than dated because
+  // that's what you actually read them as, and the time is never dropped when
+  // one is set: a task due at 8:30 that only says "Tomorrow" has lost the
+  // half of the answer that decides what you do next.
+  function gtFmtDueLabel(ymdStr, hhmm) {
+    if (!ymdStr) return hhmm ? gtFmtTime(hhmm) : "";
+    const d = parseYmd(ymdStr);
+    let day;
+    if (!d || isNaN(d.getTime())) day = String(ymdStr).slice(0, 10);
+    else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((d.getTime() - today.getTime()) / 86400000);
+      if (diffDays === 0) day = "Today";
+      else if (diffDays === 1) day = "Tomorrow";
+      else if (diffDays === -1) day = "Yesterday";
+      else day = gtFmtDate(ymdStr);
+    }
+    return hhmm ? day + ", " + gtFmtTime(hhmm) : day;
   }
 
   // A repeat rule is stored as one compact string — "1|day|never|" /
@@ -15833,6 +15884,23 @@
 
     const actions = document.createElement("div");
     actions.className = "gt-pop-actions";
+    // Removing the due date outright. Clicking the already-selected day still
+    // clears it too, but that's a discovery, not an affordance — this is the
+    // one visible way out of "this task has a date" back to "it doesn't", so
+    // it commits on the spot (no second trip through Done) and takes the time
+    // and the repeat rule with it: a repeat with no date to repeat from is
+    // meaningless, and a bare time would only be re-anchored to today by the
+    // Done handler below.
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button"; clearBtn.className = "gt-pop-clear";
+    clearBtn.title = "Remove the due date";
+    clearBtn.setAttribute("aria-label", "Remove the due date");
+    clearBtn.innerHTML = GT_ICON.trash;
+    clearBtn.addEventListener("click", function () {
+      draft.due = ""; draft.dueTime = ""; draft.repeat = "";
+      gtClosePopover();
+      onDone(draft);
+    });
     const cancel = document.createElement("button");
     cancel.type = "button"; cancel.className = "gt-pop-cancel"; cancel.textContent = "Cancel";
     cancel.addEventListener("click", gtClosePopover);
@@ -15845,7 +15913,7 @@
       gtClosePopover();
       onDone(draft);
     });
-    actions.appendChild(cancel); actions.appendChild(done);
+    actions.appendChild(clearBtn); actions.appendChild(cancel); actions.appendChild(done);
 
     function syncFields() {
       timeField.textContent = draft.dueTime ? gtFmtTime(draft.dueTime) : "Set time";
@@ -16155,6 +16223,11 @@
     const chips = document.createElement("div");
     chips.className = "gt-chips";
     main.appendChild(chips);
+    /* renderChips() runs once during construction, before the caller's own
+       `const composer = buildTaskComposer(...)` binding exists — so the very
+       first paint must NOT call back out, or an onChange that reads `composer`
+       would hit it in its temporal dead zone. Only real edits report. */
+    let firstPaint = true;
 
     // Hidden carriers, so the save path reads values rather than reaching into
     // the composer's own state.
@@ -16186,7 +16259,7 @@
         // One filled chip reporting what's actually set, with a way to clear it
         // — the Today/Tomorrow shortcuts have nothing left to offer once a
         // specific day has been chosen.
-        const label = gtFmtDate(state.due) + (state.dueTime ? ", " + gtFmtTime(state.dueTime) : "");
+        const label = gtFmtDueLabel(state.due, state.dueTime);
         const set = chip(label, { className: "is-set", icon: GT_ICON.clock, title: "Change the date or time" });
         set.addEventListener("click", openPicker);
         const clear = document.createElement("span");
@@ -16219,6 +16292,16 @@
         gtOpenRepeatDialog(state, function (rule) { state.repeat = rule; renderChips(); });
       });
       chips.appendChild(rep);
+
+      /* The date/time/repeat popovers live on <body>, not inside this element,
+         so a click on their Done button never bubbles through the composer —
+         which means an owner that re-reads these hidden inputs on its own
+         click would still be holding the pre-picker values when the user's
+         next click commits the form. Telling it directly, from the one place
+         the values change, is what keeps a due TIME (and date) from being
+         dropped on save. */
+      if (opts.onChange && !firstPaint) opts.onChange();
+      firstPaint = false;
     }
 
     function openPicker(e) {
@@ -16608,7 +16691,10 @@
       await loadGis();
       initTokenClient();
     } catch (e) {
-      authHint.textContent = "Could not reach Google. Check your connection.";
+      // Same contract: the Connect button is the signed-out state, and a
+      // failure to even load Google's script is something retrying the button
+      // (or the network coming back) resolves on its own.
+      authHint.textContent = "";
       return;
     }
     // A cached, still-valid token from earlier in this browser session means
