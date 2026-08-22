@@ -7924,7 +7924,22 @@
       }
       doomed.forEach(function (k) { localStorage.removeItem(k); });
     } catch (e) {}
-    try { indexedDB.deleteDatabase("unbleep-lifeos"); } catch (e) {}
+    /* Clear the object store rather than deleteDatabase(). A delete needs
+       exclusive access, so with this page's own connection still open (and
+       possibly another tab's) it blocks -- and a blocked delete can wedge the
+       database so that every later open() hangs. Clearing needs no exclusive
+       access and cannot block. */
+    try {
+      const req = indexedDB.open("unbleep-lifeos", 1);
+      req.onsuccess = function () {
+        try {
+          const db = req.result;
+          const tx = db.transaction("keyval", "readwrite");
+          tx.objectStore("keyval").clear();
+          tx.oncomplete = function () { try { db.close(); } catch (e) {} };
+        } catch (e) {}
+      };
+    } catch (e) {}
   }
 
   async function signOut(opts) {
@@ -8090,7 +8105,23 @@
 
       seedGoogleProviderToken(session);
       stashGoogleRefreshToken(session);   // fire-and-forget; never blocks boot
-      await hydrate();
+
+      /* Bounded, because `ready` gates every read in the app: anything that
+         stalls in here leaves the board permanently blank with nothing on
+         screen to say why. The server pull happens first and writes straight
+         to localStorage, so on a timeout the board still opens with real
+         data -- sync just carries on in the background rather than the app
+         never starting at all. */
+      try {
+        await Promise.race([
+          hydrate(),
+          new Promise(function (_, rej) {
+            setTimeout(function () { rej(new Error("hydrate-timeout")); }, 20000);
+          })
+        ]);
+      } catch (e) {
+        setStatus("offline");
+      }
 
       resolveReady();
       hideGate();
@@ -8188,6 +8219,14 @@
         req.onsuccess = function () { resolve(req.result); };
         req.onerror = function () { resolve(null); };
         req.onblocked = function () { resolve(null); };
+        /* A deleteDatabase() that got blocked by a still-open connection can
+           leave the database in a state where open() fires NO event at all --
+           not success, not error, not blocked -- and simply never settles.
+           Every await on this then hangs forever, which took the whole app
+           down behind a blank overlay. IndexedDB is only the durable mirror
+           here; localStorage is the primary and holds the same values, so
+           giving up on it degrades sync rather than stopping the app. */
+        setTimeout(function () { resolve(null); }, 3000);
       } catch (e) { resolve(null); }
     });
     return idbPromise;
