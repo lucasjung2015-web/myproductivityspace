@@ -7502,8 +7502,8 @@
   // Level Security on the kv table is the actual boundary, and the `anon`
   // role has no policy at all — only `authenticated` does. The service_role
   // key must never appear in this file.
-  const SUPABASE_URL = "__SUPABASE_URL__";
-  const SUPABASE_ANON_KEY = "__SUPABASE_ANON_KEY__";
+  const SUPABASE_URL = "https://hivtafnzuzyphwrawdpz.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpdnRhZm56dXp5cGh3cmF3ZHB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMzAxNTAsImV4cCI6MjEwMjkwNjE1MH0.JXaRedMKzsjZoDblUj1fT4yVAMJeSJaNgNdBe3IyzXE";
 
   const DIRTY_KEY  = "daily-widget:__mpsDirty";
   const CURSOR_KEY = "daily-widget:__mpsCursor";
@@ -7978,7 +7978,11 @@
     const btn = gateEl("authGateBtn");
     if (btn) btn.addEventListener("click", signIn);
 
-    if (SUPABASE_URL.indexOf("__SUPABASE") === 0) {
+    // Both, not just the URL: these get filled in one at a time, and a real
+    // URL paired with a placeholder key would sail past this check and fail
+    // later as an opaque 401 instead of saying what's actually missing.
+    if (SUPABASE_URL.indexOf("__SUPABASE") === 0 ||
+        SUPABASE_ANON_KEY.indexOf("__SUPABASE") === 0) {
       showGateError("Supabase isn't configured yet — set SUPABASE_URL and SUPABASE_ANON_KEY.");
       return;
     }
