@@ -154,3 +154,74 @@ drop trigger if exists google_tokens_touch_trg on public.google_tokens;
 create trigger google_tokens_touch_trg
   before insert or update on public.google_tokens
   for each row execute function public.kv_touch();
+
+-- ---------------------------------------------------------------------------
+-- 5. Notion connections (server-side only)
+-- ---------------------------------------------------------------------------
+-- Same shape and same reasoning as google_tokens. A Notion access token is
+-- full read/write over every page the user granted, and Notion's API cannot
+-- be called from a browser anyway, so the token is handed to the `notion`
+-- Edge Function once at connect time and never comes back out. RLS on with
+-- ZERO policies: service_role only.
+--
+-- workspace_name / workspace_icon are shown in the Connections row so the
+-- user can see WHICH workspace is linked without the client ever holding a
+-- credential. bot_id identifies the integration install, which is what
+-- Notion's token-revoked errors key off.
+
+create table if not exists public.notion_tokens (
+  user_id        uuid primary key references auth.users(id) on delete cascade,
+  access_token   text        not null,
+  bot_id         text,
+  workspace_id   text,
+  workspace_name text,
+  workspace_icon text,
+  updated_at     timestamptz not null default now()
+);
+
+alter table public.notion_tokens enable row level security;
+-- Deliberately no policies. Do not add any.
+
+drop trigger if exists notion_tokens_touch_trg on public.notion_tokens;
+create trigger notion_tokens_touch_trg
+  before insert or update on public.notion_tokens
+  for each row execute function public.kv_touch();
+
+-- Which local Page widget maps to which Notion page, and what we last saw
+-- from each side. This one IS readable by its owner: it holds no credential,
+-- and the client needs it on every sync tick to decide direction.
+create table if not exists public.notion_pages (
+  user_id            uuid        not null references auth.users(id) on delete cascade,
+  local_key          text        not null,   -- e.g. "note-content:page1786..."
+  notion_page_id     text        not null,
+  -- Notion's own last_edited_time as of our last pull. A newer value means
+  -- Notion has changes we have not seen.
+  notion_last_edited timestamptz,
+  -- Hash of the HTML we last pushed, so an unchanged local page does not
+  -- burn a write against the 3 req/sec budget on every tick.
+  pushed_hash        text,
+  updated_at         timestamptz not null default now(),
+  primary key (user_id, local_key)
+);
+
+create index if not exists notion_pages_user_idx on public.notion_pages (user_id);
+
+alter table public.notion_pages enable row level security;
+
+drop policy if exists notion_pages_select on public.notion_pages;
+create policy notion_pages_select on public.notion_pages for select to authenticated
+  using (auth.uid() = user_id);
+drop policy if exists notion_pages_insert on public.notion_pages;
+create policy notion_pages_insert on public.notion_pages for insert to authenticated
+  with check (auth.uid() = user_id);
+drop policy if exists notion_pages_update on public.notion_pages;
+create policy notion_pages_update on public.notion_pages for update to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists notion_pages_delete on public.notion_pages;
+create policy notion_pages_delete on public.notion_pages for delete to authenticated
+  using (auth.uid() = user_id);
+
+drop trigger if exists notion_pages_touch_trg on public.notion_pages;
+create trigger notion_pages_touch_trg
+  before insert or update on public.notion_pages
+  for each row execute function public.kv_touch();

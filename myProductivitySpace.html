@@ -2387,6 +2387,7 @@
   .mps-sync-dot.is-offline { background: #9a6700; }
   .mps-sync-dot.is-error   { background: #FF0000; }
   .mps-sync-label { font-size: 12px; color: var(--ink-soft); margin-right: 12px; }
+  .mps-notion-cell { display: inline-flex; align-items: center; gap: 10px; }
   .mps-card { border: 1px solid var(--hair); border-radius: 12px; padding: 14px; }
   .mps-cardgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .mps-section-title { font-size: 13px; font-weight: 700; color: var(--ink); margin: 18px 0 10px; }
@@ -8157,6 +8158,79 @@
     }
   };
 
+  /* ---------- Notion connection ----------
+     Stage 1 of backing the Pages widgets with Notion: connect/disconnect
+     state only, no page syncing yet.
+
+     The browser never holds a Notion token. It calls the notion Edge
+     Function with its own Supabase JWT and that function makes the Notion
+     call. Required whatever CORS does, since a Notion token is full
+     read/write over every page the user granted. */
+  async function notionCall(payload) {
+    if (!session) return null;
+    try {
+      const jwt = await window.__mpsSync.token();
+      if (!jwt) return null;
+      const r = await fetch(window.__mpsFnUrl + "/notion", {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": "Bearer " + jwt },
+        body: JSON.stringify(payload || {})
+      });
+      const j = await r.json().catch(function () { return null; });
+      return { ok: r.ok, status: r.status, body: j };
+    } catch (e) { return null; }
+  }
+
+  window.__mpsNotion = {
+    status: function () { return notionCall({ action: "status" }); },
+    disconnect: function () { return notionCall({ action: "disconnect" }); },
+    call: notionCall,
+
+    /* Notion's OAuth screen is where the user picks WHICH pages this app may
+       touch, so it has to be a full-page redirect rather than anything we
+       render. It returns to this same page with ?code=; the exchange needs
+       the integration's client secret, so it happens in the function. The
+       redirect_uri is built exactly the way the Google one is, because it
+       has to match what is registered on the Notion integration verbatim. */
+    connect: async function () {
+      const redirectUri = window.location.origin + window.location.pathname;
+      const r = await notionCall({ action: "authorize_url", redirect_uri: redirectUri });
+      if (!r || !r.ok || !r.body || !r.body.url) {
+        window.alert(r && r.body && /not configured/i.test(String(r.body.error || ""))
+          ? "Notion isn't set up on the server yet."
+          : "Couldn't start the Notion connection.");
+        return;
+      }
+      try { sessionStorage.setItem("mps-notion-redirect", redirectUri); } catch (e) {}
+      window.location.assign(r.body.url);
+    }
+  };
+
+  /* Completes the connect when Notion sends the browser back. Strips the
+     code from the URL either way, so a reload cannot try to redeem a spent
+     one. */
+  async function finishNotionConnectIfReturning() {
+    let code = null, state = null;
+    try {
+      const q = new URLSearchParams(window.location.search);
+      code = q.get("code"); state = q.get("state");
+    } catch (e) {}
+    /* Supabase's own OAuth also comes back as ?code=. Notion's carries the
+       state we set to the user id, so that is what tells the two apart --
+       without it this is not our callback to touch. */
+    if (!code || !state || !session || state !== session.user.id) return;
+
+    let redirectUri = window.location.origin + window.location.pathname;
+    try { redirectUri = sessionStorage.getItem("mps-notion-redirect") || redirectUri; } catch (e) {}
+    await notionCall({ action: "exchange", code: code, state: state, redirect_uri: redirectUri });
+    try { sessionStorage.removeItem("mps-notion-redirect"); } catch (e) {}
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete("code"); u.searchParams.delete("state");
+      window.history.replaceState({}, "", u.toString());
+    } catch (e) {}
+  }
+
   /* ---------- account menu ----------
      Lives here rather than with the other UI because everything it shows and
      does is session state that only this closure holds. */
@@ -8302,6 +8376,7 @@
 
       seedGoogleProviderToken(session);
       stashGoogleRefreshToken(session);   // fire-and-forget; never blocks boot
+      finishNotionConnectIfReturning();   // ditto
 
       /* Bounded, because `ready` gates every read in the app: anything that
          stalls in here leaves the board permanently blank with nothing on
@@ -19485,12 +19560,58 @@
   function connectButton(c) {
     const b = el("button", "mps-btn", "Connect");
     b.type = "button";
-    // Deliberately inert for now: no OAuth exists for these yet, and a button
-    // that looks live but does nothing is worse than one that says so.
+    /* Notion has a real OAuth flow now (see __mpsNotion). Everything else
+       still has none, and a button that looks live but does nothing is worse
+       than one that says so. */
+    if (c.id === "notion" && window.__mpsNotion) {
+      b.addEventListener("click", function () {
+        b.disabled = true;
+        b.textContent = "Opening Notion…";
+        window.__mpsNotion.connect();
+      });
+      return b;
+    }
     b.title = "Not available yet";
     return b;
   }
+
+  /* Notion connection state is server-side, so unlike __gcalIsAuthed it can
+     only be read asynchronously. The row renders in its not-connected form
+     and is corrected in place when the answer lands -- rather than blocking
+     the whole modal on a round trip. */
+  let notionState = null;
+  function refreshNotionState(onDone) {
+    if (!window.__mpsNotion) return;
+    window.__mpsNotion.status().then(function (r) {
+      notionState = (r && r.ok && r.body) ? r.body : null;
+      if (onDone) onDone();
+    });
+  }
+
+  function notionConnectedCell() {
+    const wrap = el("span", "mps-notion-cell");
+    const ok = el("span", "mps-check-ok");
+    ok.innerHTML = ICON.check;
+    ok.title = notionState && notionState.workspace_name
+      ? "Connected to " + notionState.workspace_name
+      : "Connected";
+    wrap.appendChild(ok);
+    const off = el("button", "mps-btn", "Disconnect");
+    off.type = "button";
+    off.addEventListener("click", async function () {
+      off.disabled = true;
+      await window.__mpsNotion.disconnect();
+      refreshNotionState(function () { renderCxMain(); });
+    });
+    wrap.appendChild(off);
+    return wrap;
+  }
+
   function statusCell(c) {
+    if (c.id === "notion") {
+      if (notionState && notionState.connected) return notionConnectedCell();
+      return connectButton(c);
+    }
     if (isConnected(c)) {
       const s = el("span", "mps-check-ok");
       s.innerHTML = ICON.check;
@@ -19503,6 +19624,8 @@
   function renderCxMain() {
     const root = cxViews.main;
     root.innerHTML = "";
+    // Fire-and-forget; repaints once the answer lands.
+    if (notionState === null) refreshNotionState(function () { renderCxMain(); });
 
     const head = el("div", "mps-modal-head");
     head.appendChild(el("span", "mps-modal-title", "Connectors"));
