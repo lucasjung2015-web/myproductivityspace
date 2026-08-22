@@ -122,3 +122,35 @@ drop trigger if exists enforce_invite_allowlist_trg on auth.users;
 create trigger enforce_invite_allowlist_trg
   before insert on auth.users
   for each row execute function public.enforce_invite_allowlist();
+
+-- ---------------------------------------------------------------------------
+-- 4. Google refresh tokens (server-side only)
+-- ---------------------------------------------------------------------------
+-- Supabase hands over Google's provider_token only on the OAuth callback and
+-- never persists it, so Calendar/Tasks access died with the browser tab while
+-- the board's own session lived on. GIS's silent re-mint was meant to cover
+-- that gap and does not reliably: Chrome's third-party-cookie restrictions
+-- make it succeed sometimes and fail others regardless of how long it is
+-- given. The durable answer is Google's refresh token -- but redeeming one
+-- needs the OAuth client SECRET, which must never reach the browser.
+--
+-- So the token lives here and is redeemed by the google-token Edge Function.
+-- RLS is enabled with ZERO policies, which means neither `anon` nor
+-- `authenticated` can read, write, or even detect a row: the only key that
+-- reaches this table is service_role, which exists solely inside the
+-- function. The browser hands its refresh token over once at sign-in and can
+-- never read it back -- it only ever asks for a short-lived access token.
+
+create table if not exists public.google_tokens (
+  user_id       uuid primary key references auth.users(id) on delete cascade,
+  refresh_token text        not null,
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.google_tokens enable row level security;
+-- Deliberately no policies. Do not add any.
+
+drop trigger if exists google_tokens_touch_trg on public.google_tokens;
+create trigger google_tokens_touch_trg
+  before insert or update on public.google_tokens
+  for each row execute function public.kv_touch();

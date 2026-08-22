@@ -7793,6 +7793,50 @@
     } catch (e) {}
   }
 
+  /* The refresh token arrives exactly once — on the OAuth callback, and only
+     because sign-in asks for access_type=offline. Supabase does not persist
+     it, so if this moment is missed it is gone until the next full consent.
+     It goes straight to the broker and is never kept here: redeeming one
+     needs the Google client secret, so the browser has no use for it and no
+     business holding a credential that outlives the tab. */
+  async function stashGoogleRefreshToken(sess) {
+    if (!sess || !sess.provider_refresh_token) return;
+    try {
+      await fetch(window.__mpsFnUrl + "/google-token", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "authorization": "Bearer " + sess.access_token
+        },
+        body: JSON.stringify({
+          action: "store",
+          refresh_token: sess.provider_refresh_token
+        })
+      });
+    } catch (e) {}
+  }
+
+  /* Ask the broker for a fresh Google access token. Exposed because the
+     Calendar/Tasks module — a different closure entirely — is what needs it,
+     and it has no other way to reach the Supabase session this requires.
+     Returns null rather than throwing when there is nothing stored, so the
+     caller can fall through to its own sign-in flow. */
+  window.__mpsGoogleToken = async function () {
+    if (!session) return null;
+    try {
+      const jwt = await window.__mpsSync.token();
+      if (!jwt) return null;
+      const r = await fetch(window.__mpsFnUrl + "/google-token", {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": "Bearer " + jwt },
+        body: JSON.stringify({ action: "get" })
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return j && j.access_token ? j : null;
+    } catch (e) { return null; }
+  };
+
   /* ---------------- the gate ----------------
      Rendered by default and only ever removed on success — fail closed, so
      a thrown error can never leave the board exposed. */
@@ -7900,6 +7944,16 @@
     session = null; userId = null;
 
     try { sessionStorage.removeItem("unbleep-gcal-token"); } catch (e) {}
+    /* Drop the stored Google grant as well. Leaving it would mean signing out
+       revoked the board but not the Calendar/Tasks access behind it. */
+    try {
+      const jwt = await window.__mpsSync.token();
+      if (jwt) await fetch(window.__mpsFnUrl + "/google-token", {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": "Bearer " + jwt },
+        body: JSON.stringify({ action: "forget" })
+      });
+    } catch (e) {}
     /* Suppress the auto-redirect on the reload below. Without this, signing
        out would bounce straight back to Google's consent screen and there
        would be no way to actually stay signed out. */
@@ -8035,6 +8089,7 @@
       try { sessionStorage.removeItem(AUTO_SIGNIN_KEY); } catch (e) {}
 
       seedGoogleProviderToken(session);
+      stashGoogleRefreshToken(session);   // fire-and-forget; never blocks boot
       await hydrate();
 
       resolveReady();
@@ -13771,6 +13826,23 @@
     });
   }
 
+  /* A fresh access token from the server-side broker, which redeems the
+     Google refresh token stored at sign-in. This is the reliable path: it is
+     a plain authenticated fetch, so unlike GIS's silent re-mint it does not
+     depend on third-party cookies and does not quietly stop working. Returns
+     false when there is nothing stored, so callers fall through. */
+  async function mintFromBroker() {
+    if (!window.__mpsGoogleToken) return false;
+    const r = await window.__mpsGoogleToken();
+    if (!r || !r.access_token) return false;
+    accessToken = r.access_token;
+    // Same 120s early-renewal margin as everywhere else.
+    tokenExpiry = Date.now() + ((Number(r.expires_in) || 3600) - 120) * 1000;
+    authed = true;
+    cacheToken(accessToken, tokenExpiry);
+    return true;
+  }
+
   async function ensureToken() {
     if (accessToken && Date.now() < tokenExpiry) return accessToken;
     const cached = readCachedToken();
@@ -13780,6 +13852,10 @@
       authed = true;
       return accessToken;
     }
+    // Broker first, GIS second. The silent re-mint stays as the fallback for
+    // an account that signed in before the broker existed, or one whose
+    // consent never returned a refresh token.
+    if (await mintFromBroker()) return accessToken;
     return requestToken(false);
   }
 
@@ -17511,6 +17587,18 @@
         accessToken = null; tokenExpiry = 0;
       }
     }
+    /* Broker before the silent re-mint, for the same reason ensureToken()
+       prefers it: this is the path that reliably works on a new tab, which is
+       the case that used to demand a Google click on every single one. */
+    try {
+      if (await mintFromBroker()) {
+        showSignedIn(true);
+        await refreshAll();
+        extraCalendarRefreshers.forEach(function (fn) { try { fn(); } catch (e) {} });
+        extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
+        return;
+      }
+    } catch (e) {}
     try {
       await connect(false);
     } catch (e) {
