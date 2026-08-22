@@ -7814,12 +7814,19 @@
      a thrown error can never leave the board exposed. */
   function gateEl(id) { return document.getElementById(id); }
 
+  /* Signed-out boot goes straight to Google rather than parking on a
+     click-through, so this state is now only reached as a fallback: a
+     cancelled consent screen, or a sign-out. See AUTO_SIGNIN_KEY below. */
+  const AUTO_SIGNIN_KEY = "unbleep-auto-signin-tried";
+
   function showGateSignIn() {
     const bar = gateEl("authGateBar"), btn = gateEl("authGateBtn");
     if (bar) bar.hidden = true;
     if (btn) btn.hidden = false;
+    // No caption: the button says "Continue with Google", which is the whole
+    // instruction. A line of prose above it was one more thing to read.
     const sub = gateEl("authGateSub");
-    if (sub) sub.textContent = "Sign in to load your board";
+    if (sub) sub.hidden = true;
   }
 
   function showGateError(msg) {
@@ -7857,7 +7864,13 @@
       await sb.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.origin + "/",
+          // origin + pathname, not origin + "/". In production netlify.toml
+          // copies this file to index.html, so the served path IS "/" and this
+          // resolves to exactly the URL registered in the Google and Supabase
+          // consoles. Served locally as /myProductivitySpace.html there is no
+          // index.html, so "/" landed on a directory listing instead of the app.
+          // Hardcoding the filename would fix local and break production.
+          redirectTo: window.location.origin + window.location.pathname,
           // The same two scopes the Calendar/Tasks module asks for, so one
           // consent covers both the Supabase session and the Google APIs and
           // there is no second "Connect Google Calendar" click.
@@ -7902,6 +7915,10 @@
     session = null; userId = null;
 
     try { sessionStorage.removeItem("unbleep-gcal-token"); } catch (e) {}
+    /* Suppress the auto-redirect on the reload below. Without this, signing
+       out would bounce straight back to Google's consent screen and there
+       would be no way to actually stay signed out. */
+    try { sessionStorage.setItem(AUTO_SIGNIN_KEY, "1"); } catch (e) {}
     try { if (window.__gcalSignOut) window.__gcalSignOut(); } catch (e) {}
     try { if (sb) await sb.auth.signOut(); } catch (e) {}
 
@@ -7913,7 +7930,7 @@
        the board in ANOTHER window, and the srcdoc iframe's own unload
        handlers. Unwinding that by hand is a large permanently-fragile
        surface; location.replace is correct and is one line. */
-    window.location.replace(window.location.origin + "/");
+    window.location.replace(window.location.origin + window.location.pathname);
     return { ok: true };
   }
 
@@ -8014,8 +8031,23 @@
       // overlay, which is the safe direction — no half-drawn board, and no
       // path where the app writes its first-run defaults while signed out
       // and then migrates those bogus keys into the first account to log in.
-      if (!session) { showGateSignIn(); return; }
+      /* Straight to Google's consent screen rather than showing a button to
+         click first. Guarded to one attempt per tab: returning from a
+         cancelled consent screen has no session AND no error in the hash, so
+         an unguarded redirect here would bounce forever with no way out.
+         signOut() sets the same flag, so signing out lands on the button
+         instead of being thrown back at Google. */
+      if (!session) {
+        let tried = false;
+        try { tried = sessionStorage.getItem(AUTO_SIGNIN_KEY) === "1"; } catch (e) {}
+        if (tried) { showGateSignIn(); return; }
+        try { sessionStorage.setItem(AUTO_SIGNIN_KEY, "1"); } catch (e) {}
+        signIn();
+        return;
+      }
       userId = session.user.id;
+      // Signed in: let a future signed-out boot auto-redirect again.
+      try { sessionStorage.removeItem(AUTO_SIGNIN_KEY); } catch (e) {}
 
       seedGoogleProviderToken(session);
       await hydrate();
