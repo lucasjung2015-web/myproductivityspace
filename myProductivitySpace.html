@@ -13722,9 +13722,13 @@
         clearTimeout(timer);
         fn(arg);
       };
+      /* 10s, not 4s, for the silent mint. This whole boot now runs behind the
+         Supabase hydration gate (storageGet awaits it), so GIS starts later
+         and its request competes with hydration traffic — on the old budget a
+         perfectly good silent mint routinely lost the race. */
       const timer = setTimeout(function () {
         finish(reject, new Error("Google sign-in did not respond"));
-      }, interactive ? 120000 : 4000);
+      }, interactive ? 120000 : 10000);
 
       tokenClient.callback = function (resp) {
         if (resp && resp.access_token) {
@@ -13734,6 +13738,14 @@
           tokenExpiry = Date.now() + ((Number(resp.expires_in) || 3600) - 120) * 1000;
           authed = true;
           cacheToken(accessToken, tokenExpiry);
+          /* A success that arrives after the watchdog already rejected. The
+             state above is still correct and the token is still good — but
+             the caller gave up, and boot()'s catch has painted the signed-out
+             Connect button over a session that actually works. finish() would
+             no-op here, so nothing else would ever repair that. This is the
+             state that made the app ask for a Google login on every new tab
+             despite holding a valid token. */
+          if (settled) { adoptLateToken(); return; }
           finish(resolve, accessToken);
         } else {
           finish(reject, new Error((resp && resp.error) || "Authorization failed"));
@@ -13838,6 +13850,17 @@
     if (gtOut) gtOut.hidden = !!on;
     const gtBtn = el("addGTaskBtn");
     if (gtBtn) gtBtn.hidden = !on;
+  }
+
+  /* Everything connect() does on success, minus the token request — for a
+     silent mint that lands after its caller stopped waiting. Safe to run at
+     any time: refreshAll() guards against overlapping runs itself, and
+     showSignedIn is idempotent. */
+  function adoptLateToken() {
+    try { showSignedIn(true); } catch (e) {}
+    try { refreshAll(); } catch (e) {}
+    extraCalendarRefreshers.forEach(function (fn) { try { fn(); } catch (e) {} });
+    extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
   }
 
   async function connect(interactive) {
