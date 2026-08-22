@@ -1981,6 +1981,7 @@
   body.subpage-fullscreen-mode #connectionsBtn,
   body.subpage-fullscreen-mode #addWidgetBtn,
   body.subpage-fullscreen-mode #aiPanelBtn,
+  body.subpage-fullscreen-mode #profileBtn,
   body.subpage-fullscreen-mode #aiPanel {
     display: none !important;
   }
@@ -2018,6 +2019,7 @@
   body.widget-fullscreen-mode #connectionsBtn,
   body.widget-fullscreen-mode #addWidgetBtn,
   body.widget-fullscreen-mode #aiPanelBtn,
+  body.widget-fullscreen-mode #profileBtn,
   body.widget-fullscreen-mode #aiPanel {
     display: none !important;
   }
@@ -2070,12 +2072,14 @@
      Every offset is wrapped in the docked AI sidebar's width, so opening the
      panel slides the whole row left with the page instead of leaving the
      buttons stranded underneath it. */
-  #alwaysOnTopBtn { right: calc(114px + var(--ai-panel-w)); }
-  #connectionsBtn { right: calc(80px  + var(--ai-panel-w)); }
-  #addWidgetBtn   { right: calc(46px  + var(--ai-panel-w)); }
-  #aiPanelBtn     { right: calc(12px  + var(--ai-panel-w)); }
+  #alwaysOnTopBtn { right: calc(148px + var(--ai-panel-w)); }
+  #connectionsBtn { right: calc(114px + var(--ai-panel-w)); }
+  #addWidgetBtn   { right: calc(80px  + var(--ai-panel-w)); }
+  #aiPanelBtn     { right: calc(46px  + var(--ai-panel-w)); }
+  /* Rightmost, past the AI button: this is the account, not a board tool. */
+  #profileBtn     { right: calc(12px  + var(--ai-panel-w)); }
 
-  #alwaysOnTopBtn, #connectionsBtn, #addWidgetBtn, #aiPanelBtn {
+  #alwaysOnTopBtn, #connectionsBtn, #addWidgetBtn, #aiPanelBtn, #profileBtn {
     position: fixed; top: 10px; z-index: 3000;
     display: flex; align-items: center; justify-content: center;
     width: 28px; height: 28px; padding: 0;
@@ -2103,7 +2107,76 @@
   body.pip-active #connectionsBtn,
   body.pip-active #addWidgetBtn,
   body.pip-active #aiPanelBtn,
+  body.pip-active #profileBtn,
   body.pip-active #aiPanel { display: none; }
+
+  /* ---------- account menu ----------
+     The account chooser pattern: a tinted tray holding separate white cards
+     rather than one panel with divider lines, so each row reads as its own
+     target. Deliberately NOT the .mps-modal language used elsewhere in this
+     app — that is a centred dialog for configuring things, and this is a
+     menu hanging off its own button in the corner. */
+  #profileBtn .pb-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #dadce0; color: #5f6368;
+    display: grid; place-items: center;
+  }
+  #profileBtn .pb-avatar svg { width: 17px; height: 17px; display: block; }
+  #profileBackdrop { position: fixed; inset: 0; z-index: 4400; background: transparent; }
+  #profileBackdrop[hidden], #profileMenu[hidden] { display: none; }
+  #profileMenu {
+    position: fixed; top: 46px; right: calc(12px + var(--ai-panel-w)); z-index: 4401;
+    width: 336px; padding: 12px; border-radius: 26px;
+    background: #eef1f6; box-shadow: 0 8px 30px rgba(0,0,0,.28);
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; color: var(--ink);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  /* In the tray's own top row, not floating above it: at -34px it landed at
+     viewport y=12, directly behind the fixed corner buttons. */
+  .pm-close {
+    align-self: flex-end; margin: -2px 2px -4px 0;
+    width: 30px; height: 30px; border: none; background: transparent;
+    color: var(--ink); cursor: pointer; border-radius: 50%;
+    display: grid; place-items: center; opacity: .8;
+  }
+  .pm-close:hover { background: rgba(0,0,0,.06); opacity: 1; }
+  .pm-card { background: #ffffff; border-radius: 16px; overflow: hidden; }
+  .pm-me { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+  /* The avatar carries its pencil badge, which is intentionally inert for
+     now: there is no upload path behind it yet, and a control that looks
+     live but does nothing is worse than one that plainly reads as disabled. */
+  .pm-avatar-wrap { position: relative; flex: 0 0 auto; }
+  .pm-avatar {
+    width: 62px; height: 62px; border-radius: 50%;
+    background: #f1f3f4; border: 1px solid var(--hair);
+    color: #5f6368; display: grid; place-items: center;
+  }
+  .pm-avatar svg { width: 38px; height: 38px; display: block; }
+  .pm-pencil {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2px solid #ffffff; background: #e8eaed; color: #5f6368;
+    display: grid; place-items: center; padding: 0;
+    cursor: not-allowed; opacity: .75;
+  }
+  .pm-pencil svg { width: 13px; height: 13px; display: block; }
+  .pm-name { font-size: 19px; font-weight: 600; line-height: 1.2; }
+  .pm-email { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; word-break: break-all; }
+  /* Rows below the identity card: one tap target each, full-bleed hover. */
+  .pm-row {
+    display: flex; align-items: center; gap: 16px; width: 100%;
+    padding: 15px 18px; border: none; background: transparent;
+    font-family: inherit; font-size: 15px; color: var(--ink);
+    cursor: pointer; text-align: left;
+  }
+  .pm-row:hover { background: #f1f3f4; }
+  .pm-row-icon {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center; background: #e8f0fe; color: #1a73e8;
+  }
+  .pm-row.is-signout .pm-row-icon { background: transparent; color: var(--ink); }
+  .pm-row-icon svg { width: 18px; height: 18px; display: block; }
+
 
   .add-widget-overlay { position: fixed; inset: 0; z-index: 4000; background: transparent; }
   /* Tracks the sidebar for the same reason its trigger button does. */
@@ -2573,6 +2646,42 @@
 <button type="button" id="addWidgetBtn" title="Add a section"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
 <button type="button" id="aiPanelBtn" title="myProductivitySpace AI" aria-expanded="false"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></button>
+<button type="button" id="profileBtn" title="Account" aria-haspopup="true" aria-expanded="false"><span class="pb-avatar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path d="M3.5 21a8.5 8.5 0 0 1 17 0 1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1Z"/></svg></span></button>
+<div id="profileBackdrop" hidden></div>
+<div id="profileMenu" hidden role="menu" aria-label="Account">
+  <button type="button" class="pm-close" id="profileCloseBtn" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+
+  <div class="pm-card">
+    <div class="pm-me">
+      <span class="pm-avatar-wrap">
+        <span class="pm-avatar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path d="M3.5 21a8.5 8.5 0 0 1 17 0 1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1Z"/></svg></span>
+        <!-- Inert on purpose: no avatar upload exists yet. Rendered rather
+             than omitted so the shape of the feature is visible, and
+             disabled + not-allowed so it never reads as merely broken. -->
+        <button type="button" class="pm-pencil" disabled aria-label="Change picture (not available yet)" title="Profile pictures aren't available yet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+      </span>
+      <span style="min-width:0">
+        <div class="pm-name" id="profileName">Signed in</div>
+        <div class="pm-email" id="profileEmail"></div>
+      </span>
+    </div>
+  </div>
+
+  <div class="pm-card">
+    <button type="button" class="pm-row" id="profileAddAccountBtn" role="menuitem">
+      <span class="pm-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+      Add another account
+    </button>
+  </div>
+
+  <div class="pm-card">
+    <button type="button" class="pm-row is-signout" id="profileSignOutBtn" role="menuitem">
+      <span class="pm-row-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg></span>
+      Sign out
+    </button>
+  </div>
+</div>
+
 <div id="addWidgetOverlay" class="add-widget-overlay" hidden></div>
 <div id="addWidgetPopup" class="add-widget-popup" hidden>
   <div class="add-widget-grid">
@@ -7984,6 +8093,25 @@
        the board in ANOTHER window, and the srcdoc iframe's own unload
        handlers. Unwinding that by hand is a large permanently-fragile
        surface; location.replace is correct and is one line. */
+    /* Straight back to Google with the account chooser forced, for the
+       "add another account" path -- the auto sign-in on the next load would
+       otherwise reuse the account we just signed out of, making the whole
+       thing a no-op. sessionStorage survives this navigation, so the flag
+       set above still suppresses the gate's own auto-redirect. */
+    if (opts && opts.addAccount && sb) {
+      try {
+        await sb.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: window.location.origin + window.location.pathname,
+            scopes: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks",
+            queryParams: { access_type: "offline", prompt: "select_account consent" }
+          }
+        });
+        return { ok: true };
+      } catch (e) { /* fall through to a plain reload */ }
+    }
+
     window.location.replace(window.location.origin + window.location.pathname);
     return { ok: true };
   }
@@ -8028,6 +8156,75 @@
       return r.data && r.data.session ? r.data.session.access_token : null;
     }
   };
+
+  /* ---------- account menu ----------
+     Lives here rather than with the other UI because everything it shows and
+     does is session state that only this closure holds. */
+  function wireProfileMenu() {
+    const btn = gateEl("profileBtn"), menu = gateEl("profileMenu"),
+          back = gateEl("profileBackdrop");
+    if (!btn || !menu || !back) return;
+
+    function paint() {
+      const u = (window.__mpsSync.user && window.__mpsSync.user()) || null;
+      const email = u && u.email ? u.email : "";
+      // Google's own display name when it came through the provider; the
+      // local part of the address is a decent stand-in when it didn't.
+      const meta = (u && u.user_metadata) || {};
+      const name = meta.full_name || meta.name || (email ? email.split("@")[0] : "Signed in");
+      const nEl = gateEl("profileName"), eEl = gateEl("profileEmail");
+      if (nEl) nEl.textContent = name;
+      if (eEl) eEl.textContent = email;
+    }
+
+    function open() {
+      paint();
+      menu.hidden = false; back.hidden = false;
+      btn.setAttribute("aria-expanded", "true");
+    }
+    function close() {
+      menu.hidden = true; back.hidden = true;
+      btn.setAttribute("aria-expanded", "false");
+    }
+
+    btn.addEventListener("click", function () { menu.hidden ? open() : close(); });
+    back.addEventListener("click", close);
+    const x = gateEl("profileCloseBtn");
+    if (x) x.addEventListener("click", close);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !menu.hidden) close();
+    });
+
+    const add = gateEl("profileAddAccountBtn");
+    if (add) add.addEventListener("click", async function () {
+      /* Supabase holds one session at a time, so this is really "switch
+         account" — and switching without clearing first would hand the next
+         account this one's board: hydration would find these keys locally,
+         see them missing on the server, and upload them under the new user.
+         So it goes through the same teardown sign-out does, then asks Google
+         for the account chooser rather than silently reusing the last one. */
+      add.disabled = true;
+      const r = await signOut({ addAccount: true });
+      if (r && r.unsynced) {
+        add.disabled = false;
+        const ok = window.confirm(r.unsynced.length + " change(s) haven't reached " +
+          "the server yet and will be lost. Switch account anyway?");
+        if (ok) await signOut({ addAccount: true, force: true });
+      }
+    });
+
+    const out = gateEl("profileSignOutBtn");
+    if (out) out.addEventListener("click", async function () {
+      out.disabled = true;
+      const r = await signOut();
+      if (r && r.unsynced) {
+        out.disabled = false;
+        const ok = window.confirm(r.unsynced.length + " change(s) haven't reached " +
+          "the server yet and will be lost. Sign out anyway?");
+        if (ok) await signOut({ force: true });
+      }
+    });
+  }
 
   // Same lazy CDN injection the Google Identity script uses, for the same
   // reason: this app has no bundler and no build step, and adding one for a
@@ -8125,6 +8322,7 @@
 
       resolveReady();
       hideGate();
+      wireProfileMenu();
 
       // Flush on the way out. The existing autosave flushers already fire on
       // these events; this rides along rather than adding its own listeners.
@@ -19330,57 +19528,6 @@
     head.appendChild(addBtn);
     head.appendChild(xButton(closeConnections));
     root.appendChild(head);
-
-    /* Account row. This is the only place in the app that reports who you
-       are, whether your work has actually reached the server, and how to
-       leave — the board itself is deliberately chrome-free. It sits above
-       the connector list because it is the one connection that is not
-       optional: everything below it is per-widget, this is the session all
-       of them hang off. */
-    if (window.__mpsSync) {
-      root.appendChild(el("div", "mps-section-title", "Account"));
-      const acctWrap = el("div", "mps-card");
-      const acctRow = el("div", "mps-row");
-
-      const who = el("div", "mps-connector-name");
-      const u = window.__mpsSync.user();
-      who.textContent = (u && (u.email || u.id)) || "Not signed in";
-      who.style.flex = "1 1 auto";
-      acctRow.appendChild(who);
-
-      // Live sync state, so "did that save?" has an answer that isn't a
-      // guess. onStatus fires immediately with the current value.
-      const dot = el("span", "mps-sync-dot");
-      const label = el("span", "mps-sync-label");
-      window.__mpsSync.onStatus(function (s) {
-        dot.className = "mps-sync-dot is-" + s;
-        label.textContent = { synced: "Synced", syncing: "Syncing…",
-                              offline: "Offline", error: "Sync error" }[s] || s;
-      });
-      acctRow.appendChild(dot);
-      acctRow.appendChild(label);
-
-      const outBtn = el("button", "mps-btn", "Sign out");
-      outBtn.type = "button";
-      outBtn.addEventListener("click", async function () {
-        outBtn.disabled = true;
-        const r = await window.__mpsSync.signOut();
-        // signOut refuses rather than silently discarding unpushed work —
-        // signing out wipes this browser's copy, so anything that never
-        // reached the server would be gone for good.
-        if (r && r.unsynced) {
-          outBtn.disabled = false;
-          const ok = window.confirm(
-            r.unsynced.length + " change(s) haven't reached the server yet and " +
-            "will be lost. Sign out anyway?");
-          if (ok) await window.__mpsSync.signOut({ force: true });
-        }
-      });
-      acctRow.appendChild(outBtn);
-
-      acctWrap.appendChild(acctRow);
-      root.appendChild(acctWrap);
-    }
 
     root.appendChild(el("div", "mps-section-title", "Popular"));
     const popWrap = el("div", "mps-card");
