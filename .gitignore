@@ -9,3 +9,9 @@ index.html
 # and the Anthropic key live in Supabase/Netlify env vars only.
 .env
 .env.*
+
+# Claude Code worktrees. These were committed as submodule entries with no
+# .gitmodules to describe them, which made a fresh clone fail on checkout
+# ("No url found for submodule path") and broke the Netlify build. They are
+# local working copies, not dependencies -- nothing should track them.
+.claude/worktrees/
