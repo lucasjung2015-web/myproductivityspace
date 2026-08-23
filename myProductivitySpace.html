@@ -8272,6 +8272,34 @@
   const NOTION_TEXT_MAX = 1900;
   const NOTION_BLOCKS_MAX = 90;
 
+  /* Chunks a string for Notion's 2000-char rich-text cap without ever
+     cutting through a character. Array.from splits by code point rather than
+     UTF-16 unit, and a chunk is never ended immediately before a zero-width
+     joiner or a variation selector, which is what holds emoji like 👨‍👩‍👧 or ✍️
+     together as one glyph. */
+  function notionSplitText(text) {
+    const chars = Array.from(String(text));
+    if (chars.length <= NOTION_TEXT_MAX) return chars.length ? [chars.join("")] : [];
+    const out = [];
+    let i = 0;
+    while (i < chars.length) {
+      let end = Math.min(i + NOTION_TEXT_MAX, chars.length);
+      // Back off while the boundary would orphan a joined sequence.
+      while (end > i + 1 && end < chars.length && notionIsJoiner(chars[end])) end--;
+      out.push(chars.slice(i, end).join(""));
+      i = end;
+    }
+    return out;
+  }
+  function notionIsJoiner(ch) {
+    if (!ch) return false;
+    const c = ch.codePointAt(0);
+    return c === 0x200D             // zero-width joiner
+        || c === 0xFE0F || c === 0xFE0E   // variation selectors
+        || (c >= 0x1F3FB && c <= 0x1F3FF) // skin tone modifiers
+        || (c >= 0xE0020 && c <= 0xE007F); // tag characters (flags)
+  }
+
   function notionEscapeHtml(t) {
     return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
@@ -8290,12 +8318,18 @@
     if (node.nodeType === 3) {
       const text = node.nodeValue;
       if (!text) return;
-      // Split rather than truncate: a long paragraph stays whole, just
-      // carried by several runs.
-      for (let i = 0; i < text.length; i += NOTION_TEXT_MAX) {
+      /* Split rather than truncate, so a long paragraph stays whole and is
+         just carried by several runs -- but split on CHARACTER boundaries,
+         not UTF-16 indices. An emoji is a surrogate pair, and many (flags,
+         skin tones, anything joined by a ZWJ) are several code points long;
+         slicing at an arbitrary offset can cut one in half and send Notion a
+         lone surrogate, which comes back as a replacement box. Array.from
+         iterates by code point, and the ZWJ check keeps joined sequences
+         whole on top of that. */
+      for (const piece of notionSplitText(text)) {
         out.push({
           type: "text",
-          text: { content: text.slice(i, i + NOTION_TEXT_MAX) },
+          text: { content: piece },
           annotations: {
             bold: !!ann.bold, italic: !!ann.italic, underline: !!ann.underline,
             strikethrough: false, code: false, color: "default"
@@ -8405,11 +8439,38 @@
   let notionParentId = null;      // where new pages get created
   let notionSyncing = false;
 
-  function notionPageTitleFromHtml(html) {
-    const d = document.createElement("div");
-    d.innerHTML = String(html || "");
-    const first = (d.textContent || "").split("\n")[0].trim();
-    return first.slice(0, 100) || "Untitled";
+  // "note-content:page1786..." -> "page1786...", the id the widget stores
+  // its name and emoji under.
+  function notionWidgetIdFor(localKey) { return String(localKey).slice("note-content:".length); }
+
+  /* A Notion page carries its own title and icon, so a Page's name and emoji
+     have somewhere real to land -- the emoji becomes the page icon exactly as
+     it appears on the board, not a character stranded at the front of the
+     title. Falls back to the first line of content for a widget still on its
+     default name. */
+  function notionMetaFor(localKey, html) {
+    let title = "", icon = "";
+    try {
+      const m = window.__mpsWidgetMeta && window.__mpsWidgetMeta.get(notionWidgetIdFor(localKey));
+      if (m) { title = m.title || ""; icon = m.icon || ""; }
+    } catch (e) {}
+    if (!title || /^Page(\s|$)/i.test(title)) {
+      const d = document.createElement("div");
+      d.innerHTML = String(html || "");
+      const first = (d.textContent || "").split("\n")[0].trim();
+      if (first) title = first;
+    }
+    return { title: (title || "Untitled").slice(0, 100), icon: icon };
+  }
+
+  /* Notion only accepts a single emoji for a page icon. A widget icon is
+     already exactly that, but guard anyway: sending a longer string, or an
+     SVG from an older build, is a 400 that would fail the whole update. */
+  function notionIconProp(icon) {
+    if (!icon || icon.indexOf("<") === 0) return null;
+    const chars = Array.from(String(icon));
+    if (!chars.length || chars.length > 8) return null;
+    return { type: "emoji", emoji: String(icon) };
   }
 
   // Every Page widget currently on the board, as { key, html }.
@@ -8451,11 +8512,15 @@
   async function notionCreatePageFor(localKey, html) {
     const parent = await notionFindParent();
     if (!parent) return null;
-    const r = await notionCall({ action: "page_create", payload: {
+    const meta = notionMetaFor(localKey, html);
+    const payload = {
       parent: { page_id: parent },
-      properties: { title: [{ type: "text", text: { content: notionPageTitleFromHtml(html) } }] },
+      properties: { title: [{ type: "text", text: { content: meta.title } }] },
       children: notionBlocksFromHtml(html).slice(0, NOTION_BLOCKS_MAX)
-    } });
+    };
+    const icon = notionIconProp(meta.icon);
+    if (icon) payload.icon = icon;
+    const r = await notionCall({ action: "page_create", payload: payload });
     if (!r || !r.ok || !r.body || !r.body.id) return null;
     return r.body.id;
   }
@@ -8486,9 +8551,13 @@
         block_id: row.notion_page_id, payload: { children: chunk } });
       if (!r || !r.ok) return false;
     }
-    await notionCall({ action: "page_update", page_id: row.notion_page_id, payload: {
-      properties: { title: [{ type: "text", text: { content: notionPageTitleFromHtml(html) } }] }
-    } });
+    const meta = notionMetaFor(row.local_key, html);
+    const upd = {
+      properties: { title: [{ type: "text", text: { content: meta.title } }] }
+    };
+    const icon = notionIconProp(meta.icon);
+    if (icon) upd.icon = icon;
+    await notionCall({ action: "page_update", page_id: row.notion_page_id, payload: upd });
     return true;
   }
 
@@ -8565,6 +8634,24 @@
         if (remoteIsNewer) {
           const html = await notionPullPage(row);
           if (html == null) continue;
+
+          /* Bring the page's icon and title back too, so changing the emoji
+             in Notion moves the one on the board. Sync that only carried the
+             body would leave the two looking like different pages. */
+          try {
+            const meta = await notionCall({ action: "page_get", page_id: row.notion_page_id });
+            const pg = meta && meta.ok && meta.body;
+            if (pg && window.__mpsWidgetMeta) {
+              const wid = notionWidgetIdFor(page.key);
+              if (pg.icon && pg.icon.type === "emoji" && pg.icon.emoji) {
+                window.__mpsWidgetMeta.setIcon(wid, pg.icon.emoji);
+              }
+              const tprop = pg.properties && pg.properties.title && pg.properties.title.title;
+              const tname = (tprop || []).map(function (t) { return t.plain_text || ""; }).join("").trim();
+              if (tname) window.__mpsWidgetMeta.setTitle(wid, tname);
+            }
+          } catch (e) {}
+
           T.localSet(page.key, html);
           T.idbSet(page.key, html);
           // Repaint a Page that is already on screen; a pulled change sitting
@@ -11761,6 +11848,26 @@
     // in the same family, so names are re-derived across the board rather than
     // patched for the one that changed.
     function applyAllWidgetTitles() { WIDGET_IDS.forEach(applyWidgetTitle); }
+
+    /* A Page's display name and emoji, for the Notion sync. It maps a Page
+       widget onto a Notion page, and a Notion page carries its own title and
+       icon -- so without this the emoji you set here would simply not exist
+       on the other side. Kept as a narrow bridge rather than exporting the
+       stores, so the sync never has to know how a widget is assembled. */
+    window.__mpsWidgetMeta = {
+      get: function (id) {
+        return {
+          title: WIDGET_TITLES[id] || defaultWidgetTitle(id),
+          icon: WIDGET_ICONS[id] || ""
+        };
+      },
+      setIcon: function (id, emoji) {
+        if (emoji) WIDGET_ICONS[id] = emoji; else delete WIDGET_ICONS[id];
+        try { applyWidgetIcon(id); } catch (e) {}
+        persistWidgetIcons();
+      },
+      setTitle: function (id, name) { try { setWidgetTitle(id, name); } catch (e) {} }
+    };
 
     function setWidgetTitle(id, name) {
       const trimmed = (name || "").trim();
