@@ -1528,6 +1528,34 @@
     cursor: pointer;
   }
   .cal-choice-row button:hover { background: var(--panel); }
+  /* ---------- no blue anywhere in the calendar ----------
+     The panel's own colours were already black, but the controls inside it
+     are native ones -- checkbox, date picker, <select>, text selection --
+     and a browser paints those with its OWN accent, which is blue and which
+     no amount of `color` or `border` on the element can reach. accent-color
+     is the one lever that does, and it inherits, so setting it on each root
+     covers every control underneath: the Meet checkbox, the recurrence
+     radios, the date field's picker, a select's highlighted option.
+
+     color-scheme is set alongside it so the browser does not swap in dark
+     widget chrome (with its own blue) when the OS is in dark mode.
+
+     Stated per root rather than once on <body> because the event form and
+     the time picker are reparented out of the widget to escape overflow
+     clipping -- they are not descendants of the calendar by the time they
+     are on screen. */
+  #calColWrap, .cal-createpanel, .cal-recur-modal, .gt-popover, #gtaskInlineComposer {
+    accent-color: #000000;
+    color-scheme: light;
+    caret-color: #000000;
+  }
+  #calColWrap ::selection, .cal-createpanel ::selection,
+  .cal-recur-modal ::selection, .gt-popover ::selection,
+  #gtaskInlineComposer ::selection { background: #d5d5d5; color: #000000; }
+  /* A focused field goes black-on-black rather than picking up a blue ring. */
+  .cal-field input:focus, .cal-field select:focus, .cal-field textarea:focus,
+  .cal-time-btn:focus { outline: 2px solid #000000; outline-offset: 1px; }
+
   .cal-field { display: flex; flex-direction: column; gap: 3px; }
   .cal-field label { font-size: 13px; font-weight: bold; color: #000000; }
   .cal-field input, .cal-field select, .cal-field textarea {
@@ -2554,6 +2582,24 @@
   .mps-sync-dot.is-error   { background: #FF0000; }
   .mps-sync-label { font-size: 12px; color: var(--ink-soft); margin-right: 12px; }
   .mps-notion-cell { display: inline-flex; align-items: center; gap: 10px; }
+
+  /* A connect button that has been pressed. The label is replaced by a
+     spinner rather than by another word: the wait is a redirect to someone
+     else's site, so there is nothing useful to say about it, and every
+     future connector would otherwise need wording of its own. The button
+     holds the width it already had, so the row does not twitch. */
+  .mps-btn.is-working { pointer-events: none; }
+  .mps-spin {
+    display: inline-block; width: 13px; height: 13px; vertical-align: -2px;
+    border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; opacity: 0.75;
+    animation: mps-spin 0.7s linear infinite;
+  }
+  @keyframes mps-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    /* Still legibly "working", without a continuous spin. */
+    .mps-spin { animation: mps-spin 2.4s steps(8) infinite; }
+  }
   /* Destination line under the Notion row. Indented to sit under the
      connector's name and left unbordered, so it reads as a property of the
      row above rather than as a row of its own. Deliberately worded as a
@@ -20095,6 +20141,27 @@
     return pad(d.getHours()) + ":" + pad(d.getMinutes());
   }
 
+  /* The browser's IANA zone ("Asia/Shanghai"), which is what Google wants on
+     start/end. Falls back to UTC only if the runtime cannot name one, which
+     is better than sending nothing and having the whole create rejected. */
+  function gcalTimeZone() {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (tz) return tz;
+    } catch (e) {}
+    return "UTC";
+  }
+
+  /* A Date as local wall-clock ISO with no zone suffix -- "2026-08-24T09:00:00".
+     toISOString() cannot be used here: it converts to UTC, which is a
+     different time of day, and pairing that with a local timeZone would move
+     every event by the offset. */
+  function gcalLocalIso(d) {
+    const p = function (n) { return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate())
+      + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+
   /* ---------------- event recurrence (RRULE) ----------------
      Real Google Calendar `recurrence` values, not a second local-only format
      — the event's `recurrence` field is one of the few things this app sends
@@ -20538,11 +20605,22 @@
           // Keep an all-day event all-day. Google's end.date is exclusive, so
           // preserve the original span rather than recomputing it.
           const days = Math.max(1, Math.round((existing.end - existing.start) / 86400000));
-          body.start = { date: date.input.value };
-          body.end = { date: ymd(addDays(parseYmd(date.input.value), days)) };
+          body.start = { date: date.input.value, timeZone: gcalTimeZone() };
+          body.end = { date: ymd(addDays(parseYmd(date.input.value), days)), timeZone: gcalTimeZone() };
         } else {
-          body.start = { dateTime: startAt.toISOString() };
-          body.end = { dateTime: endAt.toISOString() };
+          /* Local wall-clock time plus a named zone, not a UTC instant.
+
+             Google rejects a recurring event whose start carries no timeZone
+             -- "Missing time zone definition for start time" -- because an
+             RRULE cannot be expanded without one: "every day at 9am" is a
+             statement about a place, not about a moment. A UTC instant is
+             also the wrong thing to send even when it is accepted, since the
+             event would drift by an hour across a DST boundary while the
+             rest of the calendar stayed put. Sending the time the user
+             actually typed, with the zone their browser is in, is the only
+             form that means what the form says. */
+          body.start = { dateTime: gcalLocalIso(startAt), timeZone: gcalTimeZone() };
+          body.end = { dateTime: gcalLocalIso(endAt), timeZone: gcalTimeZone() };
         }
         const guestEmails = guests.input.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
         // On an edit, an emptied-but-changed field still sends [] — that's how
@@ -23279,6 +23357,18 @@
     cxModal.hidden = true;
   }
 
+  /* Turns a button into its own spinner, keeping the box it already
+     occupied. Shared rather than written per connector, so every one added
+     later behaves identically without inventing its own wording. */
+  function showButtonSpinner(b) {
+    b.style.minWidth = b.offsetWidth + "px";
+    b.classList.add("is-working");
+    b.setAttribute("aria-busy", "true");
+    b.disabled = true;
+    b.textContent = "";
+    b.appendChild(el("span", "mps-spin"));
+  }
+
   function connectButton(c) {
     const b = el("button", "mps-btn", "Connect");
     b.type = "button";
@@ -23287,8 +23377,7 @@
        than one that says so. */
     if (c.id === "notion" && window.__mpsNotion) {
       b.addEventListener("click", function () {
-        b.disabled = true;
-        b.textContent = "Opening Notion…";
+        showButtonSpinner(b);
         window.__mpsNotion.connect();
       });
       return b;
@@ -23321,7 +23410,7 @@
     const off = el("button", "mps-btn", "Disconnect");
     off.type = "button";
     off.addEventListener("click", async function () {
-      off.disabled = true;
+      showButtonSpinner(off);
       await window.__mpsNotion.disconnect();
       refreshNotionState(function () { renderCxMain(); });
     });
