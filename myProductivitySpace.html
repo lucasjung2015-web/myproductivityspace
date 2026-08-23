@@ -2575,6 +2575,183 @@
     .ai-msg.is-streaming::after, .ai-thinking i, .ai-tool.is-running svg { animation: none; }
   }
 
+
+  /* ---------- "Page" -> Empty / Existing chooser ----------
+     Pressing Page used to create one immediately. With Notion connected there
+     are two different intentions behind that button, so it asks which. */
+  #pageKindOverlay { position: fixed; inset: 0; z-index: 4300; background: transparent; }
+  #pageKindOverlay[hidden], #pageKindPopup[hidden] { display: none; }
+  #pageKindPopup {
+    position: fixed; z-index: 4301;
+    background: #ffffff; border-radius: 14px; padding: 10px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.22);
+    display: flex; gap: 10px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  .pk-card {
+    width: 158px; padding: 16px 14px 14px; text-align: left;
+    border: 1px solid var(--hair); border-radius: 10px;
+    background: #fafafa; color: var(--ink); cursor: pointer;
+    font-family: inherit; font-size: 14px;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  .pk-card:hover { background: #f1f3f4; border-color: #c9c9c9; }
+  .pk-card svg { display: block; width: 22px; height: 22px; color: #5f6368; margin-bottom: 26px; }
+
+  /* ---------- Notion library ---------- */
+  #notionLibBackdrop { position: fixed; inset: 0; z-index: 4400; background: rgba(10,10,10,0.28); }
+  #notionLibBackdrop[hidden], #notionLibModal[hidden] { display: none; }
+  #notionLibModal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    z-index: 4401; width: min(920px, calc(100vw - 48px));
+    max-height: min(640px, calc(100vh - 80px));
+    background: #ffffff; border-radius: 14px; padding: 18px 20px 16px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.28);
+    display: flex; flex-direction: column;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; color: var(--ink);
+  }
+  .nl-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .nl-title { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+  .nl-spacer { flex: 1 1 auto; }
+
+  /* Selection toolbar + tabs, on one row the way the reference has them. */
+  .nl-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .nl-selcount { font-size: 13px; font-weight: 600; color: #1a73e8; padding: 4px 8px; }
+  .nl-iconbtn {
+    width: 30px; height: 30px; border: none; background: transparent; border-radius: 7px;
+    color: var(--ink-soft); cursor: pointer; display: grid; place-items: center; position: relative;
+  }
+  .nl-iconbtn:hover { background: #f1f3f4; color: var(--ink); }
+  .nl-iconbtn.is-danger:hover { color: #d93025; }
+  .nl-iconbtn[disabled] { opacity: .35; cursor: default; }
+  .nl-iconbtn svg { width: 15px; height: 15px; display: block; }
+  /* Dark tooltip, as in the reference. */
+  .nl-iconbtn[data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%); white-space: nowrap;
+    background: #2f2f2f; color: #fff; font-size: 11.5px; padding: 4px 8px;
+    border-radius: 6px; pointer-events: none;
+  }
+  .nl-divider { width: 1px; height: 20px; background: var(--hair); margin: 0 4px; }
+  .nl-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border: none; background: transparent; border-radius: 999px;
+    font-family: inherit; font-size: 13px; color: var(--ink-soft); cursor: pointer;
+  }
+  .nl-tab:hover { background: #f1f3f4; }
+  .nl-tab.is-active { background: #f1f3f4; color: var(--ink); font-weight: 600; }
+  .nl-tab svg { width: 14px; height: 14px; }
+
+  .nl-scroll { flex: 1 1 auto; overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
+  .nl-thead, .nl-row {
+    display: grid; grid-template-columns: 26px 20px 1fr 150px 120px;
+    align-items: center; gap: 10px;
+  }
+  .nl-thead {
+    font-size: 11.5px; color: var(--ink-soft); font-weight: 600;
+    padding: 6px 6px 8px; border-bottom: 1px solid var(--hair); position: sticky; top: 0;
+    background: #fff; z-index: 1;
+  }
+  .nl-row {
+    padding: 8px 6px; border-radius: 8px; cursor: pointer;
+    border-bottom: 1px solid #f4f4f4;
+  }
+  .nl-row:hover { background: #f7f8fa; }
+  .nl-row.is-selected { background: #e8f0fe; }
+  .nl-row.is-dragging { opacity: .4; }
+  .nl-row.drop-above { box-shadow: inset 0 2px 0 0 var(--ink); }
+  .nl-row.drop-below { box-shadow: inset 0 -2px 0 0 var(--ink); }
+  .nl-check { width: 16px; height: 16px; accent-color: #1a73e8; cursor: pointer; }
+  /* Six-dot grip: click opens the same menu, drag reorders. */
+  .nl-grip {
+    width: 18px; height: 22px; border: none; background: transparent; padding: 0;
+    color: #c0c0c0; cursor: grab; display: grid; place-items: center; opacity: 0;
+  }
+  .nl-row:hover .nl-grip { opacity: 1; }
+  .nl-grip:active { cursor: grabbing; }
+  .nl-grip svg { width: 12px; height: 16px; display: block; }
+  .nl-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .nl-emoji { flex: 0 0 auto; width: 18px; text-align: center; font-size: 14px; line-height: 1; }
+  .nl-emoji svg { width: 14px; height: 14px; color: var(--ink-soft); display: block; margin: 0 auto; }
+  .nl-label {
+    font-size: 13.5px; color: var(--ink); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nl-meta { font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .nl-avatar {
+    flex: 0 0 auto; width: 17px; height: 17px; border-radius: 50%;
+    background: #e8eaed; color: #5f6368; font-size: 9.5px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .nl-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nl-empty { padding: 40px 8px; text-align: center; color: var(--ink-soft); font-size: 13px; }
+
+  /* Inline rename, matching the reference: emoji chip then a live field. */
+  .nl-rename {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: #f7f8fa; border: 1px solid #c9d3e6; border-radius: 8px; padding: 3px 6px;
+  }
+  .nl-rename input {
+    flex: 1 1 auto; min-width: 0; border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: 13.5px; color: var(--ink);
+  }
+  .nl-rename input::selection { background: #cfe0ff; }
+
+  /* ---------- row context menu ---------- */
+  #nlMenu {
+    position: fixed; z-index: 4402; min-width: 232px;
+    background: #ffffff; border-radius: 10px; padding: 6px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.22); border: 1px solid var(--hair);
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  #nlMenu[hidden] { display: none; }
+  .nl-menu-search {
+    width: 100%; box-sizing: border-box; margin-bottom: 6px;
+    border: 1px solid #6b9cf5; border-radius: 7px; padding: 7px 9px;
+    font-family: inherit; font-size: 13px; outline: none;
+  }
+  .nl-menu-label {
+    font-size: 11px; color: var(--ink-soft); padding: 5px 9px 3px; font-weight: 600;
+  }
+  .nl-menu-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 7px 9px; border: none; background: transparent; border-radius: 7px;
+    font-family: inherit; font-size: 13.5px; color: var(--ink); cursor: pointer; text-align: left;
+  }
+  .nl-menu-item:hover { background: #f1f3f4; }
+  .nl-menu-item svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-soft); }
+  .nl-menu-key { margin-left: auto; font-size: 11.5px; color: #b0b0b0; }
+  .nl-menu-sep { height: 1px; background: var(--hair); margin: 5px 4px; }
+  .nl-menu-foot { font-size: 11px; color: var(--ink-soft); padding: 7px 9px 3px; line-height: 1.45; }
+
+  /* ---------- emoji picker ---------- */
+  #nlEmoji {
+    position: fixed; z-index: 4403; width: 300px;
+    background: #fff; border-radius: 10px; border: 1px solid var(--hair);
+    box-shadow: 0 6px 24px rgba(0,0,0,.22); padding: 8px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  #nlEmoji[hidden] { display: none; }
+  .nl-emoji-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .nl-emoji-head input {
+    flex: 1 1 auto; min-width: 0; border: 1px solid #6b9cf5; border-radius: 7px;
+    padding: 6px 9px; font-family: inherit; font-size: 13px; outline: none;
+  }
+  .nl-emoji-clear {
+    border: none; background: transparent; color: var(--ink-soft);
+    font-family: inherit; font-size: 12.5px; cursor: pointer; padding: 4px 6px; border-radius: 6px;
+  }
+  .nl-emoji-clear:hover { background: #f1f3f4; color: var(--ink); }
+  .nl-emoji-grid {
+    display: grid; grid-template-columns: repeat(9, 1fr); gap: 2px;
+    max-height: 210px; overflow-y: auto;
+  }
+  .nl-emoji-grid button {
+    border: none; background: transparent; border-radius: 6px; cursor: pointer;
+    font-size: 18px; line-height: 1; padding: 5px 0;
+  }
+  .nl-emoji-grid button:hover { background: #f1f3f4; }
+
   /* ---------- auth gate ----------
      Covers the board from first paint until a session exists AND hydration
      has landed, so no widget is ever seen holding pre-hydration data — or,
@@ -2682,6 +2859,36 @@
     </button>
   </div>
 </div>
+
+<div id="pageKindOverlay" hidden></div>
+<div id="pageKindPopup" hidden>
+  <button type="button" class="pk-card" data-page-kind="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+    Empty page
+  </button>
+  <button type="button" class="pk-card" data-page-kind="existing">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-2"/><path d="M13 3h6a2 2 0 0 1 2 2v6"/><path d="M21 3l-9 9"/></svg>
+    Existing page
+  </button>
+</div>
+
+<div id="notionLibBackdrop" hidden></div>
+<div id="notionLibModal" hidden>
+  <div class="nl-head">
+    <span class="nl-title">Library</span>
+    <span class="nl-spacer"></span>
+    <button type="button" class="nl-iconbtn" id="nlCloseBtn" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="nl-bar" id="nlBar"></div>
+  <div class="nl-scroll">
+    <div class="nl-thead">
+      <span></span><span></span><span>Page name</span><span>Created by</span><span>Last edited</span>
+    </div>
+    <div id="nlBody"></div>
+  </div>
+</div>
+<div id="nlMenu" hidden></div>
+<div id="nlEmoji" hidden></div>
 
 <div id="addWidgetOverlay" class="add-widget-overlay" hidden></div>
 <div id="addWidgetPopup" class="add-widget-popup" hidden>
@@ -8733,6 +8940,585 @@
     notionSyncTick();
   }
 
+  /* ---------- Notion library ----------
+     Pressing "+ → Page" now asks whether you want a blank one or one that
+     already exists in Notion, and the second opens a browser over your Notion
+     pages modelled on Notion's own Library.
+
+     Three of its concepts have no API behind them -- Notion exposes no
+     endpoint for favorites, for hiding something from Recents, or for a
+     custom row order, because in Notion those are UI state rather than page
+     properties. They are kept here instead, in the same synced key/value
+     store as the rest of the board, so they follow you between devices even
+     though they will never show up in Notion itself. Everything else on this
+     screen -- the pages, their icons, their names, trashing -- is real. */
+
+  const NL_FAV_KEY    = "notion-favorites";
+  const NL_HIDDEN_KEY = "notion-hidden-recents";
+  const NL_ORDER_KEY  = "notion-lib-order";
+
+  const NL_ICON = {
+    page:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    star:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+    dots:  '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
+    grip:  '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.7"/><circle cx="9" cy="12" r="1.7"/><circle cx="9" cy="19" r="1.7"/><circle cx="15" cy="5" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="15" cy="19" r="1.7"/></svg>',
+    eyeoff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+    smile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>',
+    pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L20 8a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14 6l4 4"/></svg>',
+    link:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>'
+  };
+
+  const NL_EMOJI = ("😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 " +
+    "🥲 😋 😛 😜 🤪 😝 🤗 🤭 🤫 🤔 🤐 😐 😑 😶 😏 😒 🙄 😬 😮 😴 " +
+    "✅ ☑️ ✔️ ⭐ 🌟 ✨ 💡 🔥 🎯 📌 📍 🏁 🚀 ⚡ 💥 🎉 🎊 🏆 🥇 🎖️ " +
+    "📝 📄 📃 📑 📓 📔 📕 📗 📘 📙 📚 📖 🗒️ 🗓️ 📅 📆 🗂️ 📁 📂 🗃️ " +
+    "📈 📉 📊 💰 💵 💳 🧾 🏦 💼 🧰 🔧 🔨 ⚙️ 🧪 🔬 🔭 🧠 🫀 🦾 🤖 " +
+    "🏃 🚴 🏋️ 🧘 ⚽ 🏀 🎾 🏐 🎽 🥊 🎸 🎹 🥁 🎧 🎬 🎨 🖌️ 🧩 🎲 ♟️ " +
+    "🌍 🌎 🌏 🗺️ ✈️ 🚗 🚆 🛰️ 🏠 🏢 🏝️ ⛰️ 🌤️ 🌙 ☀️ 🌱 🌳 🍀 🌸 🍎").split(" ");
+
+  let nlState = {
+    tab: "recents", rows: [], sel: {}, users: {},
+    fav: [], hidden: [], order: [], loading: false
+  };
+
+  function nlList(key) {
+    try {
+      const T = window.__mpsTiers;
+      return JSON.parse((T && T.localGet(key)) || "[]") || [];
+    } catch (e) { return []; }
+  }
+  function nlSaveList(key, arr) {
+    try { window.storageSet(key, JSON.stringify(arr)); } catch (e) {}
+  }
+  function nlEl(id) { return document.getElementById(id); }
+
+  function nlRelTime(iso) {
+    if (!iso) return "";
+    const then = new Date(iso).getTime();
+    if (isNaN(then)) return "";
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return mins + "m ago";
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + "h ago";
+    const days = Math.round(hrs / 24);
+    if (days < 7) return days + "d ago";
+    if (days < 28) return Math.round(days / 7) + "w ago";
+    const d = new Date(then);
+    return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.getMonth()]
+      + " " + d.getDate();
+  }
+
+  function nlPageTitle(p) {
+    const props = p.properties || {};
+    for (const k in props) {
+      if (props[k] && props[k].type === "title") {
+        const t = (props[k].title || []).map(function (x) { return x.plain_text || ""; }).join("").trim();
+        if (t) return t;
+      }
+    }
+    return "Untitled";
+  }
+
+  async function nlLoadUsers() {
+    const r = await notionCall({ action: "users_list" });
+    const map = {};
+    if (r && r.ok && r.body && r.body.results) {
+      r.body.results.forEach(function (u) { map[u.id] = u.name || (u.bot && u.bot.owner ? "Integration" : "Unknown"); });
+    }
+    nlState.users = map;
+  }
+
+  async function nlLoad() {
+    nlState.loading = true;
+    nlRender();
+    nlState.fav = nlList(NL_FAV_KEY);
+    nlState.hidden = nlList(NL_HIDDEN_KEY);
+    nlState.order = nlList(NL_ORDER_KEY);
+    if (!Object.keys(nlState.users).length) await nlLoadUsers();
+    const r = await notionCall({ action: "search", payload: {
+      filter: { property: "object", value: "page" },
+      sort: { direction: "descending", timestamp: "last_edited_time" },
+      page_size: 100
+    } });
+    nlState.rows = (r && r.ok && r.body && r.body.results) ? r.body.results : [];
+    nlState.loading = false;
+    nlRender();
+  }
+
+  function nlVisibleRows() {
+    let rows = nlState.rows.slice();
+    if (nlState.tab === "favorites") {
+      rows = rows.filter(function (p) { return nlState.fav.indexOf(p.id) !== -1; });
+    } else {
+      rows = rows.filter(function (p) { return nlState.hidden.indexOf(p.id) === -1; });
+    }
+    // A custom order, when one exists, wins over Notion's recency sort. Rows
+    // never dragged keep their natural position behind those that were.
+    const ord = nlState.order;
+    if (ord.length) {
+      rows.sort(function (a, b) {
+        const ia = ord.indexOf(a.id), ib = ord.indexOf(b.id);
+        if (ia === -1 && ib === -1) return 0;
+        if (ia === -1) return 1;
+        if (ib === -1) return -1;
+        return ia - ib;
+      });
+    }
+    return rows;
+  }
+
+  function nlSelectedIds() {
+    return Object.keys(nlState.sel).filter(function (k) { return nlState.sel[k]; });
+  }
+
+  function nlRender() {
+    const body = nlEl("nlBody");
+    const bar = nlEl("nlBar");
+    if (!body || !bar) return;
+
+    // ---- toolbar ----
+    bar.innerHTML = "";
+    const selected = nlSelectedIds();
+    if (selected.length) {
+      const c = document.createElement("span");
+      c.className = "nl-selcount";
+      c.textContent = selected.length + " selected";
+      bar.appendChild(c);
+
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "nl-iconbtn is-danger";
+      del.setAttribute("data-tip", "Move to Trash");
+      del.innerHTML = NL_ICON.trash;
+      del.addEventListener("click", function () { nlTrash(selected); });
+      bar.appendChild(del);
+
+      const more = document.createElement("button");
+      more.type = "button"; more.className = "nl-iconbtn";
+      more.innerHTML = NL_ICON.dots;
+      more.addEventListener("click", function (e) {
+        e.stopPropagation();
+        const p = nlState.rows.filter(function (x) { return x.id === selected[0]; })[0];
+        if (p) nlOpenMenu(p, more.getBoundingClientRect());
+      });
+      bar.appendChild(more);
+
+      const sep = document.createElement("span");
+      sep.className = "nl-divider";
+      bar.appendChild(sep);
+    }
+
+    [["recents", "Recents", NL_ICON.clock], ["favorites", "Favorites", NL_ICON.star]]
+      .forEach(function (t) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "nl-tab" + (nlState.tab === t[0] ? " is-active" : "");
+        b.innerHTML = t[2] + "<span>" + t[1] + "</span>";
+        b.addEventListener("click", function () { nlState.tab = t[0]; nlRender(); });
+        bar.appendChild(b);
+      });
+
+    // ---- rows ----
+    body.innerHTML = "";
+    if (nlState.loading) {
+      const e = document.createElement("div");
+      e.className = "nl-empty";
+      e.textContent = "Loading your Notion pages…";
+      body.appendChild(e);
+      return;
+    }
+    const rows = nlVisibleRows();
+    if (!rows.length) {
+      const e = document.createElement("div");
+      e.className = "nl-empty";
+      e.textContent = nlState.tab === "favorites"
+        ? "No favorites yet. Use the ⋯ menu on a page to add one."
+        : "No pages. Check which pages you shared with the integration.";
+      body.appendChild(e);
+      return;
+    }
+
+    rows.forEach(function (p) {
+      const row = document.createElement("div");
+      row.className = "nl-row" + (nlState.sel[p.id] ? " is-selected" : "");
+      row.draggable = false;
+      row.dataset.id = p.id;
+
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.className = "nl-check"; cb.checked = !!nlState.sel[p.id];
+      cb.addEventListener("click", function (e) { e.stopPropagation(); });
+      cb.addEventListener("change", function () {
+        if (cb.checked) nlState.sel[p.id] = true; else delete nlState.sel[p.id];
+        nlRender();
+      });
+      row.appendChild(cb);
+
+      /* Six-dot grip. Click opens the same menu the ⋯ does; press and move
+         reorders. Both on one control because that is how the reference
+         behaves, and a grip that only did one of the two would feel broken. */
+      const grip = document.createElement("button");
+      grip.type = "button"; grip.className = "nl-grip";
+      grip.innerHTML = NL_ICON.grip;
+      let dragging = false, startY = 0;
+      grip.addEventListener("mousedown", function (e) {
+        e.stopPropagation();
+        startY = e.clientY; dragging = false;
+        row.draggable = true;
+      });
+      grip.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!dragging) nlOpenMenu(p, grip.getBoundingClientRect());
+      });
+      row.addEventListener("dragstart", function (e) {
+        dragging = true;
+        row.classList.add("is-dragging");
+        e.dataTransfer.effectAllowed = "move";
+        try { e.dataTransfer.setData("text/plain", p.id); } catch (err) {}
+      });
+      row.addEventListener("dragend", function () {
+        dragging = false; row.draggable = false;
+        row.classList.remove("is-dragging");
+        Array.prototype.forEach.call(body.children, function (c) {
+          c.classList.remove("drop-above", "drop-below");
+        });
+      });
+      row.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        const r = row.getBoundingClientRect();
+        row.classList.toggle("drop-above", e.clientY < r.top + r.height / 2);
+        row.classList.toggle("drop-below", e.clientY >= r.top + r.height / 2);
+      });
+      row.addEventListener("dragleave", function () {
+        row.classList.remove("drop-above", "drop-below");
+      });
+      row.addEventListener("drop", function (e) {
+        e.preventDefault();
+        const srcId = e.dataTransfer.getData("text/plain");
+        if (!srcId || srcId === p.id) return;
+        const ids = nlVisibleRows().map(function (x) { return x.id; });
+        const from = ids.indexOf(srcId);
+        if (from !== -1) ids.splice(from, 1);
+        let to = ids.indexOf(p.id);
+        if (e.clientY >= row.getBoundingClientRect().top + row.getBoundingClientRect().height / 2) to++;
+        ids.splice(to, 0, srcId);
+        nlState.order = ids;
+        nlSaveList(NL_ORDER_KEY, ids);
+        nlRender();
+      });
+      row.appendChild(grip);
+
+      const name = document.createElement("div");
+      name.className = "nl-name";
+      const em = document.createElement("span");
+      em.className = "nl-emoji";
+      if (p.icon && p.icon.type === "emoji") em.textContent = p.icon.emoji;
+      else em.innerHTML = NL_ICON.page;
+      name.appendChild(em);
+      const lab = document.createElement("span");
+      lab.className = "nl-label";
+      lab.textContent = nlPageTitle(p);
+      name.appendChild(lab);
+      row.appendChild(name);
+
+      const by = document.createElement("div");
+      by.className = "nl-meta";
+      const who = (p.created_by && nlState.users[p.created_by.id]) || "Unknown";
+      const av = document.createElement("span");
+      av.className = "nl-avatar";
+      av.textContent = who.slice(0, 1).toUpperCase();
+      by.appendChild(av);
+      const wn = document.createElement("span");
+      wn.textContent = who;
+      by.appendChild(wn);
+      row.appendChild(by);
+
+      const when = document.createElement("div");
+      when.className = "nl-meta";
+      when.textContent = nlRelTime(p.last_edited_time);
+      row.appendChild(when);
+
+      // Clicking the row is the primary intent of this screen: put that
+      // existing page on the board.
+      row.addEventListener("click", function () { nlAdopt(p); });
+      row.addEventListener("contextmenu", function (e) {
+        e.preventDefault();
+        nlOpenMenu(p, { left: e.clientX, top: e.clientY, bottom: e.clientY, right: e.clientX });
+      });
+      body.appendChild(row);
+    });
+  }
+
+  /* Put an existing Notion page on the board: create a Page widget, seed it
+     with that page's current content, and record the mapping so the sync
+     engine treats the two as the same page from then on. */
+  async function nlAdopt(p) {
+    nlClose();
+    const listed = await notionCall({ action: "blocks_list", block_id: p.id });
+    const html = notionHtmlFromBlocks((listed && listed.ok && listed.body && listed.body.results) || []);
+    const title = nlPageTitle(p);
+    const emoji = (p.icon && p.icon.type === "emoji") ? p.icon.emoji : "";
+
+    const id = window.__mpsCreatePageWidget ? window.__mpsCreatePageWidget() : null;
+    if (!id) return;
+    const key = "note-content:" + id;
+    const T = window.__mpsTiers;
+    const full = title ? (notionEscapeHtml(title) + "<br><br>" + html) : html;
+    if (T) { T.localSet(key, full); T.idbSet(key, full); }
+    try { window.storageSet(key, full); } catch (e) {}
+    const setter = window.__mpsNoteSetters && window.__mpsNoteSetters[key];
+    if (setter) { try { setter(full); } catch (e) {} }
+    if (window.__mpsWidgetMeta) {
+      if (emoji) window.__mpsWidgetMeta.setIcon(id, emoji);
+      if (title) window.__mpsWidgetMeta.setTitle(id, title);
+    }
+    await sb.from("notion_pages").upsert({
+      user_id: userId, local_key: key, notion_page_id: p.id,
+      notion_last_edited: p.last_edited_time, pushed_hash: notionHash(full)
+    }, { onConflict: "user_id,local_key" });
+  }
+
+  async function nlTrash(ids) {
+    nlCloseMenu();
+    for (const id of ids) {
+      await notionCall({ action: "page_trash", page_id: id });
+      // A page on the board that has just been trashed in Notion should stop
+      // being synced, or the next push would resurrect its content.
+      try { await sb.from("notion_pages").delete().eq("notion_page_id", id); } catch (e) {}
+    }
+    nlState.sel = {};
+    nlLoad();
+  }
+
+  /* ---------- row menu ---------- */
+  function nlCloseMenu() {
+    const m = nlEl("nlMenu"); if (m) m.hidden = true;
+    const e = nlEl("nlEmoji"); if (e) e.hidden = true;
+  }
+
+  function nlOpenMenu(p, rect) {
+    const m = nlEl("nlMenu");
+    if (!m) return;
+    m.innerHTML = "";
+
+    const search = document.createElement("input");
+    search.className = "nl-menu-search";
+    search.placeholder = "Search actions…";
+    m.appendChild(search);
+
+    const label = document.createElement("div");
+    label.className = "nl-menu-label";
+    label.textContent = "Page";
+    m.appendChild(label);
+
+    const isFav = nlState.fav.indexOf(p.id) !== -1;
+    const items = [
+      { icon: NL_ICON.star, text: isFav ? "Remove from Favorites" : "Add to Favorites", run: function () {
+          const next = isFav ? nlState.fav.filter(function (x) { return x !== p.id; })
+                             : nlState.fav.concat([p.id]);
+          nlState.fav = next; nlSaveList(NL_FAV_KEY, next); nlCloseMenu(); nlRender();
+        } },
+      { icon: NL_ICON.eyeoff, text: "Remove from Recents", run: function () {
+          const next = nlState.hidden.concat([p.id]);
+          nlState.hidden = next; nlSaveList(NL_HIDDEN_KEY, next); nlCloseMenu(); nlRender();
+        } },
+      { icon: NL_ICON.smile, text: "Edit icon", run: function () {
+          nlOpenEmoji(p, m.getBoundingClientRect());
+        } },
+      { icon: NL_ICON.pencil, text: "Rename", key: "⌘⇧R", run: function () {
+          nlCloseMenu(); nlStartRename(p);
+        } },
+      { sep: true },
+      { icon: NL_ICON.link, text: "Copy link", run: function () {
+          const url = p.url || ("https://www.notion.so/" + String(p.id).replace(/-/g, ""));
+          try { navigator.clipboard.writeText(url); } catch (e) {}
+          nlCloseMenu();
+        } },
+      { icon: NL_ICON.trash, text: "Move to Trash", key: "Del", run: function () { nlTrash([p.id]); } }
+    ];
+
+    const made = [];
+    items.forEach(function (it) {
+      if (it.sep) {
+        const s = document.createElement("div"); s.className = "nl-menu-sep";
+        m.appendChild(s); made.push({ el: s, sep: true, text: "" });
+        return;
+      }
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "nl-menu-item";
+      b.innerHTML = it.icon + "<span>" + it.text + "</span>" +
+        (it.key ? '<span class="nl-menu-key">' + it.key + "</span>" : "");
+      b.addEventListener("click", function (e) { e.stopPropagation(); it.run(); });
+      m.appendChild(b);
+      made.push({ el: b, text: it.text.toLowerCase() });
+    });
+
+    const foot = document.createElement("div");
+    foot.className = "nl-menu-foot";
+    const who = (p.last_edited_by && nlState.users[p.last_edited_by.id]) || "";
+    foot.textContent = (who ? "Last edited by " + who : "Last edited") +
+      "\n" + nlRelTime(p.last_edited_time);
+    m.appendChild(foot);
+
+    search.addEventListener("input", function () {
+      const q = search.value.trim().toLowerCase();
+      made.forEach(function (x) {
+        x.el.style.display = (!q || (x.text && x.text.indexOf(q) !== -1)) && !(x.sep && q) ? "" : "none";
+      });
+    });
+
+    m.hidden = false;
+    const w = m.offsetWidth, h = m.offsetHeight;
+    m.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 8)) + "px";
+    m.style.top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - h - 8)) + "px";
+    setTimeout(function () { search.focus(); }, 0);
+  }
+
+  function nlOpenEmoji(p, rect) {
+    const e = nlEl("nlEmoji");
+    if (!e) return;
+    e.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "nl-emoji-head";
+    const inp = document.createElement("input");
+    inp.placeholder = "Filter…";
+    head.appendChild(inp);
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.className = "nl-emoji-clear"; clear.textContent = "Remove";
+    clear.addEventListener("click", function () { nlSetIcon(p, ""); });
+    head.appendChild(clear);
+    e.appendChild(head);
+
+    const grid = document.createElement("div");
+    grid.className = "nl-emoji-grid";
+    function fill(q) {
+      grid.innerHTML = "";
+      NL_EMOJI.filter(function (x) { return !q || x.indexOf(q) !== -1; }).forEach(function (x) {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = x;
+        b.addEventListener("click", function () { nlSetIcon(p, x); });
+        grid.appendChild(b);
+      });
+    }
+    fill("");
+    inp.addEventListener("input", function () { fill(inp.value.trim()); });
+    e.appendChild(grid);
+
+    e.hidden = false;
+    e.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - e.offsetWidth - 8)) + "px";
+    e.style.top = Math.max(8, Math.min(rect.top, window.innerHeight - e.offsetHeight - 8)) + "px";
+    setTimeout(function () { inp.focus(); }, 0);
+  }
+
+  async function nlSetIcon(p, emoji) {
+    nlCloseMenu();
+    const payload = emoji ? { icon: { type: "emoji", emoji: emoji } } : { icon: null };
+    await notionCall({ action: "page_update", page_id: p.id, payload: payload });
+    p.icon = emoji ? { type: "emoji", emoji: emoji } : null;
+    // Keep a Page already on the board in step with what Notion now shows.
+    try {
+      const r = await sb.from("notion_pages").select("local_key").eq("notion_page_id", p.id).maybeSingle();
+      if (r.data && window.__mpsWidgetMeta) {
+        window.__mpsWidgetMeta.setIcon(notionWidgetIdFor(r.data.local_key), emoji);
+      }
+    } catch (e) {}
+    nlRender();
+  }
+
+  /* Rename in place, the way the reference does: the row's label becomes a
+     field with the page's emoji still beside it, text pre-selected. */
+  function nlStartRename(p) {
+    const row = nlEl("nlBody") &&
+      nlEl("nlBody").querySelector('.nl-row[data-id="' + p.id + '"]');
+    if (!row) return;
+    const name = row.querySelector(".nl-name");
+    if (!name) return;
+    const before = name.innerHTML;
+
+    const wrap = document.createElement("div");
+    wrap.className = "nl-rename";
+    const em = document.createElement("span");
+    em.className = "nl-emoji";
+    if (p.icon && p.icon.type === "emoji") em.textContent = p.icon.emoji;
+    else em.innerHTML = NL_ICON.page;
+    wrap.appendChild(em);
+    const inp = document.createElement("input");
+    inp.value = nlPageTitle(p);
+    wrap.appendChild(inp);
+    name.innerHTML = "";
+    name.appendChild(wrap);
+
+    wrap.addEventListener("click", function (e) { e.stopPropagation(); });
+    let done = false;
+    async function commit(save) {
+      if (done) return;
+      done = true;
+      const next = inp.value.trim();
+      if (!save || !next || next === nlPageTitle(p)) { name.innerHTML = before; return; }
+      await notionCall({ action: "page_update", page_id: p.id, payload: {
+        properties: { title: [{ type: "text", text: { content: next.slice(0, 100) } }] }
+      } });
+      // Reflect it locally straight away rather than waiting for a poll.
+      try {
+        const r = await sb.from("notion_pages").select("local_key").eq("notion_page_id", p.id).maybeSingle();
+        if (r.data && window.__mpsWidgetMeta) {
+          window.__mpsWidgetMeta.setTitle(notionWidgetIdFor(r.data.local_key), next);
+        }
+      } catch (e) {}
+      nlLoad();
+    }
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); commit(true); }
+      else if (e.key === "Escape") { e.preventDefault(); commit(false); }
+    });
+    inp.addEventListener("blur", function () { commit(true); });
+    inp.focus(); inp.select();
+  }
+
+  function nlClose() {
+    nlCloseMenu();
+    const b = nlEl("notionLibBackdrop"), m = nlEl("notionLibModal");
+    if (b) b.hidden = true;
+    if (m) m.hidden = true;
+  }
+
+  function nlOpen() {
+    const b = nlEl("notionLibBackdrop"), m = nlEl("notionLibModal");
+    if (!b || !m) return;
+    nlState.sel = {};
+    b.hidden = false; m.hidden = false;
+    nlLoad();
+  }
+
+  (function wireLibraryChrome() {
+    const b = nlEl("notionLibBackdrop"), x = nlEl("nlCloseBtn");
+    if (b) b.addEventListener("click", nlClose);
+    if (x) x.addEventListener("click", nlClose);
+    // A click anywhere else dismisses the row menu and the emoji grid, both
+    // of which sit above the modal and outside it.
+    document.addEventListener("pointerdown", function (e) {
+      const t = e.target && e.target.nodeType === 1 ? e.target : null;
+      if (t && t.closest("#nlMenu, #nlEmoji")) return;
+      nlCloseMenu();
+    }, true);
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      const m = nlEl("nlMenu");
+      if (m && !m.hidden) { nlCloseMenu(); return; }
+      const mod = nlEl("notionLibModal");
+      if (mod && !mod.hidden) nlClose();
+    });
+  })();
+
+  window.__mpsNotionLibrary = {
+    open: nlOpen,
+    isConnected: async function () {
+      const r = await notionCall({ action: "status" });
+      return !!(r && r.ok && r.body && r.body.connected);
+    }
+  };
+
   /* ---------- account menu ----------
      Lives here rather than with the other UI because everything it shows and
      does is session state that only this closure holds. */
@@ -10995,6 +11781,51 @@
       else hideWidget(id);
     }
 
+    function newEmptyPageWidget() {
+      const id = createDynamicWidgetInstance("page");
+      const editorEl = widgetEl(id) && widgetEl(id).querySelector(".note-editor");
+      if (editorEl) setTimeout(function () { editorEl.focus(); }, 60);
+      return id;
+    }
+    // What the Notion library calls to put an adopted page on the board.
+    window.__mpsCreatePageWidget = function () { return createDynamicWidgetInstance("page"); };
+
+    function closePageKindPopup() {
+      const o = document.getElementById("pageKindOverlay");
+      const p = document.getElementById("pageKindPopup");
+      if (o) o.hidden = true;
+      if (p) p.hidden = true;
+    }
+
+    function openPageKindPopup(anchorBtn) {
+      const o = document.getElementById("pageKindOverlay");
+      const pop = document.getElementById("pageKindPopup");
+      if (!o || !pop) { newEmptyPageWidget(); return; }
+      o.hidden = false; pop.hidden = false;
+      // Centred rather than anchored: the "+" popup it replaces has already
+      // closed, so there is nothing left on screen to hang off.
+      pop.style.left = Math.round((window.innerWidth - pop.offsetWidth) / 2) + "px";
+      pop.style.top = Math.round(window.innerHeight * 0.28) + "px";
+    }
+
+    (function wirePageKind() {
+      const o = document.getElementById("pageKindOverlay");
+      const pop = document.getElementById("pageKindPopup");
+      if (!o || !pop) return;
+      o.addEventListener("click", closePageKindPopup);
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && !pop.hidden) closePageKindPopup();
+      });
+      Array.prototype.forEach.call(pop.querySelectorAll("[data-page-kind]"), function (b) {
+        b.addEventListener("click", function () {
+          const kind = b.getAttribute("data-page-kind");
+          closePageKindPopup();
+          if (kind === "empty") newEmptyPageWidget();
+          else if (window.__mpsNotionLibrary) window.__mpsNotionLibrary.open();
+        });
+      });
+    })();
+
     function wireDeleteButton(btn) {
       if (!btn) return;
       const id = btn.getAttribute("data-delete-col");
@@ -12226,9 +13057,19 @@
       closeAddWidgetPopup();
 
       if (type === "page") {
-        const id = createDynamicWidgetInstance("page");
-        const editorEl = widgetEl(id) && widgetEl(id).querySelector(".note-editor");
-        if (editorEl) setTimeout(function () { editorEl.focus(); }, 60);
+        /* With Notion connected there are two intentions behind this button --
+           a blank page, or one that already exists over there -- so it asks.
+           Not connected: nothing to choose between, so it behaves as before
+           and creates one immediately rather than showing a chooser with one
+           real option. */
+        if (window.__mpsNotionLibrary) {
+          window.__mpsNotionLibrary.isConnected().then(function (on) {
+            if (on) openPageKindPopup(btn);
+            else newEmptyPageWidget();
+          });
+          return;
+        }
+        newEmptyPageWidget();
         return;
       }
 

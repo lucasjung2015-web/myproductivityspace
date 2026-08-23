@@ -179,10 +179,39 @@ Deno.serve(async (req) => {
     page_create:   { method: "POST",  path: () => "/pages" },
     page_update:   { method: "PATCH", path: (b) => `/pages/${b.page_id}` },
     blocks_list:   { method: "GET",   path: (b) => `/blocks/${b.block_id}/children?page_size=100` },
+    // Names for the "Created by" column. One call covers every row; resolving
+    // per page would spend the rate limit on repeats of the same few people.
+    users_list:    { method: "GET",   path: () => "/users?page_size=100" },
     blocks_append: { method: "PATCH", path: (b) => `/blocks/${b.block_id}/children` },
     block_update:  { method: "PATCH", path: (b) => `/blocks/${b.block_id}` },
     block_delete:  { method: "DELETE", path: (b) => `/blocks/${b.block_id}` },
   };
+
+  /* Trash is its own action rather than a raw page_update, because the
+     property name depends on the API version: `archived` on the version this
+     function pins, `in_trash` from 2026-03-11 onward where `archived` was
+     removed. Keeping that knowledge here means the client asks to trash a
+     page and never has to care which vintage of the API answers.
+     Notion has no permanent delete -- this is recoverable from Notion's own
+     trash, which is worth knowing before wiring it to a delete button. */
+  if (action === "page_trash" || action === "page_restore") {
+    const wantTrashed = action === "page_trash";
+    const modern = NOTION_VERSION >= "2026-03-11";
+    const body2 = modern ? { in_trash: wantTrashed } : { archived: wantTrashed };
+    const res2 = await fetch(`${NOTION_API}/pages/${body.page_id}`, {
+      method: "PATCH",
+      headers: {
+        "authorization": `Bearer ${tok.access_token}`,
+        "content-type": "application/json",
+        "Notion-Version": NOTION_VERSION,
+      },
+      body: JSON.stringify(body2),
+    });
+    return new Response(await res2.text(), {
+      status: res2.status,
+      headers: { ...cors, "content-type": "application/json" },
+    });
+  }
 
   const spec = ALLOWED[action];
   if (!spec) return json({ error: "unknown_action" }, 400, cors);
