@@ -8308,7 +8308,9 @@
     return new Promise(function (resolve, reject) {
       if (window.supabase && window.supabase.createClient) return resolve();
       const s = document.createElement("script");
-      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+      // Pinned, not @2: a floating major means the auth flow can change
+      // under this app between one page load and the next.
+      s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js";
       s.async = true; s.defer = true;
       s.onload = resolve;
       s.onerror = function () { reject(new Error("Could not load Supabase.")); };
@@ -8340,16 +8342,48 @@
         }
       });
 
-      // A signup blocked by the allowlist trigger comes back as an error in
-      // the URL hash, not as a thrown exception.
+      // A blocked signup comes back as an error rather than an exception, in
+      // the hash on some paths and the query string on others.
+      const q = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(String(window.location.hash || "").slice(1));
-      if (hash.get("error")) {
-        showGateError(hash.get("error_description") || hash.get("error"));
+      const errParam = hash.get("error") || q.get("error");
+      if (errParam) {
+        showGateError(hash.get("error_description") || q.get("error_description") || errParam);
         return;
       }
 
       const got = await sb.auth.getSession();
       session = (got.data && got.data.session) || null;
+
+      /* Returned from Google holding a ?code= but with no session, which
+         means detectSessionInUrl did not redeem it. Do the exchange by hand
+         rather than assuming, because the alternative below -- falling
+         through to the auto sign-in -- redirects back to Google and ABANDONS
+         this code. That was the loop: every attempt left another orphaned
+         PKCE verifier in localStorage and never produced a session, so every
+         reload asked for Google again.
+
+         Only when there is no session: a ?code= WITH a session belongs to the
+         Notion connect (see finishNotionConnectIfReturning), and feeding that
+         to Supabase would consume it wrongly. */
+      const oauthCode = q.get("code");
+      if (!session && oauthCode) {
+        try {
+          const ex = await sb.auth.exchangeCodeForSession(oauthCode);
+          if (ex.error) throw ex.error;
+          session = (ex.data && ex.data.session) || null;
+        } catch (e) {
+          // Say so. Silently bouncing back to Google is what hid this.
+          showGateError("Couldn't complete sign-in: " + ((e && e.message) || e));
+          return;
+        }
+        // Don't leave a spent code in the URL for a reload to retry.
+        try {
+          const u = new URL(window.location.href);
+          u.searchParams.delete("code"); u.searchParams.delete("state");
+          window.history.replaceState({}, "", u.toString());
+        } catch (e) {}
+      }
 
       // Signed out: `ready` is deliberately left pending forever. That
       // freezes the widget engine and the calendar mid-boot behind the
@@ -8365,7 +8399,10 @@
       if (!session) {
         let tried = false;
         try { tried = sessionStorage.getItem(AUTO_SIGNIN_KEY) === "1"; } catch (e) {}
-        if (tried) { showGateSignIn(); return; }
+        // A code was present and still produced no session: something is
+        // wrong with the exchange, and redirecting again would just abandon
+        // the next code too. Stop and offer the button.
+        if (tried || oauthCode) { showGateSignIn(); return; }
         try { sessionStorage.setItem(AUTO_SIGNIN_KEY, "1"); } catch (e) {}
         signIn();
         return;
