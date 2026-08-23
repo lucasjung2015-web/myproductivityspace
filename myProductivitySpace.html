@@ -678,7 +678,173 @@
   .note-editor:empty::before {
     content: attr(data-placeholder); color: #999999; font-weight: 700; pointer-events: none;
   }
-  .note-editor:first-line { font-weight: 700; }
+
+  /* ---------- blocks inside a Page ----------
+     A Page used to be one flat run of text split on "\n". It is now a list of
+     block elements, because none of headings/lists/toggles/callouts can be
+     expressed as a line of text without inventing a markup language on top of
+     one -- and because Notion's own model is blocks, so a flat note could
+     only ever round-trip as paragraphs no matter what it looked like here.
+     Storage is still a single HTML string, so every tier, hash and sync path
+     that already carried a Page carries this unchanged. */
+  .note-editor > * { position: relative; margin: 1px 0; }
+  /* The first block is the page's name, the same convention the flat version
+     had via :first-line -- kept for any block type, so turning the title into
+     a heading does not make it stop reading as the title. */
+  .note-editor > *:first-child { font-weight: 700; }
+  .note-editor [data-b="p"] { min-height: 1.4em; }
+
+  .note-editor [data-b^="h"], .note-editor [data-b^="th"] {
+    font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;
+  }
+  .note-editor [data-b="h1"], .note-editor [data-b="th1"] { font-size: 25px; margin: 18px 0 3px; }
+  .note-editor [data-b="h2"], .note-editor [data-b="th2"] { font-size: 20px; margin: 15px 0 2px; }
+  .note-editor [data-b="h3"], .note-editor [data-b="th3"] { font-size: 17px; margin: 13px 0 2px; }
+  .note-editor [data-b="h4"], .note-editor [data-b="th4"] { font-size: 15px; margin: 11px 0 2px; }
+  .note-editor > *:first-child[data-b^="h"] { margin-top: 0; }
+
+  /* One padding for every marker-bearing block, so a bullet, a number, a
+     checkbox and a twisty all sit on the same left rail. */
+  .note-editor [data-b="ul"], .note-editor [data-b="ol"],
+  .note-editor [data-b="todo"], .note-editor [data-b="tg"],
+  .note-editor [data-b^="th"] { padding-left: 25px; }
+
+  .note-editor [data-b="ul"]::before {
+    content: "•"; position: absolute; left: 8px; top: 0;
+    font-size: 17px; line-height: 1.35; color: var(--ink);
+  }
+  .note-editor [data-b="ol"]::before {
+    content: attr(data-n); position: absolute; left: 0; top: 0; width: 20px;
+    text-align: right; font-size: 14px; line-height: 1.45; color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Checkbox and twisty are drawn, not inserted as elements: a real <input>
+     or <button> inside a contenteditable becomes something the caret can land
+     inside and the browser can split on Enter. Drawn markers are inert, and
+     the click that toggles them is resolved by hit-testing the click's x
+     against the marker rail (see nbMarkerHit). */
+  .note-editor [data-b="todo"]::before {
+    content: ""; position: absolute; left: 4px; top: 4px; width: 14px; height: 14px;
+    border: 1.6px solid #9a9a9a; border-radius: 3px; box-sizing: border-box;
+    cursor: pointer;
+  }
+  .note-editor [data-b="todo"][data-c="1"]::before {
+    background: var(--ink) no-repeat center/10px 10px
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6L9 17l-5-5'/></svg>");
+    border-color: var(--ink);
+  }
+  .note-editor [data-b="todo"][data-c="1"] { color: #9a9a9a; text-decoration: line-through; }
+
+  .note-editor [data-b="tg"]::before, .note-editor [data-b^="th"]::before {
+    content: ""; position: absolute; left: 6px; top: 0.45em; width: 0; height: 0;
+    border-left: 6px solid #6b6b6b; border-top: 4.5px solid transparent;
+    border-bottom: 4.5px solid transparent; cursor: pointer;
+    transition: transform .12s ease; transform-origin: 2px 50%;
+  }
+  .note-editor [data-o="1"]::before { transform: rotate(90deg); }
+  /* Collapsed children. Set by nbRenumber, never stored -- what is collapsed
+     is a property of the toggle (data-o), not of the blocks underneath it. */
+  .note-editor .nb-collapsed { display: none; }
+
+  .note-editor [data-b="quote"] {
+    border-left: 3px solid var(--ink); padding-left: 13px; margin: 6px 0;
+  }
+  .note-editor [data-b="code"] {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.5; background: #f6f7f9; border: 1px solid var(--hair);
+    border-radius: 7px; padding: 10px 12px; margin: 6px 0; white-space: pre-wrap;
+    overflow-x: auto; font-weight: 400;
+  }
+  .note-editor [data-b="callout"] {
+    background: #f6f7f9; border-radius: 7px; padding: 11px 13px 11px 40px;
+    margin: 6px 0; min-height: 1.4em;
+  }
+  .note-editor [data-b="callout"]::before {
+    content: attr(data-e); position: absolute; left: 13px; top: 10px;
+    font-size: 15px; line-height: 1.3; cursor: pointer;
+  }
+
+  /* An equation block holds LaTeX. It shows the source while the caret is in
+     it and the rendered result when it is not, which is the only way to both
+     edit and read one in a plain contenteditable. */
+  .note-editor [data-b="eq"] {
+    text-align: center; padding: 9px 12px; margin: 6px 0; border-radius: 7px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13.5px; color: #444; background: #fafafa; font-weight: 400;
+  }
+  .note-editor [data-b="eq"]:hover { background: #f1f3f4; }
+  .note-editor [data-b="eq"].nb-rendered {
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 16px; color: var(--ink);
+  }
+  .note-editor [data-b="eq"]:empty::before {
+    content: "Add an equation, e.g. e^{i\\pi}+1=0"; color: #b0b0b0;
+  }
+
+  /* A page block is a link to a real Notion page. It is inert to the caret so
+     it behaves like one object rather than editable text. */
+  .note-editor [data-b="page"] {
+    display: flex; align-items: center; gap: 7px; padding: 3px 0; font-weight: 500;
+  }
+  .note-editor [data-b="page"]::before {
+    content: ""; flex: 0 0 auto; width: 15px; height: 15px; background: no-repeat center/contain
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6368' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><path d='M14 2v6h6'/></svg>");
+    position: static;
+  }
+  .note-editor [data-b="page"] .nb-page-t { text-decoration: underline; text-underline-offset: 2px; }
+  .note-editor [data-b="page"].is-pending { opacity: .5; }
+
+  /* Indentation. A flat list of blocks each carrying a depth, rather than
+     real nesting: it keeps Enter/Backspace/Tab arithmetic on one array, and
+     the tree Notion wants is rebuilt from the depths at push time. */
+  .note-editor [data-i="1"] { margin-left: 26px; }
+  .note-editor [data-i="2"] { margin-left: 52px; }
+  .note-editor [data-i="3"] { margin-left: 78px; }
+  .note-editor [data-i="4"] { margin-left: 104px; }
+  .note-editor [data-i="5"] { margin-left: 130px; }
+  .note-editor [data-i="6"] { margin-left: 156px; }
+
+  /* ---- inline marks ---- */
+  .note-editor code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em; background: #f1eeea; color: #c0392b;
+    padding: 1px 4px; border-radius: 4px;
+  }
+  .note-editor a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .note-editor span[data-color="grey"]   { color: #7a7a7a; }
+  .note-editor span[data-color="brown"]  { color: #8a6a52; }
+  .note-editor span[data-color="red"]    { color: #c0392b; }
+  .note-editor span[data-color="orange"] { color: #c07a1a; }
+  .note-editor span[data-color="yellow"] { color: #b8952a; }
+  .note-editor span[data-color="green"]  { color: #2f7a4a; }
+  .note-editor span[data-color="blue"]   { color: #2a63b8; }
+  .note-editor span[data-color="purple"] { color: #7a4ab8; }
+  .note-editor span[data-color="pink"]   { color: #b8407a; }
+  .note-editor span[data-bg="grey"]   { background: #ecebe9; }
+  .note-editor span[data-bg="brown"]  { background: #eee0d6; }
+  .note-editor span[data-bg="red"]    { background: #fbe4e0; }
+  .note-editor span[data-bg="orange"] { background: #faebdd; }
+  .note-editor span[data-bg="yellow"] { background: #fbf3db; }
+  .note-editor span[data-bg="green"]  { background: #ddedea; }
+  .note-editor span[data-bg="blue"]   { background: #ddebf1; }
+  .note-editor span[data-bg="purple"] { background: #eae4f2; }
+  .note-editor span[data-bg="pink"]   { background: #f4dfeb; }
+  .note-editor span[data-tex] {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em; background: #f3f4f6; border-radius: 4px; padding: 0 4px;
+  }
+  /* A comment's anchor. Deliberately an underline rather than a highlight:
+     highlights are already a colour the user can apply themselves. */
+  .note-editor span[data-cm] {
+    background: #fdf3d4; box-shadow: inset 0 -2px 0 0 #e3c65e; cursor: pointer;
+  }
+  .note-editor span[data-cm].is-open { background: #fbe8a6; }
+  .note-editor span[data-sug="add"] { color: #2f7a4a; text-decoration: underline; }
+  .note-editor span[data-sug="del"] { color: #c0392b; text-decoration: line-through; }
+  .note-editor span[data-react] { cursor: default; }
+  .note-editor span[data-react]::after {
+    content: attr(data-react); font-size: 0.85em; margin-left: 3px;
+    background: #f1f3f4; border-radius: 999px; padding: 1px 5px;
+  }
 
   .vocab-header { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
   .vocab-header .label { margin-bottom: 0; }
@@ -2388,6 +2554,25 @@
   .mps-sync-dot.is-error   { background: #FF0000; }
   .mps-sync-label { font-size: 12px; color: var(--ink-soft); margin-right: 12px; }
   .mps-notion-cell { display: inline-flex; align-items: center; gap: 10px; }
+  /* Destination line under the Notion row. Indented to sit under the
+     connector's name and left unbordered, so it reads as a property of the
+     row above rather than as a row of its own. Deliberately worded as a
+     direction ("syncs to") not a scope ("connected pages"): Notion's own
+     consent screen grants ACCESS, which cascades to every child page, and
+     phrasing this as a permission would imply it echoes that choice. */
+  .mps-dest-line {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 0 2px 11px 40px; margin-top: -6px;
+    font-size: 12px; color: var(--ink-soft); border-bottom: 1px solid var(--hair);
+  }
+  .mps-dest-name { color: var(--ink); font-weight: 600; }
+  .mps-dest-line.is-warn { color: #9a6700; }
+  .mps-dest-change {
+    border: none; background: transparent; padding: 2px 6px; border-radius: 6px;
+    font-family: inherit; font-size: 12px; color: var(--ink-soft);
+    cursor: pointer; text-decoration: underline;
+  }
+  .mps-dest-change:hover { background: #f1f3f4; color: var(--ink); }
   .mps-card { border: 1px solid var(--hair); border-radius: 12px; padding: 14px; }
   .mps-cardgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   .mps-section-title { font-size: 13px; font-weight: 700; color: var(--ink); margin: 18px 0 10px; }
@@ -2576,6 +2761,105 @@
   }
 
 
+  /* ---------- selection toolbar for a Page ----------
+     Appears over a non-empty selection inside a .note-editor, the way
+     Notion's does. Fixed-positioned and appended to <body> so no widget's
+     overflow can clip it. */
+  #nbBar {
+    position: fixed; z-index: 4500; background: #fff; border-radius: 10px;
+    border: 1px solid var(--hair); box-shadow: 0 6px 24px rgba(0,0,0,.18);
+    padding: 5px; display: flex; flex-direction: column; gap: 2px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  #nbBar[hidden] { display: none; }
+  .nb-bar-row { display: flex; align-items: center; gap: 1px; }
+  .nb-bar-sep { height: 1px; background: var(--hair); margin: 3px 2px; }
+  .nb-btn {
+    min-width: 30px; height: 29px; border: none; background: transparent; border-radius: 6px;
+    color: var(--ink); cursor: pointer; display: inline-flex; align-items: center;
+    justify-content: center; gap: 6px; padding: 0 7px;
+    font-family: inherit; font-size: 14px; position: relative;
+  }
+  .nb-btn:hover { background: #f1f3f4; }
+  .nb-btn.is-on { background: #e8f0fe; color: #1a56c4; }
+  .nb-btn svg { width: 15px; height: 15px; display: block; }
+  .nb-btn[data-tip]:hover::after {
+    content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%;
+    transform: translateX(-50%); white-space: nowrap; background: #2f2f2f; color: #fff;
+    font-size: 11px; padding: 3px 7px; border-radius: 5px; pointer-events: none; z-index: 1;
+  }
+  .nb-btn-wide { justify-content: flex-start; width: 100%; font-size: 13.5px; }
+  .nb-chev { margin-left: auto; color: var(--ink-soft); }
+  .nb-italic { font-style: italic; font-family: Georgia, 'Times New Roman', serif; }
+  .nb-strike { text-decoration: line-through; }
+  .nb-under { text-decoration: underline; }
+
+  /* ---------- block-type menu ---------- */
+  #nbMenu, #nbSub {
+    position: fixed; z-index: 4501; background: #fff; border-radius: 10px;
+    border: 1px solid var(--hair); box-shadow: 0 6px 24px rgba(0,0,0,.2);
+    padding: 5px; width: 232px; max-height: min(70vh, 560px); overflow-y: auto;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  #nbSub { width: 244px; }
+  #nbMenu[hidden], #nbSub[hidden] { display: none; }
+  .nb-item {
+    display: flex; align-items: center; gap: 11px; width: 100%; padding: 6px 8px;
+    border: none; background: transparent; border-radius: 7px; cursor: pointer;
+    font-family: inherit; font-size: 14px; color: var(--ink); text-align: left;
+  }
+  .nb-item:hover, .nb-item.is-active { background: #f1f3f4; }
+  .nb-item svg { width: 17px; height: 17px; flex: 0 0 auto; color: #5f6368; }
+  /* H1..H4 and their toggle variants are set as glyphs rather than icons,
+     which is what makes the four of them scannable as a group. */
+  .nb-glyph {
+    flex: 0 0 auto; width: 17px; text-align: center; font-size: 13.5px;
+    font-weight: 600; color: #5f6368; line-height: 1;
+  }
+  .nb-glyph sub { font-size: 8.5px; }
+  .nb-item-check { margin-left: auto; color: var(--ink); display: none; }
+  .nb-item.is-current .nb-item-check { display: block; }
+  .nb-item-chev { margin-left: auto; color: #9a9a9a; }
+  .nb-menu-label {
+    font-size: 11px; color: var(--ink-soft); padding: 6px 9px 3px; font-weight: 600;
+  }
+  .nb-sub-empty { padding: 14px 10px; font-size: 12.5px; color: var(--ink-soft); line-height: 1.45; }
+
+  /* ---------- comments on a Page ---------- */
+  #nbComments {
+    position: fixed; z-index: 4502; width: 288px; background: #fff; border-radius: 10px;
+    border: 1px solid var(--hair); box-shadow: 0 6px 24px rgba(0,0,0,.2); padding: 10px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  #nbComments[hidden] { display: none; }
+  .nb-cm-quote {
+    font-size: 12px; color: var(--ink-soft); border-left: 2px solid #e3c65e;
+    padding-left: 8px; margin-bottom: 9px; max-height: 46px; overflow: hidden;
+  }
+  .nb-cm-item { display: flex; gap: 8px; margin-bottom: 9px; }
+  .nb-cm-av {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; background: #e8eaed;
+    color: #5f6368; font-size: 10px; font-weight: 700; display: grid; place-items: center;
+  }
+  .nb-cm-body { min-width: 0; }
+  .nb-cm-who { font-size: 12px; font-weight: 600; }
+  .nb-cm-when { font-size: 11px; color: var(--ink-soft); margin-left: 5px; font-weight: 400; }
+  .nb-cm-text { font-size: 13px; line-height: 1.45; overflow-wrap: break-word; }
+  .nb-cm-input {
+    width: 100%; box-sizing: border-box; border: 1px solid var(--hair); border-radius: 7px;
+    padding: 7px 9px; font-family: inherit; font-size: 13px; outline: none; resize: vertical;
+    min-height: 34px;
+  }
+  .nb-cm-input:focus { border-color: #6b9cf5; }
+  .nb-cm-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 7px; }
+  .nb-cm-btn {
+    border: none; background: transparent; border-radius: 6px; padding: 5px 9px;
+    font-family: inherit; font-size: 12.5px; color: var(--ink-soft); cursor: pointer;
+  }
+  .nb-cm-btn:hover { background: #f1f3f4; color: var(--ink); }
+  .nb-cm-btn.is-primary { background: var(--ink); color: #fff; }
+  .nb-cm-btn.is-primary:hover { background: #333; }
+
   /* ---------- "Page" -> Empty / Existing chooser ----------
      Pressing Page used to create one immediately. With Notion connected there
      are two different intentions behind that button, so it asks which. */
@@ -2585,9 +2869,25 @@
     position: fixed; z-index: 4301;
     background: #ffffff; border-radius: 14px; padding: 10px;
     box-shadow: 0 8px 30px rgba(0,0,0,.22);
-    display: flex; gap: 10px;
+    display: flex; flex-direction: column; gap: 10px;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
   }
+  .pk-cards { display: flex; gap: 10px; }
+  /* Where the page will land, said before it exists rather than discovered
+     afterwards. The whole reason pages used to go missing was that this
+     sentence had nowhere to be. */
+  .pk-dest {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    border-top: 1px solid var(--hair); padding: 9px 6px 3px;
+    font-size: 12px; color: var(--ink-soft);
+  }
+  .pk-dest-name { color: var(--ink); font-weight: 600; }
+  .pk-dest-change {
+    margin-left: auto; border: none; background: transparent; padding: 3px 6px;
+    border-radius: 6px; font-family: inherit; font-size: 12px;
+    color: var(--ink-soft); cursor: pointer; text-decoration: underline;
+  }
+  .pk-dest-change:hover { background: #f1f3f4; color: var(--ink); }
   .pk-card {
     width: 158px; padding: 16px 14px 14px; text-align: left;
     border: 1px solid var(--hair); border-radius: 10px;
@@ -2685,6 +2985,20 @@
   }
   .nl-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .nl-empty { padding: 40px 8px; text-align: center; color: var(--ink-soft); font-size: 13px; }
+
+  /* ---------- destination mode ----------
+     The library asking where new pages should go. Same grid, same rows; the
+     tick sits in the checkbox column so both modes line up under one header. */
+  .nl-pick-hint {
+    font-size: 12.5px; color: var(--ink-soft); line-height: 1.5;
+    margin: -4px 0 12px; max-width: 62ch;
+  }
+  .nl-row-pick { cursor: pointer; }
+  .nl-pick-tick { display: grid; place-items: center; color: #1a7f4e; }
+  .nl-pick-tick svg { width: 15px; height: 15px; display: block; }
+  /* A sidebar page is the safe answer, so it is the one that reads as a
+     label rather than as grey metadata. */
+  .nl-loc-top { color: var(--ink); font-weight: 600; }
 
   /* Inline rename, matching the reference: emoji chip then a live field. */
   .nl-rename {
@@ -2862,6 +3176,7 @@
 
 <div id="pageKindOverlay" hidden></div>
 <div id="pageKindPopup" hidden>
+  <div class="pk-cards">
   <button type="button" class="pk-card" data-page-kind="empty">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
     Empty page
@@ -2870,6 +3185,12 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-2"/><path d="M13 3h6a2 2 0 0 1 2 2v6"/><path d="M21 3l-9 9"/></svg>
     Existing page
   </button>
+  </div>
+  <div class="pk-dest" id="pkDest" hidden>
+    <span>New pages go to</span>
+    <span class="pk-dest-name" id="pkDestName">…</span>
+    <button type="button" class="pk-dest-change" id="pkDestChange">Change</button>
+  </div>
 </div>
 
 <div id="notionLibBackdrop" hidden></div>
@@ -8450,30 +8771,30 @@
   /* ---------- Notion page sync (stages 2-4) ----------
      Two-way, between a Page widget's stored HTML and a Notion page's blocks.
 
-     The two content models do not line up, so the mapping is stated rather
-     than assumed. A Page is sanitized HTML limited to b/strong/i/em/u/br
-     (see NOTE_INLINE_TAGS): lines are <br>-separated and a bullet is the
-     literal text "• ", not a <ul>. Notion is typed blocks carrying rich-text
-     runs. So:
+     Both sides are blocks now, so the mapping is close to one-to-one --
+     see NB_TO_NOTION and NOTION_TO_NB below for the whole of it. The two
+     places the shapes genuinely differ, and what is done about each:
 
-         line starting "• "   <->  bulleted_list_item
-         any other line       <->  paragraph
-         <b>/<strong>         <->  annotations.bold
-         <i>/<em>             <->  annotations.italic
-         <u>                  <->  annotations.underline
+       depth      Ours is flat: every block carries a data-i depth. Notion's
+                  is a tree. notionBlocksFromHtml rebuilds the tree from the
+                  depths on the way out; notionHtmlFromBlocks flattens it
+                  back on the way in.
+       headings   Notion's API has three levels. A Heading 4 therefore
+                  arrives over there as a Heading 3, and comes back as one.
+                  It is the only lossy step in the map.
 
-     Notion block types outside that set -- tables, toggles, embeds, databases
-     -- cannot be shown in this editor at all. Rather than flatten or delete
-     them, a page containing any is marked pull-only: it still comes DOWN as
-     readable text, and local edits stop being pushed UP so nothing is
+     A block type this editor still cannot show -- a table, an embed, a
+     database view -- is not flattened or deleted. A page containing one is
+     marked pull-only: it still comes DOWN, with the unknown block shown as a
+     labelled placeholder, and local edits stop being pushed UP so nothing is
      destroyed. Silently eating a table because the editor has no concept of
-     one is the failure mode this design exists to avoid. */
+     one is the failure mode this design exists to avoid. The same rule
+     covers child_page blocks, for a sharper reason: pushing rewrites a
+     page's blocks, and deleting a child_page block trashes the real page
+     underneath it. */
 
-  const NOTION_SUPPORTED = { paragraph: 1, bulleted_list_item: 1, numbered_list_item: 1,
-                             heading_1: 1, heading_2: 1, heading_3: 1, to_do: 1, quote: 1 };
-  // What we can round-trip without losing the block's own type.
-  const NOTION_ROUNDTRIP = { paragraph: 1, bulleted_list_item: 1 };
-  const NOTION_BULLET = "• ";
+  // What can be round-tripped is declared beside the mapping that does it,
+  // further down, so the two can never drift apart.
   const NOTION_POLL_MS = 25000;
   // Notion caps a rich-text run at 2000 chars and a children array at 100.
   const NOTION_TEXT_MAX = 1900;
@@ -8521,148 +8842,312 @@
   }
 
   /* ---- HTML -> Notion blocks ---- */
+  /* ---------- rich text: this app's inline markup <-> Notion's ----------
+     Notion carries emphasis as flags on a run rather than as nested tags, so
+     the walk below turns <b><i>x</i></b> into one run annotated bold+italic.
+     A link is not an annotation over there but a property of the run, and an
+     inline equation is a run of its own type entirely. */
+  const NB_COLOR_OK = { grey: 1, brown: 1, red: 1, orange: 1, yellow: 1,
+                        green: 1, blue: 1, purple: 1, pink: 1 };
+
   function notionRichTextFromNode(node, out, ann) {
-    if (node.nodeType === 3) {
-      const text = node.nodeValue;
-      if (!text) return;
-      /* Split rather than truncate, so a long paragraph stays whole and is
-         just carried by several runs -- but split on CHARACTER boundaries,
-         not UTF-16 indices. An emoji is a surrogate pair, and many (flags,
-         skin tones, anything joined by a ZWJ) are several code points long;
-         slicing at an arbitrary offset can cut one in half and send Notion a
-         lone surrogate, which comes back as a replacement box. Array.from
-         iterates by code point, and the ZWJ check keeps joined sequences
-         whole on top of that. */
-      for (const piece of notionSplitText(text)) {
+    for (let c = node.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) {
+        const text = c.data;
+        if (!text) continue;
+        for (const piece of notionSplitText(text)) {
+          const run = {
+            type: "text",
+            text: { content: piece },
+            annotations: {
+              bold: !!ann.bold, italic: !!ann.italic, underline: !!ann.underline,
+              strikethrough: !!ann.strikethrough, code: !!ann.code,
+              color: ann.color || "default"
+            }
+          };
+          if (ann.href) run.text.link = { url: ann.href };
+          out.push(run);
+        }
+        continue;
+      }
+      if (c.nodeType !== 1) continue;
+      const tag = c.tagName.toLowerCase();
+
+      // An inline equation is a whole run, not a decoration on one.
+      if (tag === "span" && c.hasAttribute("data-tex")) {
         out.push({
-          type: "text",
-          text: { content: piece },
+          type: "equation",
+          equation: { expression: String(c.getAttribute("data-tex") || "").slice(0, 1000) },
           annotations: {
             bold: !!ann.bold, italic: !!ann.italic, underline: !!ann.underline,
-            strikethrough: false, code: false, color: "default"
+            strikethrough: !!ann.strikethrough, code: false, color: ann.color || "default"
           }
         });
+        continue;
       }
-      return;
-    }
-    if (node.nodeType !== 1) return;
-    const tag = node.tagName.toLowerCase();
-    const next = {
-      bold: ann.bold || tag === "b" || tag === "strong",
-      italic: ann.italic || tag === "i" || tag === "em",
-      underline: ann.underline || tag === "u"
-    };
-    for (let c = node.firstChild; c; c = c.nextSibling) {
+
+      const next = Object.assign({}, ann);
+      if (tag === "b" || tag === "strong") next.bold = true;
+      if (tag === "i" || tag === "em") next.italic = true;
+      if (tag === "u") next.underline = true;
+      if (tag === "s" || tag === "strike") next.strikethrough = true;
+      if (tag === "code") next.code = true;
+      if (tag === "a") {
+        const href = c.getAttribute("href") || "";
+        if (/^(https?:|mailto:)/i.test(href)) next.href = href;
+      }
+      if (tag === "span") {
+        const fg = c.getAttribute("data-color"), bg = c.getAttribute("data-bg");
+        if (bg && NB_COLOR_OK[bg]) next.color = bg + "_background";
+        else if (fg && NB_COLOR_OK[fg]) next.color = fg;
+      }
       notionRichTextFromNode(c, out, next);
     }
   }
 
-  // Plain text of one line's worth of nodes, for comparing against a title.
   function notionLinePlain(rich) {
-    return rich.map(function (r) { return r.text.content; }).join("").replace(/\s+/g, " ").trim();
+    return (rich || []).map(function (r) {
+      return (r.text && r.text.content) || (r.equation && r.equation.expression) || "";
+    }).join("").replace(/\s+/g, " ").trim();
+  }
+
+  /* ---------- this app's blocks -> Notion's ----------
+     Our model is flat: every block carries a depth. Notion's is a tree. The
+     depths are turned back into children here, which is the one place the two
+     shapes have to be reconciled -- everything upstream of this gets to stay
+     on a single array. */
+  const NB_TO_NOTION = {
+    p: "paragraph", h1: "heading_1", h2: "heading_2", h3: "heading_3",
+    // Notion's API tops out at three heading levels, so a Heading 4 arrives
+    // over there as a Heading 3. It is the only lossy step in this map.
+    h4: "heading_3",
+    ul: "bulleted_list_item", ol: "numbered_list_item", todo: "to_do",
+    tg: "toggle", quote: "quote", callout: "callout", code: "code",
+    eq: "equation", page: "link_to_page",
+    th1: "heading_1", th2: "heading_2", th3: "heading_3", th4: "heading_3"
+  };
+  const NB_TOGGLE_HEADING = { th1: 1, th2: 1, th3: 1, th4: 1 };
+  // Which Notion blocks accept children, so a nested block is never attached
+  // to one that would reject it.
+  const NOTION_TAKES_CHILDREN = {
+    paragraph: 1, bulleted_list_item: 1, numbered_list_item: 1, to_do: 1,
+    toggle: 1, quote: 1, callout: 1, heading_1: 1, heading_2: 1, heading_3: 1
+  };
+
+  function notionBlockFor(el) {
+    const kind = el.getAttribute("data-b") || "p";
+    const type = NB_TO_NOTION[kind] || "paragraph";
+
+    if (type === "link_to_page") {
+      const pid = el.getAttribute("data-pid");
+      if (!pid) return null;   // a page block with no page is not a block
+      return { object: "block", type: "link_to_page",
+               link_to_page: { type: "page_id", page_id: pid } };
+    }
+    if (type === "equation") {
+      const tex = el.hasAttribute("data-tex")
+        ? el.getAttribute("data-tex") : (el.textContent || "");
+      const expr = String(tex).trim();
+      if (!expr) return null;
+      return { object: "block", type: "equation", equation: { expression: expr.slice(0, 1000) } };
+    }
+
+    const rich = [];
+    notionRichTextFromNode(el, rich, {});
+    const body = { rich_text: rich };
+    if (type === "to_do") body.checked = el.getAttribute("data-c") === "1";
+    if (NB_TOGGLE_HEADING[kind]) body.is_toggleable = true;
+    if (type === "callout") {
+      const e = el.getAttribute("data-e") || "💡";
+      body.icon = { type: "emoji", emoji: e };
+    }
+    if (type === "code") {
+      // Code carries no inline marks in Notion; its text is its content.
+      body.rich_text = notionSplitText(el.textContent || "").map(function (piece) {
+        return { type: "text", text: { content: piece } };
+      });
+      body.language = el.getAttribute("data-lang") || "plain text";
+    }
+    return { object: "block", type: type, [type]: body };
   }
 
   function notionBlocksFromHtml(html, dropTitle) {
     const root = document.createElement("div");
-    root.innerHTML = String(html || "");
+    root.innerHTML = window.__mpsNoteNormalize
+      ? window.__mpsNoteNormalize(html) : String(html || "");
 
-    // Split into lines on <br>, keeping inline markup inside each line.
-    const lines = [[]];
-    (function walk(node) {
-      for (let c = node.firstChild; c; c = c.nextSibling) {
-        if (c.nodeType === 1 && c.tagName.toLowerCase() === "br") { lines.push([]); continue; }
-        lines[lines.length - 1].push(c);
-      }
-    })(root);
-
-    const blocks = [];
-    lines.forEach(function (nodes) {
-      const holder = document.createElement("div");
-      nodes.forEach(function (n) { holder.appendChild(n.cloneNode(true)); });
-      let rich = [];
-      notionRichTextFromNode(holder, rich, {});
-      const plain = rich.map(function (r) { return r.text.content; }).join("");
-
-      let type = "paragraph";
-      if (plain.indexOf(NOTION_BULLET) === 0) {
-        type = "bulleted_list_item";
-        // Drop the marker from the first run only; it is literal text here.
-        if (rich.length) {
-          rich[0] = Object.assign({}, rich[0], {
-            text: { content: rich[0].text.content.slice(NOTION_BULLET.length) }
-          });
-          rich = rich.filter(function (r) { return r.text.content.length; });
-        }
-      }
-      // A wholly empty line is still a paragraph -- it is the user's spacing.
-      blocks.push({ object: "block", type: type, [type]: { rich_text: rich } });
+    const els = Array.prototype.filter.call(root.children, function (c) {
+      return c.nodeType === 1 && c.hasAttribute("data-b");
     });
 
-    /* Notion renders the page title above the body, so a first line that IS
+    /* Notion renders the page title above the body, so a first block that IS
        the title showed up twice on the page. Dropped here and put back on the
        way in (see notionHtmlFromBlocks), which keeps this app's convention --
-       first line names the page -- without duplicating it over there. Only
-       when it actually matches: a Page with a name of its own, different from
-       its opening line, must not lose that line. */
+       the first block names the page -- without duplicating it over there.
+       Only when it actually matches: a Page with a name of its own, different
+       from its opening block, must not lose that block. */
+    let start = 0;
     if (dropTitle) {
       const want = String(dropTitle).replace(/\s+/g, " ").trim();
-      while (blocks.length) {
-        const b0 = blocks[0];
-        const p0 = notionLinePlain((b0[b0.type] && b0[b0.type].rich_text) || []);
-        if (p0 === want) { blocks.shift(); continue; }
-        // A blank line straight after the title is spacing that belonged to it.
-        if (!p0 && blocks.length > 1) {
-          const b1 = blocks[1];
-          const p1 = notionLinePlain((b1[b1.type] && b1[b1.type].rich_text) || []);
-          if (p1 === want) { blocks.shift(); continue; }
+      while (start < els.length) {
+        const t = String(els[start].textContent || "").replace(/\s+/g, " ").trim();
+        if (t === want) { start++; continue; }
+        // A blank block straight after the title is spacing that belonged to it.
+        if (!t && start + 1 < els.length) {
+          const t1 = String(els[start + 1].textContent || "").replace(/\s+/g, " ").trim();
+          if (t1 === want) { start++; continue; }
         }
         break;
       }
     }
 
+    // Flat depths -> a tree, by keeping one open block per level.
+    const out = [];
+    const stack = [];   // { indent, block }
+    for (let i = start; i < els.length; i++) {
+      const el = els[i];
+      const built = notionBlockFor(el);
+      if (!built) continue;
+      const indent = parseInt(el.getAttribute("data-i") || "0", 10) || 0;
+
+      while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+      const parent = stack.length ? stack[stack.length - 1].block : null;
+      if (parent && NOTION_TAKES_CHILDREN[parent.type]) {
+        const pb = parent[parent.type];
+        (pb.children || (pb.children = [])).push(built);
+      } else {
+        out.push(built);
+      }
+      stack.push({ indent: indent, block: built });
+    }
+
     // Trailing blank paragraphs are an artifact of how contenteditable ends,
     // not content; they would otherwise accumulate on every round trip.
-    while (blocks.length) {
-      const last = blocks[blocks.length - 1];
+    while (out.length) {
+      const last = out[out.length - 1];
       const rt = last[last.type] && last[last.type].rich_text;
-      if (last.type === "paragraph" && (!rt || !rt.length)) blocks.pop();
+      if (last.type === "paragraph" && (!rt || !rt.length)) out.pop();
       else break;
     }
-    return blocks;
+    return out;
   }
 
-  /* ---- Notion blocks -> HTML ---- */
-  function notionHtmlFromBlocks(blocks) {
-    const lines = [];
+  /* ---------- Notion's blocks -> this app's ---------- */
+  const NOTION_TO_NB = {
+    paragraph: "p", heading_1: "h1", heading_2: "h2", heading_3: "h3",
+    bulleted_list_item: "ul", numbered_list_item: "ol", to_do: "todo",
+    toggle: "tg", quote: "quote", callout: "callout", code: "code",
+    equation: "eq", link_to_page: "page"
+  };
+  const NOTION_COLOR_RE = /^(grey|brown|red|orange|yellow|green|blue|purple|pink)(_background)?$/;
+
+  function notionInlineHtml(rt) {
+    return (rt || []).map(function (r) {
+      if (r.type === "equation" && r.equation) {
+        return '<span data-tex="' + notionEscapeHtml(r.equation.expression || "") + '"></span>';
+      }
+      let t = notionEscapeHtml(r.plain_text != null ? r.plain_text : (r.text && r.text.content) || "");
+      const a = r.annotations || {};
+      if (a.code) t = "<code>" + t + "</code>";
+      if (a.strikethrough) t = "<s>" + t + "</s>";
+      if (a.underline) t = "<u>" + t + "</u>";
+      if (a.italic) t = "<i>" + t + "</i>";
+      if (a.bold) t = "<b>" + t + "</b>";
+      const m = a.color && NOTION_COLOR_RE.exec(a.color);
+      if (m) {
+        t = "<span " + (m[2] ? 'data-bg="' : 'data-color="') + m[1] + '">' + t + "</span>";
+      }
+      const href = (r.href) || (r.text && r.text.link && r.text.link.url);
+      if (href && /^(https?:|mailto:)/i.test(href)) {
+        t = '<a href="' + notionEscapeHtml(href) + '">' + t + "</a>";
+      }
+      return t;
+    }).join("");
+  }
+
+  function notionHtmlFromBlocks(blocks, depth) {
+    const indent = depth || 0;
+    const out = [];
     (blocks || []).forEach(function (b) {
       const type = b.type;
-      const body = b[type];
-      const rt = (body && body.rich_text) || [];
-      let html = rt.map(function (r) {
-        let t = notionEscapeHtml(r.plain_text != null ? r.plain_text : (r.text && r.text.content) || "");
-        const a = r.annotations || {};
-        if (a.underline) t = "<u>" + t + "</u>";
-        if (a.italic) t = "<i>" + t + "</i>";
-        if (a.bold) t = "<b>" + t + "</b>";
-        return t;
-      }).join("");
+      const body = b[type] || {};
+      let kind = NOTION_TO_NB[type];
+      const attrs = [];
 
-      if (type === "bulleted_list_item" || type === "numbered_list_item" || type === "to_do") {
-        html = NOTION_BULLET + html;
-      } else if (type === "heading_1" || type === "heading_2" || type === "heading_3") {
-        // The editor has no headings; bold is the closest thing it can show.
-        html = "<b>" + html + "</b>";
-      } else if (type === "quote") {
-        html = "> " + html;
-      } else if (!NOTION_SUPPORTED[type]) {
+      if (type === "equation") {
+        out.push('<div data-b="eq"' + notionIndentAttr(indent) + ">"
+          + notionEscapeHtml(body.expression || "") + "</div>");
+        return;
+      }
+      if (type === "link_to_page" || type === "child_page") {
+        const pid = type === "child_page" ? b.id : (body.page_id || "");
+        const title = type === "child_page"
+          ? (body.title || "Untitled")
+          : "Linked page";
+        out.push('<div data-b="page" data-pid="' + notionEscapeHtml(pid) + '"'
+          + ' data-url="https://www.notion.so/' + notionEscapeHtml(String(pid).replace(/-/g, "")) + '"'
+          + notionIndentAttr(indent) + ">" + notionEscapeHtml(title) + "</div>");
+        return;
+      }
+      if (!kind) {
         // Readable placeholder rather than a silent gap, so it is obvious
         // something lives here that this editor cannot render.
-        html = "<i>[" + notionEscapeHtml(type.replace(/_/g, " ")) + "]</i>";
+        out.push('<div data-b="p"' + notionIndentAttr(indent) + "><i>["
+          + notionEscapeHtml(type.replace(/_/g, " ")) + "]</i></div>");
+        return;
       }
-      lines.push(html);
+      // A heading Notion marks toggleable is one of ours with a twisty.
+      if (body.is_toggleable && /^h[1-3]$/.test(kind)) kind = "t" + kind;
+      if (type === "to_do" && body.checked) attrs.push(' data-c="1"');
+      if (kind === "tg" || /^th[1-4]$/.test(kind)) attrs.push(' data-o="1"');
+      if (type === "callout") {
+        const ic = body.icon;
+        attrs.push(' data-e="' + notionEscapeHtml(
+          (ic && ic.type === "emoji" && ic.emoji) ? ic.emoji : "💡") + '"');
+      }
+      if (type === "code" && body.language) {
+        attrs.push(' data-lang="' + notionEscapeHtml(body.language) + '"');
+      }
+      out.push('<div data-b="' + kind + '"' + attrs.join("") + notionIndentAttr(indent) + ">"
+        + notionInlineHtml(body.rich_text) + "</div>");
+
+      // Notion's children are our depth+1, which is exactly the inverse of
+      // the flattening the push side does.
+      if (b.__children && b.__children.length) {
+        out.push(notionHtmlFromBlocks(b.__children, indent + 1));
+      }
     });
-    return lines.join("<br>");
+    return out.join("");
   }
+
+  function notionIndentAttr(n) { return n > 0 ? ' data-i="' + Math.min(6, n) + '"' : ""; }
+
+  /* Pulls the children of anything that has them, so a toggle does not arrive
+     empty. Bounded on both depth and total requests: a deeply nested page is
+     worth showing most of, and is not worth spending a whole poll's rate
+     limit on. */
+  async function notionFetchChildren(blocks, budget, depth) {
+    if (depth > 3) return;
+    for (const b of blocks || []) {
+      if (!b.has_children) continue;
+      if (budget.left <= 0) return;
+      budget.left--;
+      const r = await notionCall({ action: "blocks_list", block_id: b.id });
+      const kids = (r && r.ok && r.body && r.body.results) || [];
+      b.__children = kids;
+      await notionFetchChildren(kids, budget, depth + 1);
+    }
+  }
+
+  /* What can be pushed back without losing the block's own type. child_page
+     is deliberately absent: pushing deletes and rewrites a page's blocks, and
+     deleting a child_page block trashes the real page underneath it. A Page
+     holding one stays pull-only rather than risking that. */
+  const NOTION_ROUNDTRIP = {
+    paragraph: 1, bulleted_list_item: 1, numbered_list_item: 1, to_do: 1,
+    heading_1: 1, heading_2: 1, heading_3: 1, toggle: 1, quote: 1,
+    callout: 1, code: 1, equation: 1, link_to_page: 1
+  };
 
   function notionPageIsRoundTrippable(blocks) {
     return (blocks || []).every(function (b) { return NOTION_ROUNDTRIP[b.type]; });
@@ -8671,7 +9156,16 @@
   /* ---- the engine ---- */
   let notionSyncTimer = null;
   let notionParentId = null;      // where new pages get created
+  let notionParentMeta = null;    // { id, title, icon } for showing it
   let notionSyncing = false;
+
+  /* Where new pages get created, remembered rather than re-guessed.
+     Notion's OAuth screen picks ACCESS, not destination -- and access
+     cascades to every descendant of what you shared -- so the API can never
+     tell us which page you had in mind. It has to be stored on this side.
+     Lives in the same synced key/value store as the library's favorites, so
+     the choice follows you between devices. */
+  const NOTION_PARENT_KEY = "notion-parent-page";
 
   // "note-content:page1786..." -> "page1786...", the id the widget stores
   // its name and emoji under.
@@ -8689,9 +9183,10 @@
       if (m) { title = m.title || ""; icon = m.icon || ""; }
     } catch (e) {}
     if (!title || /^Page(\s|$)/i.test(title)) {
-      const d = document.createElement("div");
-      d.innerHTML = String(html || "");
-      const first = (d.textContent || "").split("\n")[0].trim();
+      // Blocks concatenate without separators under .textContent, so the
+      // first line has to be read through the block model.
+      const text = window.__mpsNoteText ? window.__mpsNoteText(html) : String(html || "");
+      const first = String(text).split("\n")[0].trim();
       if (first) title = first;
     }
     return { title: (title || "Untitled").slice(0, 100), icon: icon };
@@ -8725,38 +9220,128 @@
     return map;
   }
 
-  /* The parent every new page is created under: the first top-level page the
-     integration was granted. Notion requires a parent, and asking the user to
-     paste an id would be a worse first run than picking the obvious one. */
-  async function notionFindParent() {
-    if (notionParentId) return notionParentId;
+  /* First run only: propose a destination. Sorted explicitly and preferring a
+     page whose own parent is the workspace -- i.e. one that appears in
+     Notion's sidebar. The unsorted search this replaces came back
+     last-edited-first, which meant the destination was whichever page the
+     sync engine had most recently written to. Since pushing a page bumps its
+     last-edited time, the engine was choosing its own next parent, and new
+     pages drifted into whatever it happened to touch last. */
+  async function notionPickParent() {
     const r = await notionCall({ action: "search", payload: {
       filter: { property: "object", value: "page" },
-      page_size: 20
+      sort: { direction: "descending", timestamp: "last_edited_time" },
+      page_size: 100
     } });
-    if (!r || !r.ok || !r.body || !r.body.results) return null;
-    const top = r.body.results.filter(function (p) {
-      return p.parent && (p.parent.type === "workspace" || p.parent.type === "page_id");
-    });
-    const pick = top[0] || r.body.results[0];
-    notionParentId = pick ? pick.id : null;
+    const all = (r && r.ok && r.body && r.body.results) || [];
+    const sidebar = all.filter(function (p) { return p.parent && p.parent.type === "workspace"; });
+    const nested  = all.filter(function (p) { return p.parent && p.parent.type === "page_id"; });
+    return sidebar[0] || nested[0] || all[0] || null;
+  }
+
+  // Title + icon for the destination line in the UI. Comes off the same
+  // page_get that validates the stored id, so showing it costs no request.
+  function notionParentLabel(pg) {
+    const tprop = pg && pg.properties && pg.properties.title && pg.properties.title.title;
+    const name = (tprop || []).map(function (t) { return t.plain_text || ""; }).join("").trim();
+    return {
+      id: pg && pg.id,
+      title: name || "Untitled",
+      icon: (pg && pg.icon && pg.icon.type === "emoji") ? pg.icon.emoji : ""
+    };
+  }
+
+  /* The parent every new page is created under. Cached for the tab, then
+     read from storage, and only searched for when neither has an answer. */
+  async function notionFindParent() {
+    if (notionParentId) return notionParentId;
+
+    const T = window.__mpsTiers;
+    const saved = (T && T.localGet(NOTION_PARENT_KEY)) || "";
+    if (saved) {
+      const r = await notionCall({ action: "page_get", page_id: saved });
+      const pg = r && r.ok && r.body;
+      // Trashed, or un-shared from the integration since it was chosen: fall
+      // through and pick again rather than failing every create from here on.
+      if (pg && !pg.archived && !pg.in_trash) {
+        notionParentId = saved;
+        notionParentMeta = notionParentLabel(pg);
+        return notionParentId;
+      }
+    }
+
+    const pick = await notionPickParent();
+    if (!pick) return null;
+    notionParentId = pick.id;
+    notionParentMeta = notionParentLabel(pick);
+    try { window.storageSet(NOTION_PARENT_KEY, pick.id); } catch (e) {}
+    notionAnnounceParent();
     return notionParentId;
   }
 
-  async function notionCreatePageFor(localKey, html) {
-    const parent = await notionFindParent();
-    if (!parent) return null;
+  // Set from the picker. Clearing (id falsy) forces the next create to
+  // re-propose one.
+  function notionSetParent(id, meta) {
+    notionParentId = id || null;
+    notionParentMeta = id ? (meta || null) : null;
+    try { window.storageSet(NOTION_PARENT_KEY, id || ""); } catch (e) {}
+    notionAnnounceParent();
+  }
+
+  // Anything showing the destination repaints itself off this.
+  function notionAnnounceParent() {
+    try {
+      document.dispatchEvent(new CustomEvent("mps-notion-parent", {
+        detail: notionParentMeta || null
+      }));
+    } catch (e) {}
+  }
+
+  /* Resolve the destination for display without creating anything. Returns
+     null when Notion is not connected or nothing is shareable yet. */
+  async function notionDestination() {
+    const id = await notionFindParent();
+    if (!id) return null;
+    if (!notionParentMeta || notionParentMeta.id !== id) {
+      const r = await notionCall({ action: "page_get", page_id: id });
+      if (r && r.ok && r.body) notionParentMeta = notionParentLabel(r.body);
+    }
+    return notionParentMeta;
+  }
+
+  async function notionCreatePageFor(localKey, html, parentOverride) {
     const meta = notionMetaFor(localKey, html);
-    const payload = {
-      parent: { page_id: parent },
-      properties: { title: [{ type: "text", text: { content: meta.title } }] },
-      children: notionBlocksFromHtml(html, meta.title).slice(0, NOTION_BLOCKS_MAX)
-    };
-    const icon = notionIconProp(meta.icon);
-    if (icon) payload.icon = icon;
-    const r = await notionCall({ action: "page_create", payload: payload });
-    if (!r || !r.ok || !r.body || !r.body.id) return null;
-    return r.body.id;
+
+    async function attempt(parent) {
+      if (!parent) return null;
+      const payload = {
+        parent: { page_id: parent },
+        properties: { title: [{ type: "text", text: { content: meta.title } }] },
+        children: notionBlocksFromHtml(html, meta.title).slice(0, NOTION_BLOCKS_MAX)
+      };
+      const icon = notionIconProp(meta.icon);
+      if (icon) payload.icon = icon;
+      const r = await notionCall({ action: "page_create", payload: payload });
+      if (!r || !r.ok || !r.body || !r.body.id) return null;
+      return r.body.id;
+    }
+
+    if (parentOverride) return attempt(parentOverride);
+
+    const parent = await notionFindParent();
+    const id = await attempt(parent);
+    if (id) return id;
+
+    /* The remembered destination was deleted or un-shared between the check
+       and the create. Forget it, re-propose once, and try again -- without
+       this the sync loop would `continue` past every new page forever, with
+       nothing on screen saying why. Bounded to one retry so a genuinely
+       broken connection cannot spin the rate limit. */
+    if (parent) {
+      notionSetParent("");
+      return attempt(await notionFindParent());
+    }
+    return null;
   }
 
   /* Replace a Notion page's body with what the local editor holds. Only ever
@@ -8798,7 +9383,12 @@
   async function notionPullPage(row, localHtml, title) {
     const listed = await notionCall({ action: "blocks_list", block_id: row.notion_page_id });
     if (!listed || !listed.ok) return null;
-    let html = notionHtmlFromBlocks((listed.body && listed.body.results) || []);
+    const top = (listed.body && listed.body.results) || [];
+    // Toggles, list items and callouts hold their contents as children, which
+    // blocks_list does not return. Without this pass every one of them would
+    // arrive empty. Budgeted so one deep page cannot eat a whole poll.
+    await notionFetchChildren(top, { left: 12 }, 1);
+    let html = notionHtmlFromBlocks(top, 0);
 
     /* Put the title line back, since push strips it. Only when this page
        actually keeps its name on the first line -- checked against what is
@@ -8806,15 +9396,26 @@
        has one injected that it never had. Without this the two halves are
        asymmetric and every pull quietly eats the opening line. */
     if (title) {
+      const line = function (h) {
+        const t = window.__mpsNoteText ? window.__mpsNoteText(h) : String(h || "");
+        return String(t).split("\n")[0].replace(/\s+/g, " ").trim();
+      };
       const want = String(title).replace(/\s+/g, " ").trim();
-      const d = document.createElement("div");
-      d.innerHTML = String(localHtml || "");
-      const firstLocal = (d.textContent || "").split("\n")[0].replace(/\s+/g, " ").trim();
-      const d2 = document.createElement("div");
-      d2.innerHTML = html;
-      const firstRemote = (d2.textContent || "").split("\n")[0].replace(/\s+/g, " ").trim();
-      if (firstLocal === want && firstRemote !== want) {
-        html = notionEscapeHtml(title) + "<br><br>" + html;
+      if (line(localHtml) === want && line(html) !== want) {
+        /* Put it back as the same kind of block it was locally. A Page whose
+           title is a Heading 1 would otherwise come back as a paragraph on
+           every pull, and the difference would be pushed straight back --
+           two halves of the sync quietly rewriting each other forever. */
+        let kind = "p";
+        try {
+          const d = document.createElement("div");
+          d.innerHTML = window.__mpsNoteNormalize
+            ? window.__mpsNoteNormalize(localHtml) : String(localHtml || "");
+          const f = d.firstElementChild;
+          if (f && f.getAttribute("data-b")) kind = f.getAttribute("data-b");
+        } catch (e) {}
+        if (kind === "page") kind = "p";   // a link is not a title
+        html = '<div data-b="' + kind + '">' + notionEscapeHtml(title) + "</div>" + html;
       }
     }
     return html;
@@ -8958,6 +9559,7 @@
   const NL_ORDER_KEY  = "notion-lib-order";
 
   const NL_ICON = {
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
     page:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     star:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z"/></svg>',
@@ -8980,8 +9582,26 @@
 
   let nlState = {
     tab: "recents", rows: [], sel: {}, users: {},
-    fav: [], hidden: [], order: [], loading: false
+    fav: [], hidden: [], order: [], loading: false,
+    /* Destination mode. The same list of pages, asking a different question:
+       not "which page do you want on the board" but "where should new pages
+       be created". Same rows, so it costs no extra code to fetch or render --
+       what changes is the title, one column, and what a click does. */
+    pick: null,          // { current, onPick } while choosing a destination
   };
+
+  // Parent title for the Location column. Every row came from one search, so
+  // the map is built from the rows themselves rather than asking Notion again.
+  function nlParentLabel(p) {
+    const par = p && p.parent;
+    if (!par) return "";
+    if (par.type === "workspace") return "Sidebar";
+    if (par.type !== "page_id") return par.type === "database_id" ? "In a database" : "";
+    for (const row of nlState.rows) {
+      if (row.id === par.page_id) return "in " + nlPageTitle(row);
+    }
+    return "Nested";
+  }
 
   function nlList(key) {
     try {
@@ -9055,6 +9675,19 @@
     } else {
       rows = rows.filter(function (p) { return nlState.hidden.indexOf(p.id) === -1; });
     }
+    /* Choosing a destination sorts sidebar pages to the top: they are the
+       ones that stay findable, and the ones a person means when they picture
+       "where my pages live". Recency order is kept within each group, and the
+       custom drag order below deliberately does not apply here -- an order
+       set for browsing is not an answer to this question. */
+    if (nlState.pick) {
+      rows = nlState.rows.slice().sort(function (a, b) {
+        const at = a.parent && a.parent.type === "workspace" ? 0 : 1;
+        const bt = b.parent && b.parent.type === "workspace" ? 0 : 1;
+        return at - bt;
+      });
+      return rows;
+    }
     // A custom order, when one exists, wins over Notion's recency sort. Rows
     // never dragged keep their natural position behind those that were.
     const ord = nlState.order;
@@ -9070,6 +9703,60 @@
     return rows;
   }
 
+  /* A destination row. Same five-column grid as the library row so the two
+     modes line up under one header -- the checkbox slot carries the tick for
+     the current destination, and the grip slot stays empty (there is nothing
+     to reorder or multi-select when the answer is a single page). */
+  function nlPickRow(p) {
+    const row = document.createElement("div");
+    row.className = "nl-row nl-row-pick";
+    row.dataset.id = p.id;
+
+    const tick = document.createElement("span");
+    tick.className = "nl-pick-tick";
+    if (nlState.pick && nlState.pick.current === p.id) tick.innerHTML = NL_ICON.check;
+    row.appendChild(tick);
+    row.appendChild(document.createElement("span"));
+
+    const name = document.createElement("div");
+    name.className = "nl-name";
+    const em = document.createElement("span");
+    em.className = "nl-emoji";
+    if (p.icon && p.icon.type === "emoji") em.textContent = p.icon.emoji;
+    else em.innerHTML = NL_ICON.page;
+    name.appendChild(em);
+    const lab = document.createElement("span");
+    lab.className = "nl-label";
+    lab.textContent = nlPageTitle(p);
+    name.appendChild(lab);
+    row.appendChild(name);
+
+    const where = document.createElement("div");
+    where.className = "nl-meta";
+    const wl = document.createElement("span");
+    wl.textContent = nlParentLabel(p);
+    if (p.parent && p.parent.type === "workspace") wl.className = "nl-loc-top";
+    where.appendChild(wl);
+    row.appendChild(where);
+
+    const when = document.createElement("div");
+    when.className = "nl-meta";
+    when.textContent = nlRelTime(p.last_edited_time);
+    row.appendChild(when);
+
+    row.addEventListener("click", function () {
+      const cb = nlState.pick && nlState.pick.onPick;
+      nlState.pick = null;
+      nlClose();
+      if (cb) cb({
+        id: p.id,
+        title: nlPageTitle(p),
+        icon: (p.icon && p.icon.type === "emoji") ? p.icon.emoji : ""
+      });
+    });
+    return row;
+  }
+
   function nlSelectedIds() {
     return Object.keys(nlState.sel).filter(function (k) { return nlState.sel[k]; });
   }
@@ -9078,10 +9765,31 @@
     const body = nlEl("nlBody");
     const bar = nlEl("nlBar");
     if (!body || !bar) return;
+    const picking = !!nlState.pick;
+
+    /* The modal's chrome says which question is being asked. Without this the
+       two modes are the same screen and a destination click reads as "put
+       this page on my board", which is the opposite of what it does. */
+    const titleEl = document.querySelector("#notionLibModal .nl-title");
+    if (titleEl) titleEl.textContent = picking ? "Where should new pages go?" : "Library";
+    const headSpans = document.querySelectorAll("#notionLibModal .nl-thead span");
+    if (headSpans.length >= 4) headSpans[3].textContent = picking ? "Location" : "Created by";
+    let hint = document.getElementById("nlPickHint");
+    if (picking && !hint) {
+      hint = document.createElement("div");
+      hint.id = "nlPickHint";
+      hint.className = "nl-pick-hint";
+      hint.textContent = "Top-level pages appear in your Notion sidebar. Nested ones work too, "
+        + "but are easier to lose track of.";
+      const mod = nlEl("notionLibModal");
+      if (mod && bar) mod.insertBefore(hint, bar);
+    } else if (!picking && hint) {
+      hint.parentNode.removeChild(hint);
+    }
 
     // ---- toolbar ----
     bar.innerHTML = "";
-    const selected = nlSelectedIds();
+    const selected = picking ? [] : nlSelectedIds();
     if (selected.length) {
       const c = document.createElement("span");
       c.className = "nl-selcount";
@@ -9141,6 +9849,7 @@
     }
 
     rows.forEach(function (p) {
+      if (picking) { body.appendChild(nlPickRow(p)); return; }
       const row = document.createElement("div");
       row.className = "nl-row" + (nlState.sel[p.id] ? " is-selected" : "");
       row.draggable = false;
@@ -9256,7 +9965,9 @@
   async function nlAdopt(p) {
     nlClose();
     const listed = await notionCall({ action: "blocks_list", block_id: p.id });
-    const html = notionHtmlFromBlocks((listed && listed.ok && listed.body && listed.body.results) || []);
+    const top = (listed && listed.ok && listed.body && listed.body.results) || [];
+    await notionFetchChildren(top, { left: 12 }, 1);
+    const html = notionHtmlFromBlocks(top, 0);
     const title = nlPageTitle(p);
     const emoji = (p.icon && p.icon.type === "emoji") ? p.icon.emoji : "";
 
@@ -9264,7 +9975,7 @@
     if (!id) return;
     const key = "note-content:" + id;
     const T = window.__mpsTiers;
-    const full = title ? (notionEscapeHtml(title) + "<br><br>" + html) : html;
+    const full = title ? ('<div data-b="p">' + notionEscapeHtml(title) + "</div>" + html) : html;
     if (T) { T.localSet(key, full); T.idbSet(key, full); }
     try { window.storageSet(key, full); } catch (e) {}
     const setter = window.__mpsNoteSetters && window.__mpsNoteSetters[key];
@@ -9477,6 +10188,7 @@
   }
 
   function nlClose() {
+    nlState.pick = null;
     nlCloseMenu();
     const b = nlEl("notionLibBackdrop"), m = nlEl("notionLibModal");
     if (b) b.hidden = true;
@@ -9487,6 +10199,18 @@
     const b = nlEl("notionLibBackdrop"), m = nlEl("notionLibModal");
     if (!b || !m) return;
     nlState.sel = {};
+    nlState.pick = null;
+    b.hidden = false; m.hidden = false;
+    nlLoad();
+  }
+
+  /* Open the same modal asking where new pages should go. `onPick` receives
+     { id, title, icon }, or is never called if the user backs out. */
+  function nlOpenPicker(currentId, onPick) {
+    const b = nlEl("notionLibBackdrop"), m = nlEl("notionLibModal");
+    if (!b || !m) return;
+    nlState.sel = {};
+    nlState.pick = { current: currentId || "", onPick: onPick || null };
     b.hidden = false; m.hidden = false;
     nlLoad();
   }
@@ -9516,8 +10240,76 @@
     isConnected: async function () {
       const r = await notionCall({ action: "status" });
       return !!(r && r.ok && r.body && r.body.connected);
-    }
+    },
+    // Where new pages go, for anything that wants to show or change it.
+    destination: notionDestination,
+    chooseDestination: function (onDone) {
+      nlOpenPicker(notionParentId || "", function (p) {
+        notionSetParent(p.id, { id: p.id, title: p.title, icon: p.icon });
+        if (onDone) onDone(p);
+      });
+    },
+    // Pick a page without changing the default -- used by "Page in ...".
+    choosePage: function (onPick) { nlOpenPicker("", onPick); },
+    createPageIn: function (parentId, localKey, html) {
+      return notionCreatePageFor(localKey, html, parentId);
+    },
+    listPages: nlListPages,
+    pageIdForKey: nlPageIdForKey,
+    createChildPage: nlCreateChildPage
   };
+
+  /* ---------- what "Page in ..." needs ----------
+     Kept beside the library because it is the same search, cached: the block
+     menu opens often and re-listing a hundred pages on every open would spend
+     the whole rate limit on a list that barely changes. */
+  let nlPageCache = null, nlPageCacheAt = 0;
+  const NL_PAGE_CACHE_MS = 60000;
+
+  async function nlListPages() {
+    const now = Date.now();
+    if (nlPageCache && now - nlPageCacheAt < NL_PAGE_CACHE_MS) return nlPageCache;
+    const r = await notionCall({ action: "search", payload: {
+      filter: { property: "object", value: "page" },
+      sort: { direction: "descending", timestamp: "last_edited_time" },
+      page_size: 100
+    } });
+    const rows = (r && r.ok && r.body && r.body.results) || [];
+    nlPageCache = rows.map(function (p) {
+      return {
+        id: p.id,
+        title: nlPageTitle(p),
+        icon: (p.icon && p.icon.type === "emoji") ? p.icon.emoji : "",
+        top: !!(p.parent && p.parent.type === "workspace")
+      };
+    });
+    nlPageCacheAt = now;
+    return nlPageCache;
+  }
+
+  // The Notion page a given Page widget is synced to, if it has one yet.
+  async function nlPageIdForKey(localKey) {
+    if (!localKey) return null;
+    try {
+      const r = await sb.from("notion_pages").select("notion_page_id")
+        .eq("local_key", localKey).maybeSingle();
+      return (r && r.data && r.data.notion_page_id) || null;
+    } catch (e) { return null; }
+  }
+
+  /* Creates an empty page under `parentId` and returns enough to link to it.
+     Used by "Turn into -> Page": the block's text becomes the new page's
+     title, and the block becomes a link. */
+  async function nlCreateChildPage(parentId, title) {
+    if (!parentId) return null;
+    const r = await notionCall({ action: "page_create", payload: {
+      parent: { page_id: parentId },
+      properties: { title: [{ type: "text", text: { content: String(title || "Untitled").slice(0, 100) } }] }
+    } });
+    if (!r || !r.ok || !r.body || !r.body.id) return null;
+    nlPageCache = null;   // the new page belongs in the next listing
+    return { id: r.body.id, url: r.body.url || null };
+  }
 
   /* ---------- account menu ----------
      Lives here rather than with the other UI because everything it shows and
@@ -11191,54 +11983,93 @@
       widgetEl: widgetEl
     };
 
-    // ---- note editor (Atomic Habits / Affirmations / any Page widget) ----
-    // One continuous contenteditable region — no separate title field. The
-    // first line reads as the title (bold, via the .note-editor:first-line
-    // rule in the stylesheet) simply because it's the first thing typed,
-    // not because it's a distinct input; the rest flows as the body in the
-    // same field. Enter always inserts a literal "\n" instead of letting
-    // the browser split it into separate <div>s, so the whole note stays
-    // one flat text node — which is what makes load/save as simple as
-    // reading/writing .textContent, and what lets a Cmd/Ctrl+click-to-open
-    // hyperlink (opts.href, for the two built-in notes) work at the
-    // container level without needing an inline <a> around just the first
-    // line. Neither the title nor the rest of the note is independently
-    // renamable/editable-as-a-separate-field — it's just one note.
-    // A note is stored as HTML, not plain text, so the inline formatting the
-    // contenteditable already lets you apply (Cmd/Ctrl+B and friends) actually
-    // survives a save. Only inline emphasis and <br> are kept, with every
-    // attribute dropped, so a stored note is always safe to re-inject via
-    // innerHTML; anything else is unwrapped down to its text, which keeps the
-    // note the single flat run of text-plus-newlines the rest of this widget
-    // assumes (see wireNoteEditor's comment above).
-    const NOTE_INLINE_TAGS = { b: 1, strong: 1, i: 1, em: 1, u: 1, br: 1 };
-    // Distinguishes a stored HTML note from one saved by an earlier build,
-    // when notes were plain text — those must go in as textContent, or a "<"
-    // typed into a note back then would be swallowed as markup on load.
-    const NOTE_HTML_RE = /<\/?(?:b|strong|i|em|u|br)\b[^>]*>/i;
+    /* ---- a Page's editor ----
+       One continuous contenteditable region -- no separate title field. The
+       first block reads as the title (bold, via the .note-editor rules in the
+       stylesheet) simply because it is the first thing typed, not because it
+       is a distinct input; the rest flows as the body in the same field.
+       Neither the title nor the rest is independently renamable -- it is one
+       Page. What it holds is described by the block model below. */
+    /* ---------- a Page's content model ----------
+       Stored as one HTML string, as before, so every storage tier, dirty
+       hash and sync path that already carried a Page carries this unchanged.
+       What changed is the shape inside that string: a list of block elements
+       rather than one flat run of text split on "\n".
 
+         <div data-b="h2">A heading</div>
+         <div data-b="todo" data-c="1">something done</div>
+         <div data-b="ul" data-i="1">a nested bullet</div>
+
+       Every block carries its type in data-b and its depth in data-i. The
+       depths are a flat integer per block rather than real nesting: it keeps
+       Enter/Backspace/Tab arithmetic on a single array instead of a tree, and
+       the tree Notion actually wants is rebuilt from those depths at push
+       time (see notionBlocksFromHtml). Anything a Page held before this --
+       plain text, or text with <b>/<i>/<u>/<br> -- is migrated on load by
+       nbNormalize, so nothing has to be converted ahead of time. */
+
+    const NB_INLINE_TAGS = { b: 1, strong: 1, i: 1, em: 1, u: 1, s: 1, strike: 1,
+                             br: 1, code: 1, a: 1, span: 1 };
+    // Attributes each surviving tag may keep. Everything else is dropped, so
+    // a stored Page is still always safe to re-inject through innerHTML.
+    const NB_KEEP_ATTR = {
+      div:  ["data-b", "data-i", "data-c", "data-o", "data-e", "data-lang", "data-pid", "data-url"],
+      a:    ["href"],
+      span: ["data-color", "data-bg", "data-tex", "data-cm", "data-sug", "data-react"]
+    };
+    // Distinguishes a Page saved by an earlier build -- plain text back then,
+    // later text-plus-inline-markup -- from one already in block form.
+    const NOTE_HTML_RE = /<\/?(?:b|strong|i|em|u|br|s|code|a|span)\b[^>]*>/i;
+    const NB_BLOCK_RE = /data-b=/;
+    const NOTE_BULLET = "• ";
+    const NB_MAX_INDENT = 6;
+
+    // Which types continue themselves when you press Enter, and which fall
+    // back to a paragraph the way Notion's do.
+    const NB_CONTINUES = { ul: 1, ol: 1, todo: 1, quote: 1, code: 1 };
+    // Types that carry a marker in the left rail, so a click there means the
+    // marker and not the text.
+    const NB_MARKER = { todo: 1, tg: 1, th1: 1, th2: 1, th3: 1, th4: 1, callout: 1 };
+    const NB_TOGGLE = { tg: 1, th1: 1, th2: 1, th3: 1, th4: 1 };
+
+    function nbEscape(t) {
+      return String(t == null ? "" : t)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    /* Strips a Page down to the tags and attributes above. Kept as the single
+       gate every path goes through -- load, paste, and the Notion pull -- so
+       there is one answer to "what can be in a Page", not three. */
     function sanitizeNoteHtml(html) {
       const container = document.createElement("div");
-      container.innerHTML = html;
+      container.innerHTML = String(html == null ? "" : html);
       (function clean(node) {
         let child = node.firstChild;
         while (child) {
           const next = child.nextSibling;
           if (child.nodeType === 1) {
             const tag = child.tagName.toLowerCase();
-            while (child.attributes && child.attributes.length) {
-              child.removeAttribute(child.attributes[0].name);
-            }
-            // script/style go away wholesale — unwrapping them the way any
+            // script/style go away wholesale -- unwrapping them the way any
             // other unknown tag is unwrapped would spill their source into
-            // the note as visible text.
+            // the Page as visible text.
             if (tag === "script" || tag === "style") {
               node.removeChild(child);
               child = next;
               continue;
             }
+            const keep = NB_KEEP_ATTR[tag] || [];
+            for (let i = child.attributes.length - 1; i >= 0; i--) {
+              const a = child.attributes[i].name;
+              if (keep.indexOf(a) === -1) child.removeAttribute(a);
+            }
+            // A link that can run script is worse than a link that is lost.
+            if (tag === "a") {
+              const href = child.getAttribute("href") || "";
+              if (!/^(https?:|mailto:|#)/i.test(href)) child.removeAttribute("href");
+            }
             clean(child);
-            if (!NOTE_INLINE_TAGS[tag]) {
+            const isBlock = tag === "div" && child.hasAttribute("data-b");
+            if (!isBlock && !NB_INLINE_TAGS[tag]) {
               while (child.firstChild) node.insertBefore(child.firstChild, child);
               node.removeChild(child);
             }
@@ -11251,99 +12082,613 @@
       return container.innerHTML;
     }
 
-    /* ---------- bullets in a note / Page ----------
-       The same literal "• " bullets the Docs field in Branch AI uses, and
-       the same algorithm: find the line the caret is on, splice the text, put
-       the caret back. What differs from the Docs field is HOW the splice
-       lands: a Page is a contenteditable carrying real <b>/<i> markup (see
-       the HTML storage above), not a <textarea>, so writing the spliced
-       string back through .textContent — as the textarea version does —
-       would strip every bit of formatting in the note the first time a
-       bullet was typed. Each edit is applied as a range operation instead,
-       leaving the elements around it untouched. No execCommand anywhere,
-       which is what makes it work reliably from inside an input event. */
-    const NOTE_BULLET = "• ";
+    function nbMakeBlock(type, indent) {
+      const d = document.createElement("div");
+      d.setAttribute("data-b", type || "p");
+      if (indent) d.setAttribute("data-i", String(indent));
+      return d;
+    }
 
-    // Caret position as a flat offset into the note's text. Measured with a
-    // range rather than read off startOffset directly, so it is still right
-    // when the caret is parked on the editor element (an empty note) rather
-    // than inside the text node.
-    function noteCaretOffset(editorEl) {
+    /* One flat line of inline nodes -> one block. The "• " the old model used
+       as literal text becomes a real bulleted block, which is what stops a
+       migrated Page from showing two bullets once the CSS draws one. */
+    function nbLineToBlock(nodes) {
+      const holder = nbMakeBlock("p", 0);
+      nodes.forEach(function (n) { holder.appendChild(n); });
+      const text = holder.textContent || "";
+      let m;
+      if (text.indexOf(NOTE_BULLET) === 0) {
+        holder.setAttribute("data-b", "ul");
+        nbStripLeading(holder, NOTE_BULLET.length);
+      } else if ((m = /^(\d+)\.\s/.exec(text))) {
+        holder.setAttribute("data-b", "ol");
+        nbStripLeading(holder, m[0].length);
+      } else if (/^>\s/.test(text)) {
+        holder.setAttribute("data-b", "quote");
+        nbStripLeading(holder, 2);
+      }
+      return holder;
+    }
+
+    // Removes the first `n` characters of a block's text without disturbing
+    // the elements around them -- rewriting textContent would flatten every
+    // <b>/<i> in the line.
+    function nbStripLeading(block, n) {
+      let left = n;
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      let node;
+      while (left > 0 && (node = walker.nextNode())) {
+        const take = Math.min(left, node.data.length);
+        node.data = node.data.slice(take);
+        left -= take;
+      }
+    }
+
+    /* Any stored value -> block HTML. Handles all three vintages a Page can
+       be found in: block form (returned as-is), inline-markup-plus-<br>, and
+       the plain text the very first build stored. */
+    function nbNormalize(stored) {
+      const src = String(stored == null ? "" : stored);
+      if (NB_BLOCK_RE.test(src)) {
+        const d = document.createElement("div");
+        d.innerHTML = sanitizeNoteHtml(src);
+        nbEnsureBlocks(d);
+        return d.innerHTML;
+      }
+
+      const flat = document.createElement("div");
+      if (NOTE_HTML_RE.test(src)) flat.innerHTML = sanitizeNoteHtml(src);
+      else flat.textContent = src;
+
+      // Split into lines on <br> and on the literal newlines Enter used to
+      // insert, keeping the inline markup inside each line intact.
+      const lines = [[]];
+      (function walk(node) {
+        for (let c = node.firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 1 && c.tagName.toLowerCase() === "br") { lines.push([]); continue; }
+          if (c.nodeType === 3 && c.data.indexOf("\n") !== -1) {
+            const parts = c.data.split("\n");
+            parts.forEach(function (p, i) {
+              if (i) lines.push([]);
+              if (p) lines[lines.length - 1].push(document.createTextNode(p));
+            });
+            continue;
+          }
+          lines[lines.length - 1].push(c.cloneNode(true));
+        }
+      })(flat);
+
+      const out = document.createElement("div");
+      lines.forEach(function (nodes) { out.appendChild(nbLineToBlock(nodes)); });
+      nbEnsureBlocks(out);
+      return out.innerHTML;
+    }
+
+    /* Guarantees the invariant everything below relies on: every child of the
+       editor is a block. Browsers drop bare text nodes and <br>s into a
+       contenteditable on their own (a paste, a drag, an undo), and a stray
+       one would otherwise be content with no type and no way to select it. */
+    function nbEnsureBlocks(root) {
+      let child = root.firstChild, pending = null;
+      function flush() {
+        if (!pending) return;
+        root.insertBefore(pending, child);
+        pending = null;
+      }
+      while (child) {
+        const next = child.nextSibling;
+        const isBlock = child.nodeType === 1 && child.getAttribute &&
+                        child.getAttribute("data-b");
+        if (isBlock) {
+          flush();
+        } else if (child.nodeType === 1 && child.tagName.toLowerCase() === "br") {
+          flush();
+          root.removeChild(child);
+        } else {
+          if (!pending) pending = nbMakeBlock("p", 0);
+          pending.appendChild(child);
+        }
+        child = next;
+      }
+      flush();
+      if (!root.firstChild) root.appendChild(nbMakeBlock("p", 0));
+    }
+
+    function nbBlocks(editorEl) {
+      return Array.prototype.filter.call(editorEl.children, function (c) {
+        return c.nodeType === 1 && c.hasAttribute("data-b");
+      });
+    }
+    function nbType(b) { return (b && b.getAttribute("data-b")) || "p"; }
+    function nbIndentOf(b) { return parseInt((b && b.getAttribute("data-i")) || "0", 10) || 0; }
+    function nbSetIndent(b, n) {
+      if (n > 0) b.setAttribute("data-i", String(Math.min(NB_MAX_INDENT, n)));
+      else b.removeAttribute("data-i");
+    }
+
+    /* Plain text of a Page, with one "\n" per block. Blocks concatenate
+       without separators under .textContent, so everything that used to read
+       "the first line" off a Page -- its widget title, its Notion page title
+       -- has to come through here instead. */
+    function nbTextOf(htmlOrEl) {
+      let root;
+      if (htmlOrEl && htmlOrEl.nodeType === 1) {
+        root = htmlOrEl;
+      } else {
+        root = document.createElement("div");
+        root.innerHTML = String(htmlOrEl == null ? "" : htmlOrEl);
+      }
+      const blocks = Array.prototype.filter.call(root.children, function (c) {
+        return c.nodeType === 1 && c.hasAttribute && c.hasAttribute("data-b");
+      });
+      if (!blocks.length) return String(root.textContent || "");
+      return blocks.map(function (b) {
+        if (nbType(b) === "eq" && b.hasAttribute("data-tex")) return b.getAttribute("data-tex");
+        return b.textContent || "";
+      }).join("\n");
+    }
+    window.__mpsNoteText = nbTextOf;
+    window.__mpsNoteNormalize = nbNormalize;
+
+    /* What gets stored. A clone, stripped of everything that is display state
+       rather than content: computed list numbers, collapse classes, the
+       rendered form of an equation, the page-block chrome. Without this the
+       stored copy would differ every time the same Page was merely looked at,
+       and the sync engine's "did this change" hash would never settle. */
+    function nbSerialize(editorEl) {
+      const clone = editorEl.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll("[data-b]"), function (b) {
+        b.removeAttribute("data-n");
+        b.removeAttribute("class");
+        b.removeAttribute("contenteditable");
+        if (b.getAttribute("data-b") === "eq" && b.hasAttribute("data-tex")) {
+          b.textContent = b.getAttribute("data-tex");
+          b.removeAttribute("data-tex");
+        }
+        if (b.getAttribute("data-b") === "page") {
+          b.textContent = (b.textContent || "").trim();
+        }
+      });
+      /* KaTeX renders into a thicket of styled spans. Storing that would mean
+         storing presentation, and sanitising it on the way back in would
+         leave the equation as a pile of stray glyphs -- so every equation,
+         inline or block, goes back to its source before it is written. */
+      Array.prototype.forEach.call(clone.querySelectorAll("span[data-tex]"), function (sp) {
+        sp.textContent = sp.getAttribute("data-tex");
+      });
+      // Caret placeholders are not content (see nbCaretPlaceholders).
+      let br;
+      while ((br = clone.querySelector("br"))) br.parentNode.removeChild(br);
+      return sanitizeNoteHtml(clone.innerHTML);
+    }
+
+    /* Display state, recomputed from the blocks after every change: list
+       numbering, what a collapsed toggle hides, and the rendered/​source form
+       of each equation. Everything here is derived, so it never has to be
+       stored, merged or synced. */
+    function nbRefresh(editorEl) {
+      const blocks = nbBlocks(editorEl);
+      const counters = [];
+
+      blocks.forEach(function (b, idx) {
+        const t = nbType(b), ind = nbIndentOf(b);
+        // ---- numbered lists ----
+        if (t === "ol") {
+          counters[ind] = (counters[ind] || 0) + 1;
+          counters.length = ind + 1;
+          b.setAttribute("data-n", counters[ind] + ".");
+        } else {
+          b.removeAttribute("data-n");
+          // A run is broken by anything that is not a deeper block, which is
+          // what makes two lists separated by a paragraph start again at 1
+          // while a nested list leaves its parent's count alone.
+          for (let i = ind; i < counters.length; i++) counters[i] = 0;
+        }
+        b.classList.remove("nb-collapsed");
+        void idx;
+      });
+
+      // ---- collapsed toggles ----
+      blocks.forEach(function (b, i) {
+        if (!NB_TOGGLE[nbType(b)]) return;
+        if (b.getAttribute("data-o") === "1") return;
+        const ind = nbIndentOf(b);
+        for (let j = i + 1; j < blocks.length; j++) {
+          if (nbIndentOf(blocks[j]) <= ind) break;
+          blocks[j].classList.add("nb-collapsed");
+        }
+      });
+
+      nbCaretPlaceholders(editorEl);
+      nbRenderEquations(editorEl);
+    }
+
+    /* An empty block element has no position for a caret to occupy, so
+       typing into one lands the text outside it -- at the editor's root,
+       where nbEnsureBlocks then wraps it into a block of its own and the
+       first character of every new line ends up somewhere else entirely.
+       A <br> is the browser's own convention for "empty but editable", and
+       giving each empty block one is what makes it typeable.
+
+       Every <br> inside a block is therefore a placeholder and never
+       content: a soft break is stored as a real newline (Enter inserts one
+       into code blocks, Shift+Enter anywhere) and rendered by pre-wrap, and
+       the migration off the old flat format splits on <br> rather than
+       keeping any. So they can all be dropped again the moment there is real
+       text, and stripped wholesale on the way to storage. */
+    function nbCaretPlaceholders(editorEl) {
+      nbBlocks(editorEl).forEach(function (b) {
+        if (nbType(b) === "page") return;
+        const brs = b.getElementsByTagName("br");
+        if ((b.textContent || "").length) {
+          // Removing the placeholder from under the caret would move it, so
+          // this only runs on blocks the caret is not currently inside.
+          if (brs.length && !nbCaretInside(b)) {
+            while (brs.length) brs[0].parentNode.removeChild(brs[0]);
+          }
+        } else if (!brs.length) {
+          b.appendChild(document.createElement("br"));
+        }
+      });
+    }
+
+    function nbCaretInside(block) {
       const sel = window.getSelection();
-      if (!sel || !sel.rangeCount || !sel.isCollapsed) return -1;
-      const caret = sel.getRangeAt(0);
-      if (!editorEl.contains(caret.startContainer)) return -1;
+      if (!sel || !sel.rangeCount) return false;
+      const n = sel.getRangeAt(0).startContainer;
+      return block === n || block.contains(n);
+    }
+
+    /* ---------- equations ----------
+       KaTeX is fetched only the first time a Page actually contains one, and
+       the block stays readable as LaTeX source if that fetch never lands --
+       an equation you cannot render is still an equation you can edit, and a
+       Page should not depend on a CDN to open. */
+    let nbKatexState = 0;   // 0 untried, 1 loading, 2 ready, 3 failed
+    const nbKatexWaiters = [];
+    function nbLoadKatex(then) {
+      if (nbKatexState === 2) { then(true); return; }
+      if (nbKatexState === 3) { then(false); return; }
+      nbKatexWaiters.push(then);
+      if (nbKatexState === 1) return;
+      nbKatexState = 1;
+      function done(ok) {
+        nbKatexState = ok ? 2 : 3;
+        while (nbKatexWaiters.length) nbKatexWaiters.shift()(ok);
+      }
+      try {
+        const css = document.createElement("link");
+        css.rel = "stylesheet";
+        css.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+        document.head.appendChild(css);
+        const js = document.createElement("script");
+        js.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
+        js.onload = function () { done(!!window.katex); };
+        js.onerror = function () { done(false); };
+        document.head.appendChild(js);
+      } catch (e) { done(false); }
+    }
+
+    function nbRenderEquations(editorEl) {
+      const sel = window.getSelection();
+      const active = document.activeElement === editorEl && sel && sel.rangeCount
+        ? nbBlockOf(editorEl, sel.getRangeAt(0).startContainer) : null;
+
+      nbBlocks(editorEl).forEach(function (b) {
+        if (nbType(b) !== "eq") return;
+        const rendered = b.hasAttribute("data-tex");
+        if (b === active) {
+          // Caret is inside: show the source, so it can be typed.
+          if (rendered) {
+            b.textContent = b.getAttribute("data-tex");
+            b.removeAttribute("data-tex");
+            b.classList.remove("nb-rendered");
+          }
+          return;
+        }
+        if (rendered) return;
+        const tex = (b.textContent || "").trim();
+        if (!tex) return;
+        nbLoadKatex(function (ok) {
+          // Re-check: the caret may have moved back in while KaTeX loaded.
+          if (b.hasAttribute("data-tex") || !b.isConnected) return;
+          const now = (b.textContent || "").trim();
+          if (now !== tex) return;
+          if (!ok) return;   // stays as readable source
+          try {
+            const html = window.katex.renderToString(tex, {
+              throwOnError: false, displayMode: true
+            });
+            b.setAttribute("data-tex", tex);
+            b.innerHTML = html;
+            b.classList.add("nb-rendered");
+          } catch (e) { /* leave the source visible */ }
+        });
+      });
+    }
+
+    /* ---------- caret <-> block ---------- */
+    function nbBlockOf(editorEl, node) {
+      let n = node;
+      while (n && n !== editorEl) {
+        if (n.nodeType === 1 && n.hasAttribute && n.hasAttribute("data-b")) return n;
+        n = n.parentNode;
+      }
+      return null;
+    }
+    function nbCaretBlock(editorEl) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return null;
+      const r = sel.getRangeAt(0);
+      if (!editorEl.contains(r.startContainer)) return null;
+      return nbBlockOf(editorEl, r.startContainer);
+    }
+    // Offset of the caret within its own block, in characters.
+    function nbCaretOffset(editorEl, block) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return -1;
+      const r = sel.getRangeAt(0);
+      if (!block.contains(r.startContainer) && block !== r.startContainer) return -1;
       const pre = document.createRange();
-      pre.setStart(editorEl, 0);
-      pre.setEnd(caret.startContainer, caret.startOffset);
+      pre.selectNodeContents(block);
+      pre.setEnd(r.startContainer, r.startOffset);
       return pre.toString().length;
     }
-
-    // The inverse of noteCaretOffset: a flat offset back to a real position
-    // inside the note's DOM, so the splices below can be expressed as ranges.
-    function noteDomPoint(editorEl, offset) {
-      const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
-      let seen = 0, node;
+    function nbPlaceCaret(block, offset) {
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      let seen = 0, node, target = null, at = 0;
       while ((node = walker.nextNode())) {
-        if (offset <= seen + node.data.length) return { node: node, offset: offset - seen };
+        if (offset <= seen + node.data.length) { target = node; at = offset - seen; break; }
         seen += node.data.length;
       }
-      return { node: editorEl, offset: editorEl.childNodes.length };
-    }
-
-    // Replaces [start,end) of the note's text with `text` and leaves the caret
-    // at `caret` — the formatting-preserving stand-in for "rewrite the whole
-    // string, then reset the caret".
-    function spliceNoteText(editorEl, start, end, text, caret) {
-      const from = noteDomPoint(editorEl, start);
-      const to = noteDomPoint(editorEl, end);
       const r = document.createRange();
-      r.setStart(from.node, from.offset);
-      r.setEnd(to.node, to.offset);
-      r.deleteContents();
-      if (text) r.insertNode(document.createTextNode(text));
-      const at = noteDomPoint(editorEl, caret);
-      const cr = document.createRange();
-      cr.setStart(at.node, at.offset);
-      cr.collapse(true);
+      if (target) r.setStart(target, at);
+      else r.setStart(block, Math.min(block.childNodes.length, offset > 0 ? block.childNodes.length : 0));
+      r.collapse(true);
       const sel = window.getSelection();
       sel.removeAllRanges();
-      sel.addRange(cr);
+      sel.addRange(r);
+    }
+    function nbFocusBlock(block, atEnd) {
+      const r = document.createRange();
+      r.selectNodeContents(block);
+      r.collapse(!atEnd);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
     }
 
-    function noteLineBounds(text, pos) {
-      const start = text.lastIndexOf("\n", pos - 1) + 1;
-      let end = text.indexOf("\n", pos);
-      if (end === -1) end = text.length;
-      return { start: start, end: end, line: text.slice(start, end) };
+    /* ---------- changing a block's type ----------
+       Type is the only thing that changes; the block's text, its inline
+       marks, its depth and its position all survive. That is what makes the
+       menu safe to click repeatedly while deciding. */
+    function nbSetType(editorEl, block, type, opts) {
+      opts = opts || {};
+      const was = nbType(block);
+      if (was === "eq" && block.hasAttribute("data-tex")) {
+        block.textContent = block.getAttribute("data-tex");
+        block.removeAttribute("data-tex");
+        block.classList.remove("nb-rendered");
+      }
+      block.setAttribute("data-b", type);
+      // Attributes that only mean something for the type that owns them.
+      if (type !== "todo") block.removeAttribute("data-c");
+      if (!NB_TOGGLE[type]) block.removeAttribute("data-o");
+      else if (!block.hasAttribute("data-o")) block.setAttribute("data-o", "1");
+      if (type !== "callout") block.removeAttribute("data-e");
+      else if (!block.getAttribute("data-e")) block.setAttribute("data-e", opts.emoji || "💡");
+      if (type !== "code") block.removeAttribute("data-lang");
+      if (type !== "page") { block.removeAttribute("data-pid"); block.removeAttribute("data-url"); }
+      nbRefresh(editorEl);
+      return block;
     }
 
-    // "- " or "* " typed at the very start of a line becomes a bullet.
-    function applyNoteBulletShorthand(editorEl) {
-      const pos = noteCaretOffset(editorEl);
-      if (pos < 0) return false;
-      const b = noteLineBounds(editorEl.textContent, pos);
-      if (!/^[-*] /.test(b.line)) return false;
-      // Only the marker the caret just finished typing, not one that happens
-      // to already sit further up the note.
-      if (pos !== b.start + 2) return false;
-      spliceNoteText(editorEl, b.start, b.start + 2, NOTE_BULLET, b.start + NOTE_BULLET.length);
-      return true;
-    }
+    /* ---------- Enter ---------- */
+    function nbHandleEnter(editorEl, e) {
+      const block = nbCaretBlock(editorEl);
+      if (!block) return false;
+      const type = nbType(block);
+      const sel = window.getSelection();
 
-    // Enter on a bullet line continues the list; Enter on an empty bullet ends
-    // it. Returns true when it handled the key itself.
-    function handleNoteBulletEnter(editorEl) {
-      const pos = noteCaretOffset(editorEl);
-      if (pos < 0) return false;
-      const b = noteLineBounds(editorEl.textContent, pos);
-      if (b.line.indexOf(NOTE_BULLET) !== 0) return false;
-      if (b.line.trim() === NOTE_BULLET.trim()) {
-        spliceNoteText(editorEl, b.start, b.start + b.line.length, "", b.start);
+      // A code block keeps newlines inside itself; Shift+Enter does the same
+      // anywhere, which is the one way to get a soft break in any block.
+      if (type === "code" || e.shiftKey) {
+        const r = sel.getRangeAt(0);
+        r.deleteContents();
+        const nl = document.createTextNode("\n");
+        r.insertNode(nl);
+        r.setStartAfter(nl); r.collapse(true);
+        sel.removeAllRanges(); sel.addRange(r);
         return true;
       }
-      spliceNoteText(editorEl, pos, pos, "\n" + NOTE_BULLET, pos + 1 + NOTE_BULLET.length);
+
+      // A page block is one object, not a line: Enter starts a new paragraph
+      // after it rather than trying to split its title.
+      if (type === "page") {
+        const nb = nbMakeBlock("p", nbIndentOf(block));
+        block.parentNode.insertBefore(nb, block.nextSibling);
+        nbFocusBlock(nb, false);
+        return true;
+      }
+
+      const text = block.textContent || "";
+      // Enter on an empty list item ends the list, one level at a time --
+      // outdent first if it is nested, so a deep list unwinds instead of
+      // jumping straight back to the margin.
+      if (!text.trim() && (NB_CONTINUES[type] || NB_TOGGLE[type]) && type !== "code") {
+        if (nbIndentOf(block) > 0) nbSetIndent(block, nbIndentOf(block) - 1);
+        else nbSetType(editorEl, block, "p");
+        nbRefresh(editorEl);
+        return true;
+      }
+
+      // Split at the caret. Everything after it moves into the new block,
+      // with its markup intact -- extractContents keeps the <b>/<i> around
+      // the tail rather than flattening it.
+      const r = sel.getRangeAt(0);
+      r.deleteContents();
+      const tail = document.createRange();
+      tail.selectNodeContents(block);
+      tail.setStart(r.startContainer, r.startOffset);
+      let frag = null;
+      try { frag = tail.extractContents(); } catch (err) { frag = null; }
+
+      let nextType = NB_CONTINUES[type] ? type : "p";
+      let nextIndent = nbIndentOf(block);
+      // Enter at the end of a toggle opens its first child, which is the
+      // only way to put something inside one without reaching for Tab.
+      if (NB_TOGGLE[type]) {
+        nextType = "p";
+        nextIndent = Math.min(NB_MAX_INDENT, nextIndent + 1);
+        block.setAttribute("data-o", "1");
+      }
+      const nb = nbMakeBlock(nextType, nextIndent);
+      if (nextType === "todo" && block.getAttribute("data-c") === "1") {
+        // A new item starts unchecked even when it was split off a done one.
+        nb.removeAttribute("data-c");
+      }
+      if (frag) nb.appendChild(frag);
+      block.parentNode.insertBefore(nb, block.nextSibling);
+      nbFocusBlock(nb, false);
+      nbRefresh(editorEl);
       return true;
+    }
+
+    /* ---------- Backspace at the start of a block ---------- */
+    function nbHandleBackspace(editorEl) {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+      const block = nbCaretBlock(editorEl);
+      if (!block) return false;
+      if (nbCaretOffset(editorEl, block) !== 0) return false;
+
+      // Peel one thing at a time: depth, then type, then the block itself.
+      // Each press undoes exactly one decision, which is what makes it
+      // predictable enough to hold down.
+      if (nbIndentOf(block) > 0) {
+        nbSetIndent(block, nbIndentOf(block) - 1);
+        nbRefresh(editorEl);
+        return true;
+      }
+      if (nbType(block) !== "p") {
+        nbSetType(editorEl, block, "p");
+        return true;
+      }
+      const prev = block.previousElementSibling;
+      if (!prev) return true;   // first block: nothing above to merge into
+
+      // A page block is deleted whole rather than merged into -- its text is
+      // a page's name, not this Page's content.
+      if (nbType(prev) === "page") {
+        prev.parentNode.removeChild(prev);
+        nbRefresh(editorEl);
+        return true;
+      }
+      const at = (prev.textContent || "").length;
+      while (block.firstChild) prev.appendChild(block.firstChild);
+      block.parentNode.removeChild(block);
+      nbPlaceCaret(prev, at);
+      nbRefresh(editorEl);
+      return true;
+    }
+
+    /* ---------- Tab ---------- */
+    function nbHandleTab(editorEl, e) {
+      const block = nbCaretBlock(editorEl);
+      if (!block) return false;
+      if (e.shiftKey) {
+        if (nbIndentOf(block) === 0) return true;
+        nbSetIndent(block, nbIndentOf(block) - 1);
+      } else {
+        // Nothing can be indented past what is above it, and the first block
+        // of a Page has nothing above it at all.
+        const prev = block.previousElementSibling;
+        if (!prev) return true;
+        if (nbIndentOf(block) >= nbIndentOf(prev) + 1) return true;
+        nbSetIndent(block, nbIndentOf(block) + 1);
+      }
+      nbRefresh(editorEl);
+      return true;
+    }
+
+    /* ---------- markdown shorthands ----------
+       Typed at the very start of a block, and only the marker just finished
+       -- one that happens to already sit further along is left alone. */
+    const NB_SHORTHAND = [
+      [/^# /,       "h1"], [/^## /,   "h2"], [/^### /,  "h3"], [/^#### /, "h4"],
+      [/^[-*] /,    "ul"], [/^\d+\. /, "ol"], [/^\[\]\s/, "todo"], [/^\[ ?\]\s/, "todo"],
+      [/^> /,       "tg"], [/^\| /,   "quote"], [/^" /,   "quote"],
+      [/^```\s?/,   "code"], [/^\$\$\s?/, "eq"]
+    ];
+    function nbApplyShorthand(editorEl) {
+      const block = nbCaretBlock(editorEl);
+      if (!block) return false;
+      if (nbType(block) === "code") return false;   // ``` inside code is text
+      const text = block.textContent || "";
+      const pos = nbCaretOffset(editorEl, block);
+      for (const pair of NB_SHORTHAND) {
+        const m = pair[0].exec(text);
+        if (!m) continue;
+        if (pos !== m[0].length) continue;
+        nbStripLeading(block, m[0].length);
+        nbSetType(editorEl, block, pair[1]);
+        nbFocusBlock(block, false);
+        return true;
+      }
+      return false;
+    }
+
+    /* ---------- clicking a marker ----------
+       Checkboxes and twisties are drawn by CSS, not inserted as elements
+       (see the stylesheet), so the click that toggles one is resolved by
+       hit-testing against the left rail rather than by an event on it. */
+    function nbMarkerHit(block, e) {
+      if (!NB_MARKER[nbType(block)]) return false;
+      const r = block.getBoundingClientRect();
+      // The rail is the block's own left padding, which is where the CSS
+      // draws every marker. getBoundingClientRect is already past the
+      // indent margin, so no depth arithmetic is needed here.
+      const rail = nbType(block) === "callout" ? 34 : 24;
+      if (e.clientX < r.left - 4 || e.clientX > r.left + rail) return false;
+      // A twisty and a checkbox sit on the first line of the block; clicking
+      // the rail beside the third line of a long item is not a toggle.
+      const lineBottom = r.top + parseFloat(window.getComputedStyle(block).lineHeight || "20") + 8;
+      return e.clientY <= lineBottom;
+    }
+
+    /* Renders the chrome a block needs that is not plain text: the title span
+       inside a page block. Kept out of storage (see nbSerialize) so what is
+       synced stays the block's own content. */
+    function nbHydrate(editorEl) {
+      const tex = editorEl.querySelectorAll("span[data-tex]");
+      if (tex.length) {
+        nbLoadKatex(function (ok) {
+          if (!ok) return;
+          Array.prototype.forEach.call(tex, function (sp) {
+            if (!sp.isConnected) return;
+            try {
+              sp.innerHTML = window.katex.renderToString(sp.getAttribute("data-tex") || "",
+                { throwOnError: false });
+            } catch (e) {}
+          });
+        });
+      }
+      nbBlocks(editorEl).forEach(function (b) {
+        if (nbType(b) !== "page") return;
+        if (b.querySelector(".nb-page-t")) return;
+        const span = document.createElement("span");
+        span.className = "nb-page-t";
+        span.textContent = (b.textContent || "").trim() || "Untitled";
+        b.textContent = "";
+        b.appendChild(span);
+      });
+    }
+
+    function nbSetContent(editorEl, html) {
+      editorEl.innerHTML = nbNormalize(html);
+      nbEnsureBlocks(editorEl);
+      nbHydrate(editorEl);
+      nbRefresh(editorEl);
     }
 
     function wireNoteEditor(id, opts) {
@@ -11358,7 +12703,10 @@
       // stored copy lands on top of live edits and silently reverts them.
       let touched = false;
 
-      function currentHtml() { return sanitizeNoteHtml(editorEl.innerHTML); }
+      editorEl.__mpsKey = storageKey;
+      editorEl.__mpsWidgetId = id;
+
+      function currentHtml() { return nbSerialize(editorEl); }
       function saveLocalNow() {
         localSet(storageKey, currentHtml());
         /* This path deliberately bypasses storageSet — it runs on every
@@ -11374,6 +12722,13 @@
         if (window.__mpsSync) { try { window.__mpsSync.markDirty(storageKey); } catch (e) {} }
       }
       registerLocalAutosaveFlusher(saveLocalNow);
+      editorEl.__mpsSave = function () {
+        touched = true;
+        saveLocalNow();
+        applyWidgetTitle(id);
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () { storageSet(storageKey, currentHtml()); }, 300);
+      };
 
       /* Lets the Notion pull write new content into a Page that is already on
          screen. Without it a pulled change would sit in storage until the
@@ -11386,7 +12741,7 @@
       (window.__mpsNoteSetters || (window.__mpsNoteSetters = {}))[storageKey] =
         function (html) {
           if (document.activeElement === editorEl) return false;
-          editorEl.innerHTML = sanitizeNoteHtml(html);
+          nbSetContent(editorEl, html);
           try { applyWidgetTitle(id); } catch (e) {}
           return true;
         };
@@ -11394,11 +12749,13 @@
       let saveTimer = null;
       editorEl.addEventListener("input", function () {
         touched = true;
-        // Before the saves, so what gets written already has the bullet in it
-        // rather than the "- " that was typed.
-        applyNoteBulletShorthand(editorEl);
+        // Before the saves, so what gets written already carries the block
+        // type rather than the "## " that was typed to ask for it.
+        nbApplyShorthand(editorEl);
+        nbEnsureBlocks(editorEl);
+        nbRefresh(editorEl);
         saveLocalNow();
-        // Keeps the tab strip's label following the note's first line live,
+        // Keeps the tab strip's label following the Page's first line live,
         // the same way a Notion sidebar entry updates as you type its
         // page's title — cheap even on every keystroke, since it's just a
         // couple of text-node writes, and a no-op once the first line
@@ -11409,73 +12766,125 @@
       });
       editorEl.addEventListener("blur", function () {
         clearTimeout(saveTimer);
+        // An equation left mid-edit renders on the way out.
+        setTimeout(function () { nbRefresh(editorEl); }, 0);
         storageSet(storageKey, currentHtml());
       });
       editorEl.addEventListener("keydown", function (e) {
-        if (e.key !== "Enter") return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (nbHandleEnter(editorEl, e)) {
+            editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          return;
+        }
+        if (e.key === "Tab") {
+          e.preventDefault();
+          if (nbHandleTab(editorEl, e)) {
+            editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          return;
+        }
+        if (e.key === "Backspace") {
+          if (nbHandleBackspace(editorEl)) {
+            e.preventDefault();
+            editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+          return;
+        }
+        // Caret moving between blocks changes which equation is being edited.
+        if (e.key === "ArrowUp" || e.key === "ArrowDown" ||
+            e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          setTimeout(function () { nbRenderEquations(editorEl); }, 0);
+        }
+      });
+
+      /* Plain text only, and multi-line text becomes multiple blocks rather
+         than one block with newlines wedged into it — pasting a list should
+         give a list, not a paragraph that merely looks like one. */
+      editorEl.addEventListener("paste", function (e) {
         e.preventDefault();
-        // On a bullet line, Enter carries the list on (or ends it) instead of
-        // inserting a bare newline.
-        if (handleNoteBulletEnter(editorEl)) {
+        const text = ((e.clipboardData || window.clipboardData).getData("text/plain") || "");
+        const lines = text.split(/\r?\n/);
+        const block = nbCaretBlock(editorEl);
+        if (!block || lines.length === 1) {
+          document.execCommand("insertText", false, text.replace(/\r?\n/g, " "));
           editorEl.dispatchEvent(new Event("input", { bubbles: true }));
           return;
         }
-        // execCommand("insertText", false, "\n") is unreliable in Chrome —
-        // it silently drops the newline instead of inserting it. Inserting
-        // the text node directly keeps this a single flat text node (see
-        // the comment on wireNoteEditor above for why that matters).
         const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return;
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        const nl = document.createTextNode("\n");
-        range.insertNode(nl);
-        range.setStartAfter(nl);
-        range.setEndAfter(nl);
-        sel.removeAllRanges();
-        sel.addRange(range);
+        const r = sel.getRangeAt(0);
+        r.deleteContents();
+        const tail = document.createRange();
+        tail.selectNodeContents(block);
+        tail.setStart(r.startContainer, r.startOffset);
+        let frag = null;
+        try { frag = tail.extractContents(); } catch (err) { frag = null; }
+
+        block.appendChild(document.createTextNode(lines[0]));
+        let at = block;
+        for (let i = 1; i < lines.length; i++) {
+          const nb = nbLineToBlock([document.createTextNode(lines[i])]);
+          nbSetIndent(nb, nbIndentOf(block));
+          at.parentNode.insertBefore(nb, at.nextSibling);
+          at = nb;
+        }
+        if (frag) at.appendChild(frag);
+        nbFocusBlock(at, false);
         editorEl.dispatchEvent(new Event("input", { bubbles: true }));
       });
-      editorEl.addEventListener("paste", function (e) {
-        e.preventDefault();
-        const text = (e.clipboardData || window.clipboardData).getData("text/plain");
-        document.execCommand("insertText", false, text);
-      });
-      if (opts.href) {
-        editorEl.addEventListener("click", function (e) {
-          if (e.metaKey || e.ctrlKey) window.open(opts.href, "_blank");
-        });
-      }
 
-      // Clicking the empty space under the note starts the next line, instead
+      /* One click handler for everything a Page's body can be clicked on:
+         a checkbox, a twisty, a callout's emoji, a page link, and the
+         Cmd/Ctrl+click-to-open the two built-in notes have always had. */
+      editorEl.addEventListener("click", function (e) {
+        const block = nbBlockOf(editorEl, e.target);
+        if (block) {
+          const type = nbType(block);
+          if (type === "page") {
+            const url = block.getAttribute("data-url");
+            if (url) { e.preventDefault(); window.open(url, "_blank", "noopener"); return; }
+          }
+          if (nbMarkerHit(block, e)) {
+            e.preventDefault();
+            if (type === "todo") {
+              if (block.getAttribute("data-c") === "1") block.removeAttribute("data-c");
+              else block.setAttribute("data-c", "1");
+            } else if (NB_TOGGLE[type]) {
+              if (block.getAttribute("data-o") === "1") block.removeAttribute("data-o");
+              else block.setAttribute("data-o", "1");
+            } else if (type === "callout") {
+              nbOpenCalloutEmoji(editorEl, block);
+              return;
+            }
+            nbRefresh(editorEl);
+            editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+            return;
+          }
+          if (type === "eq") { nbRenderEquations(editorEl); }
+        }
+        if (opts.href && (e.metaKey || e.ctrlKey)) window.open(opts.href, "_blank");
+      });
+
+      // Clicking the empty space under the Page starts a new block, instead
       // of just dropping the caret at the end of the last one. Without this,
-      // a note that is still only its (bold, first-line) title gives you
-      // nowhere to click to begin the body — you had to put the caret in the
-      // title and press Enter. Clicking on existing text is untouched; this
-      // only fires below the last line's baseline.
+      // a Page that is still only its (bold, first-block) title gives you
+      // nowhere to click to begin the body.
       editorEl.addEventListener("mousedown", function (e) {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-        const text = editorEl.textContent;
-        if (!text) return; // empty note: the placeholder click already lands on line 1
-        const contentRange = document.createRange();
-        contentRange.selectNodeContents(editorEl);
-        const bottom = contentRange.getBoundingClientRect().bottom;
-        if (e.clientY <= bottom) return; // clicked on the text itself
+        const blocks = nbBlocks(editorEl);
+        if (!blocks.length) return;
+        const last = blocks[blocks.length - 1];
+        if (e.clientY <= last.getBoundingClientRect().bottom) return;
         e.preventDefault();
-        // A trailing newline is what actually creates the line to land on.
-        // Appended as its own node rather than by rewriting .textContent,
-        // which would flatten every <b>/<i> in the note back to plain text.
-        if (!/\n$/.test(text)) {
-          editorEl.appendChild(document.createTextNode("\n"));
+        let target = last;
+        if ((last.textContent || "").trim() || nbType(last) !== "p") {
+          target = nbMakeBlock("p", 0);
+          editorEl.appendChild(target);
           editorEl.dispatchEvent(new Event("input", { bubbles: true }));
         }
         editorEl.focus();
-        const end = document.createRange();
-        end.selectNodeContents(editorEl);
-        end.collapse(false);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(end);
+        nbFocusBlock(target, true);
       });
 
       (async function loadContent() {
@@ -11489,18 +12898,884 @@
         // live edits silently reverts them.
         if (touched) return;
         if (text != null) {
-          // Notes saved before this widget stored formatting are plain text —
-          // see NOTE_HTML_RE — and have to go in as text, not markup.
-          if (NOTE_HTML_RE.test(text)) editorEl.innerHTML = sanitizeNoteHtml(text);
-          else editorEl.textContent = text;
+          nbSetContent(editorEl, text);
+          /* Rewrite the stored copy in block form the first time a Page from
+             an older build is opened. Without this the migration would run
+             again on every load, and the Notion push would keep seeing the
+             flat original rather than what is on screen. */
+          const migrated = currentHtml();
+          if (migrated !== text) storageSet(storageKey, migrated);
+        } else {
+          /* Nothing stored yet. The two built-in Pages ship with their name
+             already in the markup ("Atomic Habits", "Affirmations"), so this
+             converts what is on screen into blocks rather than clearing it --
+             replacing it with an empty Page would throw that seed away on
+             the first load of a fresh browser. */
+          nbSetContent(editorEl, editorEl.innerHTML);
         }
         // The tab strip's label (built into the static markup as a bare
-        // "Page") needs the note's actual first line the moment it's known
+        // "Page") needs the Page's actual first line the moment it's known
         // — this load is the first point that's true, for a widget whose
         // subpage the user hasn't opened/typed into yet this session.
         applyWidgetTitle(id);
       })();
     }
+
+    /* ================= selection toolbar =================
+       Appears over a live selection inside any Page, the way Notion's does.
+       One instance for the whole board, appended to <body>: a toolbar per
+       widget would be clipped by that widget's own overflow, and there is
+       only ever one selection anyway. */
+
+    const NB_TYPE_LABEL = {
+      p: "Text", h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", h4: "Heading 4",
+      ul: "Bulleted list", ol: "Numbered list", todo: "To-do list", tg: "Toggle list",
+      code: "Code", quote: "Quote", callout: "Callout", eq: "Block equation",
+      page: "Page", th1: "Toggle heading 1", th2: "Toggle heading 2",
+      th3: "Toggle heading 3", th4: "Toggle heading 4"
+    };
+    const NB_SVG = {
+      text:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 6h14M12 6v13"/></svg>',
+      page:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+      pagein:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 3h6v6"/><path d="M21 3l-8 8"/></svg>',
+      ul:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 7h11M9 12h11M9 17h11"/><circle cx="4.5" cy="7" r="1.3" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17" r="1.3" fill="currentColor" stroke="none"/></svg>',
+      ol:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9 7h11M9 12h11M9 17h11"/><text x="2" y="9.5" font-size="7" font-weight="700" fill="currentColor" stroke="none" font-family="Arial">1</text><text x="2" y="19.5" font-size="7" font-weight="700" fill="currentColor" stroke="none" font-family="Arial">2</text></svg>',
+      todo:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="7" height="7" rx="1.6"/><path d="M4.4 8.2l1.5 1.5 2.6-2.9"/><path d="M13 8h8M13 16h8"/><rect x="3" y="12.5" width="7" height="7" rx="1.6"/></svg>',
+      tg:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6l4 3.5L5 13"/><path d="M12 7h8M12 12h8M12 17h8"/></svg>',
+      code:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7l-5 5 5 5M15 7l5 5-5 5"/></svg>',
+      quote: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 5v14"/><path d="M10 8h9M10 12h9M10 16h5"/></svg>',
+      callout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M8 12h8" stroke-linecap="round"/></svg>',
+      eq:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M8.5 8.5h7l-4 3.5 4 3.5h-7"/></svg>',
+      chev:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+      link:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"/></svg>',
+      clear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6h11"/><path d="M11 6l-2.5 9"/><path d="M15 13l5 5M20 13l-5 5"/></svg>',
+      eqi:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l3 7 4-14h5"/></svg>',
+      comment:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 15a2 2 0 0 1-2 2H8l-4 3V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>',
+      smile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="12" r="8"/><path d="M8 14.5s1.2 1.5 3 1.5 3-1.5 3-1.5"/><circle cx="8.5" cy="10" r=".9" fill="currentColor" stroke="none"/><circle cx="13.5" cy="10" r=".9" fill="currentColor" stroke="none"/><path d="M19 3v5M16.5 5.5h5"/></svg>',
+      suggest:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7"/><path d="M18.5 3.5a1.9 1.9 0 0 1 2.7 2.7L13 14.4l-3.4.9.9-3.4z"/></svg>'
+    };
+    function nbGlyph(n, toggle) {
+      return '<span class="nb-glyph">' + (toggle ? "‣" : "") + "H<sub>" + n + "</sub></span>";
+    }
+    const NB_MENU = [
+      { type: "p",   label: "Text",           icon: NB_SVG.text },
+      { type: "h1",  label: "Heading 1",      glyph: nbGlyph(1) },
+      { type: "h2",  label: "Heading 2",      glyph: nbGlyph(2) },
+      { type: "h3",  label: "Heading 3",      glyph: nbGlyph(3) },
+      { type: "h4",  label: "Heading 4",      glyph: nbGlyph(4) },
+      { type: "page", label: "Page",          icon: NB_SVG.page },
+      { type: "pagein", label: "Page in",     icon: NB_SVG.pagein, sub: true },
+      { type: "ul",  label: "Bulleted list",  icon: NB_SVG.ul },
+      { type: "ol",  label: "Numbered list",  icon: NB_SVG.ol },
+      { type: "todo", label: "To-do list",    icon: NB_SVG.todo },
+      { type: "tg",  label: "Toggle list",    icon: NB_SVG.tg },
+      { type: "code", label: "Code",          icon: NB_SVG.code },
+      { type: "quote", label: "Quote",        icon: NB_SVG.quote },
+      { type: "callout", label: "Callout",    icon: NB_SVG.callout },
+      { type: "eq",  label: "Block equation", icon: NB_SVG.eq },
+      { type: "th1", label: "Toggle heading 1", glyph: nbGlyph(1, true) },
+      { type: "th2", label: "Toggle heading 2", glyph: nbGlyph(2, true) },
+      { type: "th3", label: "Toggle heading 3", glyph: nbGlyph(3, true) },
+      { type: "th4", label: "Toggle heading 4", glyph: nbGlyph(4, true) }
+    ];
+    const NB_COLORS = ["default", "grey", "brown", "red", "orange", "yellow",
+                       "green", "blue", "purple", "pink"];
+
+    let nbBar = null, nbMenu = null, nbSub = null;
+    // The editor and range the toolbar is acting on. Held because opening a
+    // menu moves focus out of the Page, which throws the live selection away.
+    let nbCtx = { editor: null, range: null, block: null };
+
+    function nbEl(tag, cls, html) {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (html != null) e.innerHTML = html;
+      return e;
+    }
+
+    function nbBuildBar() {
+      if (nbBar) return nbBar;
+      nbBar = nbEl("div"); nbBar.id = "nbBar"; nbBar.hidden = true;
+      nbMenu = nbEl("div"); nbMenu.id = "nbMenu"; nbMenu.hidden = true;
+      nbSub = nbEl("div"); nbSub.id = "nbSub"; nbSub.hidden = true;
+      document.body.appendChild(nbBar);
+      document.body.appendChild(nbMenu);
+      document.body.appendChild(nbSub);
+
+      // ---- row 1: the block type ----
+      const r1 = nbEl("div", "nb-bar-row");
+      const typeBtn = nbEl("button", "nb-btn nb-btn-wide");
+      typeBtn.type = "button";
+      typeBtn.id = "nbTypeBtn";
+      typeBtn.innerHTML = '<span class="nb-glyph">T</span><span id="nbTypeLabel">Text</span>'
+        + '<span class="nb-chev">' + NB_SVG.chev + "</span>";
+      typeBtn.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      typeBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        nbOpenTypeMenu(typeBtn.getBoundingClientRect());
+      });
+      r1.appendChild(typeBtn);
+      nbBar.appendChild(r1);
+      nbBar.appendChild(nbEl("div", "nb-bar-sep"));
+
+      // ---- row 2: colour + the four marks ----
+      const r2 = nbEl("div", "nb-bar-row");
+      r2.appendChild(nbMakeBtn("A", "Colour", null, function (btn) {
+        nbOpenColorMenu(btn.getBoundingClientRect());
+      }, "nb-color-a"));
+      r2.appendChild(nbMakeBtn("<b>B</b>", "Bold  ⌘B", null, function () { nbInlineCmd("bold"); }));
+      r2.appendChild(nbMakeBtn('<span class="nb-italic">I</span>', "Italic  ⌘I", null,
+        function () { nbInlineCmd("italic"); }));
+      r2.appendChild(nbMakeBtn('<span class="nb-under">U</span>', "Underline  ⌘U", null,
+        function () { nbInlineCmd("underline"); }));
+      r2.appendChild(nbMakeBtn(NB_SVG.clear, "Clear formatting", null, function () { nbClearMarks(); }));
+      nbBar.appendChild(r2);
+
+      // ---- row 3: link, strike, code, inline equation ----
+      const r3 = nbEl("div", "nb-bar-row");
+      r3.appendChild(nbMakeBtn(NB_SVG.link, "Link  ⌘K", null, function () { nbMakeLink(); }));
+      r3.appendChild(nbMakeBtn('<span class="nb-strike">S</span>', "Strikethrough", null,
+        function () { nbInlineCmd("strikeThrough"); }));
+      r3.appendChild(nbMakeBtn(NB_SVG.code, "Inline code", null, function () { nbWrapInline("code", {}); }));
+      r3.appendChild(nbMakeBtn(NB_SVG.eqi, "Inline equation", null, function () { nbInlineEquation(); }));
+      nbBar.appendChild(r3);
+      nbBar.appendChild(nbEl("div", "nb-bar-sep"));
+
+      // ---- row 4: comment, reaction, suggestion ----
+      const r4 = nbEl("div", "nb-bar-row");
+      const cbtn = nbMakeBtn(NB_SVG.comment + "<span>Comment</span>", null, null,
+        function () { nbStartComment(); });
+      cbtn.classList.add("nb-btn-wide");
+      cbtn.style.fontSize = "13.5px";
+      r4.appendChild(cbtn);
+      r4.appendChild(nbMakeBtn(NB_SVG.smile, "Add reaction", null, function (btn) {
+        nbOpenReactionPicker(btn.getBoundingClientRect());
+      }));
+      r4.appendChild(nbMakeBtn(NB_SVG.suggest, "Suggest edit", null, function (btn) {
+        nbStartSuggestion(btn.getBoundingClientRect());
+      }));
+      nbBar.appendChild(r4);
+      return nbBar;
+    }
+
+    function nbMakeBtn(html, tip, key, onClick, cls) {
+      const b = nbEl("button", "nb-btn" + (cls ? " " + cls : ""), html);
+      b.type = "button";
+      if (tip) b.setAttribute("data-tip", tip);
+      // mousedown must not move focus, or the selection the button acts on is
+      // gone by the time the click lands.
+      b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      b.addEventListener("click", function (e) { e.stopPropagation(); onClick(b); });
+      return b;
+    }
+
+    /* ---------- showing and hiding ---------- */
+    function nbEditorOf(node) {
+      let n = node;
+      while (n && n !== document.body) {
+        if (n.nodeType === 1 && n.classList && n.classList.contains("note-editor")) return n;
+        n = n.parentNode;
+      }
+      return null;
+    }
+
+    function nbHideBar() {
+      if (nbBar) nbBar.hidden = true;
+      nbCloseMenus();
+    }
+    function nbCloseMenus() {
+      if (nbMenu) nbMenu.hidden = true;
+      if (nbSub) nbSub.hidden = true;
+    }
+
+    function nbSyncBar() {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) {
+        // A menu is open and acting on a stored range; leave the bar up.
+        if (nbMenu && !nbMenu.hidden) return;
+        if (nbSub && !nbSub.hidden) return;
+        nbHideBar();
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      const editor = nbEditorOf(range.startContainer);
+      if (!editor || !editor.contains(range.endContainer) || !String(sel).trim()) {
+        nbHideBar();
+        return;
+      }
+      nbBuildBar();
+      nbCtx.editor = editor;
+      nbCtx.range = range.cloneRange();
+      nbCtx.block = nbBlockOf(editor, range.startContainer);
+
+      const label = document.getElementById("nbTypeLabel");
+      if (label) label.textContent = NB_TYPE_LABEL[nbType(nbCtx.block)] || "Text";
+
+      nbBar.hidden = false;
+      const r = range.getBoundingClientRect();
+      const bw = nbBar.offsetWidth, bh = nbBar.offsetHeight;
+      let left = r.left + r.width / 2 - bw / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - bw - 8));
+      // Above the selection, or below it when there is no room above.
+      let top = r.top - bh - 8;
+      if (top < 8) top = Math.min(r.bottom + 8, window.innerHeight - bh - 8);
+      nbBar.style.left = Math.round(left) + "px";
+      nbBar.style.top = Math.round(top) + "px";
+    }
+
+    // Puts the stored selection back before acting on it.
+    function nbRestore() {
+      if (!nbCtx.range) return false;
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(nbCtx.range);
+      if (nbCtx.editor) nbCtx.editor.focus();
+      return true;
+    }
+    function nbAfterEdit() {
+      if (!nbCtx.editor) return;
+      nbEnsureBlocks(nbCtx.editor);
+      nbRefresh(nbCtx.editor);
+      nbCtx.editor.dispatchEvent(new Event("input", { bubbles: true }));
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount) nbCtx.range = sel.getRangeAt(0).cloneRange();
+      nbSyncBar();
+    }
+
+    /* ---------- inline marks ---------- */
+    function nbInlineCmd(cmd) {
+      if (!nbRestore()) return;
+      try { document.execCommand(cmd, false, null); } catch (e) {}
+      nbAfterEdit();
+    }
+
+    /* Wraps the selection in one element. Used for everything execCommand has
+       no verb for -- inline code, colours, equations, comment anchors. */
+    function nbWrapInline(tag, attrs) {
+      if (!nbRestore()) return null;
+      const sel = window.getSelection();
+      if (!sel.rangeCount || sel.isCollapsed) return null;
+      const range = sel.getRangeAt(0);
+      const el = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+      let frag;
+      try { frag = range.extractContents(); } catch (e) { return null; }
+      el.appendChild(frag);
+      range.insertNode(el);
+      // Select what was just wrapped, so a second click is on the same text.
+      const after = document.createRange();
+      after.selectNodeContents(el);
+      sel.removeAllRanges(); sel.addRange(after);
+      nbAfterEdit();
+      return el;
+    }
+
+    function nbClearMarks() {
+      if (!nbRestore()) return;
+      try {
+        document.execCommand("removeFormat", false, null);
+      } catch (e) {}
+      // removeFormat leaves the elements execCommand does not own behind.
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        const frag = range.cloneContents();
+        const holder = document.createElement("div");
+        holder.appendChild(frag);
+        const text = holder.textContent || "";
+        range.deleteContents();
+        const tn = document.createTextNode(text);
+        range.insertNode(tn);
+        const after = document.createRange();
+        after.selectNode(tn);
+        sel.removeAllRanges(); sel.addRange(after);
+      }
+      nbAfterEdit();
+    }
+
+    function nbMakeLink() {
+      if (!nbRestore()) return;
+      const sel = window.getSelection();
+      const existing = nbClosest(sel.anchorNode, "a");
+      const url = window.prompt("Link to", existing ? existing.getAttribute("href") || "" : "https://");
+      if (url === null) return;
+      if (!url) {
+        if (existing) {
+          while (existing.firstChild) existing.parentNode.insertBefore(existing.firstChild, existing);
+          existing.parentNode.removeChild(existing);
+          nbAfterEdit();
+        }
+        return;
+      }
+      if (!/^(https?:|mailto:|#)/i.test(url)) return;
+      if (existing) { existing.setAttribute("href", url); nbAfterEdit(); return; }
+      nbWrapInline("a", { href: url });
+    }
+
+    function nbClosest(node, tag) {
+      let n = node;
+      while (n && n !== document.body) {
+        if (n.nodeType === 1 && n.tagName.toLowerCase() === tag) return n;
+        n = n.parentNode;
+      }
+      return null;
+    }
+
+    /* An inline equation is the selected text read as LaTeX. Kept as its own
+       span so the source survives a round trip, and rendered by the same
+       lazy KaTeX load the block form uses. */
+    function nbInlineEquation() {
+      if (!nbRestore()) return;
+      const sel = window.getSelection();
+      const tex = String(sel).trim();
+      if (!tex) return;
+      const span = nbWrapInline("span", { "data-tex": tex });
+      if (!span) return;
+      nbLoadKatex(function (ok) {
+        if (!ok || !span.isConnected) return;
+        try {
+          span.innerHTML = window.katex.renderToString(tex, { throwOnError: false });
+        } catch (e) {}
+      });
+    }
+
+    /* ---------- the block-type menu ---------- */
+    function nbPlaceMenu(menu, rect, width) {
+      menu.hidden = false;
+      const w = width || menu.offsetWidth, h = menu.offsetHeight;
+      let left = rect.right + 6;
+      if (left + w > window.innerWidth - 8) left = Math.max(8, rect.left - w - 6);
+      let top = rect.top;
+      if (top + h > window.innerHeight - 8) top = Math.max(8, window.innerHeight - h - 8);
+      menu.style.left = Math.round(left) + "px";
+      menu.style.top = Math.round(top) + "px";
+    }
+
+    function nbOpenTypeMenu(rect) {
+      nbBuildBar();
+      if (nbSub) nbSub.hidden = true;
+      nbMenu.innerHTML = "";
+      const current = nbType(nbCtx.block);
+      NB_MENU.forEach(function (item) {
+        const b = nbEl("button", "nb-item" + (item.type === current ? " is-current" : ""));
+        b.type = "button";
+        b.innerHTML = (item.glyph || item.icon || "") + "<span>" + item.label + "</span>"
+          + (item.sub
+              ? '<span class="nb-item-chev">' + NB_SVG.chev + "</span>"
+              : '<span class="nb-item-check">' + NB_SVG.check + "</span>");
+        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (item.sub) { nbOpenPageInMenu(b.getBoundingClientRect()); return; }
+          nbApplyType(item.type);
+        });
+        if (item.sub) {
+          b.addEventListener("mouseenter", function () {
+            nbOpenPageInMenu(b.getBoundingClientRect());
+          });
+        } else {
+          b.addEventListener("mouseenter", function () { if (nbSub) nbSub.hidden = true; });
+        }
+        nbMenu.appendChild(b);
+      });
+      nbPlaceMenu(nbMenu, rect, 232);
+    }
+
+    /* Turning a block into a page is the one menu item that is not a local
+       change: it creates a real page in Notion and leaves a link behind.
+       Everything else is a data-b swap. */
+    function nbApplyType(type) {
+      if (!nbCtx.block || !nbCtx.editor) return;
+      // A page is one block by definition -- it is a link to somewhere else,
+      // so converting a multi-block selection into one is not a thing to do.
+      if (type === "page") { nbConvertToPage(null); return; }
+      // Selecting three paragraphs and choosing "Bulleted list" should give
+      // three bullets, not change the first and leave the rest behind.
+      nbSelectedBlocks().forEach(function (b) { nbSetType(nbCtx.editor, b, type); });
+      nbCloseMenus();
+      nbRestore();
+      nbAfterEdit();
+    }
+
+    // Every block the stored range touches, in document order.
+    function nbSelectedBlocks() {
+      const editor = nbCtx.editor, range = nbCtx.range;
+      if (!editor || !range) return nbCtx.block ? [nbCtx.block] : [];
+      const first = nbBlockOf(editor, range.startContainer);
+      const last = nbBlockOf(editor, range.endContainer);
+      if (!first) return [];
+      if (!last || first === last) return [first];
+      const all = nbBlocks(editor);
+      const a = all.indexOf(first), b = all.indexOf(last);
+      if (a === -1 || b === -1) return [first];
+      return all.slice(Math.min(a, b), Math.max(a, b) + 1);
+    }
+
+    /* "Page in ›" -- the same question the + button asks, asked per block.
+       Lists what the integration can see, filtered, with the full picker
+       behind it for anything not in the first hundred. */
+    function nbOpenPageInMenu(rect) {
+      nbBuildBar();
+      nbSub.innerHTML = "";
+      const lib = window.__mpsNotionLibrary;
+      if (!lib) {
+        nbSub.appendChild(nbEl("div", "nb-sub-empty", "Connect Notion to create pages."));
+        nbPlaceMenu(nbSub, rect, 244);
+        return;
+      }
+      const search = nbEl("input", "nl-menu-search");
+      search.placeholder = "Search pages…";
+      search.addEventListener("mousedown", function (e) { e.stopPropagation(); });
+      nbSub.appendChild(search);
+      const list = nbEl("div");
+      nbSub.appendChild(list);
+      list.appendChild(nbEl("div", "nb-sub-empty", "Loading your Notion pages…"));
+      nbPlaceMenu(nbSub, rect, 244);
+
+      lib.listPages().then(function (pages) {
+        function fill(q) {
+          list.innerHTML = "";
+          const ql = q.toLowerCase();
+          const rows = pages.filter(function (p) {
+            return !ql || (p.title || "").toLowerCase().indexOf(ql) !== -1;
+          }).slice(0, 40);
+          if (!rows.length) {
+            list.appendChild(nbEl("div", "nb-sub-empty",
+              "No pages shared with this integration match that."));
+            return;
+          }
+          rows.forEach(function (p) {
+            const b = nbEl("button", "nb-item");
+            b.type = "button";
+            b.innerHTML = '<span class="nb-glyph">' + (p.icon || "") + "</span><span>"
+              + nbEscape(p.title) + "</span>";
+            if (!p.icon) b.querySelector(".nb-glyph").innerHTML = NB_SVG.page;
+            b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+            b.addEventListener("click", function (e) {
+              e.stopPropagation();
+              nbConvertToPage(p.id);
+            });
+            list.appendChild(b);
+          });
+        }
+        fill("");
+        search.addEventListener("input", function () { fill(search.value.trim()); });
+        setTimeout(function () { search.focus(); }, 0);
+      }).catch(function () {
+        list.innerHTML = "";
+        list.appendChild(nbEl("div", "nb-sub-empty", "Could not reach Notion."));
+      });
+    }
+
+    /* The block's text becomes a real Notion page's title; the block becomes
+       a link to it. parentId null means "inside this Page's own Notion page",
+       which is what plain "Page" does; a chosen id is what "Page in" does. */
+    async function nbConvertToPage(parentId) {
+      const editor = nbCtx.editor, block = nbCtx.block;
+      if (!editor || !block) return;
+      const lib = window.__mpsNotionLibrary;
+      nbCloseMenus();
+      nbHideBar();
+      const title = (block.textContent || "").trim() || "Untitled";
+      if (!lib) return;
+
+      block.classList.add("is-pending");
+      let target = parentId;
+      try {
+        if (!target) target = await lib.pageIdForKey(editor.__mpsKey);
+        // A Page that has not been pushed to Notion yet has no page of its
+        // own to be a child of; the chosen destination stands in for it.
+        if (!target) { const d = await lib.destination(); target = d && d.id; }
+        if (!target) { block.classList.remove("is-pending"); return; }
+        const made = await lib.createChildPage(target, title);
+        block.classList.remove("is-pending");
+        if (!made) return;
+        nbSetType(editor, block, "page");
+        block.setAttribute("data-pid", made.id);
+        if (made.url) block.setAttribute("data-url", made.url);
+        block.textContent = title;
+        nbHydrate(editor);
+        nbRefresh(editor);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      } catch (e) {
+        block.classList.remove("is-pending");
+      }
+    }
+
+    /* ---------- colour ---------- */
+    function nbOpenColorMenu(rect) {
+      nbBuildBar();
+      nbSub.innerHTML = "";
+      nbSub.appendChild(nbEl("div", "nb-menu-label", "TEXT"));
+      NB_COLORS.forEach(function (c) {
+        const b = nbEl("button", "nb-item");
+        b.type = "button";
+        b.innerHTML = '<span class="nb-glyph" ' + (c === "default" ? "" : 'style="color:inherit"')
+          + "><span data-color=\"" + c + "\">A</span></span><span>"
+          + (c === "default" ? "Default" : c.charAt(0).toUpperCase() + c.slice(1)) + "</span>";
+        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          nbApplyColor("data-color", c);
+        });
+        nbSub.appendChild(b);
+      });
+      nbSub.appendChild(nbEl("div", "nb-menu-label", "BACKGROUND"));
+      NB_COLORS.forEach(function (c) {
+        const b = nbEl("button", "nb-item");
+        b.type = "button";
+        b.innerHTML = '<span class="nb-glyph"><span data-bg="' + c + '">A</span></span><span>'
+          + (c === "default" ? "Default" : c.charAt(0).toUpperCase() + c.slice(1)) + "</span>";
+        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          nbApplyColor("data-bg", c);
+        });
+        nbSub.appendChild(b);
+      });
+      nbPlaceMenu(nbSub, rect, 244);
+      // The colour swatches have to be visible against the menu, and the
+      // stylesheet only paints them inside a .note-editor.
+      Array.prototype.forEach.call(nbSub.querySelectorAll("[data-color],[data-bg]"), function (s) {
+        const c = s.getAttribute("data-color") || s.getAttribute("data-bg");
+        const probe = document.createElement("span");
+        probe.className = "note-editor";
+        probe.style.display = "none";
+        document.body.appendChild(probe);
+        const test = document.createElement("span");
+        if (s.hasAttribute("data-color")) test.setAttribute("data-color", c);
+        else test.setAttribute("data-bg", c);
+        probe.appendChild(test);
+        const cs = window.getComputedStyle(test);
+        if (s.hasAttribute("data-color")) s.style.color = cs.color;
+        else s.style.background = cs.backgroundColor;
+        document.body.removeChild(probe);
+      });
+    }
+
+    function nbApplyColor(attr, value) {
+      nbCloseMenus();
+      if (value === "default") {
+        if (!nbRestore()) return;
+        const sel = window.getSelection();
+        const span = nbClosest(sel.anchorNode, "span");
+        if (span && (span.hasAttribute("data-color") || span.hasAttribute("data-bg"))) {
+          span.removeAttribute(attr);
+          if (!span.hasAttribute("data-color") && !span.hasAttribute("data-bg")) {
+            while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+            span.parentNode.removeChild(span);
+          }
+          nbAfterEdit();
+        }
+        return;
+      }
+      const attrs = {};
+      attrs[attr] = value;
+      nbWrapInline("span", attrs);
+    }
+
+    /* ---------- comments ----------
+       A comment is an anchor in the text plus a thread beside it. The anchor
+       lives in the Page's own HTML (a span carrying the thread id) so it
+       moves with the text it is about and survives every sync path already
+       built; the threads themselves live in the same synced key/value store
+       as the rest of the board, keyed by widget. */
+    function nbCommentsKey(editor) {
+      return "note-comments:" + (editor && editor.__mpsWidgetId || "");
+    }
+    function nbLoadComments(editor) {
+      try {
+        const T = window.__mpsTiers;
+        return JSON.parse((T && T.localGet(nbCommentsKey(editor))) || "{}") || {};
+      } catch (e) { return {}; }
+    }
+    function nbSaveComments(editor, data) {
+      try { window.storageSet(nbCommentsKey(editor), JSON.stringify(data)); } catch (e) {}
+    }
+    function nbWho() {
+      const u = window.__mpsUserLabel;
+      return (typeof u === "string" && u) ? u : "You";
+    }
+    function nbNewId() {
+      return "c" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    }
+
+    let nbCmPanel = null, nbCmThread = null, nbCmEditor = null;
+    function nbCmEl() {
+      if (nbCmPanel) return nbCmPanel;
+      nbCmPanel = nbEl("div");
+      nbCmPanel.id = "nbComments";
+      nbCmPanel.hidden = true;
+      document.body.appendChild(nbCmPanel);
+      return nbCmPanel;
+    }
+    function nbCloseComments() {
+      if (nbCmPanel) nbCmPanel.hidden = true;
+      if (nbCmEditor) {
+        Array.prototype.forEach.call(nbCmEditor.querySelectorAll("span[data-cm].is-open"),
+          function (s) { s.classList.remove("is-open"); });
+      }
+      nbCmThread = null;
+    }
+
+    // New thread from the current selection.
+    function nbStartComment() {
+      const editor = nbCtx.editor;
+      if (!editor) return;
+      const id = nbNewId();
+      const quote = String(window.getSelection() || "").slice(0, 240);
+      const span = nbWrapInline("span", { "data-cm": id });
+      if (!span) return;
+      const data = nbLoadComments(editor);
+      data[id] = { quote: quote, items: [] };
+      nbSaveComments(editor, data);
+      nbHideBar();
+      nbOpenComments(editor, id, span.getBoundingClientRect());
+    }
+
+    function nbOpenComments(editor, id, rect) {
+      const panel = nbCmEl();
+      nbCmEditor = editor;
+      nbCmThread = id;
+      const data = nbLoadComments(editor);
+      const thread = data[id] || { quote: "", items: [] };
+
+      panel.innerHTML = "";
+      if (thread.quote) panel.appendChild(nbEl("div", "nb-cm-quote", nbEscape(thread.quote)));
+      thread.items.forEach(function (it) {
+        const row = nbEl("div", "nb-cm-item");
+        row.appendChild(nbEl("div", "nb-cm-av", nbEscape((it.who || "?").slice(0, 1).toUpperCase())));
+        const body = nbEl("div", "nb-cm-body");
+        body.appendChild(nbEl("div", "nb-cm-who",
+          nbEscape(it.who || "You") + '<span class="nb-cm-when">' + nbEscape(nbWhen(it.at)) + "</span>"));
+        body.appendChild(nbEl("div", "nb-cm-text", nbEscape(it.text)));
+        row.appendChild(body);
+        panel.appendChild(row);
+      });
+
+      const input = nbEl("textarea", "nb-cm-input");
+      input.placeholder = thread.items.length ? "Reply…" : "Add a comment…";
+      panel.appendChild(input);
+      const actions = nbEl("div", "nb-cm-actions");
+      const del = nbEl("button", "nb-cm-btn", "Resolve");
+      del.type = "button";
+      del.addEventListener("click", function () { nbResolveComment(editor, id); });
+      actions.appendChild(del);
+      const send = nbEl("button", "nb-cm-btn is-primary", "Comment");
+      send.type = "button";
+      send.addEventListener("click", function () {
+        const text = input.value.trim();
+        if (!text) return;
+        const d2 = nbLoadComments(editor);
+        if (!d2[id]) d2[id] = { quote: thread.quote, items: [] };
+        d2[id].items.push({ who: nbWho(), text: text, at: Date.now() });
+        nbSaveComments(editor, d2);
+        nbOpenComments(editor, id, rect);
+      });
+      actions.appendChild(send);
+      panel.appendChild(actions);
+
+      panel.hidden = false;
+      let left = Math.min(rect.left, window.innerWidth - panel.offsetWidth - 8);
+      let top = rect.bottom + 8;
+      if (top + panel.offsetHeight > window.innerHeight - 8) {
+        top = Math.max(8, rect.top - panel.offsetHeight - 8);
+      }
+      panel.style.left = Math.round(Math.max(8, left)) + "px";
+      panel.style.top = Math.round(top) + "px";
+      const anchor = editor.querySelector('span[data-cm="' + id + '"]');
+      if (anchor) anchor.classList.add("is-open");
+      setTimeout(function () { input.focus(); }, 0);
+    }
+
+    function nbResolveComment(editor, id) {
+      const data = nbLoadComments(editor);
+      delete data[id];
+      nbSaveComments(editor, data);
+      const anchor = editor.querySelector('span[data-cm="' + id + '"]');
+      if (anchor) {
+        while (anchor.firstChild) anchor.parentNode.insertBefore(anchor.firstChild, anchor);
+        anchor.parentNode.removeChild(anchor);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      nbCloseComments();
+    }
+
+    function nbWhen(ts) {
+      if (!ts) return "";
+      const mins = Math.round((Date.now() - ts) / 60000);
+      if (mins < 1) return "just now";
+      if (mins < 60) return mins + "m ago";
+      const hrs = Math.round(mins / 60);
+      if (hrs < 24) return hrs + "h ago";
+      return Math.round(hrs / 24) + "d ago";
+    }
+
+    /* ---------- reactions ----------
+       An emoji attached to a run of text, shown as a pill after it. Notion
+       puts these on blocks; on a selection is more useful here, because a
+       Page's blocks are often a single long paragraph. */
+    function nbOpenReactionPicker(rect) {
+      nbBuildBar();
+      nbSub.innerHTML = "";
+      const grid = nbEl("div", "nl-emoji-grid");
+      "👍 👎 ❤️ 🔥 🎉 ✅ ❌ ⭐ 💡 👀 🙏 😂 🤔 😮 🚀 📌 ⚠️ 💯".split(" ").forEach(function (x) {
+        const b = nbEl("button", null, x);
+        b.type = "button";
+        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          nbCloseMenus();
+          nbWrapInline("span", { "data-react": "1" });
+          // The pill goes after the text it reacts to, not around it.
+          const sel = window.getSelection();
+          const span = nbClosest(sel.anchorNode, "span");
+          if (span && span.hasAttribute("data-react")) {
+            const pill = document.createElement("span");
+            pill.setAttribute("data-react", "1");
+            pill.textContent = x;
+            while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+            span.parentNode.replaceChild(pill, span);
+            nbAfterEdit();
+          }
+        });
+        grid.appendChild(b);
+      });
+      nbSub.appendChild(grid);
+      nbPlaceMenu(nbSub, rect, 244);
+    }
+
+    /* ---------- suggested edits ----------
+       The selection is marked as a proposed deletion and the replacement is
+       inserted beside it, both left visible until someone accepts or rejects.
+       Clicking either half offers that choice. */
+    function nbStartSuggestion(rect) {
+      if (!nbCtx.editor) return;
+      const replacement = window.prompt("Suggest replacing the selected text with", String(window.getSelection() || ""));
+      if (replacement === null) return;
+      if (!nbRestore()) return;
+      const del = nbWrapInline("span", { "data-sug": "del" });
+      if (!del) return;
+      if (replacement) {
+        const add = document.createElement("span");
+        add.setAttribute("data-sug", "add");
+        add.textContent = replacement;
+        del.parentNode.insertBefore(add, del.nextSibling);
+      }
+      nbHideBar();
+      nbAfterEdit();
+    }
+
+    function nbSuggestionMenu(span, rect) {
+      nbBuildBar();
+      nbSub.innerHTML = "";
+      const editor = nbEditorOf(span);
+      function pair(s) {
+        const kind = s.getAttribute("data-sug");
+        const other = kind === "del" ? s.nextElementSibling : s.previousElementSibling;
+        const ok = other && other.getAttribute && other.getAttribute("data-sug") &&
+                   other.getAttribute("data-sug") !== kind;
+        return { del: kind === "del" ? s : (ok ? other : null),
+                 add: kind === "add" ? s : (ok ? other : null) };
+      }
+      const p = pair(span);
+      function finish() {
+        nbCloseMenus();
+        if (!editor) return;
+        nbEnsureBlocks(editor);
+        nbRefresh(editor);
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      function unwrap(el) {
+        if (!el) return;
+        while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+        el.parentNode.removeChild(el);
+      }
+      const accept = nbEl("button", "nb-item", "<span>Accept suggestion</span>");
+      accept.type = "button";
+      accept.addEventListener("click", function () {
+        if (p.del) p.del.parentNode.removeChild(p.del);
+        unwrap(p.add);
+        finish();
+      });
+      nbSub.appendChild(accept);
+      const reject = nbEl("button", "nb-item", "<span>Reject suggestion</span>");
+      reject.type = "button";
+      reject.addEventListener("click", function () {
+        if (p.add) p.add.parentNode.removeChild(p.add);
+        unwrap(p.del);
+        finish();
+      });
+      nbSub.appendChild(reject);
+      nbPlaceMenu(nbSub, rect, 244);
+    }
+
+    /* ---------- a callout's emoji ---------- */
+    function nbOpenCalloutEmoji(editor, block) {
+      nbBuildBar();
+      nbCtx.editor = editor;
+      nbSub.innerHTML = "";
+      const grid = nbEl("div", "nl-emoji-grid");
+      ("💡 ⚠️ ✅ ❌ 📌 🔥 ⭐ 🎯 📝 🧠 🚀 ❓ ❗ 🔒 📊 🧪 🎉 ⏰").split(" ").forEach(function (x) {
+        const b = nbEl("button", null, x);
+        b.type = "button";
+        b.addEventListener("mousedown", function (e) { e.preventDefault(); });
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          block.setAttribute("data-e", x);
+          nbCloseMenus();
+          nbRefresh(editor);
+          editor.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        grid.appendChild(b);
+      });
+      nbSub.appendChild(grid);
+      nbPlaceMenu(nbSub, block.getBoundingClientRect(), 244);
+    }
+
+    /* ---------- wiring ---------- */
+    // Debounced: selectionchange fires per character while dragging, and
+    // measuring the toolbar's box on each one is wasted work.
+    let nbSyncTimer = null;
+    document.addEventListener("selectionchange", function () {
+      clearTimeout(nbSyncTimer);
+      nbSyncTimer = setTimeout(nbSyncBar, 30);
+    });
+
+    document.addEventListener("mousedown", function (e) {
+      const t = e.target && e.target.nodeType === 1 ? e.target : null;
+      if (t && t.closest && t.closest("#nbBar, #nbMenu, #nbSub, #nbComments")) return;
+      nbCloseMenus();
+      if (!t || !t.closest || !t.closest("span[data-cm]")) nbCloseComments();
+    }, true);
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      if (nbSub && !nbSub.hidden) { nbSub.hidden = true; return; }
+      if (nbMenu && !nbMenu.hidden) { nbMenu.hidden = true; return; }
+      if (nbCmPanel && !nbCmPanel.hidden) { nbCloseComments(); return; }
+      nbHideBar();
+    });
+
+    // Clicking a comment anchor or a suggestion opens what belongs to it.
+    document.addEventListener("click", function (e) {
+      const t = e.target && e.target.nodeType === 1 ? e.target : null;
+      if (!t || !t.closest) return;
+      const cm = t.closest("span[data-cm]");
+      if (cm && nbEditorOf(cm)) {
+        e.preventDefault();
+        nbOpenComments(nbEditorOf(cm), cm.getAttribute("data-cm"), cm.getBoundingClientRect());
+        return;
+      }
+      const sug = t.closest("span[data-sug]");
+      if (sug && nbEditorOf(sug)) {
+        e.preventDefault();
+        nbSuggestionMenu(sug, sug.getBoundingClientRect());
+      }
+    });
+
+    window.addEventListener("resize", nbHideBar);
 
     // Migrates anyone who already renamed/typed into the previous separate
     // title+body fields (from earlier in this same build) into the merged
@@ -11797,11 +14072,27 @@
       if (p) p.hidden = true;
     }
 
+    /* Paints the destination line. Async because resolving it may need one
+       page_get; the popup opens immediately either way and the line fills in,
+       rather than holding the whole chooser back on a network round trip. */
+    function paintPageKindDest() {
+      const wrap = document.getElementById("pkDest");
+      const nameEl = document.getElementById("pkDestName");
+      if (!wrap || !nameEl || !window.__mpsNotionLibrary) return;
+      wrap.hidden = false;
+      nameEl.textContent = "…";
+      window.__mpsNotionLibrary.destination().then(function (d) {
+        if (!d) { wrap.hidden = true; return; }
+        nameEl.textContent = (d.icon ? d.icon + " " : "") + d.title;
+      }).catch(function () { wrap.hidden = true; });
+    }
+
     function openPageKindPopup(anchorBtn) {
       const o = document.getElementById("pageKindOverlay");
       const pop = document.getElementById("pageKindPopup");
       if (!o || !pop) { newEmptyPageWidget(); return; }
       o.hidden = false; pop.hidden = false;
+      paintPageKindDest();
       // Centred rather than anchored: the "+" popup it replaces has already
       // closed, so there is nothing left on screen to hang off.
       pop.style.left = Math.round((window.innerWidth - pop.offsetWidth) / 2) + "px";
@@ -11815,6 +14106,12 @@
       o.addEventListener("click", closePageKindPopup);
       document.addEventListener("keydown", function (e) {
         if (e.key === "Escape" && !pop.hidden) closePageKindPopup();
+      });
+      const change = document.getElementById("pkDestChange");
+      if (change) change.addEventListener("click", function (e) {
+        e.stopPropagation();
+        closePageKindPopup();
+        if (window.__mpsNotionLibrary) window.__mpsNotionLibrary.chooseDestination();
       });
       Array.prototype.forEach.call(pop.querySelectorAll("[data-page-kind]"), function (b) {
         b.addEventListener("click", function () {
@@ -12590,7 +14887,14 @@
         // .note-widget hides .section-header-title-group entirely.
         const wrap = widgetEl(id);
         const ed = wrap && wrap.querySelector(".note-editor");
-        const firstLine = ed ? String(ed.textContent || "").split("\n")[0].trim() : "";
+        /* Blocks concatenate without separators under .textContent, so the
+           Page's first line has to come from the block model rather than
+           from the raw text -- otherwise every line of the Page runs together
+           into one very long tab label. */
+        const text = ed
+          ? (window.__mpsNoteText ? window.__mpsNoteText(ed) : String(ed.textContent || ""))
+          : "";
+        const firstLine = String(text).split("\n")[0].trim();
         return firstLine || "Untitled";
       }
       const label = WIDGET_FAMILY_LABEL[family];
@@ -21025,6 +23329,42 @@
     return wrap;
   }
 
+  /* The "Pages sync to -> X" line. Also the one place the self-healing
+     re-pick becomes visible: by the time this is read the recovery has
+     already run, so it is phrased as a notice about what happened, not as a
+     task waiting to be done. */
+  function notionDestLine() {
+    const wrap = el("div", "mps-dest-line");
+    const lead = el("span", null, "Pages sync to");
+    wrap.appendChild(lead);
+    const name = el("span", "mps-dest-name", "…");
+    wrap.appendChild(name);
+    const change = el("button", "mps-dest-change", "Change");
+    change.type = "button";
+    change.addEventListener("click", function () {
+      if (!window.__mpsNotionLibrary) return;
+      window.__mpsNotionLibrary.chooseDestination(function () { renderCxMain(); });
+    });
+    wrap.appendChild(change);
+
+    if (window.__mpsNotionLibrary) {
+      window.__mpsNotionLibrary.destination().then(function (d) {
+        if (!d) {
+          wrap.classList.add("is-warn");
+          lead.textContent = "No page shared with the integration yet — nothing to sync into";
+          name.textContent = "";
+          return;
+        }
+        name.textContent = (d.icon ? d.icon + " " : "") + d.title;
+      }).catch(function () {
+        wrap.classList.add("is-warn");
+        lead.textContent = "Could not read the destination";
+        name.textContent = "";
+      });
+    }
+    return wrap;
+  }
+
   function statusCell(c) {
     if (c.id === "notion") {
       if (notionState && notionState.connected) return notionConnectedCell();
@@ -21121,6 +23461,9 @@
       st.appendChild(statusCell(c));
       tr.appendChild(st);
       table.appendChild(tr);
+      if (c.id === "notion" && notionState && notionState.connected) {
+        table.appendChild(notionDestLine());
+      }
     });
     root.appendChild(table);
   }
