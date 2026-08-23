@@ -8350,7 +8350,12 @@
     }
   }
 
-  function notionBlocksFromHtml(html) {
+  // Plain text of one line's worth of nodes, for comparing against a title.
+  function notionLinePlain(rich) {
+    return rich.map(function (r) { return r.text.content; }).join("").replace(/\s+/g, " ").trim();
+  }
+
+  function notionBlocksFromHtml(html, dropTitle) {
     const root = document.createElement("div");
     root.innerHTML = String(html || "");
 
@@ -8385,6 +8390,28 @@
       // A wholly empty line is still a paragraph -- it is the user's spacing.
       blocks.push({ object: "block", type: type, [type]: { rich_text: rich } });
     });
+
+    /* Notion renders the page title above the body, so a first line that IS
+       the title showed up twice on the page. Dropped here and put back on the
+       way in (see notionHtmlFromBlocks), which keeps this app's convention --
+       first line names the page -- without duplicating it over there. Only
+       when it actually matches: a Page with a name of its own, different from
+       its opening line, must not lose that line. */
+    if (dropTitle) {
+      const want = String(dropTitle).replace(/\s+/g, " ").trim();
+      while (blocks.length) {
+        const b0 = blocks[0];
+        const p0 = notionLinePlain((b0[b0.type] && b0[b0.type].rich_text) || []);
+        if (p0 === want) { blocks.shift(); continue; }
+        // A blank line straight after the title is spacing that belonged to it.
+        if (!p0 && blocks.length > 1) {
+          const b1 = blocks[1];
+          const p1 = notionLinePlain((b1[b1.type] && b1[b1.type].rich_text) || []);
+          if (p1 === want) { blocks.shift(); continue; }
+        }
+        break;
+      }
+    }
 
     // Trailing blank paragraphs are an artifact of how contenteditable ends,
     // not content; they would otherwise accumulate on every round trip.
@@ -8516,7 +8543,7 @@
     const payload = {
       parent: { page_id: parent },
       properties: { title: [{ type: "text", text: { content: meta.title } }] },
-      children: notionBlocksFromHtml(html).slice(0, NOTION_BLOCKS_MAX)
+      children: notionBlocksFromHtml(html, meta.title).slice(0, NOTION_BLOCKS_MAX)
     };
     const icon = notionIconProp(meta.icon);
     if (icon) payload.icon = icon;
@@ -8544,7 +8571,7 @@
     for (const b of existing) {
       await notionCall({ action: "block_delete", block_id: b.id });
     }
-    const blocks = notionBlocksFromHtml(html);
+    const blocks = notionBlocksFromHtml(html, notionMetaFor(row.local_key, html).title);
     for (let i = 0; i < blocks.length; i += NOTION_BLOCKS_MAX) {
       const chunk = blocks.slice(i, i + NOTION_BLOCKS_MAX);
       const r = await notionCall({ action: "blocks_append",
@@ -8561,10 +8588,29 @@
     return true;
   }
 
-  async function notionPullPage(row) {
+  async function notionPullPage(row, localHtml, title) {
     const listed = await notionCall({ action: "blocks_list", block_id: row.notion_page_id });
     if (!listed || !listed.ok) return null;
-    return notionHtmlFromBlocks((listed.body && listed.body.results) || []);
+    let html = notionHtmlFromBlocks((listed.body && listed.body.results) || []);
+
+    /* Put the title line back, since push strips it. Only when this page
+       actually keeps its name on the first line -- checked against what is
+       stored locally right now, so a Page carrying a name of its own never
+       has one injected that it never had. Without this the two halves are
+       asymmetric and every pull quietly eats the opening line. */
+    if (title) {
+      const want = String(title).replace(/\s+/g, " ").trim();
+      const d = document.createElement("div");
+      d.innerHTML = String(localHtml || "");
+      const firstLocal = (d.textContent || "").split("\n")[0].replace(/\s+/g, " ").trim();
+      const d2 = document.createElement("div");
+      d2.innerHTML = html;
+      const firstRemote = (d2.textContent || "").split("\n")[0].replace(/\s+/g, " ").trim();
+      if (firstLocal === want && firstRemote !== want) {
+        html = notionEscapeHtml(title) + "<br><br>" + html;
+      }
+    }
+    return html;
   }
 
   /* One tick. Deliberately a single /search to learn what changed on Notion's
@@ -8632,7 +8678,8 @@
 
         // ---- pull ----
         if (remoteIsNewer) {
-          const html = await notionPullPage(row);
+          const html = await notionPullPage(row, page.html,
+                                             notionMetaFor(page.key, page.html).title);
           if (html == null) continue;
 
           /* Bring the page's icon and title back too, so changing the emoji
