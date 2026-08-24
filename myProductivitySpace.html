@@ -972,6 +972,11 @@
   }
   .widget-icon-btn:hover { background: #f2f2f2; color: #000000; }
   .col.collapsible-col-wrap:hover .widget-icon-btn,
+  /* Bookmarks in its floating-bar form is a .links-row-wrap, not a grid
+     .col, so the hover rule above never reaches it -- without this its icon
+     button would be permanently invisible until an emoji was somehow set,
+     which is the same as not having one. */
+  .links-row-wrap:hover .widget-icon-btn,
   .widget-icon-btn.has-icon,
   .widget-icon-btn:focus { opacity: 1; }
   .widget-icon-display { display: flex; align-items: center; justify-content: center; }
@@ -4785,6 +4790,28 @@
   var roots = [];
   var links = []; // {id, a, b} — connects two root-level task ids with a plain line, no dependency logic
 
+  /* Whether the stored tree has actually been READ yet.
+
+     Everything below turns on the difference between "the board is empty" and
+     "we do not know what the board is". Both look like roots === [] in
+     memory, and one of them must never be written back.
+
+     The read is slow in a way that is easy to miss: window.storage.get goes
+     through the parent's storageGet, which waits on the cloud layer's
+     hydration before answering anything -- sign-in, then a pull of every
+     synced row. Seconds, on a cold load. Meanwhile this frame is alive, and
+     the three autosave listeners below are already armed.
+
+     So: open the dashboard, and before hydration lands, switch tabs. The
+     visibilitychange listener fires save(), which writes {roots:[],links:[]}
+     -- the empty value this frame started with -- over the real tree, in
+     localStorage and then (marked dirty) up to the server. Come back and the
+     board is blank. Closing or reloading the tab did the same thing through
+     pagehide/beforeunload. That is the "it reverts to nothing" report, and
+     the "previous version" one is the same race losing to a stale local copy
+     instead of an empty one. */
+  var loadedOk = false;
+
   async function load(){
     try{
       var result = await window.storage.get(KEY, true); // shared: same tasks for every user
@@ -4801,12 +4828,25 @@
             r.id = "task:" + r.id;
           }
         });
+        loadedOk = true;
         return;
       }
+      // A clean read that found nothing is still a successful read: this is a
+      // genuinely empty board, and saving over it later is correct.
+      roots = []; links = [];
+      loadedOk = true;
+      return;
     }catch(e){}
+    /* The read failed. Leave loadedOk false, which keeps save() shut for the
+       rest of this frame's life: an empty tree here means "unknown", and
+       writing it would destroy whatever is really stored. Losing this
+       session's edits is recoverable; overwriting every task is not. */
     roots = []; links = [];
   }
+
   async function save(){
+    // Never write a state that was never read. See loadedOk above.
+    if(!loadedOk) return;
     try{ await window.storage.set(KEY, JSON.stringify({roots:roots, links:links}), true); }catch(e){} // shared
   }
 
@@ -4815,6 +4855,8 @@
   // throughout), but this guarantees a final flush right before the tab/window
   // actually goes away or is hidden (covers closing, refreshing, switching tabs,
   // backgrounding on mobile, etc.)
+  // Each is a no-op until the first load has landed -- these three are the
+  // ones that used to fire during the gap and blank the board.
   window.addEventListener("beforeunload", save);
   window.addEventListener("pagehide", save);
   document.addEventListener("visibilitychange", function(){
@@ -15097,6 +15139,19 @@
       setTitle: function (id, name) { try { setWidgetTitle(id, name); } catch (e) {} }
     };
 
+    /* Bookmarks builds its own header markup rather than carrying the static
+       one every other widget has, and rebuilds it from scratch on each render
+       -- so it needs to attach the icon button itself, and re-attach it every
+       time. Exposed for the same reason __applyWidgetTitle is. */
+    window.__wireWidgetIcon = function (btn) {
+      try { wireIconButton(btn); } catch (e) {}
+    };
+    window.__applyWidgetIcon = function (id) {
+      try { applyWidgetIcon(id); } catch (e) {}
+    };
+    // The blank-face placeholder every widget shows before an emoji is picked.
+    window.__mpsDefaultIconSvg = DEFAULT_ICON_SVG;
+
     function setWidgetTitle(id, name) {
       const trimmed = (name || "").trim();
       // Clearing the field, or typing the original name back, both mean "no
@@ -18312,10 +18367,68 @@
     // Position timed events absolutely inside their day's 00:00 slot, so an
     // event's height can express its true duration rather than being forced
     // into a single hour cell.
+    // Two things at the same time must sit side by side, not on top of each
+    // other. Everything absolutely positioned in a day column -- timed events
+    // and timed tasks alike -- goes through here together, so a task at 2pm
+    // and a meeting at 2pm split the width rather than one hiding the other.
+    //
+    // Items are grouped into clusters of mutually overlapping blocks, and each
+    // cluster is divided into as many columns as it actually needs. Clusters
+    // are independent: a busy 9am does not narrow a lone 4pm. Within a cluster
+    // a block takes the first column whose previous occupant has already
+    // ended, which is the usual greedy interval-partitioning rule and gives
+    // the minimum number of columns.
+    function layoutOverlapping(items) {
+      if (items.length < 2) return;
+      items.sort(function (a, b) {
+        return a.startMin - b.startMin || b.endMin - a.endMin;
+      });
+
+      let cluster = [];
+      let clusterEnd = -1;
+
+      function flush() {
+        if (!cluster.length) return;
+        const colEnds = [];
+        cluster.forEach(function (it) {
+          let col = 0;
+          // Strictly greater: a block starting exactly when another ends is
+          // not an overlap, so it may reuse that column.
+          while (col < colEnds.length && colEnds[col] > it.startMin) col++;
+          it.col = col;
+          colEnds[col] = it.endMin;
+        });
+        const cols = colEnds.length;
+        if (cols > 1) {
+          cluster.forEach(function (it) {
+            const width = 100 / cols;
+            it.el.style.left = (it.col * width) + "%";
+            // calc() keeps the 1px gutter the full-width rule used, so
+            // neighbours read as separate blocks rather than one striped one.
+            it.el.style.width = "calc(" + width + "% - 2px)";
+            it.el.style.right = "auto";
+            it.el.style.marginLeft = "1px";
+          });
+        }
+        cluster = [];
+      }
+
+      items.forEach(function (it) {
+        if (cluster.length && it.startMin >= clusterEnd) flush();
+        cluster.push(it);
+        clusterEnd = cluster.length === 1
+          ? it.endMin
+          : Math.max(clusterEnd, it.endMin);
+      });
+      flush();
+    }
+
     days.forEach(function (day) {
       const dayEvents = events.filter(function (e) { return !e.allDay && sameDay(e.start, day); });
       const anchorSlot = wrap.querySelector('.cal-tg-slot[data-hour="0"][data-day="' + ymd(day) + '"]');
       if (!anchorSlot) return;
+      // Collected across both loops below, then laid out once per day.
+      const placed = [];
       dayEvents.forEach(function (e) {
         const startMin = e.start.getHours() * 60 + e.start.getMinutes();
         const endMin = Math.max(startMin + 20, e.end.getHours() * 60 + e.end.getMinutes());
@@ -18382,6 +18495,7 @@
           openItemEditor(nsId, e.title);
         });
         anchorSlot.appendChild(box);
+        placed.push({ startMin: startMin, endMin: endMin, el: box });
       });
 
       // A task with a due TIME gets the same absolute-positioned treatment
@@ -18409,7 +18523,12 @@
         chip.style.top = (startMin / 60) * HOUR_H + "px";
         chip.style.height = height + "px";
         anchorSlot.appendChild(chip);
+        // The 30-minute block the comment above describes is also its extent
+        // for overlap purposes.
+        placed.push({ startMin: startMin, endMin: startMin + 30, el: chip });
       });
+
+      layoutOverlapping(placed);
     });
   }
 
@@ -22854,9 +22973,20 @@
     // scratch on every render.
     header.innerHTML =
       '<div class="section-header-title-group">' +
+        '<button type="button" class="widget-icon-btn" data-icon-btn="' + cfg.id + '" title="Add icon">' +
+          '<span class="widget-icon-display" data-icon-display="' + cfg.id + '">' +
+            (window.__mpsDefaultIconSvg || "") +
+          '</span>' +
+        '</button>' +
         '<span class="section-header-title" data-widget-title-id="' + cfg.id + '">Bookmarks</span>' +
       '</div>';
     wrapEl.appendChild(header);
+    /* Wired and painted on every render, not once at startup: this header is
+       replaced wholesale each time (see the note on the title above), so the
+       listener and the chosen emoji would both be thrown away with the old
+       node otherwise. */
+    if (window.__wireWidgetIcon) window.__wireWidgetIcon(header.querySelector("[data-icon-btn]"));
+    if (window.__applyWidgetIcon) window.__applyWidgetIcon(cfg.id);
     if (window.__applyWidgetTitle) window.__applyWidgetTitle(cfg.id);
 
     var controls = document.createElement("div");
@@ -22925,7 +23055,14 @@
     el.innerHTML =
       '<div class="collapsible-body">' +
         '<div class="section-header">' +
-          '<div class="section-header-title-group"><span class="section-header-title">Bookmarks</span></div>' +
+          '<div class="section-header-title-group">' +
+            '<button type="button" class="widget-icon-btn" data-icon-btn="' + cfg.id + '" title="Add icon">' +
+              '<span class="widget-icon-display" data-icon-display="' + cfg.id + '">' +
+                (window.__mpsDefaultIconSvg || "") +
+              '</span>' +
+            '</button>' +
+            '<span class="section-header-title">Bookmarks</span>' +
+          '</div>' +
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + cfg.id + '" title="Drag to reorder Bookmarks">' + DRAG_HANDLE_SVG + '</button>' +
             '<button type="button" class="collapse-btn links-edit-btn" title="Edit bookmarks">' + EDIT_ICON_SVG + '</button>' +
@@ -22937,6 +23074,9 @@
       '</div>';
     wireEditBtn(el);
     wireRemoveBtn(el);
+    // Built once and kept (see the note above), so wiring it once is enough.
+    if (window.__wireWidgetIcon) window.__wireWidgetIcon(el.querySelector("[data-icon-btn]"));
+    if (window.__applyWidgetIcon) window.__applyWidgetIcon(cfg.id);
     // Wired by the widget-layout script, which owns the maximized state.
     if (window.__wireWidgetFullscreen) window.__wireWidgetFullscreen(el);
     return el;
