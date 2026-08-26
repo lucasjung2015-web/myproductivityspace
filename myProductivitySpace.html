@@ -134,7 +134,12 @@
      measured, not assumed. Padding html shrinks the initial containing block,
      which is what actually moves the grid out from under the panel. */
   html { padding-right: var(--ai-panel-w); }
-  html.ai-panel-open { --ai-panel-w: 360px; }
+  /* The panel's width is the user's, dragged from its left edge and stored;
+     360px is only the starting point. Two variables rather than one because
+     --ai-panel-w is the GUTTER, which the full-screen modes below zero out
+     while the panel keeps whatever width it was given -- collapsing the
+     gutter must not also forget how wide the panel is. */
+  html.ai-panel-open { --ai-panel-w: var(--ai-panel-user-w, 360px); }
   /* Declared AFTER .ai-panel-open deliberately — equal specificity, so source
      order decides. Each full-screen mode owns the whole viewport, so the
      sidebar folds away and the content reclaims its width (the panel itself is
@@ -2693,10 +2698,27 @@
      panel to 0px wide instead of simply hiding it. */
   #aiPanel {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: 2500;
-    width: 360px; background: var(--bg); border-left: 1px solid var(--hair);
+    width: var(--ai-panel-user-w, 360px); background: var(--bg); border-left: 1px solid var(--hair);
     display: flex; flex-direction: column; min-height: 0;
   }
   #aiPanel[hidden] { display: none; }
+  /* The panel's own edge, dragged to set its width -- the same 2px hairline
+     the grid's column resizers use, so the two read as one gesture. It sits
+     ON the border rather than inside the padding, which is why it is pulled
+     half its width to the left of the panel's own box. */
+  .ai-resizer {
+    position: absolute; top: 0; bottom: 0; left: -5px; width: 10px; z-index: 3;
+    cursor: col-resize; -webkit-tap-highlight-color: transparent;
+  }
+  .ai-resizer::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%;
+    width: 2px; background: var(--ink); opacity: 0; transform: translateX(-50%);
+    transition: opacity 0.12s ease;
+  }
+  .ai-resizer:hover::after, .ai-resizer.dragging::after { opacity: 0.45; }
+  /* No transition on the panel while it is being dragged, or the edge lags
+     behind the pointer. */
+  html.ai-panel-resizing, html.ai-panel-resizing body { cursor: col-resize; user-select: none; }
   .ai-head {
     flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
     padding: 12px 14px; border-bottom: 1px solid var(--hair);
@@ -3419,6 +3441,7 @@
 <!-- The docked AI sidebar. Its width is mirrored by --ai-panel-w so the board
      and the corner buttons make room for it; see the :root declaration. -->
 <aside id="aiPanel" hidden>
+  <div class="ai-resizer" id="aiResizer" title="Drag to resize" role="separator" aria-orientation="vertical"></div>
   <div class="ai-head">
     <span class="ai-head-mark"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></span>
     <span class="ai-head-title">myProductivitySpace AI</span>
@@ -12002,10 +12025,31 @@
         const start = pointXY(e);
         const MOVE_THRESHOLD = 6;
 
+        /* Where the insertion bar is drawn for a given target and zone.
+           Left/right insert a whole new COLUMN beside the target's section,
+           so the bar belongs on the section -- full height of the grid,
+           however many widgets are stacked in it -- rather than on the one
+           widget the pointer happens to be over, which drew a short line
+           against half a column and read as "it goes next to this widget".
+           Top/bottom really are about that one widget (the dragged widget
+           joins its stack above or below it), so those stay on the widget. */
+        function dropHostFor(el, zone) {
+          if (zone !== "left" && zone !== "right") return { node: el, cls: "col-drop-" + zone };
+          const slot = el.parentElement;
+          if (slot && slot.classList.contains("col-slot")) return { node: slot, cls: "section-drop-" + zone };
+          return { node: el, cls: "col-drop-" + zone };
+        }
+
         function clearHighlight() {
           if (dropTargetId) {
             const el = widgetEl(dropTargetId);
-            if (el) el.classList.remove("col-drop-left", "col-drop-right", "col-drop-top", "col-drop-bottom");
+            if (el) {
+              el.classList.remove("col-drop-left", "col-drop-right", "col-drop-top", "col-drop-bottom");
+              const slot = el.parentElement;
+              if (slot && slot.classList.contains("col-slot")) {
+                slot.classList.remove("section-drop-left", "section-drop-right");
+              }
+            }
           }
           dropTargetId = null;
           dropZone = null;
@@ -12098,7 +12142,8 @@
             else if (relX > 1 - edge) dropZone = "right";
             else dropZone = relY < 0.5 ? "top" : "bottom";
             dropTargetId = match.id;
-            match.el.classList.add("col-drop-" + dropZone);
+            const host = dropHostFor(match.el, dropZone);
+            host.node.classList.add(host.cls);
           }
           ev.preventDefault();
         }
@@ -26703,6 +26748,75 @@
     if (persist !== false) window.storageSet(AI_OPEN_KEY, open ? "true" : "false");
   }
 
+  /* ---------------- the panel's own width ----------------
+     Dragged from the left edge. Only the custom property moves: the panel
+     reads it for its width and <html> reads it for the gutter, so the board
+     reflows out from under the panel on the same frame, with no second
+     write to keep in step. Clamped against the viewport rather than a fixed
+     maximum, so the panel can never be dragged wider than the window. */
+  const AI_WIDTH_KEY = "ai-panel-width";
+  const AI_MIN_W = 280;
+  function aiMaxWidth() { return Math.max(AI_MIN_W, Math.min(880, Math.round(window.innerWidth * 0.7))); }
+  function setAiPanelWidth(px, persist) {
+    const w = Math.round(Math.max(AI_MIN_W, Math.min(aiMaxWidth(), px)));
+    document.documentElement.style.setProperty("--ai-panel-user-w", w + "px");
+    if (persist) window.storageSet(AI_WIDTH_KEY, String(w));
+    return w;
+  }
+
+  const aiResizer = $("aiResizer");
+  if (aiResizer) {
+    aiResizer.addEventListener("mousedown", startAiResize);
+    aiResizer.addEventListener("touchstart", startAiResize, { passive: false });
+    // Keyboard: the handle is a real separator, so arrows move it too.
+    aiResizer.tabIndex = 0;
+    aiResizer.addEventListener("keydown", function (e) {
+      const step = e.shiftKey ? 40 : 10;
+      if (e.key === "ArrowLeft") { e.preventDefault(); setAiPanelWidth(aiPanel.getBoundingClientRect().width + step, true); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); setAiPanelWidth(aiPanel.getBoundingClientRect().width - step, true); }
+    });
+  }
+
+  function startAiResize(e) {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.touches && e.touches.length ? e.touches[0].clientX : e.clientX;
+    const startW = aiPanel.getBoundingClientRect().width;
+    aiResizer.classList.add("dragging");
+    document.documentElement.classList.add("ai-panel-resizing");
+
+    function onMove(ev) {
+      if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
+      const x = ev.touches && ev.touches.length ? ev.touches[0].clientX : ev.clientX;
+      // Dragging LEFT widens it: the panel is pinned to the right edge, so
+      // the delta is inverted relative to a column resizer.
+      setAiPanelWidth(startW + (startX - x), false);
+      ev.preventDefault();
+    }
+    function onUp() {
+      aiResizer.classList.remove("dragging");
+      document.documentElement.classList.remove("ai-panel-resizing");
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+      setAiPanelWidth(aiPanel.getBoundingClientRect().width, true);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onUp);
+  }
+
+  // A window narrowed past the stored width would leave the panel wider than
+  // the viewport, so the clamp is re-applied rather than only enforced while
+  // dragging. Not persisted: shrinking the window shouldn't overwrite the
+  // width the user chose for a larger one.
+  window.addEventListener("resize", function () {
+    const w = aiPanel.getBoundingClientRect().width;
+    if (w > aiMaxWidth()) setAiPanelWidth(w, false);
+  });
+
   if (aiPanelBtn) {
     aiPanelBtn.addEventListener("click", function () { setAiPanelOpen(aiPanel.hidden, true); });
   }
@@ -26727,6 +26841,12 @@
   });
 
   (async function bootPanels() {
+    let savedWidth = null;
+    try { savedWidth = await window.storageGet(AI_WIDTH_KEY); } catch (e) {}
+    if (savedWidth) {
+      const n = parseInt(savedWidth, 10);
+      if (!isNaN(n)) setAiPanelWidth(n, false);
+    }
     let saved = null;
     try { saved = await window.storageGet(AI_OPEN_KEY); } catch (e) {}
     // storageGet returns null ONLY for a key that was never written, so a
