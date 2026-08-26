@@ -17009,9 +17009,25 @@
     const everydayCount = chineseCount - businessCount;
 
     const mode = config.mode === "shuffle" ? "shuffle" : "rotation";
-    const englishWords = pickWords(bankFor(config, "english", ENGLISH_WORDS), englishCount, periodDays, mode);
-    const businessWords = pickWords(bankFor(config, "business", BUSINESS_TERMS), businessCount, periodDays, mode);
-    const everydayWords = pickWords(bankFor(config, "literary", EVERYDAY_TERMS), everydayCount, periodDays, mode);
+    /* In shuffle mode the widget's own history is the memory: anything shown
+       in the last 300 draws is set aside before the pick, so "log the word
+       and don't repeat it" is literally what happens. Only when the bank has
+       nothing unseen left does the draw fall back to the whole bank. */
+    let unseen = function (list) { return list; };
+    if (mode === "shuffle") {
+      const h = await getHistory();
+      const seenW = {}, seenP = {};
+      (h.words || []).forEach(function (w) { seenW[String(w).toLowerCase()] = true; });
+      (h.phrases || []).forEach(function (p) { seenP[String(p)] = true; });
+      unseen = function (list, isChinese) {
+        const seen = isChinese ? seenP : seenW;
+        const fresh = list.filter(function (w) { return !seen[isChinese ? String(w) : String(w).toLowerCase()]; });
+        return fresh.length ? fresh : list;
+      };
+    }
+    const englishWords = pickWords(unseen(bankFor(config, "english", ENGLISH_WORDS), false), englishCount, periodDays, mode);
+    const businessWords = pickWords(unseen(bankFor(config, "business", BUSINESS_TERMS), true), businessCount, periodDays, mode);
+    const everydayWords = pickWords(unseen(bankFor(config, "literary", EVERYDAY_TERMS), true), everydayCount, periodDays, mode);
 
     const [englishEntries, businessEntries, everydayEntries] = await Promise.all([
       resolveEnglishEntries(englishWords),
@@ -17085,7 +17101,7 @@
       settings: { languages: cfg.languages.slice(), frequency: cfg.frequency, counts: Object.assign({}, cfg.counts), mode: mode,
                   is_default: !liveConfig || liveConfig === DEFAULT_VOCAB_CONFIG },
       pick_mode: mode === "shuffle"
-        ? "shuffle: each period draws a fresh random set from the bank (seeded by the period, so every device agrees)."
+        ? "shuffle: each period draws a fresh random set from the bank, skipping anything in the widget's history (last 300 shown) so nothing repeats until the bank is exhausted. Seeded by the period, so every device agrees."
         : "rotation: the bank is walked in order, one block per period, wrapping around when it ends.",
       banks: {
         note: "These are the lists words are drawn from. The AI can replace, extend or prune any of them with configure_vocab; nothing is fixed. A bank marked custom was written by the user or the AI; otherwise it is the built-in default.",
@@ -26081,7 +26097,7 @@
     /* ---- vocabulary ---- */
     {
       name: "configure_vocab",
-      description: "Change how a Vocabulary widget works. Settings: languages (ids from read_widget's options), frequency (daily|3days|weekly), counts (words per language, keyed by language id), mode (rotation = walk the bank in order; shuffle = a fresh random draw each period). The word banks themselves are editable too: pass english_words / business_terms / literary_terms as arrays with bank_action replace (default), append (add to the current bank, duplicates dropped) or remove (reset that bank to the built-in default). You can author these lists yourself -- e.g. to make English 'ongoing' rather than a fixed rotation, append a few hundred fresh advanced words and set mode to shuffle. Read the current banks with read_widget first. Every Vocabulary widget shares one config.",
+      description: "Change how a Vocabulary widget works. Settings: languages (ids from read_widget's options), frequency (daily|3days|weekly), counts (words per language, keyed by language id), mode (rotation = walk the bank in order; shuffle = a fresh random draw each period). The word banks themselves are editable too: pass english_words / business_terms / literary_terms as arrays with bank_action replace (default), append (add to the current bank, duplicates dropped) or remove (reset that bank to the built-in default). You can author these lists yourself -- e.g. to make English 'ongoing' rather than a fixed rotation, append fresh advanced words and set mode to shuffle: in shuffle mode the draw skips anything in the widget's own history (the last 300 shown), so words never repeat until the bank is exhausted. Send at most 120 words per call and append in further calls -- a larger list is cut off at the output limit. Read the current banks with read_widget first. Every Vocabulary widget shares one config.",
       input_schema: {
         type: "object",
         properties: {
@@ -26615,7 +26631,7 @@
         model: AI_MODEL,
         // A custom widget's code alone can run past 1024; a tool_use block
         // cut off mid-JSON arrives as input {} and fails silently.
-        max_tokens: 4096,
+        max_tokens: 8192,
         stream: true,
         system: systemPrompt(),
         tools: AI_TOOLS,
@@ -26663,7 +26679,15 @@
         const blk = blocks[ev.index];
         if (blk && blk.type === "tool_use") {
           try { blk.input = blk._json ? JSON.parse(blk._json) : {}; }
-          catch (e) { blk.input = {}; }
+          catch (e) {
+            // The JSON never closed: the output limit cut the model off
+            // mid-argument. Running the tool with {} would produce a
+            // misleading "widget_id is required", and the model would
+            // retry the same too-large call. Flag it so the loop can say
+            // what actually happened.
+            blk.input = {};
+            blk.truncated = true;
+          }
           delete blk._json;
         }
       } else if (ev.type === "message_delta") {
@@ -27014,6 +27038,10 @@
           if (out === null && targetId) startFog(targetId, ui.label);
           const started = Date.now();
 
+          if (out === null && use.truncated) {
+            out = { error: "Your input for " + use.name + " was cut off at the output-token limit before the JSON was complete, so nothing ran. " +
+                           "Send it in smaller pieces: for word banks, at most 120 words per call, then further calls with bank_action 'append'; for widget code, keep html/css/js concise or split across create and update calls." };
+          }
           if (out === null) {
             try { out = await runTool(use.name, use.input); }
             catch (e) { out = { error: String((e && e.message) || e) }; }
