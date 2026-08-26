@@ -15514,6 +15514,13 @@
           const c = window.__customWidgets.read(id);
           return c ? "v" + c.version + (c.lastError ? ", has a runtime error" : "") : "";
         }
+        if (type === "vocab" && window.__vocabInfo) {
+          const v = window.__vocabInfo();
+          const parts = [];
+          if (v.english.enabled) parts.push(v.english.words_per_period + " English");
+          if (v.chinese.enabled) parts.push(v.chinese.terms_per_period + " Chinese");
+          return parts.join(" + ") + " per " + (v.schedule.refresh_every_days === 1 ? "day" : v.schedule.refresh_every_days + " days");
+        }
       } catch (e) {}
       return "";
     }
@@ -15591,9 +15598,14 @@
           return api ? Object.assign(base, { entries: api.list() }) : Object.assign(base, { error: "Bookmarks is not ready yet." });
         }
         if (type === "vocab") {
+          // The generation module owns the truth here -- the registry's
+          // vocabSettings is only set on widgets created through the setup
+          // wizard, and is null on the original built-in one even while it
+          // is showing two languages' worth of content.
+          const info = window.__vocabInfo ? window.__vocabInfo() : null;
+          if (info) return Object.assign(base, info, { options: window.__vocabOptions || null });
           const s = (dynamicWidgets[id] && dynamicWidgets[id].vocabSettings) || null;
-          return Object.assign(base, { settings: s, options: window.__vocabOptions || null,
-            note: "Every Vocabulary widget mirrors the same generated content; settings are shared." });
+          return Object.assign(base, { settings: s, options: window.__vocabOptions || null });
         }
         if (type === "tasks" || type === "tasksView") {
           return window.__aiTasks ? Object.assign(base, window.__aiTasks.listTasks()) : Object.assign(base, { error: "Google Tasks is not connected." });
@@ -16887,29 +16899,82 @@
     return { english: englishEntries, chinese: chineseEntries };
   }
 
+  /* What is on screen right now, and how it got there -- kept so the AI
+     panel can describe this widget truthfully. The config used to live only
+     inside init()'s call, which is why the assistant once read "settings:
+     null" off a widget visibly showing two languages: the real config is
+     resolved here, defaults included, not on the widget's registry entry. */
+  let liveConfig = null, liveVocab = null, liveSource = null, liveError = null;
+
   async function init() {
     const config = await resolveVocabConfig();
+    liveConfig = config;
     const cacheKey = "daily-vocab-api-v5:" + dateKey + ":" + vocabCacheKeySuffix(config);
 
     // If today's vocab (for this config) is already cached, use it and stop — no repeat generation.
     const cached = await storageGet(cacheKey);
     if (cached) {
-      try { renderVocab(JSON.parse(cached)); return; } catch (e) { /* fall through */ }
+      try { liveVocab = JSON.parse(cached); liveSource = "cache"; liveError = null; renderVocab(liveVocab); return; } catch (e) { /* fall through */ }
     }
 
     // New day/config (or first load): select the next words from the preloaded vocabulary bank.
     showLoading();
     try {
       const vocab = await generateVocab(config);
+      liveVocab = vocab; liveSource = "live"; liveError = null;
       renderVocab(vocab);
       await storageSet(cacheKey, JSON.stringify(vocab));
       await updateHistory(vocab);
     } catch (e) {
       console.warn("Preloaded vocabulary selection failed, showing fallback:", e);
+      liveVocab = FALLBACK; liveSource = "fallback"; liveError = String((e && e.message) || e);
       renderVocab(FALLBACK);
       await storageSet(cacheKey, JSON.stringify(FALLBACK));
     }
   }
+
+  /* The widget, explained: schedule, sources, banks, what is showing today.
+     Every number here is read off the same constants and state the widget
+     runs on, so it cannot drift from what the widget actually does. */
+  window.__vocabInfo = function () {
+    const cfg = liveConfig || DEFAULT_VOCAB_CONFIG;
+    const period = periodDaysFor(cfg.frequency);
+    const wantE = cfg.languages.indexOf("english") !== -1;
+    const wantC = cfg.languages.indexOf("chinese") !== -1;
+    const eCount = wantE ? Math.max(1, cfg.counts.english || 1) : 0;
+    const cCount = wantC ? Math.max(1, cfg.counts.chinese || 1) : 0;
+    const v = liveVocab || { english: [], chinese: [] };
+    return {
+      settings: { languages: cfg.languages.slice(), frequency: cfg.frequency, counts: Object.assign({}, cfg.counts),
+                  is_default: !liveConfig || liveConfig === DEFAULT_VOCAB_CONFIG },
+      schedule: {
+        refresh_every_days: period,
+        description: "A new set is generated once every " + period + " day" + (period === 1 ? "" : "s") +
+          "; the day rolls over at 5:00 AM local time, not midnight. Within a period the same set is served from cache -- no repeat API calls.",
+        today_key: dateKey, todays_set_source: liveSource || "not loaded yet"
+      },
+      english: !wantE ? { enabled: false } : {
+        enabled: true, words_per_period: eCount,
+        source: "Live lookup against api.dictionaryapi.dev (free dictionary API), one request per word per period.",
+        rotation_bank_size: ENGLISH_WORDS.length,
+        rotation: "A fixed list of " + ENGLISH_WORDS.length + " advanced literary words, walked in order in blocks of " + eCount + " per period, wrapping around -- about " + Math.round(ENGLISH_WORDS.length / eCount * period) + " days before a word repeats.",
+        entry_format: "{ word, syllables (word split with dots), pronunciation (IPA in slashes), pos, meaning, example }",
+        showing_now: (v.english || []).map(function (e) { return { word: e.word, pos: e.pos, meaning: e.meaning, example: e.example }; })
+      },
+      chinese: !wantC ? { enabled: false } : {
+        enabled: true, terms_per_period: cCount,
+        source: "Live lookup against en.wiktionary.org (REST page HTML), scoped to the Chinese section, plus one request per character for pinyin/jyutping of multi-character terms.",
+        split: "Terms are split between two categories: business (" + Math.ceil(cCount / 2) + " per period) and literary/chengyu (" + (cCount - Math.ceil(cCount / 2)) + " per period).",
+        rotation_bank_sizes: { business: BUSINESS_TERMS.length, literary: EVERYDAY_TERMS.length },
+        romanization: "Every character carries both Mandarin pinyin (above) and Cantonese jyutping (below); each term has a template example sentence.",
+        entry_format: "{ characters[], pinyin, jyutping_chars[], meaning, type ('business'|'everyday'), example: { characters[], pinyin, jyutping_chars[], translation } }",
+        showing_now: (v.chinese || []).map(function (c) { return { term: (c.characters || []).join(""), pinyin: c.pinyin, jyutping: (c.jyutping_chars || []).join(" "), meaning: c.meaning, type: c.type }; })
+      },
+      history: "The last 300 words and 300 terms shown are kept under the 'vocab-history' key.",
+      last_error: liveError,
+      note: "Every Vocabulary widget on the board mirrors this same generated set; the settings are shared, and changing them (configure_vocab) regenerates for all of them."
+    };
+  };
 
   // Lets the "+" setup flow trigger an immediate re-generation right after
   // saving a new config, instead of the user having to reload the page to
@@ -26966,6 +27031,11 @@
     // Already has a gear — either one this module injected on an earlier pass,
     // or "Lists"' own customize button, which is the same affordance.
     if (controls.querySelector(".widget-settings-btn, .list-config-btn")) return;
+    // No gear until there is something behind it. A gear that opens onto
+    // "No settings configure yet" is a control that promises and doesn't
+    // deliver; the button appears the moment a module registers a real
+    // panel for this widget (see register() below), and not before.
+    if (!registry[id]) return;
 
     var btn = document.createElement("button");
     btn.type = "button";
@@ -27017,6 +27087,12 @@
     register: function (id, entry) {
       if (!id || !entry) return;
       registry[id] = entry;
+      // The widget's element usually exists before its module registers a
+      // panel (custom widgets wire after their DOM lands), and ensureGear
+      // skipped it back then because nothing was registered. Rescan now so
+      // the gear appears the moment there is something for it to open.
+      var el = document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]');
+      if (el) ensureGear(el);
       // A gear already open on this widget is showing the stale empty state.
       if (popEl && popAnchor && popAnchor.closest('[data-col-id="' + id + '"]')) {
         var btn = popAnchor;
