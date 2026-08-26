@@ -139,7 +139,11 @@
      --ai-panel-w is the GUTTER, which the full-screen modes below zero out
      while the panel keeps whatever width it was given -- collapsing the
      gutter must not also forget how wide the panel is. */
-  html.ai-panel-open { --ai-panel-w: var(--ai-panel-user-w, 360px); }
+  html.ai-panel-open { --ai-panel-w: calc(var(--ai-panel-user-w, 360px) + var(--ai-side-w, 0px)); }
+  /* The chat sidebar is ADDED to the panel's width rather than carved out of
+     it, so folding it away never squeezes the conversation; the user's own
+     dragged width is the conversation's alone. */
+  html.ai-side-open { --ai-side-w: 224px; }
   /* Declared AFTER .ai-panel-open deliberately — equal specificity, so source
      order decides. Each full-screen mode owns the whole viewport, so the
      sidebar folds away and the content reclaims its width (the panel itself is
@@ -1424,6 +1428,8 @@
        becomes a full-bleed sheet over the board instead. */
     html.ai-panel-open { --ai-panel-w: 0px; }
     #aiPanel { width: 100vw; }
+    html.ai-side-open { --ai-side-w: 0px; }
+    html.ai-side-open .ai-side { position: absolute; inset: 0 auto 0 0; width: 224px; z-index: 2; box-shadow: 4px 0 18px rgba(0,0,0,0.08); }
 
     .phrase-content { flex-direction: column; align-items: flex-start; gap: 6px; }
     .char-row { flex-wrap: wrap; }
@@ -2698,10 +2704,57 @@
      panel to 0px wide instead of simply hiding it. */
   #aiPanel {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: 2500;
-    width: var(--ai-panel-user-w, 360px); background: var(--bg); border-left: 1px solid var(--hair);
-    display: flex; flex-direction: column; min-height: 0;
+    width: calc(var(--ai-panel-user-w, 360px) + var(--ai-side-w, 0px)); background: var(--bg); border-left: 1px solid var(--hair);
+    display: flex; flex-direction: row; min-height: 0;
   }
   #aiPanel[hidden] { display: none; }
+  .ai-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  /* ---- saved-chats sidebar ---- */
+  .ai-side {
+    flex: 0 0 var(--ai-side-w, 0px); width: var(--ai-side-w, 0px); min-height: 0;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: #fafafa; border-right: 1px solid var(--hair);
+  }
+  html:not(.ai-side-open) .ai-side { display: none; }
+  html.ai-side-open .ai-head-side-btn { display: none; }
+  .ai-side-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; gap: 2px; padding: 10px 8px 4px; }
+  .ai-side-btn {
+    width: 30px; height: 30px; padding: 0; border: none; border-radius: 7px; background: transparent;
+    color: #8a8a8a; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .ai-side-btn:hover { background: #ededed; color: var(--ink); }
+  .ai-head-side-btn { margin: 0 2px 0 -4px; }
+  .ai-side-search {
+    flex: 0 0 auto; margin: 2px 10px 6px; padding: 7px 10px; border: 1px solid var(--hair); border-radius: 8px;
+    font-family: inherit; font-size: 13px; color: var(--ink); background: var(--bg); outline: none;
+  }
+  .ai-side-search:focus { border-color: var(--ink); }
+  .ai-side-search[hidden] { display: none; }
+  .ai-side-new {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 9px; margin: 2px 6px 0; padding: 8px 10px;
+    border: none; border-radius: 8px; background: transparent; color: var(--ink);
+    font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left;
+  }
+  .ai-side-new:hover { background: #ededed; }
+  .ai-side-new svg { color: #6b6b6b; flex: 0 0 auto; }
+  .ai-side-label { flex: 0 0 auto; padding: 14px 16px 4px; font-size: 13px; font-weight: 500; color: #8a8a8a; }
+  .ai-side-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 10px; }
+  .ai-side-item {
+    display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 8px;
+    font-size: 14px; color: var(--ink); cursor: pointer; line-height: 1.35;
+  }
+  .ai-side-item:hover { background: #ededed; }
+  .ai-side-item.is-active { background: #e6e6e6; }
+  .ai-side-item-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ai-side-item-x {
+    flex: 0 0 auto; width: 20px; height: 20px; padding: 0; border: none; border-radius: 5px;
+    background: transparent; color: #8a8a8a; cursor: pointer; opacity: 0;
+    display: flex; align-items: center; justify-content: center; transition: opacity 0.12s ease;
+  }
+  .ai-side-item:hover .ai-side-item-x, .ai-side-item-x:focus { opacity: 1; }
+  .ai-side-item-x:hover { background: #dedede; color: var(--ink); }
+  .ai-side-empty { padding: 6px 16px; font-size: 13px; color: #9a9a9a; }
   /* The panel's own edge, dragged to set its width -- the same 2px hairline
      the grid's column resizers use, so the two read as one gesture. It sits
      ON the border rather than inside the padding, which is why it is pulled
@@ -3478,7 +3531,23 @@
      and the corner buttons make room for it; see the :root declaration. -->
 <aside id="aiPanel" hidden>
   <div class="ai-resizer" id="aiResizer" title="Drag to resize" role="separator" aria-orientation="vertical"></div>
+  <!-- Saved chats. Every conversation is kept; the panel opens on a fresh one
+       and this column lists the rest, newest first, the way a chat app's
+       sidebar does. The rectangular button at its top right folds it away;
+       the same button reappears in the chat's own header while it is folded. -->
+  <div class="ai-side" id="aiSide">
+    <div class="ai-side-head">
+      <button type="button" class="ai-side-btn" id="aiSideSearchBtn" title="Search chats" aria-label="Search chats"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg></button>
+      <button type="button" class="ai-side-btn" id="aiSideToggle" title="Hide sidebar" aria-label="Hide sidebar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
+    </div>
+    <input type="text" class="ai-side-search" id="aiSideSearch" placeholder="Search chats" hidden>
+    <button type="button" class="ai-side-new" id="aiNewChatBtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>New chat</span></button>
+    <div class="ai-side-label">Recents</div>
+    <div class="ai-side-list" id="aiSideList"></div>
+  </div>
+  <div class="ai-main">
   <div class="ai-head">
+    <button type="button" class="ai-side-btn ai-head-side-btn" id="aiHeadSideToggle" title="Show sidebar" aria-label="Show sidebar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
     <span class="ai-head-mark"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></span>
     <span class="ai-head-title">myProductivitySpace AI</span>
     <button type="button" class="mps-x-btn" id="aiCloseBtn" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -3488,6 +3557,7 @@
   <div class="ai-composer">
     <textarea id="aiInput" rows="1" placeholder="Write a message..."></textarea>
     <button type="button" class="ai-send" id="aiSendBtn" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button>
+  </div>
   </div>
 </aside>
 
@@ -25653,6 +25723,20 @@
   const aiPanelBtn = $("aiPanelBtn");
   const AI_OPEN_KEY = "ai-panel-open";
 
+  /* ---------------- saved chats ----------------
+     Every conversation is kept, under its own key, with an index of titles
+     for the sidebar. The panel always opens on a fresh chat -- a chat only
+     enters the index once it has a first message, so the list never fills
+     with empties. Persistence rides on storageSet, so chats sync across
+     devices like everything else on the board. */
+  const CHATS_KEY = "ai-chats";
+  const SIDE_OPEN_KEY = "ai-sidebar-open";
+  const CHAT_MAX_MESSAGES = 80;
+  function chatKey(id) { return "ai-chat:" + id; }
+  let chats = [];               // [{ id, title, updatedAt, titled }]
+  let currentChatId = null;     // null until the first message of a fresh chat
+  let sideSearch = "";
+
   const messages = [];
   // Frozen when the panel opens, not when a message is sent: the requirement
   // is "whichever widget the user was last looking at WHEN THE PANEL WAS
@@ -26958,6 +27042,8 @@
 
     messages.push({ role: "user", content: clean });
     appendMessage("user", clean);
+    ensureChat(clean);
+    saveCurrentChat();
     // The starter row is an empty state, so it goes the moment there is a
     // real message, not when the panel closes.
     aiStarters.hidden = true;
@@ -27026,6 +27112,7 @@
         // to stay a legal message for the NEXT turn's history.
         if (!assistantContent.length) assistantContent = [{ type: "text", text: "(no response)" }];
         messages.push({ role: "assistant", content: assistantContent });
+        saveCurrentChat();
 
         if (!toolUses.length) {
           // Nothing streamed and nothing was called: the model ended the
@@ -27114,7 +27201,185 @@
       if (placeholder && placeholder.parentNode) placeholder.remove();
       setBusy(false);
       scrollLog();
+      saveCurrentChat();
+      maybeTitleChat();
     }
+  }
+
+  /* ---- the chat store ---- */
+  function newChatId() { return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function chatIndexEntry(id) { return chats.filter(function (c) { return c.id === id; })[0] || null; }
+
+  // A sidebar title before the model has named the chat: the first words
+  // of the first message, in Title Case, the way a subject line reads.
+  function deriveTitle(text) {
+    const words = String(text || "").replace(/[\n\r]+/g, " ").replace(/[^\p{L}\p{N}' ]+/gu, " ").trim().split(/\s+/).filter(Boolean).slice(0, 6);
+    if (!words.length) return "New chat";
+    return words.map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" ");
+  }
+
+  function ensureChat(firstText) {
+    if (currentChatId) return;
+    currentChatId = newChatId();
+    chats.unshift({ id: currentChatId, title: deriveTitle(firstText), updatedAt: Date.now(), titled: false });
+    renderSidebar();
+  }
+
+  // History can only be cut at a user message that is plain text: a
+  // tool_use with its tool_result sliced away is a request the API rejects.
+  function trimMessages() {
+    while (messages.length > CHAT_MAX_MESSAGES) {
+      messages.shift();
+      while (messages.length && !(messages[0].role === "user" && typeof messages[0].content === "string")) messages.shift();
+    }
+  }
+
+  function saveCurrentChat() {
+    if (!currentChatId) return;
+    trimMessages();
+    const entry = chatIndexEntry(currentChatId);
+    if (entry) entry.updatedAt = Date.now();
+    chats.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+    try {
+      window.storageSet(chatKey(currentChatId), JSON.stringify({ id: currentChatId, messages: messages }));
+      window.storageSet(CHATS_KEY, JSON.stringify(chats));
+    } catch (e) {}
+    renderSidebar();
+  }
+
+  /* One tiny non-streaming call names the chat after its first exchange --
+     "Vocabulary Rotation Settings" rather than "Can You Do It So". A few
+     hundred input tokens and a dozen out, once per chat; if it fails the
+     derived title simply stays. */
+  async function maybeTitleChat() {
+    const id = currentChatId;
+    const entry = chatIndexEntry(id);
+    if (!entry || entry.titled) return;
+    const firstUser = messages.filter(function (m) { return m.role === "user" && typeof m.content === "string"; })[0];
+    const firstReply = messages.filter(function (m) { return m.role === "assistant"; })
+      .map(function (m) { return m.content.filter(function (b) { return b.type === "text" && b.text && b.text !== "(no response)"; }).map(function (b) { return b.text; }).join(" "); })
+      .filter(Boolean)[0];
+    if (!firstUser || !firstReply) return;
+    entry.titled = true;   // one attempt, whatever happens
+    try {
+      const jwt = window.__mpsSync ? await window.__mpsSync.token() : null;
+      if (!jwt) return;
+      const res = await fetch(AI_API_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json", "authorization": "Bearer " + jwt, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: AI_MODEL, max_tokens: 24, stream: false,
+          system: "You title conversations for a sidebar. Reply with only the title: three to six words, Title Case, no quotes, no trailing punctuation.",
+          messages: [{ role: "user", content: "First message:\n" + firstUser.content.slice(0, 600) + "\n\nReply:\n" + firstReply.slice(0, 600) }]
+        })
+      });
+      const raw = await res.text();
+      let j = null;
+      try { j = JSON.parse(raw); } catch (e) { j = null; }
+      const t = j && j.content && j.content[0] && j.content[0].text ? String(j.content[0].text).trim().replace(/^["'\u201c]|["'\u201d.]+$/g, "") : "";
+      if (t && t.length <= 60) {
+        entry.title = t;
+        window.storageSet(CHATS_KEY, JSON.stringify(chats));
+        renderSidebar();
+      }
+    } catch (e) {}
+  }
+
+  function startNewChat() {
+    if (aiBusy) return;
+    messages.length = 0;
+    currentChatId = null;
+    aiLog.innerHTML = "";
+    renderStarters();
+    renderSidebar();
+    aiInput.focus();
+  }
+
+  async function openChat(id) {
+    if (aiBusy || id === currentChatId) return;
+    let raw = null;
+    try { raw = await window.storageGet(chatKey(id)); } catch (e) {}
+    let saved = null;
+    try { saved = raw ? JSON.parse(raw) : null; } catch (e) { saved = null; }
+    if (!saved || !Array.isArray(saved.messages)) { deleteChat(id); return; }
+    messages.length = 0;
+    saved.messages.forEach(function (m) { messages.push(m); });
+    currentChatId = id;
+    aiLog.innerHTML = "";
+    aiStarters.hidden = true;
+    // The transcript, from the history itself: the user's lines and the
+    // model's prose. Tool calls and their results are what the model said
+    // to the board, not to the user, and were never shown live either.
+    messages.forEach(function (m) {
+      if (m.role === "user" && typeof m.content === "string") { appendMessage("user", m.content); return; }
+      if (m.role === "assistant" && Array.isArray(m.content)) {
+        m.content.forEach(function (b) {
+          if (b.type === "text" && b.text && b.text !== "(no response)") setBubbleMarkdown(appendMessage("ai", ""), b.text);
+        });
+      }
+    });
+    renderSidebar();
+    scrollLog();
+    aiInput.focus();
+  }
+
+  function deleteChat(id) {
+    chats = chats.filter(function (c) { return c.id !== id; });
+    try {
+      window.storageSet(chatKey(id), "");
+      window.storageSet(CHATS_KEY, JSON.stringify(chats));
+    } catch (e) {}
+    if (id === currentChatId) { messages.length = 0; currentChatId = null; aiLog.innerHTML = ""; renderStarters(); }
+    renderSidebar();
+  }
+
+  const aiSideList = $("aiSideList");
+  const X_ICON = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  function renderSidebar() {
+    if (!aiSideList) return;
+    aiSideList.innerHTML = "";
+    const q = sideSearch.trim().toLowerCase();
+    const rows = chats.filter(function (c) { return !q || String(c.title || "").toLowerCase().indexOf(q) !== -1; });
+    if (!rows.length) {
+      aiSideList.appendChild(el("div", "ai-side-empty", q ? "No chats match." : "No chats yet."));
+      return;
+    }
+    rows.forEach(function (c) {
+      const row = el("div", "ai-side-item" + (c.id === currentChatId ? " is-active" : ""));
+      row.setAttribute("role", "button");
+      row.title = c.title;
+      row.appendChild(el("span", "ai-side-item-title", c.title || "New chat"));
+      const x = el("button", "ai-side-item-x");
+      x.type = "button"; x.title = "Delete chat"; x.setAttribute("aria-label", "Delete chat");
+      x.innerHTML = X_ICON;
+      x.addEventListener("click", function (e) { e.stopPropagation(); deleteChat(c.id); });
+      row.appendChild(x);
+      row.addEventListener("click", function () { openChat(c.id); });
+      aiSideList.appendChild(row);
+    });
+  }
+
+  function setSideOpen(open, persist) {
+    document.documentElement.classList.toggle("ai-side-open", !!open);
+    if (persist) window.storageSet(SIDE_OPEN_KEY, open ? "true" : "false");
+  }
+  const aiSideToggle = $("aiSideToggle"), aiHeadSideToggle = $("aiHeadSideToggle");
+  if (aiSideToggle) aiSideToggle.addEventListener("click", function () { setSideOpen(false, true); });
+  if (aiHeadSideToggle) aiHeadSideToggle.addEventListener("click", function () { setSideOpen(true, true); });
+  const aiNewChatBtn = $("aiNewChatBtn");
+  if (aiNewChatBtn) aiNewChatBtn.addEventListener("click", startNewChat);
+  const aiSideSearchBtn = $("aiSideSearchBtn"), aiSideSearch = $("aiSideSearch");
+  if (aiSideSearchBtn && aiSideSearch) {
+    aiSideSearchBtn.addEventListener("click", function () {
+      const show = aiSideSearch.hidden;
+      aiSideSearch.hidden = !show;
+      if (show) aiSideSearch.focus();
+      else { aiSideSearch.value = ""; sideSearch = ""; renderSidebar(); }
+    });
+    aiSideSearch.addEventListener("input", function () { sideSearch = aiSideSearch.value; renderSidebar(); });
+    aiSideSearch.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { aiSideSearch.value = ""; sideSearch = ""; aiSideSearch.hidden = true; renderSidebar(); }
+    });
   }
 
   function renderStarters() {
@@ -27260,6 +27525,17 @@
   });
 
   (async function bootPanels() {
+    let sideSaved = null;
+    try { sideSaved = await window.storageGet(SIDE_OPEN_KEY); } catch (e) {}
+    setSideOpen(sideSaved === null ? true : sideSaved === "true", false);
+    let idxRaw = null;
+    try { idxRaw = await window.storageGet(CHATS_KEY); } catch (e) {}
+    try {
+      const parsed = idxRaw ? JSON.parse(idxRaw) : null;
+      if (Array.isArray(parsed)) chats = parsed.filter(function (c) { return c && c.id; });
+    } catch (e) { chats = []; }
+    chats.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+    renderSidebar();
     let savedWidth = null;
     try { savedWidth = await window.storageGet(AI_WIDTH_KEY); } catch (e) {}
     if (savedWidth) {
