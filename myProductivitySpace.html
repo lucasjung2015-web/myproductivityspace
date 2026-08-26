@@ -2707,6 +2707,17 @@
     flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
     display: flex; flex-direction: column; gap: 10px; padding: 14px;
   }
+  /* The empty state is the wordmark's own sparkle, large and centred: the
+     same two paths .ai-head-mark draws at 15px, just at 140. Drawn by CSS on
+     :empty so it costs no markup and disappears by itself the instant the
+     first message lands -- #aiLog has no whitespace children, so :empty holds
+     until appendMessage adds the first node. Full black, per the brand's
+     monochrome rule; it is decoration, not an icon, so it gets no label. */
+  .ai-log:empty { justify-content: center; align-items: center; }
+  .ai-log:empty::before {
+    content: ""; width: 140px; height: 140px; flex: 0 0 auto;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230A0A0A'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
+  }
   .ai-msg {
     max-width: 84%; padding: 9px 13px; border-radius: 14px;
     font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word;
@@ -2770,6 +2781,63 @@
   .ai-tool.is-running { color: var(--ink); }
   .ai-tool.is-running svg { animation: ai-spin 0.9s linear infinite; }
   @keyframes ai-spin { to { transform: rotate(360deg); } }
+  /* A destructive tool pauses here for a real answer. Same receipt shape as
+     .ai-tool so it sits in the log as an event, but with the question and
+     two pills inside it; the model cannot get past it in prose, because the
+     tool itself refuses to run until the Yes button re-issues the call. */
+  .ai-confirm {
+    align-self: flex-start; max-width: 92%;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 9px 12px; border: 1px solid #c9c9c9; border-radius: 12px;
+    font-size: 12.5px; color: var(--ink); background: #fafafa;
+  }
+  .ai-confirm-q { font-weight: 600; }
+  .ai-confirm-row { display: flex; gap: 6px; }
+  .ai-confirm-row button {
+    padding: 5px 12px; border-radius: 999px; font-family: inherit; font-size: 12px;
+    font-weight: 600; cursor: pointer; border: 1px solid var(--ink);
+    transition: transform 0.1s var(--ease-spring);
+  }
+  .ai-confirm-row button:active { transform: scale(0.95); }
+  .ai-confirm-yes { background: var(--ink); color: var(--bg); }
+  .ai-confirm-no { background: transparent; color: var(--ink); }
+  .ai-confirm.is-settled { color: #4a4a4a; border-color: var(--hair); }
+  .ai-confirm.is-settled .ai-confirm-row { display: none; }
+
+  /* ---------- AI-built ("custom") widgets ---------- */
+  /* The widget's code runs in a sandboxed iframe that fills the body. The
+     chain of min-height:0 already exists on .widget-body/.collapsible-body,
+     so a 100% frame in a flex slot resolves to the slot's height rather than
+     collapsing to nothing. */
+  .cw-host { flex: 1 1 auto; min-height: 80px; display: flex; }
+  .cw-frame { width: 100%; height: 100%; min-height: 80px; border: 0; display: block; background: transparent; }
+  .cw-empty { font-size: 13px; color: #6b6b6b; padding: 8px 2px; }
+  /* The gear's code editor: three tabs over one textarea. Wider than the
+     other popovers because code is. */
+  .cw-editor { width: 460px; max-width: 92vw; display: flex; flex-direction: column; gap: 8px; }
+  .cw-tabs { display: flex; gap: 4px; }
+  .cw-tab {
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--hair);
+    background: transparent; color: var(--ink); font-family: inherit; font-size: 12px; cursor: pointer;
+  }
+  .cw-tab.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .cw-code {
+    width: 100%; height: 190px; resize: vertical; box-sizing: border-box;
+    padding: 8px 10px; border: 1px solid var(--hair); border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.45;
+    color: var(--ink); background: #fafafa; outline: none; white-space: pre; tab-size: 2;
+  }
+  .cw-code:focus { border-color: var(--ink); }
+  .cw-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #4a4a4a; }
+  .cw-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .cw-err { font-size: 11.5px; color: #7a2020; white-space: pre-wrap; word-break: break-word; }
+  .cw-err:empty { display: none; }
+  .cw-actions { display: flex; gap: 6px; justify-content: flex-end; }
+  .cw-actions button {
+    padding: 6px 13px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .cw-apply { border: 1px solid var(--ink); background: var(--ink); color: var(--bg); }
+  .cw-reset { border: 1px solid var(--hair); background: transparent; color: var(--ink); }
   .ai-thinking { display: inline-flex; align-items: center; gap: 4px; }
   .ai-thinking i {
     width: 5px; height: 5px; border-radius: 50%; background: #9a9a9a;
@@ -10096,7 +10164,7 @@
     const emoji = (p.icon && p.icon.type === "emoji") ? p.icon.emoji : "";
 
     const id = window.__mpsCreatePageWidget ? window.__mpsCreatePageWidget() : null;
-    if (!id) return;
+    if (!id) return null;
     const key = "note-content:" + id;
     const T = window.__mpsTiers;
     const full = title ? ('<div data-b="p">' + notionEscapeHtml(title) + "</div>" + html) : html;
@@ -10112,6 +10180,19 @@
       user_id: userId, local_key: key, notion_page_id: p.id,
       notion_last_edited: p.last_edited_time, pushed_hash: notionHash(full)
     }, { onConflict: "user_id,local_key" });
+    return id;
+  }
+
+  /* The AI panel's way in: it only has a page id (from listPages), and
+     nlAdopt wants the raw Notion page for its title, icon and edit time --
+     so fetch that first. Returns the new widget's id, or an error. */
+  async function nlAdoptById(pageId) {
+    const r = await notionCall({ action: "page_get", page_id: pageId });
+    if (!r || !r.ok || !r.body || !r.body.id) {
+      return { error: (r && r.body && r.body.error) ? String(r.body.error) : "Notion could not find that page (is it shared with the integration?)." };
+    }
+    const id = await nlAdopt(r.body);
+    return id ? { ok: true, widget_id: id, title: nlPageTitle(r.body) } : { error: "The Page widget could not be created." };
   }
 
   async function nlTrash(ids) {
@@ -10380,7 +10461,9 @@
     },
     listPages: nlListPages,
     pageIdForKey: nlPageIdForKey,
-    createChildPage: nlCreateChildPage
+    createChildPage: nlCreateChildPage,
+    // A Page widget from an existing Notion page, by id -- the AI's route.
+    adoptById: nlAdoptById
   };
 
   /* ---------- what "Page in ..." needs ----------
@@ -12143,6 +12226,72 @@
       widgetEl: widgetEl
     };
 
+    /* ---- layout control for myProductivitySpace AI ----
+       The same splice __menuGrid.insert does for Bookmarks, generalised to
+       any widget, plus the two size knobs. Every move is expressed relative
+       to another widget ("left of Calendar", "below Tasks") rather than as a
+       slot number, because that is how a person says it and because slot
+       numbers shift under every other change. */
+    window.__aiLayout = {
+      describe: function () {
+        return layout.map(function (slot, i) {
+          return { section: i, widgets: slot.slice(), width: widths[slot[0]] || null };
+        });
+      },
+      arrange: function (id, action, targetId, value) {
+        if (WIDGET_IDS.indexOf(id) === -1) return { error: "No widget with id '" + id + "'." };
+        const needsTarget = /^(move_left_of|move_right_of|stack_above|stack_below)$/.test(action);
+        if (needsTarget) {
+          if (!targetId || WIDGET_IDS.indexOf(targetId) === -1) return { error: "target_id must name another widget on the board." };
+          if (targetId === id) return { error: "A widget cannot be placed relative to itself." };
+        }
+        if (action === "set_width" || action === "set_height") {
+          const px = Math.round(Number(value));
+          if (!isFinite(px) || px <= 0) return { error: "value must be a size in pixels." };
+          const slot = slotOf(id);
+          if (action === "set_width") {
+            if (slot && slot[0] !== id) {
+              return { error: "Width belongs to the section, which is led by '" + slot[0] + "' -- set the width on that widget instead." };
+            }
+            widths[id] = clamp(px, MIN_COL, 1600);
+            applyWidth(id);
+            storageSet(WIDTH_STORAGE_KEY[id], String(widths[id]));
+            return { ok: true, widget_id: id, width: widths[id] };
+          }
+          if (!slot || slot.length < 2) {
+            return { error: "Height only applies when a widget shares a section with another; alone, it fills the column." };
+          }
+          heights[id] = clamp(px, MIN_ROW, 1600);
+          if (NOTE_WIDGETS[id]) { MANUALLY_RESIZED[id] = true; storageSet("manuallyResized-" + id, "1"); }
+          storageSet(HEIGHT_STORAGE_KEY[id], String(heights[id]));
+          applyHeightInSlot(id);
+          return { ok: true, widget_id: id, height: heights[id] };
+        }
+        removeFromLayout(id);
+        if (action === "move_to_end") {
+          layout.push([id]);
+        } else if (action === "move_left_of" || action === "move_right_of") {
+          const at = layout.findIndex(function (s) { return s.indexOf(targetId) !== -1; });
+          if (at === -1) { layout.push([id]); }
+          else layout.splice(action === "move_left_of" ? at : at + 1, 0, [id]);
+        } else if (action === "stack_above" || action === "stack_below") {
+          const slot = layout[layout.findIndex(function (s) { return s.indexOf(targetId) !== -1; })];
+          if (!slot) { layout.push([id]); }
+          else {
+            const i = slot.indexOf(targetId);
+            slot.splice(action === "stack_above" ? i : i + 1, 0, id);
+          }
+        } else {
+          layout.push([id]);
+          persistLayout(); render();
+          return { error: "Unknown action '" + action + "'." };
+        }
+        persistLayout();
+        render();
+        return { ok: true, widget_id: id, layout: window.__aiLayout.describe() };
+      }
+    };
+
     /* ---- a Page's editor ----
        One continuous contenteditable region -- no separate title field. The
        first block reads as the title (bold, via the .note-editor rules in the
@@ -12422,6 +12571,110 @@
     }
     window.__mpsNoteText = nbTextOf;
     window.__mpsNoteNormalize = nbNormalize;
+
+    /* ---------- Markdown -> blocks ----------
+       What the AI writes a Page in. nbNormalize only knows the two markers
+       old plain-text Pages used ("N. " and "> "); the rest of the shorthand
+       vocabulary -- "# ", "- ", "[] ", ``` -- is applied by nbApplyShorthand
+       as it is TYPED, so content that arrives whole needs this pass instead.
+       One line becomes one block, exactly the shapes nbSetType would have
+       produced by hand. Fenced code/equation runs become a single block.
+
+       opts.allowH1: only the first block of a Page may be a Heading 1 (it is
+       the title, see nbLockTitle); a "# " further down, or in a fragment
+       appended to an existing Page, demotes to Heading 2 rather than
+       producing a second title. */
+    function nbEscape(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    function nbInlineMarkdown(text) {
+      let s = nbEscape(text);
+      // Code spans first, so their contents are never re-marked.
+      const spans = [];
+      s = s.replace(/`([^`\n]+)`/g, function (_, c) { spans.push(c); return " " + (spans.length - 1) + " "; });
+      s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+|mailto:[^)\s]+)\)/g, '<a href="$2">$1</a>');
+      s = s.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+      s = s.replace(/__([^_\n]+)__/g, "<b>$1</b>");
+      s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<i>$2</i>");
+      s = s.replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<i>$2</i>");
+      s = s.replace(/~~([^~\n]+)~~/g, "<s>$1</s>");
+      s = s.replace(/ (\d+) /g, function (_, i) { return "<code>" + spans[Number(i)] + "</code>"; });
+      return s;
+    }
+    function markdownToNoteHtml(md, opts) {
+      opts = opts || {};
+      const lines = String(md == null ? "" : md).replace(/\r\n?/g, "\n").split("\n");
+      const out = document.createElement("div");
+      let fence = null;   // { type, indent, buf } while inside ``` or $$
+      let count = 0;
+      function push(type, indent, html, attrs) {
+        const b = nbMakeBlock(type, Math.min(NB_MAX_INDENT, indent || 0));
+        if (attrs) Object.keys(attrs).forEach(function (k) { b.setAttribute(k, attrs[k]); });
+        b.innerHTML = html;
+        out.appendChild(b);
+        count++;
+        return b;
+      }
+      for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        const lead = /^([ \t]*)/.exec(raw)[1];
+        const indent = Math.floor(lead.replace(/\t/g, "  ").length / 2);
+        const line = raw.slice(lead.length);
+        if (fence) {
+          if ((fence.type === "code" && /^```/.test(line)) || (fence.type === "eq" && /^\$\$/.test(line))) {
+            const b = push(fence.type, fence.indent, "");
+            b.textContent = fence.buf.join("\n");
+            if (fence.lang) b.setAttribute("data-lang", fence.lang);
+            fence = null;
+          } else {
+            fence.buf.push(raw);
+          }
+          continue;
+        }
+        let m;
+        if ((m = /^```\s*(\w+)?\s*$/.exec(line))) { fence = { type: "code", indent: indent, buf: [], lang: m[1] || "" }; continue; }
+        if (/^\$\$\s*$/.test(line)) { fence = { type: "eq", indent: indent, buf: [] }; continue; }
+        if (!line.trim()) continue;                       // blank lines are spacing, not blocks
+        if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) continue;  // rules have no block form
+        if ((m = /^(#{1,4})\s+(.*)$/.exec(line))) {
+          let level = m[1].length;
+          if (level === 1 && !(opts.allowH1 && count === 0)) level = 2;
+          push("h" + level, indent, nbInlineMarkdown(m[2]));
+        } else if ((m = /^\[( |x|X)?\]\s+(.*)$/.exec(line))) {
+          push("todo", indent, nbInlineMarkdown(m[2]), /x/i.test(m[1] || "") ? { "data-c": "1" } : null);
+        } else if ((m = /^[-*+]\s+\[( |x|X)\]\s+(.*)$/.exec(line))) {
+          push("todo", indent, nbInlineMarkdown(m[2]), /x/i.test(m[1]) ? { "data-c": "1" } : null);
+        } else if ((m = /^[-*+]\s+(.*)$/.exec(line))) {
+          push("ul", indent, nbInlineMarkdown(m[1]));
+        } else if ((m = /^\d+[.)]\s+(.*)$/.exec(line))) {
+          push("ol", indent, nbInlineMarkdown(m[1]));
+        } else if ((m = /^(?:>|\|)\s+(.*)$/.exec(line))) {
+          push("quote", indent, nbInlineMarkdown(m[1]));
+        } else {
+          push("p", indent, nbInlineMarkdown(line));
+        }
+      }
+      if (fence) { const b = push(fence.type, fence.indent, ""); b.textContent = fence.buf.join("\n"); }
+      return out.innerHTML;
+    }
+    window.__mpsMarkdownToNote = markdownToNoteHtml;
+
+    /* The read side of the same bridge: a Page as a list of blocks with
+       stable indexes, which is what lets the AI address "block 3" when it
+       edits one line rather than rewriting the Page. */
+    function nbBlocksInfo(editorEl) {
+      return nbBlocks(editorEl).map(function (b, i) {
+        const type = nbType(b);
+        return {
+          index: i, type: type,
+          text: type === "eq" && b.hasAttribute("data-tex") ? b.getAttribute("data-tex") : (b.textContent || ""),
+          indent: nbIndentOf(b),
+          checked: type === "todo" ? b.getAttribute("data-c") === "1" : undefined
+        };
+      });
+    }
+    window.__mpsNoteBlocks = nbBlocksInfo;
 
     /* What gets stored. A clone, stripped of everything that is display state
        rather than content: computed list numbers, collapse classes, the
@@ -14037,7 +14290,7 @@
     // Every instance of a type shows the same fixed label — there's no
     // per-instance renaming, so there's nothing to number ("Vocabulary 2")
     // or distinguish in the header.
-    const DYNAMIC_TYPE_LABEL = { readingList: "Reading List", list: "Lists", vocab: "Vocabulary", page: "Page", calView: "Google Calendar", menu: "Bookmarks", tasksView: "Google Tasks" };
+    const DYNAMIC_TYPE_LABEL = { readingList: "Reading List", list: "Lists", vocab: "Vocabulary", page: "Page", calView: "Google Calendar", menu: "Bookmarks", tasksView: "Google Tasks", custom: "Widget" };
 
     function buildPageWidgetEl(id) {
       const wrap = document.createElement("div");
@@ -14085,8 +14338,8 @@
       dynamicWidgets[id] = { type: type };
       if (opts.vocabSettings) dynamicWidgets[id].vocabSettings = opts.vocabSettings;
       if (WIDGET_IDS.indexOf(id) === -1) WIDGET_IDS.push(id);
-      const TYPE_W = { vocab: 420, readingList: 240, list: 240, calView: 320, menu: 260, tasksView: 240 };
-      const TYPE_H = { vocab: 260, readingList: 220, list: 220, calView: 300, menu: 220, tasksView: 220 };
+      const TYPE_W = { vocab: 420, readingList: 240, list: 240, calView: 320, menu: 260, tasksView: 240, custom: 300 };
+      const TYPE_H = { vocab: 260, readingList: 220, list: 220, calView: 300, menu: 220, tasksView: 220, custom: 280 };
       if (DEFAULT_WIDTH[id] == null) DEFAULT_WIDTH[id] = TYPE_W[type] || 280;
       if (DEFAULT_HEIGHT[id] == null) DEFAULT_HEIGHT[id] = TYPE_H[type] || 320;
       if (!WIDTH_STORAGE_KEY[id]) WIDTH_STORAGE_KEY[id] = "col" + id + "-width";
@@ -14146,6 +14399,7 @@
       else if (type === "calView" && window.__buildExtraCalendarSection) el = window.__buildExtraCalendarSection(id);
       else if (type === "menu" && window.__buildBookmarksSection) el = window.__buildBookmarksSection(id);
       else if (type === "tasksView" && window.__buildExtraTasksSection) el = window.__buildExtraTasksSection(id);
+      else if (type === "custom" && window.__buildCustomSection) el = window.__buildCustomSection(id, label);
       if (!el) return null;
       widget.appendChild(el);
       if (type === "readingList" && window.__wireReadingListSection) window.__wireReadingListSection(id);
@@ -14153,6 +14407,7 @@
       else if (type === "vocab" && window.__wireVocabMirrorSection) window.__wireVocabMirrorSection(id);
       else if (type === "calView" && window.__wireExtraCalendarSection) window.__wireExtraCalendarSection(id);
       else if (type === "tasksView" && window.__wireExtraTasksSection) window.__wireExtraTasksSection(id);
+      else if (type === "custom" && window.__wireCustomSection) window.__wireCustomSection(id);
       // A widget built late still needs everything registerDynamicWidget would
       // have given it, since that call returned empty-handed.
       if (!(opts && opts.alreadyWired)) {
@@ -14222,6 +14477,7 @@
       if (type === "vocab" && window.__unwireVocabMirrorSection) window.__unwireVocabMirrorSection(id);
       else if (type === "menu" && window.__unwireBookmarksSection) window.__unwireBookmarksSection(id);
       else if (type === "tasksView" && window.__unwireExtraTasksSection) window.__unwireExtraTasksSection(id);
+      else if (type === "custom" && window.__unwireCustomSection) window.__unwireCustomSection(id);
       // A deleted widget's nickname goes with it, so a later widget that
       // happens to reuse the id can't inherit a name it never had.
       delete WIDGET_TITLES[id];
@@ -14437,6 +14693,11 @@
         el.style.backgroundColor = "";
         if (note) note.style.backgroundColor = "";
         Array.prototype.forEach.call(cards, function (c) { c.style.backgroundColor = ""; });
+      }
+      // An AI-built widget draws its own surface inside a sandboxed frame, so
+      // the colour has to be told to it rather than painted over it.
+      if (window.__customWidgets) {
+        try { window.__customWidgets.notifyTheme(id, customColor ? color : "#FFFFFF"); } catch (e) {}
       }
     }
 
@@ -15043,11 +15304,12 @@
     const WIDGET_TYPE_FAMILY = {
       cal: "cal", calView: "cal",
       tasks: "tasks", tasksView: "tasks",
-      readingList: "readingList", list: "list", vocab: "vocab", page: "page", menu: "menu"
+      readingList: "readingList", list: "list", vocab: "vocab", page: "page", menu: "menu",
+      custom: "custom"
     };
     const WIDGET_FAMILY_LABEL = {
       cal: "Google Calendar", tasks: "Google Tasks", readingList: "Reading List", list: "Lists",
-      vocab: "Vocabulary", page: "Page", menu: "Bookmarks"
+      vocab: "Vocabulary", page: "Page", menu: "Bookmarks", custom: "Widget"
     };
     // The built-ins that exist as static markup rather than through the dynamic
     // registry. Atomic Habits and Affirmations are deliberately absent: they're
@@ -15183,6 +15445,55 @@
              (NOTE_WIDGETS[id] ? "page" : null);
     }
 
+    /* A one-line size for the system prompt's widget list -- "7 items", "12
+       blocks" -- so the model knows what is worth a read_widget without the
+       prompt carrying every widget's whole contents on every turn. Each
+       count comes from the bridge the owning module publishes; a bridge
+       that is not there yet simply contributes nothing. */
+    function widgetSummary(id, type) {
+      try {
+        if (type === "page" || NOTE_WIDGETS[id]) {
+          const ed = widgetEl(id) && widgetEl(id).querySelector(".note-editor");
+          return ed ? nbBlocks(ed).length + " blocks" : "";
+        }
+        if ((type === "readingList" || type === "list") && window.__listItemsApi && window.__listItemsApi[id]) {
+          const l = window.__listItemsApi[id].list();
+          return l.items.filter(function (it) { return !it.done; }).length + " open items";
+        }
+        if (type === "menu" && window.__bookmarksApi && window.__bookmarksApi[id]) {
+          return window.__bookmarksApi[id].list().length + " entries";
+        }
+        if ((type === "tasks" || type === "tasksView") && window.__aiTasks) return window.__aiTasks.count() + " open tasks";
+        if ((type === "cal" || type === "calView") && window.__aiTasks) return window.__aiTasks.eventCount() + " events in view";
+        if (type === "custom" && window.__customWidgets) {
+          const c = window.__customWidgets.read(id);
+          return c ? "v" + c.version + (c.lastError ? ", has a runtime error" : "") : "";
+        }
+      } catch (e) {}
+      return "";
+    }
+
+    function pageEditorOf(id) {
+      const wrap = widgetEl(id);
+      return wrap ? wrap.querySelector(".note-editor") : null;
+    }
+    /* Every AI write to a Page lands through here: content set on the live
+       editor (so what is on screen is the truth), then the editor's own save
+       hook (so local storage, the cloud queue and the tab-strip title all
+       update on exactly the path a keystroke takes). The editor is blurred
+       first because nothing sensible can be done with a caret that was in
+       the middle of text that no longer exists -- and the user asked for
+       this edit, so their place in the old text is not something to keep. */
+    function writePageHtml(id, html) {
+      const ed = pageEditorOf(id);
+      if (!ed) return { error: "'" + id + "' has no Page editor." };
+      if (document.activeElement === ed) ed.blur();
+      nbSetContent(ed, html);
+      if (ed.__mpsSave) ed.__mpsSave();
+      else ed.dispatchEvent(new Event("input", { bubbles: true }));
+      return { ok: true, widget_id: id, blocks: nbBlocksInfo(ed) };
+    }
+
     window.__aiBoard = {
       colorPresets: function () {
         return COLOR_PRESETS.map(function (p) { return { name: p.name, hex: p.bg }; });
@@ -15190,25 +15501,132 @@
       list: function () {
         return WIDGET_IDS.map(function (id) {
           const isNote = !!NOTE_WIDGETS[id];
+          const type = widgetTypeOf(id);
+          const slot = slotOf(id);
           return {
             id: id,
             title: WIDGET_TITLES[id] || defaultWidgetTitle(id),
-            type: widgetTypeOf(id),
+            type: type,
             color: WIDGET_COLORS[id] || "#FFFFFF",
             icon: WIDGET_ICONS[id] || "",
             hidden: !!hidden[id],
             isNote: isNote,
+            summary: widgetSummary(id, type),
+            section: slot ? layout.indexOf(slot) : null,
             noteText: isNote ? noteTextOf(id) : null
           };
         });
       },
       exists: function (id) { return WIDGET_IDS.indexOf(id) !== -1; },
+      typeOf: widgetTypeOf,
       setColor: function (id, hex) { setWidgetColor(id, hex); },
       rename: function (id, name) { setWidgetTitle(id, name); },
       setIcon: function (id, emoji) { setWidgetIcon(id, emoji); },
       setHidden: function (id, value) { setHidden(id, !!value); },
       create: function (type) { return createDynamicWidgetInstance(type); },
       remove: function (id) { deleteWidget(id); },
+
+      /* The full contents of one widget, whatever kind it is. Each branch
+         reads through the bridge its module publishes; the shapes differ
+         because the widgets do, and flattening them would lose the ids the
+         edit tools need back. */
+      read: function (id) {
+        const type = widgetTypeOf(id);
+        const base = { widget_id: id, type: type, title: WIDGET_TITLES[id] || defaultWidgetTitle(id) };
+        if (type === "page" || NOTE_WIDGETS[id]) {
+          const ed = pageEditorOf(id);
+          return Object.assign(base, { blocks: ed ? nbBlocksInfo(ed) : [] });
+        }
+        if (type === "readingList" || type === "list") {
+          const api = window.__listItemsApi && window.__listItemsApi[id];
+          return api ? Object.assign(base, api.list()) : Object.assign(base, { error: "That list is not ready yet." });
+        }
+        if (type === "menu") {
+          const api = window.__bookmarksApi && window.__bookmarksApi[id];
+          return api ? Object.assign(base, { entries: api.list() }) : Object.assign(base, { error: "Bookmarks is not ready yet." });
+        }
+        if (type === "vocab") {
+          const s = (dynamicWidgets[id] && dynamicWidgets[id].vocabSettings) || null;
+          return Object.assign(base, { settings: s, options: window.__vocabOptions || null,
+            note: "Every Vocabulary widget mirrors the same generated content; settings are shared." });
+        }
+        if (type === "tasks" || type === "tasksView") {
+          return window.__aiTasks ? Object.assign(base, window.__aiTasks.listTasks()) : Object.assign(base, { error: "Google Tasks is not connected." });
+        }
+        if (type === "cal" || type === "calView") {
+          return window.__aiTasks ? Object.assign(base, { events: window.__aiTasks.listEvents() }) : Object.assign(base, { error: "Google Calendar is not connected." });
+        }
+        if (type === "custom") {
+          const c = window.__customWidgets ? window.__customWidgets.read(id) : null;
+          return c ? Object.assign(base, c) : Object.assign(base, { error: "That widget's code could not be read." });
+        }
+        return base;
+      },
+
+      /* Pages, three ways: replace everything, add to the end, or swap one
+         block. All three go through markdownToNoteHtml so a heading is a
+         heading and a "[ ]" is a real checkbox, not the literal characters. */
+      setPageMarkdown: function (id, md) {
+        return writePageHtml(id, markdownToNoteHtml(md, { allowH1: true }));
+      },
+      appendPage: function (id, md) {
+        const ed = pageEditorOf(id);
+        if (!ed) return { error: "'" + id + "' has no Page editor." };
+        const empty = !nbTextOf(ed).trim();
+        return writePageHtml(id, (empty ? "" : nbSerialize(ed)) + markdownToNoteHtml(md, { allowH1: empty }));
+      },
+      replacePageBlock: function (id, where, md) {
+        const ed = pageEditorOf(id);
+        if (!ed) return { error: "'" + id + "' has no Page editor." };
+        const blocks = nbBlocks(ed);
+        let idx = -1;
+        if (where && typeof where.index === "number") idx = where.index;
+        else if (where && where.matchText) {
+          const q = String(where.matchText).toLowerCase();
+          idx = blocks.findIndex(function (b) { return (b.textContent || "").toLowerCase().indexOf(q) !== -1; });
+        }
+        if (idx < 0 || idx >= blocks.length) return { error: "No block matched. Call read_widget for the current block indexes." };
+        const frag = document.createElement("div");
+        frag.innerHTML = markdownToNoteHtml(md, { allowH1: idx === 0 });
+        if (idx === 0 && !(frag.children.length === 1 && nbType(frag.firstElementChild) === "h1")) {
+          return { error: "Block 0 is the Page's title and must stay a single Heading 1. To retitle, pass one line of text." };
+        }
+        const html = blocks.map(function (b, i) { return i === idx ? frag.innerHTML : b.outerHTML; }).join("");
+        return writePageHtml(id, html);
+      },
+
+      /* Vocabulary: one shared config drives every instance's generation
+         (see the wizard's own comment), so a patch lands on the widget AND on
+         the shared key the generator reads. */
+      setVocabSettings: function (id, patch) {
+        if (!dynamicWidgets[id] || dynamicWidgets[id].type !== "vocab") return { error: "'" + id + "' is not a Vocabulary widget." };
+        const opts = window.__vocabOptions || { languages: [], frequencies: [] };
+        const cur = dynamicWidgets[id].vocabSettings || { languages: [], frequency: "daily", counts: {} };
+        const next = { languages: cur.languages.slice(), frequency: cur.frequency, counts: Object.assign({}, cur.counts) };
+        if (Array.isArray(patch.languages)) {
+          const ok = opts.languages.map(function (l) { return l.id; });
+          const bad = patch.languages.filter(function (l) { return ok.indexOf(l) === -1; });
+          if (bad.length) return { error: "Unknown language(s): " + bad.join(", ") + ". Options: " + ok.join(", ") + "." };
+          if (!patch.languages.length) return { error: "At least one language is required." };
+          next.languages = patch.languages.slice();
+        }
+        if (patch.frequency != null) {
+          const ok = opts.frequencies.map(function (f) { return f.id; });
+          if (ok.indexOf(patch.frequency) === -1) return { error: "Unknown frequency. Options: " + ok.join(", ") + "." };
+          next.frequency = patch.frequency;
+        }
+        if (patch.counts && typeof patch.counts === "object") {
+          Object.keys(patch.counts).forEach(function (k) {
+            const n = Math.round(Number(patch.counts[k]));
+            if (isFinite(n) && n > 0) next.counts[k] = Math.min(50, n);
+          });
+        }
+        dynamicWidgets[id].vocabSettings = next;
+        persistDynamicWidgets();
+        storageSet("vocab-config", JSON.stringify(next));
+        if (window.__refreshVocab) { try { window.__refreshVocab(); } catch (e) {} }
+        return { ok: true, widget_id: id, settings: next };
+      },
       // Writing straight to the contenteditable and then firing the same
       // "input" event a keystroke would means the widget's own autosave and
       // bullet handling run — no second persistence path to keep in step.
@@ -15693,6 +16111,9 @@
       { id: "3days", label: "Every 3 days" },
       { id: "weekly", label: "Weekly" }
     ];
+    // The two option lists, readable from outside this closure so the AI's
+    // configure_vocab can validate against the same choices the wizard shows.
+    window.__vocabOptions = { languages: VOCAB_LANGUAGES, frequencies: VOCAB_FREQUENCIES };
 
     const vocabSetupOverlay = document.getElementById("vocabSetupOverlay");
     const vocabSetupPopup = document.getElementById("vocabSetupPopup");
@@ -17437,20 +17858,115 @@
           patch = patch || {};
           if (patch.itemNoun) itemNoun = String(patch.itemNoun).trim() || itemNoun;
           if (Array.isArray(patch.tagDefs)) {
-            tagDefs = tagDefs.map(function (def, i) {
-              const p = patch.tagDefs[i];
-              if (!p) return def;
-              return Object.assign({}, def, {
-                label: p.label ? String(p.label).trim() || def.label : def.label,
-                options: Array.isArray(p.options) && p.options.length ? p.options : def.options
-              });
+            // Replaced wholesale, the same way the load path treats a saved
+            // config: a patch may add a third category or drop to one, and
+            // an index-by-index merge against the current two silently
+            // threw those away.
+            tagDefs = patch.tagDefs.map(function (p, i) {
+              const def = tagDefs[i];
+              return {
+                key: (def && def.key) || ("cat" + i),
+                label: (p && p.label ? String(p.label).trim() : "") || (def && def.label) || ("Tag " + (i + 1)),
+                options: (p && Array.isArray(p.options) && p.options.length) ? p.options.map(String) : ((def && def.options) || ["Option A"]),
+                hasDot: i === 0,
+                colors: null,
+                optionColors: (def && def.optionColors) || {}
+              };
             });
+            if (!tagDefs.length) tagDefs = [{ key: "cat0", label: "Tag 1", options: ["Option A"], hasDot: true, colors: null, optionColors: {} }];
           }
           refreshAddButtonLabel();
           persistListConfig();
           renderReadingList();
         }
       };
+    }
+
+    /* The items themselves, for the AI panel -- every instance, fixed-field
+       Reading List included, since adding a book is not a configuration
+       change. Tag values live directly on the item under each category's
+       key, which is why list() hands the categories back alongside the
+       items: the keys are what an edit has to use. Every mutator persists and
+       re-renders on the same two calls the buttons use. */
+    if (cfg.id) {
+      window.__listItemsApi = window.__listItemsApi || {};
+      window.__listItemsApi[cfg.id] = {
+        list: function () {
+          return {
+            itemNoun: itemNoun,
+            tagDefs: tagDefs.map(function (d) { return { key: d.key, label: d.label, options: d.options.slice() }; }),
+            items: items.map(function (it) {
+              const tags = {};
+              tagDefs.forEach(function (d) { if (it[d.key]) tags[d.key] = it[d.key]; });
+              return { id: it.id, text: it.text || "", done: !!it.done, completedAt: it.completedAt || null, tags: tags };
+            })
+          };
+        },
+        tagDefs: function () { return tagDefs; },
+        add: function (o) {
+          o = o || {};
+          const text = String(o.text == null ? "" : o.text).trim();
+          if (!text) return { error: "text is required." };
+          const it = { id: uid(), text: text, done: false };
+          const bad = applyTags(it, o.tags);
+          if (bad) return bad;
+          items.push(it);
+          persist(); renderReadingList();
+          return { ok: true, item: this.list().items.filter(function (x) { return x.id === it.id; })[0] };
+        },
+        update: function (itemId, o) {
+          const it = items.filter(function (x) { return x.id === itemId; })[0];
+          if (!it) return { error: "No item with id '" + itemId + "'." };
+          o = o || {};
+          if (o.text != null) {
+            const t = String(o.text).trim();
+            if (!t) return { error: "text cannot be empty." };
+            it.text = t;
+          }
+          if (typeof o.done === "boolean") {
+            it.done = o.done;
+            if (o.done) it.completedAt = it.completedAt || new Date().toISOString();
+            else delete it.completedAt;
+          }
+          const bad = applyTags(it, o.tags);
+          if (bad) return bad;
+          persist(); renderReadingList();
+          return { ok: true, item: this.list().items.filter(function (x) { return x.id === it.id; })[0] };
+        },
+        remove: function (itemId) {
+          const i = items.findIndex(function (x) { return x.id === itemId; });
+          if (i === -1) return { error: "No item with id '" + itemId + "'." };
+          const gone = items.splice(i, 1)[0];
+          persist(); renderReadingList();
+          return { ok: true, removed: { id: gone.id, text: gone.text } };
+        },
+        move: function (itemId, toIndex) {
+          const i = items.findIndex(function (x) { return x.id === itemId; });
+          if (i === -1) return { error: "No item with id '" + itemId + "'." };
+          const to = Math.max(0, Math.min(items.length - 1, Math.round(Number(toIndex)) || 0));
+          items.splice(to, 0, items.splice(i, 1)[0]);
+          persist(); renderReadingList();
+          return { ok: true };
+        }
+      };
+      // Sets tag values by category key OR label, rejecting anything that is
+      // not one of that category's options so a typo never becomes a new
+      // silent value. Returns an error object, or null when everything took.
+      function applyTags(it, tags) {
+        if (!tags || typeof tags !== "object") return null;
+        for (const k in tags) {
+          const def = tagDefs.filter(function (d) { return d.key === k || d.label.toLowerCase() === String(k).toLowerCase(); })[0];
+          if (!def) {
+            return { error: "Unknown tag category '" + k + "'. Categories: " + tagDefs.map(function (d) { return d.label + " (key " + d.key + ")"; }).join(", ") + "." };
+          }
+          const v = tags[k];
+          if (v == null || v === "") { delete it[def.key]; continue; }
+          const opt = def.options.filter(function (o) { return o.toLowerCase() === String(v).toLowerCase(); })[0];
+          if (!opt) return { error: "'" + v + "' is not an option for " + def.label + ". Options: " + def.options.join(", ") + "." };
+          it[def.key] = opt;
+        }
+        return null;
+      }
     }
 
     if (addBtn) {
@@ -21715,6 +22231,23 @@
     // Enter that would create the task twice.
     closeInlineComposer();
 
+    const r = await createTaskFromDraft({ title: t, notes: notes, due: due, dueTime: dueTime, repeat: repeat }, pendingTags);
+    // NOT showError(): that writes into the modal panel, which isn't open on
+    // this path, so the message would land somewhere nobody can see. An
+    // inline failure has to report itself inline.
+    if (r && r.error) showInlineError(r.error);
+  }
+
+  /* One create path for the composer and the AI panel, so the two can't
+     drift: same optimistic row, same POST, same staged-tag write once the
+     real id exists. Resolves to { ok, task } or { error } -- never throws and
+     never alerts, so a caller can show the failure wherever it lives. */
+  async function createTaskFromDraft(draft, pendingTags) {
+    const t = String(draft.title || "").trim();
+    if (!t) return { error: "Give the task a title." };
+    const notes = String(draft.notes || "").trim();
+    const due = draft.due || "", dueTime = draft.dueTime || "", repeat = draft.repeat || "";
+
     const body = { title: t, notes: notes };
     // Same as the modal path: Google stores `due` as RFC-3339 but ignores the
     // time, so midnight UTC keeps the date from drifting either way.
@@ -21748,7 +22281,7 @@
         else tasks.unshift(saved);
         // Staged tags can only be written once the real id exists — setTagMeta
         // keys off it, and a subtree seeded under "tmp-…" would be orphaned.
-        const staged = Object.assign({}, pendingTags);
+        const staged = Object.assign({}, pendingTags || {});
         if (dueTime) staged.dueTime = dueTime;
         if (repeat) staged.repeat = repeat;
         applyStagedTags(nsTask(saved.id), saved.title, staged);
@@ -21761,17 +22294,265 @@
          stale with no retry. renderGrid() draws task chips from this same local
          array, so repainting both surfaces is correct without a round trip. */
       refreshTagSurfaces();
+      return { ok: true, task: saved && saved.id ? publicTask(saved) : null };
     } catch (e) {
       // Roll the placeholder back out so a failed create can't leave a ghost
       // row that looks real but has no id behind it.
       tasks = tasks.filter(function (x) { return x.id !== tempId; });
       renderTasks();
-      // NOT showError(): that writes into the modal panel, which isn't open on
-      // this path, so the message would land somewhere nobody can see. An
-      // inline failure has to report itself inline.
-      showInlineError(String(e.message || e));
+      return { error: String(e.message || e) };
     }
   }
+
+  /* ---------- Google Tasks + Calendar for myProductivitySpace AI ----------
+     The AI panel is another script block; this is the whole of what it may
+     do here. Every write goes through the same api() the buttons use, and
+     every failure comes back as { error } rather than an alert, so the
+     model sees it and can say so. */
+  const TAG_FIELDS = ["status", "workDepth", "taskType", "location", "habitStacking", "durationMinutes"];
+  function publicTask(t) {
+    const meta = tagMeta(nsTask(t.id)) || {};
+    const tags = {};
+    TAG_FIELDS.forEach(function (f) { if (meta[f]) tags[f] = meta[f]; });
+    return {
+      id: t.id, title: t.title, notes: t.notes || "",
+      due: t.due ? String(t.due).slice(0, 10) : null,
+      due_time: meta.dueTime || "", repeat: meta.repeat || "",
+      tags: tags, subtasks: meta.subtaskCount || 0
+    };
+  }
+  function publicEvent(e) {
+    const raw = e.raw || {};
+    return {
+      id: e.id, title: e.title, all_day: !!e.allDay,
+      start: e.allDay ? ymd(e.start) : gcalLocalIso(e.start),
+      end: e.allDay ? ymd(e.end) : gcalLocalIso(e.end),
+      description: raw.description || "",
+      recurrence: raw.recurrence || (raw.recurringEventId ? ["(instance of a recurring event)"] : []),
+      guests: (raw.attendees || []).map(function (a) { return a.email; })
+    };
+  }
+  function findTask(id) { return tasks.filter(function (x) { return x.id === id; })[0] || null; }
+  function tagPresetsForAi() {
+    const d = tagDefs() || {};
+    return {
+      status: (d.status && d.status.presets) || [],
+      workDepth: (d.workDepth && d.workDepth.presets) || [],
+      taskType: (d.taskType && d.taskType.presets) || [],
+      location: "free text", habitStacking: "free text", durationMinutes: "a number of minutes"
+    };
+  }
+  // Validates a tags object against the presets, writing each accepted field.
+  function applyTaskTags(nsId, title, tags) {
+    if (!tags || typeof tags !== "object") return null;
+    const presets = tagPresetsForAi();
+    for (const k in tags) {
+      if (TAG_FIELDS.indexOf(k) === -1) return { error: "Unknown tag '" + k + "'. Tags: " + TAG_FIELDS.join(", ") + "." };
+      let v = tags[k];
+      if (v == null || v === "") { setTagMeta(nsId, k, k === "durationMinutes" ? 0 : "", title); continue; }
+      if (Array.isArray(presets[k])) {
+        const hit = presets[k].filter(function (p) { return p.toLowerCase() === String(v).toLowerCase(); })[0];
+        if (!hit) return { error: "'" + v + "' is not a " + k + " option. Options: " + presets[k].join(", ") + "." };
+        v = hit;
+      } else if (k === "durationMinutes") {
+        v = Math.round(Number(v));
+        if (!isFinite(v) || v < 0) return { error: "durationMinutes must be a number of minutes." };
+      } else {
+        v = String(v);
+      }
+      setTagMeta(nsId, k, v, title);
+    }
+    return null;
+  }
+  function eventBodyFromFields(f, existing) {
+    const body = {};
+    if (f.title != null) body.summary = String(f.title).trim();
+    if (f.description != null) body.description = String(f.description);
+    const date = f.date || (existing ? ymd(existing.start) : null);
+    if (!date && !existing) return { error: "date is required (YYYY-MM-DD)." };
+    const timed = f.start_time || f.end_time || (existing && !existing.allDay && f.all_day !== true);
+    if (f.all_day === true || (!timed && !existing) || (f.date && !f.start_time && !f.end_time && (!existing || existing.allDay))) {
+      if (f.date || f.end_date || f.all_day === true || !existing) {
+        const days = f.end_date ? Math.max(1, Math.round((parseYmd(f.end_date) - parseYmd(date)) / 86400000)) : 1;
+        body.start = { date: date, timeZone: gcalTimeZone() };
+        body.end = { date: ymd(addDays(parseYmd(date), days)), timeZone: gcalTimeZone() };
+      }
+    } else if (f.date || f.start_time || f.end_time) {
+      const st = f.start_time || (existing && !existing.allDay ? gcalLocalIso(existing.start).slice(11, 16) : "09:00");
+      let en = f.end_time || (existing && !existing.allDay && !f.start_time ? gcalLocalIso(existing.end).slice(11, 16) : null);
+      const startAt = new Date(date + "T" + st + ":00");
+      let endAt = en ? new Date(date + "T" + en + ":00") : new Date(startAt.getTime() + 60 * 60000);
+      if (!(endAt > startAt)) return { error: "end_time must be after start_time." };
+      body.start = { dateTime: gcalLocalIso(startAt), timeZone: gcalTimeZone() };
+      body.end = { dateTime: gcalLocalIso(endAt), timeZone: gcalTimeZone() };
+    }
+    if (f.repeat != null) {
+      const startDate = body.start && body.start.date ? parseYmd(body.start.date)
+        : body.start && body.start.dateTime ? new Date(body.start.dateTime)
+        : (existing ? existing.start : parseYmd(date));
+      const r = String(f.repeat).trim();
+      if (!r || r === "none") body.recurrence = [];
+      else if (/^RRULE:/i.test(r)) body.recurrence = [r.toUpperCase().replace(/^RRULE:/, "RRULE:")];
+      else {
+        const rule = rrulePresetString(r, startDate);
+        if (!rule) return { error: "repeat must be none, daily, weekly, monthly, yearly, weekday, or an RRULE: string." };
+        body.recurrence = [rule];
+      }
+    }
+    if (Array.isArray(f.guests)) body.attendees = f.guests.map(function (e) { return { email: String(e).trim() }; }).filter(function (a) { return a.email; });
+    if (f.reminder_minutes != null) {
+      const m = Math.round(Number(f.reminder_minutes));
+      body.reminders = isFinite(m) && m >= 0
+        ? { useDefault: false, overrides: [{ method: "popup", minutes: m }] }
+        : { useDefault: false, overrides: [] };
+    }
+    return { body: body };
+  }
+  async function guarded(fn) {
+    try { return await fn(); }
+    catch (e) { return { error: String((e && e.message) || e) }; }
+  }
+  function connected() {
+    try { return !!(window.__gcalIsAuthed && window.__gcalIsAuthed()); } catch (e) { return false; }
+  }
+
+  window.__aiTasks = {
+    connected: connected,
+    count: function () { return tasks.filter(function (t) { return !t.__pending; }).length; },
+    eventCount: function () { return events.length; },
+    listTasks: function () {
+      return { tasks: tasks.filter(function (t) { return !t.__pending; }).map(publicTask), tag_options: tagPresetsForAi() };
+    },
+    listEvents: function () { return events.map(publicEvent); },
+    listEventsBetween: function (from, to) {
+      return guarded(async function () {
+        const a = from ? parseYmd(from) : startOfDay(new Date());
+        const b = to ? addDays(parseYmd(to), 1) : addDays(a, 14);
+        const url = CAL_API + "/calendars/primary/events" +
+          "?timeMin=" + encodeURIComponent(a.toISOString()) +
+          "&timeMax=" + encodeURIComponent(b.toISOString()) +
+          "&singleEvents=true&orderBy=startTime&maxResults=250";
+        const data = await api(url);
+        const list = ((data && data.items) || [])
+          .filter(function (ev) { return ev.status !== "cancelled" && ev.start; })
+          .map(normalizeEvent).map(publicEvent);
+        return { from: ymd(a), to: ymd(addDays(b, -1)), events: list };
+      });
+    },
+    createTask: function (o) {
+      return guarded(async function () {
+        if (!connected()) return { error: "Google Tasks is not connected." };
+        const staged = {};
+        const bad = (function () {
+          if (!o.tags) return null;
+          const presets = tagPresetsForAi();
+          for (const k in o.tags) {
+            if (TAG_FIELDS.indexOf(k) === -1) return { error: "Unknown tag '" + k + "'. Tags: " + TAG_FIELDS.join(", ") + "." };
+            let v = o.tags[k];
+            if (v == null || v === "") continue;
+            if (Array.isArray(presets[k])) {
+              const hit = presets[k].filter(function (p) { return p.toLowerCase() === String(v).toLowerCase(); })[0];
+              if (!hit) return { error: "'" + v + "' is not a " + k + " option. Options: " + presets[k].join(", ") + "." };
+              v = hit;
+            }
+            staged[k] = v;
+          }
+          return null;
+        })();
+        if (bad) return bad;
+        return createTaskFromDraft({ title: o.title, notes: o.notes, due: o.due, dueTime: o.due_time, repeat: o.repeat }, staged);
+      });
+    },
+    updateTask: function (id, o) {
+      return guarded(async function () {
+        const t = findTask(id);
+        if (!t) return { error: "No open task with id '" + id + "'. Call list_tasks for current ids." };
+        const title = o.title != null ? String(o.title).trim() : t.title;
+        if (!title) return { error: "title cannot be empty." };
+        const nsId = nsTask(t.id);
+        t.title = title;
+        if (o.notes != null) t.notes = String(o.notes);
+        if (o.due !== undefined) t.due = o.due ? o.due + "T00:00:00.000Z" : null;
+        if (o.due_time !== undefined) setTagMeta(nsId, "dueTime", o.due_time || "", title);
+        if (o.repeat !== undefined) setTagMeta(nsId, "repeat", o.repeat || "", title);
+        const bad = applyTaskTags(nsId, title, o.tags);
+        if (bad) return bad;
+        renderTasks();
+        const body = { id: t.id, title: title, notes: t.notes || "" };
+        body.due = t.due || null;
+        await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(t.id), { method: "PATCH", body: JSON.stringify(body) });
+        refreshTagSurfaces();
+        return { ok: true, task: publicTask(t) };
+      });
+    },
+    completeTask: function (id) {
+      return guarded(async function () {
+        const t = findTask(id);
+        if (!t) return { error: "No open task with id '" + id + "'." };
+        const saved = await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(id), {
+          method: "PATCH", body: JSON.stringify({ id: id, status: "completed" })
+        });
+        tasks = tasks.filter(function (x) { return x.id !== id; });
+        if (completedTasks && saved) completedTasks.unshift(saved);
+        renderGrid(); renderTasks();
+        return { ok: true, completed: { id: id, title: t.title } };
+      });
+    },
+    deleteTask: function (id) {
+      return guarded(async function () {
+        const t = findTask(id);
+        if (!t) return { error: "No open task with id '" + id + "'." };
+        await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(id), { method: "DELETE" });
+        tasks = tasks.filter(function (x) { return x.id !== id; });
+        const w = frameWin();
+        if (w && w.__unbleepRemoveGoogleRoot) w.__unbleepRemoveGoogleRoot(nsTask(id));
+        renderGrid(); renderTasks();
+        return { ok: true, deleted: { id: id, title: t.title } };
+      });
+    },
+    createEvent: function (f) {
+      return guarded(async function () {
+        if (!connected()) return { error: "Google Calendar is not connected." };
+        if (!f.title || !String(f.title).trim()) return { error: "title is required." };
+        if (!f.date) return { error: "date is required (YYYY-MM-DD)." };
+        const r = eventBodyFromFields(f, null);
+        if (r.error) return r;
+        const saved = await api(CAL_API + "/calendars/primary/events", { method: "POST", body: JSON.stringify(r.body) });
+        await refreshAll();
+        return { ok: true, event: saved && saved.id ? publicEvent(normalizeEvent(saved)) : null };
+      });
+    },
+    updateEvent: function (id, f) {
+      return guarded(async function () {
+        let ev = events.filter(function (e) { return e.id === id; })[0];
+        if (!ev) {
+          const raw = await api(CAL_API + "/calendars/primary/events/" + encodeURIComponent(id));
+          if (!raw || !raw.id) return { error: "No event with id '" + id + "'." };
+          ev = normalizeEvent(raw);
+        }
+        const r = eventBodyFromFields(f, ev);
+        if (r.error) return r;
+        if (!Object.keys(r.body).length) return { error: "Nothing to change." };
+        const saved = await api(CAL_API + "/calendars/primary/events/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify(r.body) });
+        await refreshAll();
+        return { ok: true, event: saved && saved.id ? publicEvent(normalizeEvent(saved)) : null };
+      });
+    },
+    deleteEvent: function (id) {
+      return guarded(async function () {
+        const ev = events.filter(function (e) { return e.id === id; })[0];
+        await api(CAL_API + "/calendars/primary/events/" + encodeURIComponent(id), { method: "DELETE" });
+        events = events.filter(function (e) { return e.id !== id; });
+        const w = frameWin();
+        if (w && w.__unbleepRemoveGoogleRoot) w.__unbleepRemoveGoogleRoot(nsEvent(id));
+        renderGrid();
+        return { ok: true, deleted: { id: id, title: ev ? ev.title : id } };
+      });
+    },
+    // Titles for the confirm chip, so "delete task X" names X.
+    taskTitle: function (id) { const t = findTask(id); return t ? t.title : null; },
+    eventTitle: function (id) { const e = events.filter(function (x) { return x.id === id; })[0]; return e ? e.title : null; }
+  };
 
   function showInlineError(msg) {
     if (!inlineComposerEl) return;
@@ -23481,6 +24262,106 @@
     init: init
   };
   instances.push(api);
+
+  /* The links, for the AI panel. Same shapes the edit-mode UI writes (see
+     the add-link commit above and addFolder), same saveLinks/renderCurrent
+     afterwards. A folder is a top-level entry with children; links can sit
+     at the top level or inside exactly one folder. */
+  function findEntry(id) {
+    for (var i = 0; i < links.length; i++) {
+      if (links[i].id === id) return { entry: links[i], list: links, index: i, folder: null };
+      var kids = links[i].children;
+      if (kids) for (var j = 0; j < kids.length; j++) {
+        if (kids[j].id === id) return { entry: kids[j], list: kids, index: j, folder: links[i] };
+      }
+    }
+    return null;
+  }
+  function publicEntry(e, folderId) {
+    if (e.type === "folder") {
+      return { id: e.id, type: "folder", label: e.label, children: (e.children || []).map(function (c) { return publicEntry(c, e.id); }) };
+    }
+    return { id: e.id, type: "link", url: e.url, label: e.label, folder_id: folderId || null };
+  }
+  window.__bookmarksApi = window.__bookmarksApi || {};
+  window.__bookmarksApi[cfg.id] = {
+    list: function () { return links.map(function (e) { return publicEntry(e, null); }); },
+    addLink: function (o) {
+      o = o || {};
+      var url = normalizeUrl(o.url);
+      if (!url) return { error: "url must be an http(s) address with a hostname." };
+      var target = links;
+      if (o.folder_id) {
+        var f = findEntry(o.folder_id);
+        if (!f || f.entry.type !== "folder") return { error: "No folder with id '" + o.folder_id + "'." };
+        target = f.entry.children;
+      }
+      var link = {
+        id: "link" + Date.now() + Math.floor(Math.random() * 1000),
+        url: url,
+        label: (o.label && String(o.label).trim()) || hostLabelFromUrl(url),
+        iconImg: faviconUrlFor(url)
+      };
+      target.push(link);
+      saveLinks(); renderCurrent();
+      return { ok: true, link: publicEntry(link, o.folder_id || null) };
+    },
+    updateLink: function (id, o) {
+      var hit = findEntry(id);
+      if (!hit || hit.entry.type === "folder") return { error: "No link with id '" + id + "'." };
+      o = o || {};
+      if (o.url != null) {
+        var url = normalizeUrl(o.url);
+        if (!url) return { error: "url must be an http(s) address with a hostname." };
+        hit.entry.url = url;
+        hit.entry.iconImg = faviconUrlFor(url);
+      }
+      if (o.label != null) hit.entry.label = String(o.label).trim() || hostLabelFromUrl(hit.entry.url);
+      if (o.folder_id !== undefined) {
+        var moved = hit.list.splice(hit.index, 1)[0];
+        if (o.folder_id) {
+          var f = findEntry(o.folder_id);
+          if (!f || f.entry.type !== "folder") { hit.list.splice(hit.index, 0, moved); return { error: "No folder with id '" + o.folder_id + "'." }; }
+          f.entry.children.push(moved);
+        } else {
+          links.push(moved);
+        }
+      }
+      saveLinks(); renderCurrent();
+      var again = findEntry(id);
+      return { ok: true, link: publicEntry(again.entry, again.folder ? again.folder.id : null) };
+    },
+    removeLink: function (id) {
+      var hit = findEntry(id);
+      if (!hit || hit.entry.type === "folder") return { error: "No link with id '" + id + "'." };
+      var gone = hit.list.splice(hit.index, 1)[0];
+      saveLinks(); renderCurrent();
+      return { ok: true, removed: { id: gone.id, label: gone.label, url: gone.url } };
+    },
+    createFolder: function (label) {
+      var folder = { id: newId("folder"), type: "folder", label: (label && String(label).trim()) || "New folder", children: [] };
+      links.push(folder);
+      saveLinks(); renderCurrent();
+      return { ok: true, folder: publicEntry(folder, null) };
+    },
+    renameFolder: function (id, label) {
+      var hit = findEntry(id);
+      if (!hit || hit.entry.type !== "folder") return { error: "No folder with id '" + id + "'." };
+      hit.entry.label = (label && String(label).trim()) || hit.entry.label;
+      saveLinks(); renderCurrent();
+      return { ok: true, folder: publicEntry(hit.entry, null) };
+    },
+    removeFolder: function (id) {
+      var hit = findEntry(id);
+      if (!hit || hit.entry.type !== "folder") return { error: "No folder with id '" + id + "'." };
+      // Its links come out to the top level rather than vanishing with it.
+      var kids = hit.entry.children || [];
+      links.splice(hit.index, 1);
+      kids.forEach(function (k) { links.push(k); });
+      saveLinks(); renderCurrent();
+      return { ok: true, removed: { id: id, label: hit.entry.label }, links_kept: kids.length };
+    }
+  };
   return api;
   }
 
@@ -23506,6 +24387,7 @@
     for (var i = instances.length - 1; i >= 0; i--) {
       if (instances[i].id === id) instances.splice(i, 1);
     }
+    if (window.__bookmarksApi) delete window.__bookmarksApi[id];
   };
 
   if (document.readyState === "loading") {
@@ -23513,6 +24395,422 @@
   } else {
     primary.init();
   }
+})();
+</script>
+
+<script>
+/* =====================================================================
+   AI-built ("custom") widgets
+   ---------------------------------------------------------------------
+   A widget whose HTML/CSS/JS was written by the AI panel, or typed into
+   the gear's code editor. The code runs inside a sandboxed iframe: no
+   allow-same-origin, so it has an opaque origin and cannot see this page,
+   its storage, its session or its Google/Notion tokens; a CSP with
+   connect-src 'none' by default, so it cannot phone out either. What it
+   gets instead is a small `mps` runtime injected ahead of its own script:
+   a key/value store that persists through the parent's storageSet (and so
+   syncs like everything else), the widget's colour, and its size.
+
+   The store is keyed by widget id, not by code version, which is the
+   whole point: "make the button blue" replaces the code and reloads the
+   frame, and whatever the widget had saved is still there.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  const BLOB_KEY = function (id) { return "custom-widget:" + id; };
+  const STORE_PREFIX = function (id) { return "cw:" + id + ":"; };
+  const KEYS_KEY = function (id) { return "cw:" + id + ":__keys"; };
+  const MAX_KEYS = 200, MAX_VALUE = 64 * 1024, MAX_CODE = 200 * 1024;
+  const KEY_RE = /^[\w.\-]{1,64}$/;
+
+  const blobs = {};        // id -> { name, html, css, js, version, net, createdAt, updatedAt }
+  const stores = {};       // id -> { key: value }
+  const frames = new Map();// iframe -> id
+  const lastError = {};    // id -> string
+  const themes = {};       // id -> hex
+
+  /* ---- what runs inside the frame, before the widget's own script ---- */
+  const RUNTIME = [
+    "(function(){",
+    "  var snap = {}, theme = '#FFFFFF', size = {w:0,h:0}, rid = 0, pending = {}, handlers = {};",
+    "  var readyResolve; var ready = new Promise(function(r){ readyResolve = r; });",
+    "  function send(m){ parent.postMessage(m, '*'); }",
+    "  function ask(m){ return new Promise(function(res, rej){ m.rid = ++rid; pending[m.rid] = {res:res, rej:rej}; send(m); }); }",
+    "  function emit(ev, v){ (handlers[ev]||[]).forEach(function(fn){ try{ fn(v); }catch(e){} }); }",
+    "  window.addEventListener('message', function(e){",
+    "    var m = e.data || {}; if (e.source !== parent) return;",
+    "    if (m.t === 'init'){ snap = m.store || {}; theme = m.theme || theme; size = m.size || size; mps.theme = theme; mps.size = size; readyResolve(); emit('ready'); }",
+    "    else if (m.t === 'reply'){ var p = pending[m.rid]; if (p){ delete pending[m.rid]; m.ok ? p.res(m.value) : p.rej(new Error(m.error||'store error')); } }",
+    "    else if (m.t === 'theme'){ theme = m.value; mps.theme = theme; document.documentElement.style.setProperty('--mps-bg', theme); emit('theme', theme); }",
+    "    else if (m.t === 'size'){ size = m.value; mps.size = size; emit('size', size); }",
+    "  });",
+    "  var mps = window.mps = {",
+    "    ready: ready, theme: theme, size: size,",
+    "    on: function(ev, fn){ (handlers[ev] = handlers[ev]||[]).push(fn); if (ev==='ready') ready.then(function(){ fn(); }); },",
+    "    store: {",
+    "      get: function(k){ return Object.prototype.hasOwnProperty.call(snap, k) ? snap[k] : null; },",
+    "      getJSON: function(k, d){ var v = snap[k]; if (v == null) return d; try { return JSON.parse(v); } catch(e){ return d; } },",
+    "      set: function(k, v){ v = typeof v === 'string' ? v : JSON.stringify(v); snap[k] = v; return ask({t:'store.set', key:k, value:v}); },",
+    "      remove: function(k){ delete snap[k]; return ask({t:'store.remove', key:k}); },",
+    "      keys: function(){ return Object.keys(snap); },",
+    "      all: function(){ var o = {}; for (var k in snap) o[k] = snap[k]; return o; }",
+    "    }",
+    "  };",
+    "  window.addEventListener('error', function(e){ send({t:'error', message: String(e.message||e) + (e.lineno ? ' (line ' + e.lineno + ')' : '')}); });",
+    "  window.addEventListener('unhandledrejection', function(e){ send({t:'error', message: 'Unhandled promise rejection: ' + String(e.reason && e.reason.message || e.reason)}); });",
+    "  document.documentElement.style.setProperty('--mps-bg', theme);",
+    "  send({t:'ready'});",
+    "})();"
+  ].join("\n");
+
+  function noScriptClose(s) { return String(s == null ? "" : s).replace(/<\/script/gi, "<\\/script"); }
+  function compose(id, blob) {
+    const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
+      "img-src data: https:; font-src data:; media-src data: https:; " +
+      "connect-src " + (blob.net ? "https:" : "'none'") + "; form-action 'none'; base-uri 'none'";
+    return "<!doctype html><html><head><meta charset=\"utf-8\">" +
+      "<meta http-equiv=\"Content-Security-Policy\" content=\"" + csp + "\">" +
+      "<style>:root{color-scheme:light;--mps-bg:" + (themes[id] || "#FFFFFF") + "}" +
+      "html,body{margin:0;min-height:100%;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0a0a0a;background:transparent}" +
+      "*{box-sizing:border-box}button,input,select,textarea{font:inherit}</style>" +
+      "<style>" + noScriptClose(blob.css) + "</style></head><body>" +
+      noScriptClose(blob.html) +
+      "<script>" + RUNTIME + "<\/script>" +
+      "<script>" + noScriptClose(blob.js) + "<\/script>" +
+      "</body></html>";
+  }
+
+  /* ---- DOM ---- */
+  const HEADER_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10.5h.01"/><path d="M15.5 10.5h.01"/><path d="M8.5 15c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></svg>';
+  function buildSection(id, label) {
+    const wrap = document.createElement("div");
+    wrap.className = "col collapsible-col-wrap";
+    wrap.id = id + "ColWrap";
+    wrap.setAttribute("data-col-id", id);
+    wrap.innerHTML =
+      '<div class="collapsible-body" id="' + id + 'Body">' +
+        '<div class="section-header">' +
+          '<div class="section-header-title-group">' +
+            '<button type="button" class="widget-icon-btn" data-icon-btn="' + id + '" title="Add icon"><span class="widget-icon-display" data-icon-display="' + id + '">' + HEADER_ICON + '</span></button>' +
+            '<span class="section-header-title"></span>' +
+          '</div>' +
+          '<div class="widget-header-controls">' +
+            '<button type="button" class="col-drag-handle" data-drag-col="' + id + '" title="Drag to reorder this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
+            '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 9 4.5 9 7 0 .8-.5 1.9-1.4 3"/><path d="M6.2 6.7C4 8.2 3 10.2 3 12c0 2.5 4 7 9 7 1.7 0 3.2-.5 4.5-1.2"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="widget-body" id="' + id + 'WidgetBody"><div class="cw-host" id="' + id + 'CwHost"></div></div>' +
+      '</div>' +
+      '<div class="collapsible-strip" id="' + id + 'Strip">' +
+        '<span class="collapsible-tab-icon" data-tab-icon="' + id + '" hidden></span>' +
+        '<span class="collapsible-strip-label"></span>' +
+        '<button type="button" class="collapsible-unhide" aria-label="Unhide" title="Unhide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button>' +
+      '</div>';
+    wrap.querySelector(".section-header-title").textContent = label || "Widget";
+    wrap.querySelector(".collapsible-strip-label").textContent = label || "Widget";
+    return wrap;
+  }
+
+  function hostOf(id) { return document.getElementById(id + "CwHost"); }
+
+  /* (Re)builds the frame from the current blob. Idempotent: called on first
+     wire, after every code update, and after a network-flag change. The
+     old frame is dropped from the map before the new one goes in, so a
+     late message from it is ignored rather than acted on. */
+  function mount(id) {
+    const host = hostOf(id);
+    if (!host) return;
+    Array.prototype.forEach.call(host.querySelectorAll("iframe"), function (f) { frames.delete(f); });
+    host.innerHTML = "";
+    const blob = blobs[id];
+    if (!blob) {
+      const e = document.createElement("div");
+      e.className = "cw-empty";
+      e.textContent = "This widget has no code yet. Ask the AI to build it, or open the gear.";
+      host.appendChild(e);
+      return;
+    }
+    delete lastError[id];
+    const frame = document.createElement("iframe");
+    frame.className = "cw-frame";
+    frame.setAttribute("sandbox", "allow-scripts");
+    frame.setAttribute("referrerpolicy", "no-referrer");
+    frame.title = blob.name || "Widget";
+    frames.set(frame, id);
+    host.appendChild(frame);
+    frame.srcdoc = compose(id, blob);
+    if (window.ResizeObserver && !host.__cwRo) {
+      host.__cwRo = new ResizeObserver(function () { post(id, { t: "size", value: sizeOf(id) }); });
+      host.__cwRo.observe(host);
+    }
+  }
+  function frameOf(id) {
+    let hit = null;
+    frames.forEach(function (fid, f) { if (fid === id && f.isConnected) hit = f; });
+    return hit;
+  }
+  function sizeOf(id) {
+    const h = hostOf(id);
+    return h ? { w: Math.round(h.clientWidth), h: Math.round(h.clientHeight) } : { w: 0, h: 0 };
+  }
+  function post(id, msg) {
+    const f = frameOf(id);
+    if (f && f.contentWindow) { try { f.contentWindow.postMessage(msg, "*"); } catch (e) {} }
+  }
+
+  /* ---- the parent side of the protocol ----
+     Trust comes from e.source: it must be the contentWindow of a frame this
+     module created, and that is the only thing that identifies which
+     widget is talking. Nothing in the message body is used for identity. */
+  window.addEventListener("message", function (e) {
+    if (e.origin !== "null") return;          // sandboxed frames report the string "null"
+    let id = null;
+    frames.forEach(function (fid, f) { if (f.contentWindow === e.source) id = fid; });
+    if (!id) return;
+    const m = e.data || {};
+    const store = stores[id] || (stores[id] = {});
+    function reply(ok, value, error) {
+      if (m.rid == null) return;
+      post(id, { t: "reply", rid: m.rid, ok: ok, value: value == null ? null : value, error: error || null });
+    }
+    switch (m.t) {
+      case "ready":
+        post(id, { t: "init", theme: themes[id] || "#FFFFFF", size: sizeOf(id), store: Object.assign({}, store) });
+        break;
+      case "store.set": {
+        const k = String(m.key || "");
+        const v = typeof m.value === "string" ? m.value : JSON.stringify(m.value);
+        if (!KEY_RE.test(k)) return reply(false, null, "Invalid key.");
+        if (v.length > MAX_VALUE) return reply(false, null, "Value too large (64 KB max).");
+        if (!(k in store) && Object.keys(store).length >= MAX_KEYS) return reply(false, null, "Too many keys (200 max).");
+        store[k] = v;
+        window.storageSet(STORE_PREFIX(id) + k, v);
+        window.storageSet(KEYS_KEY(id), JSON.stringify(Object.keys(store)));
+        reply(true, v);
+        break;
+      }
+      case "store.get": reply(true, store[String(m.key)] == null ? null : store[String(m.key)]); break;
+      case "store.keys": reply(true, Object.keys(store)); break;
+      case "store.remove": {
+        const k = String(m.key || "");
+        delete store[k];
+        window.storageSet(STORE_PREFIX(id) + k, "");
+        window.storageSet(KEYS_KEY(id), JSON.stringify(Object.keys(store)));
+        reply(true, null);
+        break;
+      }
+      case "error":
+        lastError[id] = String(m.message || "error").slice(0, 500);
+        refreshGearError(id);
+        break;
+    }
+  });
+
+  /* ---- persistence ---- */
+  async function loadBlob(id) {
+    if (blobs[id]) return blobs[id];
+    let raw = null;
+    try { raw = await window.storageGet(BLOB_KEY(id)); } catch (e) {}
+    if (!raw) return null;
+    try {
+      const b = JSON.parse(raw);
+      if (b && typeof b === "object") blobs[id] = normalizeBlob(b);
+    } catch (e) {}
+    return blobs[id] || null;
+  }
+  async function loadStore(id) {
+    if (stores[id]) return stores[id];
+    const store = {};
+    let keys = [];
+    try { keys = JSON.parse((await window.storageGet(KEYS_KEY(id))) || "[]") || []; } catch (e) {}
+    for (const k of keys) {
+      try {
+        const v = await window.storageGet(STORE_PREFIX(id) + k);
+        if (v != null && v !== "") store[k] = v;
+      } catch (e) {}
+    }
+    stores[id] = store;
+    return store;
+  }
+  function normalizeBlob(b) {
+    return {
+      name: String(b.name || "Widget").slice(0, 80),
+      html: String(b.html || ""), css: String(b.css || ""), js: String(b.js || ""),
+      version: Number(b.version) || 1, net: !!b.net,
+      createdAt: b.createdAt || new Date().toISOString(), updatedAt: b.updatedAt || new Date().toISOString()
+    };
+  }
+  function saveBlob(id) {
+    window.storageSet(BLOB_KEY(id), JSON.stringify(blobs[id]));
+  }
+  function codeTooBig(b) {
+    return (b.html.length + b.css.length + b.js.length) > MAX_CODE;
+  }
+
+  /* ---- the gear: a code editor ---- */
+  const gearErrEls = {};
+  function refreshGearError(id) {
+    const el = gearErrEls[id];
+    if (el && el.isConnected) el.textContent = lastError[id] || "";
+  }
+  function registerGear(id) {
+    if (!window.__widgetSettings) return;
+    window.__widgetSettings.register(id, {
+      title: "Widget code",
+      build: function (body) {
+        const blob = blobs[id] || normalizeBlob({});
+        const draft = { html: blob.html, css: blob.css, js: blob.js, net: blob.net };
+        const box = document.createElement("div");
+        box.className = "cw-editor";
+        const tabs = document.createElement("div");
+        tabs.className = "cw-tabs";
+        const area = document.createElement("textarea");
+        area.className = "cw-code";
+        area.spellcheck = false;
+        let cur = "html";
+        function show(kind) {
+          draft[cur] = area.value;
+          cur = kind;
+          area.value = draft[kind];
+          Array.prototype.forEach.call(tabs.children, function (t) { t.classList.toggle("is-active", t.dataset.kind === kind); });
+        }
+        ["html", "css", "js"].forEach(function (kind) {
+          const b = document.createElement("button");
+          b.type = "button"; b.className = "cw-tab"; b.dataset.kind = kind; b.textContent = kind.toUpperCase();
+          b.addEventListener("click", function () { show(kind); });
+          tabs.appendChild(b);
+        });
+        area.value = draft.html;
+        tabs.firstChild.classList.add("is-active");
+        const row = document.createElement("div");
+        row.className = "cw-row";
+        const netLabel = document.createElement("label");
+        const net = document.createElement("input");
+        net.type = "checkbox"; net.checked = !!draft.net;
+        netLabel.appendChild(net);
+        netLabel.appendChild(document.createTextNode("Allow network requests (https)"));
+        row.appendChild(netLabel);
+        const err = document.createElement("div");
+        err.className = "cw-err";
+        err.textContent = lastError[id] || "";
+        gearErrEls[id] = err;
+        const actions = document.createElement("div");
+        actions.className = "cw-actions";
+        const reset = document.createElement("button");
+        reset.type = "button"; reset.className = "cw-reset"; reset.textContent = "Reset";
+        reset.addEventListener("click", function () {
+          draft.html = blob.html; draft.css = blob.css; draft.js = blob.js; draft.net = blob.net;
+          area.value = draft[cur]; net.checked = blob.net;
+        });
+        const apply = document.createElement("button");
+        apply.type = "button"; apply.className = "cw-apply"; apply.textContent = "Apply";
+        apply.addEventListener("click", function () {
+          draft[cur] = area.value;
+          const r = api.update(id, { html: draft.html, css: draft.css, js: draft.js, net: net.checked });
+          if (r && r.error) err.textContent = r.error;
+        });
+        actions.appendChild(reset);
+        actions.appendChild(apply);
+        box.appendChild(tabs);
+        box.appendChild(area);
+        box.appendChild(row);
+        box.appendChild(err);
+        box.appendChild(actions);
+        body.appendChild(box);
+      }
+    });
+  }
+
+  /* ---- what the layout and the AI call ---- */
+  window.__buildCustomSection = buildSection;
+  window.__wireCustomSection = function (id) {
+    registerGear(id);
+    Promise.all([loadBlob(id), loadStore(id)]).then(function () { mount(id); });
+  };
+  window.__unwireCustomSection = function (id) {
+    const host = hostOf(id);
+    if (host) {
+      Array.prototype.forEach.call(host.querySelectorAll("iframe"), function (f) { frames.delete(f); });
+      if (host.__cwRo) { host.__cwRo.disconnect(); host.__cwRo = null; }
+    }
+    const store = stores[id] || {};
+    Object.keys(store).forEach(function (k) { window.storageSet(STORE_PREFIX(id) + k, ""); });
+    window.storageSet(KEYS_KEY(id), "");
+    window.storageSet(BLOB_KEY(id), "");
+    delete blobs[id]; delete stores[id]; delete lastError[id]; delete themes[id];
+  };
+
+  const api = {
+    /* Create: mint the widget through the board (so it gets a slot, a
+       header, colour, hide/delete -- everything a widget has), then hang
+       the code on it and mount. */
+    create: function (o) {
+      o = o || {};
+      const b = window.__aiBoard;
+      if (!b) return { error: "The board is not ready." };
+      const blob = normalizeBlob({ name: o.name, html: o.html, css: o.css, js: o.js, version: 1 });
+      if (!blob.html.trim() && !blob.js.trim()) return { error: "Provide at least html or js." };
+      if (codeTooBig(blob)) return { error: "Widget code is too large (200 KB max)." };
+      const id = b.create("custom");
+      blobs[id] = blob;
+      stores[id] = {};
+      saveBlob(id);
+      if (o.name) b.rename(id, String(o.name));
+      registerGear(id);
+      mount(id);
+      return { ok: true, widget_id: id, version: 1 };
+    },
+    update: function (id, patch) {
+      const cur = blobs[id];
+      if (!cur) return { error: "No custom widget with id '" + id + "'." };
+      patch = patch || {};
+      const next = normalizeBlob({
+        name: patch.name != null ? patch.name : cur.name,
+        html: patch.html != null ? patch.html : cur.html,
+        css: patch.css != null ? patch.css : cur.css,
+        js: patch.js != null ? patch.js : cur.js,
+        version: cur.version + 1, net: patch.net != null ? !!patch.net : cur.net,
+        createdAt: cur.createdAt, updatedAt: new Date().toISOString()
+      });
+      if (codeTooBig(next)) return { error: "Widget code is too large (200 KB max)." };
+      blobs[id] = next;
+      saveBlob(id);
+      if (patch.name != null && window.__aiBoard) window.__aiBoard.rename(id, String(patch.name));
+      mount(id);
+      return { ok: true, widget_id: id, version: next.version };
+    },
+    read: function (id) {
+      const b = blobs[id];
+      if (!b) return null;
+      return {
+        name: b.name, html: b.html, css: b.css, js: b.js, version: b.version, net: b.net,
+        store: Object.assign({}, stores[id] || {}), lastError: lastError[id] || null
+      };
+    },
+    lastError: function (id) { return lastError[id] || null; },
+    setStore: function (id, key, value) {
+      if (!blobs[id]) return { error: "No custom widget with id '" + id + "'." };
+      if (!KEY_RE.test(String(key))) return { error: "Invalid key." };
+      const store = stores[id] || (stores[id] = {});
+      const v = typeof value === "string" ? value : JSON.stringify(value);
+      store[key] = v;
+      window.storageSet(STORE_PREFIX(id) + key, v);
+      window.storageSet(KEYS_KEY(id), JSON.stringify(Object.keys(store)));
+      // Hand the running frame the new value too, as if it had set it.
+      mount(id);
+      return { ok: true };
+    },
+    notifyTheme: function (id, hex) {
+      themes[id] = hex;
+      post(id, { t: "theme", value: hex });
+    },
+    isCustom: function (id) { return !!blobs[id]; }
+  };
+  window.__customWidgets = api;
 })();
 </script>
 
@@ -24111,7 +25409,7 @@
   const AI_MODEL = "claude-sonnet-5";
   // A ceiling on tool round-trips, so a model that keeps calling tools can't
   // spin the panel forever.
-  const AI_MAX_TURNS = 6;
+  const AI_MAX_TURNS = 10;
 
   function board() { return window.__aiBoard || null; }
 
@@ -24283,14 +25581,380 @@
     },
     {
       name: "delete_widget",
-      description: "Remove a widget from the board. Google Calendar and Google Tasks are parked in the hidden pool rather than destroyed, because they hold the Google connection.",
+      description: "Remove a widget from the board. Google Calendar and Google Tasks are parked in the hidden pool rather than destroyed, because they hold the Google connection. The user is shown a confirm button automatically.",
       input_schema: {
         type: "object",
         properties: { widget_id: { type: "string" } },
         required: ["widget_id"]
       }
+    },
+
+    /* ---- reading ---- */
+    {
+      name: "read_widget",
+      description: "Read one widget's full contents: a Page's blocks (with indexes), a list's items (with ids and tag categories), a Bookmarks widget's links and folders, a Vocabulary widget's settings, the Google Tasks list, the Google Calendar's visible events, or a custom widget's code, store and last runtime error. Call this before editing anything inside a widget so you have the exact ids.",
+      input_schema: { type: "object", properties: { widget_id: { type: "string" } }, required: ["widget_id"] }
+    },
+
+    /* ---- pages ---- */
+    {
+      name: "set_page_content",
+      description: "Replace a Page's entire content with Markdown. Supported: # title (first line only), ## / ### / #### headings, - bullets, 1. numbered, [ ] and [x] to-dos, > quotes, ``` code fences, $$ equation fences, 2-space indents for nesting, **bold**, *italic*, `code`, [links](https://…). The first line becomes the Page's title. If the Page already has content the user is shown a confirm button. Prefer append_to_page or replace_page_block for edits.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, markdown: { type: "string" } },
+        required: ["widget_id", "markdown"]
+      }
+    },
+    {
+      name: "append_to_page",
+      description: "Add Markdown blocks to the end of a Page, keeping everything already there. Same Markdown as set_page_content.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, markdown: { type: "string" } },
+        required: ["widget_id", "markdown"]
+      }
+    },
+    {
+      name: "replace_page_block",
+      description: "Replace exactly one block of a Page with new Markdown (which may be several blocks). Address it by block_index from read_widget, or by match_text (the first block containing that text). Block 0 is the title and may only be replaced by a single line of text.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          block_index: { type: "integer" },
+          match_text: { type: "string" },
+          markdown: { type: "string" }
+        },
+        required: ["widget_id", "markdown"]
+      }
+    },
+
+    /* ---- reading list / lists ---- */
+    {
+      name: "add_list_item",
+      description: "Add an item to a Reading List or a 'list' widget. tags is an object keyed by category key or label (from read_widget) whose values must be one of that category's options.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          text: { type: "string" },
+          tags: { type: "object", additionalProperties: { type: "string" } }
+        },
+        required: ["widget_id", "text"]
+      }
+    },
+    {
+      name: "update_list_item",
+      description: "Edit an item in a Reading List or 'list' widget: its text, tags (empty string clears a tag) and/or done state.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          item_id: { type: "string" },
+          text: { type: "string" },
+          tags: { type: "object", additionalProperties: { type: "string" } },
+          done: { type: "boolean" }
+        },
+        required: ["widget_id", "item_id"]
+      }
+    },
+    {
+      name: "remove_list_item",
+      description: "Delete an item from a Reading List or 'list' widget. The user is shown a confirm button automatically.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, item_id: { type: "string" } },
+        required: ["widget_id", "item_id"]
+      }
+    },
+
+    /* ---- bookmarks ---- */
+    {
+      name: "add_bookmark",
+      description: "Add a link to a Bookmarks widget, optionally inside a folder (folder_id from read_widget). The label defaults to the site's name.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          url: { type: "string" },
+          label: { type: "string" },
+          folder_id: { type: "string" }
+        },
+        required: ["widget_id", "url"]
+      }
+    },
+    {
+      name: "update_bookmark",
+      description: "Change a bookmark's url, label, or folder (folder_id; pass an empty string to move it to the top level).",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          link_id: { type: "string" },
+          url: { type: "string" },
+          label: { type: "string" },
+          folder_id: { type: "string" }
+        },
+        required: ["widget_id", "link_id"]
+      }
+    },
+    {
+      name: "remove_bookmark",
+      description: "Delete a link from a Bookmarks widget. The user is shown a confirm button automatically.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, link_id: { type: "string" } },
+        required: ["widget_id", "link_id"]
+      }
+    },
+    {
+      name: "create_bookmark_folder",
+      description: "Create a folder in a Bookmarks widget.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, label: { type: "string" } },
+        required: ["widget_id", "label"]
+      }
+    },
+
+    /* ---- google tasks ---- */
+    {
+      name: "list_tasks",
+      description: "List every open Google Task with its id, title, notes, due date/time, repeat rule and tags, plus the allowed tag options. Cheaper than read_widget when you only need tasks.",
+      input_schema: { type: "object", properties: {}, required: [] }
+    },
+    {
+      name: "create_task",
+      description: "Create a Google Task. due is YYYY-MM-DD, due_time is HH:MM (24h), repeat is none|daily|weekly|monthly|yearly|weekday. tags: status, workDepth, taskType (each from list_tasks's tag_options), location and habitStacking (free text), durationMinutes (number).",
+      input_schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          notes: { type: "string" },
+          due: { type: "string" },
+          due_time: { type: "string" },
+          repeat: { type: "string" },
+          tags: { type: "object" }
+        },
+        required: ["title"]
+      }
+    },
+    {
+      name: "update_task",
+      description: "Edit an open Google Task's title, notes, due date (empty string clears), due time, repeat, or tags.",
+      input_schema: {
+        type: "object",
+        properties: {
+          task_id: { type: "string" },
+          title: { type: "string" },
+          notes: { type: "string" },
+          due: { type: "string" },
+          due_time: { type: "string" },
+          repeat: { type: "string" },
+          tags: { type: "object" }
+        },
+        required: ["task_id"]
+      }
+    },
+    {
+      name: "complete_task",
+      description: "Mark a Google Task complete. It moves to the Completed section and can be restored there by the user.",
+      input_schema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] }
+    },
+    {
+      name: "delete_task",
+      description: "Delete a Google Task permanently. The user is shown a confirm button automatically.",
+      input_schema: { type: "object", properties: { task_id: { type: "string" } }, required: ["task_id"] }
+    },
+
+    /* ---- google calendar ---- */
+    {
+      name: "list_events",
+      description: "List Google Calendar events between two dates (YYYY-MM-DD, inclusive). Defaults to today through 14 days out.",
+      input_schema: { type: "object", properties: { from: { type: "string" }, to: { type: "string" } }, required: [] }
+    },
+    {
+      name: "create_event",
+      description: "Create a Google Calendar event. Omit start_time and end_time for an all-day event (end_date for a multi-day one). Times are HH:MM 24h local; end_time defaults to one hour after start. repeat: none|daily|weekly|monthly|yearly|weekday or a raw RRULE: string. reminder_minutes sets one popup reminder.",
+      input_schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          date: { type: "string" },
+          start_time: { type: "string" },
+          end_time: { type: "string" },
+          end_date: { type: "string" },
+          repeat: { type: "string" },
+          description: { type: "string" },
+          reminder_minutes: { type: "integer" },
+          guests: { type: "array", items: { type: "string" } }
+        },
+        required: ["title", "date"]
+      }
+    },
+    {
+      name: "update_event",
+      description: "Edit a Google Calendar event. Only the fields given change. Same fields as create_event; set all_day true to turn a timed event into an all-day one.",
+      input_schema: {
+        type: "object",
+        properties: {
+          event_id: { type: "string" },
+          title: { type: "string" },
+          date: { type: "string" },
+          start_time: { type: "string" },
+          end_time: { type: "string" },
+          end_date: { type: "string" },
+          all_day: { type: "boolean" },
+          repeat: { type: "string" },
+          description: { type: "string" },
+          reminder_minutes: { type: "integer" },
+          guests: { type: "array", items: { type: "string" } }
+        },
+        required: ["event_id"]
+      }
+    },
+    {
+      name: "delete_event",
+      description: "Delete a Google Calendar event. The user is shown a confirm button automatically.",
+      input_schema: { type: "object", properties: { event_id: { type: "string" } }, required: ["event_id"] }
+    },
+
+    /* ---- vocabulary ---- */
+    {
+      name: "configure_vocab",
+      description: "Change a Vocabulary widget's settings: languages (ids from read_widget's options), frequency (daily|3days|weekly), and counts (words per language, keyed by language id). Every Vocabulary widget shares one config.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          languages: { type: "array", items: { type: "string" } },
+          frequency: { type: "string" },
+          counts: { type: "object", additionalProperties: { type: "integer" } }
+        },
+        required: ["widget_id"]
+      }
+    },
+
+    /* ---- notion ---- */
+    {
+      name: "list_notion_pages",
+      description: "List the Notion pages shared with this app (id, title, icon), optionally filtered by a title substring. Requires Notion to be connected.",
+      input_schema: { type: "object", properties: { query: { type: "string" } }, required: [] }
+    },
+    {
+      name: "create_page_from_notion",
+      description: "Create a new Page widget on the board from an existing Notion page (id from list_notion_pages), synced two-way from then on.",
+      input_schema: { type: "object", properties: { notion_page_id: { type: "string" } }, required: ["notion_page_id"] }
+    },
+
+    /* ---- layout ---- */
+    {
+      name: "arrange_widget",
+      description: "Move or resize a widget. move_left_of / move_right_of put it in its own column beside target_id; stack_above / stack_below put it in the same column as target_id; move_to_end makes it the last column. set_width (pixels; only for the top widget of a column) and set_height (pixels; only when stacked) take value.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          action: { type: "string", enum: ["move_left_of", "move_right_of", "stack_above", "stack_below", "move_to_end", "set_width", "set_height"] },
+          target_id: { type: "string" },
+          value: { type: "integer" }
+        },
+        required: ["widget_id", "action"]
+      }
+    },
+
+    /* ---- custom widgets ---- */
+    {
+      name: "create_custom_widget",
+      description: "Build a brand-new widget from your own HTML, CSS and JavaScript and add it to the board. It runs in a sandboxed iframe (about 300x280px by default, resizable by the user) with NO network access and no access to the page — only the `mps` API injected before your script:\n" +
+        "  mps.store.get(key) -> string|null (sync), mps.store.getJSON(key, fallback), mps.store.set(key, value) (persists; objects are JSON-stringified), mps.store.remove(key), mps.store.keys();\n" +
+        "  mps.theme (the widget's background hex; also CSS var --mps-bg), mps.size ({w,h}), mps.on('ready'|'theme'|'size', fn), mps.ready (Promise).\n" +
+        "Wait for mps.on('ready') before reading the store. Keep all state in mps.store so it survives code updates. Inline styles/scripts only; no external URLs except https images. Write complete, working, self-contained code — the body is your html; do not include <html>/<head>/<body> tags.",
+      input_schema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Short title shown in the widget's header." },
+          html: { type: "string" },
+          css: { type: "string" },
+          js: { type: "string" }
+        },
+        required: ["name", "html"]
+      }
+    },
+    {
+      name: "update_custom_widget",
+      description: "Replace some or all of a custom widget's code (html, css, js) or its name. Omitted fields stay as they were; the widget's store is preserved. Read the current code with read_widget first. The result includes any runtime error the new code threw, so you can fix it.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          name: { type: "string" },
+          html: { type: "string" },
+          css: { type: "string" },
+          js: { type: "string" }
+        },
+        required: ["widget_id"]
+      }
+    },
+    {
+      name: "set_custom_widget_store",
+      description: "Write one key of a custom widget's persistent store (e.g. to seed it with data). value may be a string or JSON value.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, key: { type: "string" }, value: {} },
+        required: ["widget_id", "key", "value"]
+      }
     }
   ];
+
+  // Tools that take no widget_id at all, so the existence guard skips them.
+  const NO_WIDGET_TOOLS = {
+    list_widgets: 1, create_widget: 1, list_tasks: 1, create_task: 1, update_task: 1, complete_task: 1,
+    delete_task: 1, list_events: 1, create_event: 1, update_event: 1, delete_event: 1,
+    list_notion_pages: 1, create_page_from_notion: 1, create_custom_widget: 1
+  };
+  // Tools that pause for a real answer from the user before they run. The
+  // value is a function of the input that returns the question to ask, or
+  // null when this particular call is not destructive after all (a Page
+  // that is still empty, say).
+  const DESTRUCTIVE = {
+    delete_widget: function (i) { return "Delete the widget “" + widgetNameFor(i.widget_id) + "”?"; },
+    delete_task: function (i) {
+      const t = window.__aiTasks && window.__aiTasks.taskTitle(i.task_id);
+      return "Delete the task “" + (t || i.task_id) + "” from Google Tasks?";
+    },
+    delete_event: function (i) {
+      const t = window.__aiTasks && window.__aiTasks.eventTitle(i.event_id);
+      return "Delete the event “" + (t || i.event_id) + "” from Google Calendar?";
+    },
+    remove_list_item: function (i) {
+      let text = i.item_id;
+      try {
+        const l = window.__listItemsApi[i.widget_id].list().items.filter(function (x) { return x.id === i.item_id; })[0];
+        if (l) text = l.text;
+      } catch (e) {}
+      return "Remove “" + text + "” from " + widgetNameFor(i.widget_id) + "?";
+    },
+    remove_bookmark: function (i) {
+      let text = i.link_id;
+      try {
+        const all = window.__bookmarksApi[i.widget_id].list();
+        all.forEach(function (e) {
+          if (e.id === i.link_id) text = e.label;
+          (e.children || []).forEach(function (c) { if (c.id === i.link_id) text = c.label; });
+        });
+      } catch (e) {}
+      return "Remove the bookmark “" + text + "”?";
+    },
+    set_page_content: function (i) {
+      const w = board().list().filter(function (x) { return x.id === i.widget_id; })[0];
+      const text = w && w.noteText ? String(w.noteText).trim() : "";
+      // One line is just a title on an otherwise empty Page: nothing to lose.
+      if (!text || text.indexOf("\n") === -1) return null;
+      return "Replace everything in “" + widgetNameFor(i.widget_id) + "”?";
+    }
+  };
 
   // What the fog's label reads while each tool runs, and which input field
   // names the widget the fog should appear over.
@@ -24302,8 +25966,44 @@
     set_note_text:         { label: "Writing\u2026",      target: "widget_id" },
     delete_widget:         { label: "Removing\u2026",     target: "widget_id" },
     create_widget:         { label: "Building\u2026",     target: null },
-    configure_list:        { label: "Customizing\u2026",  target: "widget_id" }
+    configure_list:        { label: "Customizing\u2026",  target: "widget_id" },
+    read_widget:           { label: "Reading\u2026",      target: "widget_id" },
+    set_page_content:      { label: "Writing\u2026",      target: "widget_id" },
+    append_to_page:        { label: "Writing\u2026",      target: "widget_id" },
+    replace_page_block:    { label: "Editing\u2026",      target: "widget_id" },
+    add_list_item:         { label: "Adding\u2026",       target: "widget_id" },
+    update_list_item:      { label: "Editing\u2026",      target: "widget_id" },
+    remove_list_item:      { label: "Removing\u2026",     target: "widget_id" },
+    add_bookmark:          { label: "Adding\u2026",       target: "widget_id" },
+    update_bookmark:       { label: "Editing\u2026",      target: "widget_id" },
+    remove_bookmark:       { label: "Removing\u2026",     target: "widget_id" },
+    create_bookmark_folder:{ label: "Adding\u2026",       target: "widget_id" },
+    list_tasks:            { label: "Reading tasks\u2026", target: "tasks" },
+    create_task:           { label: "Adding task\u2026",  target: "tasks" },
+    update_task:           { label: "Editing task\u2026", target: "tasks" },
+    complete_task:         { label: "Completing\u2026",   target: "tasks" },
+    delete_task:           { label: "Deleting\u2026",     target: "tasks" },
+    list_events:           { label: "Reading calendar\u2026", target: "cal" },
+    create_event:          { label: "Adding event\u2026", target: "cal" },
+    update_event:          { label: "Editing event\u2026", target: "cal" },
+    delete_event:          { label: "Deleting\u2026",     target: "cal" },
+    configure_vocab:       { label: "Configuring\u2026",  target: "widget_id" },
+    list_notion_pages:     { label: "Asking Notion\u2026", target: null },
+    create_page_from_notion:{ label: "Importing\u2026",   target: null },
+    arrange_widget:        { label: "Moving\u2026",       target: "widget_id" },
+    create_custom_widget:  { label: "Building\u2026",     target: null },
+    update_custom_widget:  { label: "Rebuilding\u2026",   target: "widget_id" },
+    set_custom_widget_store:{ label: "Writing\u2026",     target: "widget_id" }
   };
+
+  // Tasks and events have no widget_id of their own; the fog goes over the
+  // singleton Google widget that shows them, when it is on the board.
+  function resolveTarget(ui, input) {
+    if (!ui || !ui.target) return null;
+    if (ui.target === "tasks") return board() && board().exists("unschedTasks") ? "unschedTasks" : null;
+    if (ui.target === "cal") return board() && board().exists("cal") ? "cal" : null;
+    return input[ui.target] || null;
+  }
 
   function resolveColor(input) {
     const raw = String(input || "").trim();
@@ -24322,24 +26022,173 @@
     return hit ? hit.title : id;
   }
 
-  function runTool(name, input) {
+  function typeOfWidget(id) {
+    const b = board();
+    return b && b.typeOf ? b.typeOf(id) : null;
+  }
+  function needsType(id, types, what) {
+    const t = typeOfWidget(id);
+    if (types.indexOf(t) !== -1) return null;
+    return { error: "'" + id + "' is a " + (t || "unknown") + " widget, not " + what + "." };
+  }
+
+  async function runTool(name, input) {
     const b = board();
     if (!b) return { error: "The board is not ready yet." };
     input = input || {};
     const id = input.widget_id;
 
     // One guard for every widget-addressed tool, so an id the model invented
-    // comes back as a correctable error rather than a silent no-op.
-    if (name !== "list_widgets" && name !== "create_widget") {
+    // comes back as a correctable error rather than a silent no-op. The
+    // original Bookmarks bar lives outside the grid as "menu" and is still
+    // addressable through its own bridge while it floats.
+    if (!NO_WIDGET_TOOLS[name]) {
       if (!id) return { error: "widget_id is required." };
-      if (!b.exists(id)) {
+      const floatingMenu = id === "menu" && window.__bookmarksApi && window.__bookmarksApi.menu;
+      if (!b.exists(id) && !floatingMenu) {
         return { error: "No widget with id '" + id + "'. Call list_widgets for the current ids." };
       }
     }
 
+    const T = window.__aiTasks;
+    const L = window.__listItemsApi && window.__listItemsApi[id];
+    const BM = window.__bookmarksApi && window.__bookmarksApi[id];
+    const CW = window.__customWidgets;
+
     switch (name) {
       case "list_widgets":
-        return { widgets: b.list() };
+        return { widgets: b.list().map(function (w) { const c = Object.assign({}, w); delete c.noteText; return c; }),
+                 layout: window.__aiLayout ? window.__aiLayout.describe() : null };
+
+      case "read_widget":
+        return b.read(id);
+
+      /* ---- pages ---- */
+      case "set_page_content": {
+        const bad = needsType(id, ["page"], "a Page");
+        if (bad) return bad;
+        return b.setPageMarkdown(id, String(input.markdown || ""));
+      }
+      case "append_to_page": {
+        const bad = needsType(id, ["page"], "a Page");
+        if (bad) return bad;
+        return b.appendPage(id, String(input.markdown || ""));
+      }
+      case "replace_page_block": {
+        const bad = needsType(id, ["page"], "a Page");
+        if (bad) return bad;
+        const where = typeof input.block_index === "number" ? { index: input.block_index }
+          : input.match_text ? { matchText: input.match_text } : null;
+        if (!where) return { error: "Give block_index or match_text." };
+        return b.replacePageBlock(id, where, String(input.markdown || ""));
+      }
+
+      /* ---- lists ---- */
+      case "add_list_item":
+      case "update_list_item":
+      case "remove_list_item": {
+        const bad = needsType(id, ["readingList", "list"], "a Reading List or list");
+        if (bad) return bad;
+        if (!L) return { error: "That list is not ready yet." };
+        if (name === "add_list_item") return L.add({ text: input.text, tags: input.tags });
+        if (name === "update_list_item") return L.update(String(input.item_id || ""), { text: input.text, tags: input.tags, done: input.done });
+        return L.remove(String(input.item_id || ""));
+      }
+
+      /* ---- bookmarks ---- */
+      case "add_bookmark":
+      case "update_bookmark":
+      case "remove_bookmark":
+      case "create_bookmark_folder": {
+        if (!BM) return { error: "'" + id + "' is not a Bookmarks widget." };
+        if (name === "add_bookmark") return BM.addLink({ url: input.url, label: input.label, folder_id: input.folder_id });
+        if (name === "update_bookmark") {
+          const patch = { url: input.url, label: input.label };
+          if (input.folder_id !== undefined) patch.folder_id = input.folder_id || null;
+          return BM.updateLink(String(input.link_id || ""), patch);
+        }
+        if (name === "remove_bookmark") return BM.removeLink(String(input.link_id || ""));
+        return BM.createFolder(input.label);
+      }
+
+      /* ---- google tasks ---- */
+      case "list_tasks":
+        if (!T) return { error: "Google Tasks is not connected." };
+        return T.listTasks();
+      case "create_task":
+        if (!T) return { error: "Google Tasks is not connected." };
+        return await T.createTask(input);
+      case "update_task":
+        if (!T) return { error: "Google Tasks is not connected." };
+        return await T.updateTask(String(input.task_id || ""), input);
+      case "complete_task":
+        if (!T) return { error: "Google Tasks is not connected." };
+        return await T.completeTask(String(input.task_id || ""));
+      case "delete_task":
+        if (!T) return { error: "Google Tasks is not connected." };
+        return await T.deleteTask(String(input.task_id || ""));
+
+      /* ---- google calendar ---- */
+      case "list_events":
+        if (!T) return { error: "Google Calendar is not connected." };
+        return await T.listEventsBetween(input.from, input.to);
+      case "create_event":
+        if (!T) return { error: "Google Calendar is not connected." };
+        return await T.createEvent(input);
+      case "update_event":
+        if (!T) return { error: "Google Calendar is not connected." };
+        return await T.updateEvent(String(input.event_id || ""), input);
+      case "delete_event":
+        if (!T) return { error: "Google Calendar is not connected." };
+        return await T.deleteEvent(String(input.event_id || ""));
+
+      /* ---- vocabulary ---- */
+      case "configure_vocab":
+        return b.setVocabSettings(id, { languages: input.languages, frequency: input.frequency, counts: input.counts });
+
+      /* ---- notion ---- */
+      case "list_notion_pages": {
+        const lib = window.__mpsNotionLibrary;
+        if (!lib) return { error: "Notion is not connected. The user can connect it from the Connections button." };
+        try {
+          const pages = await lib.listPages();
+          const q = String(input.query || "").toLowerCase();
+          const rows = pages.filter(function (p) { return !q || String(p.title || "").toLowerCase().indexOf(q) !== -1; });
+          return { pages: rows.slice(0, 60).map(function (p) { return { id: p.id, title: p.title, icon: p.icon }; }), total: rows.length };
+        } catch (e) { return { error: "Could not reach Notion: " + String((e && e.message) || e) }; }
+      }
+      case "create_page_from_notion": {
+        const lib = window.__mpsNotionLibrary;
+        if (!lib || !lib.adoptById) return { error: "Notion is not connected." };
+        return await lib.adoptById(String(input.notion_page_id || ""));
+      }
+
+      /* ---- layout ---- */
+      case "arrange_widget":
+        if (!window.__aiLayout) return { error: "Layout control is not available." };
+        return window.__aiLayout.arrange(id, String(input.action || ""), input.target_id, input.value);
+
+      /* ---- custom widgets ---- */
+      case "create_custom_widget": {
+        if (!CW) return { error: "Custom widgets are not available." };
+        const r = CW.create({ name: input.name, html: input.html, css: input.css, js: input.js });
+        if (r.error) return r;
+        await wait(400);   // let the frame boot so a syntax error is reported now
+        r.lastError = CW.lastError(r.widget_id);
+        return r;
+      }
+      case "update_custom_widget": {
+        if (!CW) return { error: "Custom widgets are not available." };
+        if (!CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
+        const r = CW.update(id, { name: input.name, html: input.html, css: input.css, js: input.js });
+        if (r.error) return r;
+        await wait(400);
+        r.lastError = CW.lastError(id);
+        return r;
+      }
+      case "set_custom_widget_store":
+        if (!CW || !CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
+        return CW.setStore(id, String(input.key || ""), input.value);
 
       case "set_widget_color": {
         const hex = resolveColor(input.color);
@@ -24409,24 +26258,35 @@
       : "The user has not touched a particular widget yet, so if a request is ambiguous " +
         "about which widget it applies to, ask before changing anything.";
 
+    const now = new Date();
+    const today = now.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const google = window.__aiTasks && window.__aiTasks.connected() ? "connected" : "not connected";
+    const notion = window.__mpsNotionLibrary ? "available" : "not connected";
+
     return [
       "You are myProductivitySpace AI, the assistant built into a single-page personal dashboard.",
       "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
+      "Today is " + today + " (local time " + now.toTimeString().slice(0, 5) + "). Google Calendar/Tasks: " + google + ". Notion: " + notion + ".",
       "",
-      "Current widgets on the board:",
+      "Current widgets on the board (id \u2014 title, type, size):",
       widgets.length
         ? widgets.map(function (w) {
-            return "- " + w.id + " \u2014 \u201c" + w.title + "\u201d (type: " + w.type +
-                   ", colour: " + w.color + (w.hidden ? ", currently hidden" : "") + ")";
+            return "- " + w.id + " \u2014 \u201c" + w.title + "\u201d (" + w.type +
+                   (w.summary ? ", " + w.summary : "") + ", colour " + w.color +
+                   (w.hidden ? ", currently hidden" : "") + ")";
           }).join("\n")
         : "- (the board is empty)",
       "",
       "Colour presets: " + presets + ".",
       focus,
       "",
+      "How to work: read before you edit \u2014 read_widget, list_tasks or list_events give you the ids that edit tools need. " +
+      "Pages are written in Markdown; prefer append_to_page / replace_page_block over rewriting a whole Page. " +
+      "For anything the existing widget types can't do, build a custom widget with create_custom_widget (sandboxed HTML/CSS/JS with the mps store API); revise it with update_custom_widget, and check lastError in the result. " +
+      "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
+      "",
       "Style: you are a narrow sidebar, so keep replies short \u2014 usually one or two sentences.",
-      "Confirm what you changed in plain language rather than restating the tool call.",
-      "Ask first before anything destructive: deleting a widget, or replacing note text that already has content."
+      "Confirm what you changed in plain language rather than restating the tool call."
     ].join("\n");
   }
 
@@ -24453,7 +26313,9 @@
       },
       body: JSON.stringify({
         model: AI_MODEL,
-        max_tokens: 1024,
+        // A custom widget's code alone can run past 1024; a tool_use block
+        // cut off mid-JSON arrives as input {} and fails silently.
+        max_tokens: 4096,
         stream: true,
         system: systemPrompt(),
         tools: AI_TOOLS,
@@ -24557,6 +26419,35 @@
     chip.appendChild(el("span", null, text));
   }
 
+  /* A question in the log with two real buttons. Resolves true/false; the
+     tool loop awaits it, so the model gets an answer it cannot talk past.
+     Escape is a No, so the keyboard has a way out too. */
+  function askConfirm(question) {
+    return new Promise(function (resolve) {
+      const box = el("div", "ai-confirm");
+      box.appendChild(el("div", "ai-confirm-q", question));
+      const row = el("div", "ai-confirm-row");
+      const yes = el("button", "ai-confirm-yes", "Yes, do it");
+      const no = el("button", "ai-confirm-no", "No");
+      yes.type = "button"; no.type = "button";
+      row.appendChild(yes); row.appendChild(no);
+      box.appendChild(row);
+      aiLog.appendChild(box);
+      scrollLog();
+      function settle(v) {
+        document.removeEventListener("keydown", onKey);
+        box.classList.add("is-settled");
+        box.querySelector(".ai-confirm-q").textContent = question + (v ? "  ✓" : "  — cancelled");
+        resolve(v);
+      }
+      function onKey(e) { if (e.key === "Escape") { e.preventDefault(); settle(false); } }
+      yes.addEventListener("click", function () { settle(true); });
+      no.addEventListener("click", function () { settle(false); });
+      document.addEventListener("keydown", onKey);
+      yes.focus();
+    });
+  }
+
   function appendThinking() {
     const b = el("div", "ai-msg is-ai");
     const dots = el("span", "ai-thinking");
@@ -24572,18 +26463,47 @@
   function describeTool(name, input, result) {
     const who = input && input.widget_id ? widgetNameFor(input.widget_id) : null;
     if (result && result.error) return "Couldn't do that: " + result.error;
+    if (result && result.cancelled) return "Cancelled";
+    const t = function (o) { return o && o.title ? "\u201c" + o.title + "\u201d" : ""; };
     switch (name) {
       case "list_widgets": return "Read the board";
+      case "read_widget": return "Read " + who;
       case "set_widget_color": return "Recoloured " + who;
       case "rename_widget": return "Renamed to \u201c" + (result.title || input.name) + "\u201d";
       case "set_widget_icon": return input.emoji
         ? "Set " + who + "'s icon to " + input.emoji
         : "Removed " + who + "'s icon";
       case "set_widget_visibility": return (input.hidden ? "Hid " : "Unhid ") + who;
-      case "set_note_text": return "Rewrote " + who;
+      case "set_note_text":
+      case "set_page_content": return "Rewrote " + who;
+      case "append_to_page": return "Added to " + who;
+      case "replace_page_block": return "Edited a line in " + who;
       case "create_widget": return "Added a new " + (input.type === "page" ? "note" : input.type) + " widget";
       case "delete_widget": return "Removed " + who;
       case "configure_list": return "Customized " + who;
+      case "add_list_item": return "Added \u201c" + (result.item ? result.item.text : input.text) + "\u201d to " + who;
+      case "update_list_item": return "Updated an item in " + who;
+      case "remove_list_item": return "Removed \u201c" + (result.removed ? result.removed.text : "an item") + "\u201d from " + who;
+      case "add_bookmark": return "Bookmarked " + (result.link ? result.link.label : input.url);
+      case "update_bookmark": return "Updated a bookmark";
+      case "remove_bookmark": return "Removed the bookmark " + (result.removed ? "\u201c" + result.removed.label + "\u201d" : "");
+      case "create_bookmark_folder": return "Created the folder \u201c" + input.label + "\u201d";
+      case "list_tasks": return "Read Google Tasks";
+      case "create_task": return "Added the task " + t(result.task);
+      case "update_task": return "Updated the task " + t(result.task);
+      case "complete_task": return "Completed " + t(result.completed);
+      case "delete_task": return "Deleted the task " + t(result.deleted);
+      case "list_events": return "Read the calendar";
+      case "create_event": return "Added the event " + t(result.event);
+      case "update_event": return "Updated the event " + t(result.event);
+      case "delete_event": return "Deleted the event " + t(result.deleted);
+      case "configure_vocab": return "Configured " + who;
+      case "list_notion_pages": return "Listed Notion pages";
+      case "create_page_from_notion": return "Imported " + t(result) + " from Notion";
+      case "arrange_widget": return "Moved " + who;
+      case "create_custom_widget": return "Built \u201c" + input.name + "\u201d" + (result.lastError ? " (with a runtime error)" : "");
+      case "update_custom_widget": return "Rebuilt " + who + (result.lastError ? " (with a runtime error)" : "");
+      case "set_custom_widget_store": return "Wrote to " + who + "'s store";
       default: return name;
     }
   }
@@ -24671,15 +26591,31 @@
         const results = [];
         for (const use of toolUses) {
           const ui = TOOL_UI[use.name] || {};
-          const targetId = ui.target ? use.input[ui.target] : null;
-          const chip = ui.label ? appendToolChip(ui.label) : null;
+          const targetId = resolveTarget(ui, use.input || {});
 
-          if (targetId) startFog(targetId, ui.label);
+          /* The pause. A destructive tool asks first, with a question that
+             names the thing about to go; only a click on Yes runs it. The
+             stream for this turn has already closed, so waiting here costs
+             nothing and the model simply sees the answer in its result. */
+          let out = null;
+          const ask = DESTRUCTIVE[use.name];
+          let question = null;
+          if (ask) { try { question = ask(use.input || {}); } catch (e) { question = null; } }
+          if (question) {
+            if (placeholder && placeholder.parentNode) placeholder.remove();
+            placeholder = null;
+            const yes = await askConfirm(question);
+            if (!yes) out = { cancelled: true, reason: "The user declined." };
+          }
+
+          const chip = ui.label ? appendToolChip(ui.label) : null;
+          if (out === null && targetId) startFog(targetId, ui.label);
           const started = Date.now();
 
-          let out;
-          try { out = runTool(use.name, use.input); }
-          catch (e) { out = { error: String((e && e.message) || e) }; }
+          if (out === null) {
+            try { out = await runTool(use.name, use.input); }
+            catch (e) { out = { error: String((e && e.message) || e) }; }
+          }
 
           // Instant work still gets a visible beat of fog. See FOG_MIN_MS.
           if (targetId) {
@@ -24727,12 +26663,16 @@
     let widgets = [];
     try { widgets = window.__listWidgetTitles ? window.__listWidgetTitles() : []; } catch (e) {}
     const chips = [];
-    widgets.slice(0, 2).forEach(function (w) {
-      if (w.title) chips.push("Change how " + w.title + " looks");
-    });
-    if (widgets.length) chips.push("Summarize what's on my board");
-    chips.push("Create a widget from Notion");
-    chips.push("Summarize what's connected");
+    // Every chip here has a tool behind it. The Page one only appears when
+    // the widget the user was last in IS a Page, so it never asks for
+    // something the focus rule would then have to guess at.
+    let focusType = null;
+    try { focusType = aiTargetWidgetId && board() && board().typeOf ? board().typeOf(aiTargetWidgetId) : null; } catch (e) {}
+    if (focusType === "page") chips.push("Turn this page into a checklist");
+    chips.push("Add a task for tomorrow");
+    chips.push("What's on my calendar this week?");
+    chips.push("Build me a pomodoro widget");
+    if (widgets.length && widgets[0].title) chips.push("Change how " + widgets[0].title + " looks");
 
     chips.slice(0, 4).forEach(function (text) {
       const b = el("button", "ai-starter", text);
