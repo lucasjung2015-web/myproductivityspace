@@ -26578,7 +26578,7 @@
      blocks are accumulated (their input arrives as a stream of JSON fragments
      and is only parseable once the block closes) and returned for the caller
      to execute. */
-  async function streamTurn(apiMessages, onText) {
+  async function streamTurn(apiMessages, onText, onToolStart) {
     // The proxy authenticates the CALLER, not Anthropic — it holds the real
     // key itself. getSession() (behind token()) refreshes an access token
     // that is near expiry, which is what keeps a long-lived tab authorised.
@@ -26587,7 +26587,24 @@
     // Raw fetch, deliberately: supabase-js's functions.invoke() buffers the
     // whole response and cannot read a stream, which would turn the panel's
     // token-by-token rendering back into one late block of text.
-    const res = await fetch(AI_API_URL, {
+    /* Watchdog. A proxy can hold the connection open with nothing arriving
+       -- the reader then awaits forever, the dots never stop, and aiBusy
+       stays true so every later message is silently ignored. Any stretch
+       of STALL_MS with no bytes aborts the fetch, which surfaces as an
+       ordinary error in the log and frees the panel. Reset on every chunk,
+       so a long but live reply is never cut off. */
+    const STALL_MS = 75000;
+    const ctrl = new AbortController();
+    let stallTimer = null;
+    function armStall() {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(function () { ctrl.abort(); }, STALL_MS);
+    }
+    armStall();
+    let res;
+    try {
+      res = await fetch(AI_API_URL, {
+      signal: ctrl.signal,
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -26605,8 +26622,14 @@
         messages: apiMessages
       })
     });
+    } catch (e) {
+      if (stallTimer) clearTimeout(stallTimer);
+      if (e && e.name === "AbortError") throw new Error("The reply stalled \u2014 nothing arrived for over a minute. Try again.");
+      throw e;
+    }
 
     if (!res.ok) {
+      if (stallTimer) clearTimeout(stallTimer);
       let detail = "";
       try {
         const j = await res.json();
@@ -26629,6 +26652,7 @@
         blocks[ev.index] = cb.type === "tool_use"
           ? { type: "tool_use", id: cb.id, name: cb.name, _json: "", input: {} }
           : { type: "text", text: "" };
+        if (cb.type === "tool_use" && onToolStart) { try { onToolStart(cb.name); } catch (e) {} }
       } else if (ev.type === "content_block_delta") {
         const blk = blocks[ev.index];
         const d = ev.delta || {};
@@ -26649,9 +26673,11 @@
       }
     }
 
+    try {
     for (;;) {
       const chunk = await reader.read();
       if (chunk.done) break;
+      armStall();
       buf += decoder.decode(chunk.value, { stream: true });
       let nl;
       while ((nl = buf.indexOf("\n")) !== -1) {
@@ -26664,6 +26690,12 @@
         try { ev = JSON.parse(payload); } catch (e) { continue; }
         onEvent(ev);
       }
+    }
+    } catch (e) {
+      if (e && e.name === "AbortError") throw new Error("The reply stalled \u2014 nothing arrived for over a minute. Try again.");
+      throw e;
+    } finally {
+      if (stallTimer) clearTimeout(stallTimer);
     }
 
     return { blocks: blocks.filter(Boolean), stopReason: stopReason };
@@ -26913,7 +26945,18 @@
           }
           setBubbleMarkdown(bubble, streamed);
           scrollLog();
+        }, function (toolName) {
+          /* The model has started writing a tool call. Its input may be
+             seconds away -- a whole word bank, a widget's code -- and until
+             it lands the log shows only dots. The fog can start now for the
+             tools whose target is known without the input (the Google
+             widgets); it is the "working, here" signal, on the widget
+             rather than as a step in the chat. */
+          const ui = TOOL_UI[toolName] || {};
+          const early = resolveTarget(ui, {});
+          if (early) startFog(early, ui.label);
         });
+        stopFog();
 
         if (bubble) bubble.classList.remove("is-streaming");
 
@@ -27003,8 +27046,12 @@
         messages.push({ role: "user", content: results });
 
         // Only now, with another turn about to be requested, does a waiting
-        // indicator make sense again.
-        placeholder = appendThinking();
+        // indicator make sense again. If this turn produced no text the
+        // original dots never became a bubble and are still in the log --
+        // MOVE them to the bottom rather than adding a second set, or a
+        // tool-only turn leaves a spinner stranded above the reply forever.
+        if (placeholder && placeholder.parentNode) { aiLog.appendChild(placeholder); scrollLog(); }
+        else placeholder = appendThinking();
       }
     } catch (err) {
       const msg = String((err && err.message) || err);
