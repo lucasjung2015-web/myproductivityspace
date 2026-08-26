@@ -1469,7 +1469,7 @@
   #calCreateBtn { background: #000000; }
   #calCreateBtn:hover { background: #222222; }
 
-  .cal-navbar { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-bottom: 8px; }
+  .cal-navbar { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-bottom: 4px; }
   .cal-navbtn, .cal-refreshbtn {
     width: 22px; height: 22px; padding: 0; flex: 0 0 auto;
     display: flex; align-items: center; justify-content: center;
@@ -1854,15 +1854,22 @@
   .cal-panel-delete:hover { background: #c0392b; color: #ffffff; }
   .cal-panel-error { font-size: 13px; color: #c0392b; }
 
+  /* No padding on the TOP edge: the day/week header inside is position:sticky
+     top:0, and any padding above it is a strip the grid scrolls through
+     while the header floats below it — an event box sliding up into the gap
+     between the date row and the first hour line. Flush to the border, the
+     header covers the whole top edge and the date row sits right on the
+     grid, the way a real day view reads. The month view has no sticky header
+     to lose, so it re-adds the breathing room on .cal-month-head itself. */
   .cal-viewport {
     flex: 1 1 0; min-height: 120px; overflow: auto; overscroll-behavior: contain;
-    border: 1px solid #000000; border-radius: 4px; padding: 8px;
+    border: 1px solid #000000; border-radius: 4px; padding: 0 8px 8px;
   }
   .cal-loading { font-size: 13px; color: #000000; opacity: 0.6; }
 
   /* Month grid */
   .cal-month-head, .cal-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
-  .cal-month-head { margin-bottom: 4px; }
+  .cal-month-head { margin-top: 8px; margin-bottom: 4px; }
   .cal-month-head span {
     font-size: 11px; font-weight: bold; text-align: center; color: #000000; opacity: 0.6;
   }
@@ -1922,10 +1929,14 @@
   .cal-timegrid { display: grid; gap: 0; min-width: 0; }
   .cal-timegrid.week { min-width: 460px; }
   .cal-tg-corner { position: sticky; top: 0; background: #ffffff; z-index: 2; }
+  /* The top padding lives HERE rather than on .cal-viewport (which now has
+     none — see the note there): inside the sticky header it is opaque and
+     travels with it, so it is breathing room above the date instead of a
+     see-through strip the grid scrolls up into. */
   .cal-tg-dayhead {
     position: sticky; top: 0; background: #ffffff; z-index: 2;
     font-size: 11px; font-weight: bold; text-align: center; color: #000000;
-    padding: 2px 0 4px; border-bottom: 1px solid #000000; cursor: pointer;
+    padding: 6px 0 4px; border-bottom: 1px solid #000000; cursor: pointer;
   }
   .cal-tg-dayhead.today { color: #000000; }
   .cal-tg-hourlabel {
@@ -11059,8 +11070,19 @@
     function applyHeightInSlot(id) {
       const el = widgetEl(id);
       if (!el) return;
-      const slot = slotOf(id);
-      if (!slot || slot.length === 1) { el.style.flex = "1 1 auto"; return; }
+      const full = slotOf(id);
+      if (!full) { el.style.flex = "1 1 auto"; return; }
+      /* Hidden siblings do not count. A widget hidden away to the tab bar is
+         display:none but still sits in its slot's layout entry, and the
+         remaining widget kept the fixed pixel height it had been given as
+         one of two -- leaving the section's colour stopping partway down
+         with dead space under it. Measuring the slot by what is actually
+         VISIBLE is what makes "the only widget left in this section" fill
+         the section, however it came to be the only one: hidden, deleted or
+         never joined. */
+      const slot = full.filter(function (mid) { return !isHidden(mid); });
+      if (slot.length <= 1) { el.style.flex = "1 1 auto"; return; }
+      if (isHidden(id)) { el.style.flex = "1 1 auto"; return; }
 
       // Check if this widget is a page and if the slot has any pages
       const isPage = NOTE_WIDGETS[id];
@@ -11284,6 +11306,22 @@
       render();
       WIDGET_IDS.forEach(applyWidgetColor);
       WIDGET_IDS.forEach(applyWidgetIcon);
+      /* Bookmarks builds its own header and paints its icon as it renders,
+         which happens while this function is still awaiting storage -- at
+         which point WIDGET_ICONS is empty and it paints the blank
+         placeholder. It is also not a member of WIDGET_IDS unless it is
+         currently in the grid, so the sweep above never reaches it and the
+         saved emoji stayed invisible until something else forced a repaint.
+         Repainting every icon button actually on the page covers it, and
+         anything else that owns its own header, without either side having
+         to know about the other. */
+      const painted = {};
+      Array.prototype.forEach.call(document.querySelectorAll("[data-icon-btn]"), function (b) {
+        const bid = b.getAttribute("data-icon-btn");
+        if (!bid || painted[bid]) return;
+        painted[bid] = true;
+        applyWidgetIcon(bid);
+      });
       applyAllWidgetTitles();
       // Anything whose builder hadn't loaded when it was registered above.
       ensureDynamicWidgetElements();
@@ -11367,6 +11405,15 @@
 
       updateTabsBarVisibility();
       updateResizerStates();
+      /* Last, and always: hiding or unhiding changes how many widgets a slot
+         actually shows, and applyHeightInSlot decides between "fill the
+         section" and "keep your own pixel height" from exactly that count.
+         Without this the heights stay whatever the previous arrangement
+         wanted and a section that just lost its second widget keeps a hole
+         where that widget was. */
+      layout.forEach(function (slot) {
+        slot.forEach(applyHeightInSlot);
+      });
     }
 
     // Which other widgets, if any, `id` was hidden together with via
@@ -12280,6 +12327,39 @@
       }
       flush();
       if (!root.firstChild) root.appendChild(nbMakeBlock("p", 0));
+      nbLockTitle(root);
+    }
+
+    /* The first block of a Page is its title -- it is what names the widget,
+       the hidden tab and the Notion page on the other side of the sync -- so
+       it is always a Heading 1 and never anything else. Enforced here rather
+       than only at the points where a type is chosen, because content also
+       arrives from storage, from a paste and from the Notion pull, and a
+       title that came back as a paragraph would still be a paragraph.
+       A "page" block is left alone: it is a link to another page, not text,
+       and rewriting it as a heading would throw that link away. */
+    function nbTitleBlockOf(root) {
+      const first = nbBlocks(root)[0];
+      return first && nbType(first) !== "page" ? first : null;
+    }
+    function nbIsTitleBlock(root, block) {
+      return !!block && !!root && block === nbTitleBlockOf(root);
+    }
+    function nbLockTitle(root) {
+      const t = nbTitleBlockOf(root);
+      if (!t || nbType(t) === "h1") return;
+      if (t.hasAttribute("data-tex")) {
+        t.textContent = t.getAttribute("data-tex");
+        t.removeAttribute("data-tex");
+        t.classList.remove("nb-rendered");
+      }
+      t.setAttribute("data-b", "h1");
+      // Attributes that belonged to whatever type it used to be.
+      t.removeAttribute("data-c");
+      t.removeAttribute("data-o");
+      t.removeAttribute("data-e");
+      t.removeAttribute("data-lang");
+      t.removeAttribute("data-i");
     }
 
     function nbBlocks(editorEl) {
@@ -12552,6 +12632,11 @@
        menu safe to click repeatedly while deciding. */
     function nbSetType(editorEl, block, type, opts) {
       opts = opts || {};
+      // The title is fixed at Heading 1 (see nbLockTitle). Every path that
+      // changes a type -- the toolbar menu, a markdown shorthand, Backspace
+      // at the start of a block -- comes through here, so one guard covers
+      // all of them.
+      if (nbIsTitleBlock(editorEl, block) && type !== "h1") return block;
       const was = nbType(block);
       if (was === "eq" && block.hasAttribute("data-tex")) {
         block.textContent = block.getAttribute("data-tex");
@@ -12712,6 +12797,9 @@
       const block = nbCaretBlock(editorEl);
       if (!block) return false;
       if (nbType(block) === "code") return false;   // ``` inside code is text
+      // Fixed at Heading 1, so "# " typed into it is just text -- stripping
+      // the marker for a conversion that can't happen would eat the keystroke.
+      if (nbIsTitleBlock(editorEl, block)) return false;
       const text = block.textContent || "";
       const pos = nbCaretOffset(editorEl, block);
       for (const pair of NB_SHORTHAND) {
@@ -13189,6 +13277,15 @@
       const range = sel.getRangeAt(0);
       const editor = nbEditorOf(range.startContainer);
       if (!editor || !editor.contains(range.endContainer) || !String(sel).trim()) {
+        nbHideBar();
+        return;
+      }
+      // Nothing on the bar applies to a Page's title: its type is fixed at
+      // Heading 1, and colouring/marking the text that names the widget and
+      // its Notion page would only ever be undone by the next sync. So
+      // selecting it shows no popup at all rather than a toolbar whose
+      // controls quietly do nothing.
+      if (nbIsTitleBlock(editor, nbBlockOf(editor, range.startContainer))) {
         nbHideBar();
         return;
       }
@@ -15283,18 +15380,27 @@
       document.execCommand("insertText", false, text);
     }, true);
 
+    /* EVERY button carrying this id, not just the first one the document
+       happens to hold. Bookmarks is the reason: it exists as a floating
+       full-width bar OR as a grid widget, and during a switch between the
+       two both headers are momentarily in the document. A querySelector
+       picked whichever came first, which was regularly the copy on its way
+       out -- so the emoji looked like it had never been saved. */
     function applyWidgetIcon(id) {
-      const display = document.querySelector('[data-icon-display="' + id + '"]');
-      const btn = document.querySelector('[data-icon-btn="' + id + '"]');
-      if (!display || !btn) return;
       const emoji = WIDGET_ICONS[id];
-      if (emoji) {
-        display.textContent = emoji;
-        btn.classList.add("has-icon");
-      } else {
-        display.innerHTML = DEFAULT_ICON_SVG;
-        btn.classList.remove("has-icon");
-      }
+      const btns = document.querySelectorAll('[data-icon-btn="' + id + '"]');
+      Array.prototype.forEach.call(btns, function (btn) {
+        const display = btn.querySelector('[data-icon-display="' + id + '"]')
+          || btn.querySelector(".widget-icon-display");
+        if (!display) return;
+        if (emoji) {
+          display.textContent = emoji;
+          btn.classList.add("has-icon");
+        } else {
+          display.innerHTML = DEFAULT_ICON_SVG;
+          btn.classList.remove("has-icon");
+        }
+      });
       // The widget's hidden-tab copy of the same icon (see applyTabIcon), so
       // changing an icon updates the tab too rather than only the live widget.
       applyTabIcon(id);
@@ -18325,8 +18431,7 @@
         allDayRow.appendChild(makeChip(nsEvent(e.id), prefix + e.title, "event"));
       });
       tasksOnDay(ymd(day)).forEach(function (t) {
-        const meta = tagMeta(nsTask(t.id));
-        if (meta && meta.dueTime) return;
+        if (taskDueTime(t, tagMeta(nsTask(t.id)))) return;
         allDayRow.appendChild(makeChip(nsTask(t.id), prefix + t.title, "task"));
       });
     });
@@ -18508,17 +18613,17 @@
       // uses (ring+checkmark included), just placed absolutely instead of
       // sitting inline in a flex row.
       const dayTasks = tasksOnDay(ymd(day)).filter(function (t) {
-        const meta = tagMeta(nsTask(t.id));
-        return meta && meta.dueTime;
+        return !!taskDueTime(t, tagMeta(nsTask(t.id)));
       });
       dayTasks.forEach(function (t) {
         const meta = tagMeta(nsTask(t.id));
-        const tp = String(meta.dueTime).split(":");
+        const hhmm = taskDueTime(t, meta);
+        const tp = String(hhmm).split(":");
         const startMin = Number(tp[0]) * 60 + Number(tp[1] || 0);
         const height = Math.max(12, (30 / 60) * HOUR_H - 2);
         const nsId = nsTask(t.id);
 
-        const chip = makeChip(nsId, gtFmtTime(meta.dueTime) + " " + t.title, "task");
+        const chip = makeChip(nsId, gtFmtTime(hhmm) + " " + t.title, "task");
         chip.classList.add("cal-tg-task-pos");
         chip.style.top = (startMin / 60) * HOUR_H + "px";
         chip.style.height = height + "px";
@@ -18555,6 +18660,20 @@
     try { return (w && w.__unbleepGetGTaskMeta) ? w.__unbleepGetGTaskMeta(taskId) : null; }
     catch (e) { return null; }
   }
+  /* A task's due TIME, including one that has been chosen but has nowhere to
+     live yet. Google Tasks' own `due` carries no time of day, so the time is
+     tag metadata keyed by the task's REAL id — and a task created from the
+     inline composer is painted optimistically under a temporary one, before
+     the POST that mints the real id has returned. In that window tagMeta()
+     misses, and the due pill rendered a bare "Today" that grew a ", 3:00 PM"
+     a beat later. The chosen time rides on the optimistic row itself (see
+     commitInlineComposer) and this is what reads it, so both halves of the
+     due date show from the very first paint. */
+  function taskDueTime(t, meta) {
+    if (meta && meta.dueTime) return meta.dueTime;
+    return (t && t.__dueTime) || "";
+  }
+
   function setTagMeta(taskId, field, value, title) {
     const w = frameWin();
     try { if (w && w.__unbleepSetGTaskMeta) w.__unbleepSetGTaskMeta(taskId, field, value, title); }
@@ -19603,7 +19722,7 @@
         // due TIME is appended after a comma, so a task due at 8:30 never shows
         // up as a bare day — the same string the composer's own chip renders
         // from the same helper, so the two surfaces can't phrase it differently.
-        const dueTimeStr = (meta && meta.dueTime) || "";
+        const dueTimeStr = taskDueTime(t, meta);
         const near = rel.text === "Today" || rel.text === "Tomorrow" || rel.text === "Yesterday";
         dueEl.appendChild(document.createTextNode(
           near
@@ -19614,7 +19733,7 @@
           e.stopPropagation();
           gtOpenDatePicker(dueEl, {
             due: String(t.due).slice(0, 10),
-            dueTime: (meta && meta.dueTime) || "",
+            dueTime: taskDueTime(t, meta),
             repeat: (meta && meta.repeat) || ""
           }, function (draft) {
             window.__unbleepSetDueDate(nsId, draft.due, draft.dueTime, draft.repeat);
@@ -21288,7 +21407,7 @@
     mark.className = "gt-composer-mark" + (opts.deleteButton ? " task-complete-btn" : "");
     if (opts.deleteButton) {
       mark.type = "button";
-      mark.title = "Delete task";
+      mark.title = opts.deleteTitle || "Delete task";
       mark.innerHTML = TASK_CHECK_ICON;
       mark.addEventListener("click", function (e) {
         e.stopPropagation();
@@ -21585,6 +21704,9 @@
     const tempId = "tmp-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
     const optimistic = { id: tempId, title: t, notes: notes, __pending: true };
     if (body.due) optimistic.due = body.due;
+    // Read by taskDueTime() until the real id exists and the staged tags are
+    // written, so the due pill never flashes a date without its time.
+    if (dueTime) optimistic.__dueTime = dueTime;
     tasks.unshift(optimistic);
     renderTasks();
 
@@ -21642,7 +21764,16 @@
   function openInlineComposer() {
     if (!inlineComposerEl) return;
     inlineComposerEl.innerHTML = "";
-    inlineComposer = buildTaskComposer({ title: "", notes: "", due: "", dueTime: "", repeat: "" });
+    /* The open circle is live from the very first keystroke — before the task
+       exists, before it has a name. Hovering it previews the checkmark the
+       way a settled row's does, and clicking it throws the draft away. A
+       composer whose circle is inert until the task is saved is a control
+       that looks pressable and isn't, and it leaves an abandoned draft with
+       no way out but Escape. */
+    inlineComposer = buildTaskComposer(
+      { title: "", notes: "", due: "", dueTime: "", repeat: "" },
+      { deleteButton: true, deleteTitle: "Discard task", onDelete: function () { closeInlineComposer(); } }
+    );
     inlineComposerPendingTags = {};
     inlineComposerEl.appendChild(inlineComposer.el);
     // Same Tags row the New task modal stages into (no id yet, so it writes
