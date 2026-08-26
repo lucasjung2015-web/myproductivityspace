@@ -2747,7 +2747,10 @@
   .ai-msg.is-user { align-self: flex-end; background: var(--ink); color: var(--bg); }
   /* A defined edge rather than --hair: at this size a near-white hairline
      doesn't read as a bubble at all, and the panel has no colour to lean on. */
-  .ai-msg.is-ai { align-self: flex-start; background: var(--bg); color: var(--ink); border: 1px solid #c9c9c9; }
+  /* The reply is plain text on the panel, not a second bubble facing the
+     user's: one voice is boxed, the other simply speaks. The error state
+     below keeps its tint, since that one is a notice rather than a reply. */
+  .ai-msg.is-ai { align-self: flex-start; max-width: 100%; padding: 4px 2px; background: transparent; color: var(--ink); border: none; }
   .ai-starters { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 7px; padding: 0 14px 12px; }
   .ai-starters[hidden] { display: none; }
   .ai-starter {
@@ -2790,7 +2793,7 @@
     animation: ai-caret-blink 1s steps(1, end) infinite;
   }
   @keyframes ai-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-  .ai-msg.is-error { border-color: #d8b4b4; color: #7a2020; background: #fdf6f6; }
+  .ai-msg.is-error { padding: 9px 13px; border: 1px solid #d8b4b4; color: #7a2020; background: #fdf6f6; }
   /* A rendered reply. pre-wrap comes off: the Markdown parser owns line
      structure now, and leaving it on would double every list's spacing.
      Everything is scaled to the bubble's 13.5px rather than the page's
@@ -11466,6 +11469,13 @@
           if (parsed && typeof parsed === "object") Object.assign(WIDGET_TITLES, parsed);
         } catch (e) {}
       }
+      const instrRaw = await storageGet(WIDGET_INSTRUCTIONS_STORAGE_KEY);
+      if (instrRaw) {
+        try {
+          const parsed = JSON.parse(instrRaw);
+          if (parsed && typeof parsed === "object") Object.assign(WIDGET_INSTRUCTIONS, parsed);
+        } catch (e) {}
+      }
 
       render();
       WIDGET_IDS.forEach(applyWidgetColor);
@@ -14560,6 +14570,8 @@
       // happens to reuse the id can't inherit a name it never had.
       delete WIDGET_TITLES[id];
       persistWidgetTitles();
+      delete WIDGET_INSTRUCTIONS[id];
+      persistWidgetInstructions();
       persistLayout();
       persistDynamicWidgets();
       render();
@@ -15374,6 +15386,15 @@
        their header title is hidden and their name IS the note's first line. */
     const WIDGET_TITLE_STORAGE_KEY = "widget-titles";
     const WIDGET_TITLES = {};
+    /* Standing instructions per widget, written by the user through the AI
+       ("for this list, always tag new items To-do"; "keep Vocabulary to
+       finance terms"). The consumer is the AI itself: they ride in the
+       system prompt and in read_widget, so every later edit to that widget
+       is made with them in view. Kept as one map like the titles, since
+       they are the same kind of thing -- a name the user gave a widget. */
+    const WIDGET_INSTRUCTIONS_STORAGE_KEY = "widget-instructions";
+    const WIDGET_INSTRUCTIONS = {};
+    const INSTRUCTIONS_MAX = 1200;
 
     // Several ids describe the same KIND of widget: an extra read-only calendar
     // is still a Calendar for naming, and an extra tasks view is still Google
@@ -15398,6 +15419,7 @@
     };
 
     function persistWidgetTitles() { storageSet(WIDGET_TITLE_STORAGE_KEY, JSON.stringify(WIDGET_TITLES)); }
+    function persistWidgetInstructions() { storageSet(WIDGET_INSTRUCTIONS_STORAGE_KEY, JSON.stringify(WIDGET_INSTRUCTIONS)); }
 
     // Every on-screen copy of one widget's name. Normally exactly one — the
     // title in its own header — but the original Bookmarks also has a header
@@ -15598,12 +15620,20 @@
             isNote: isNote,
             summary: widgetSummary(id, type),
             section: slot ? layout.indexOf(slot) : null,
+            instructions: WIDGET_INSTRUCTIONS[id] || "",
             noteText: isNote ? noteTextOf(id) : null
           };
         });
       },
       exists: function (id) { return WIDGET_IDS.indexOf(id) !== -1; },
       typeOf: widgetTypeOf,
+      getInstructions: function (id) { return WIDGET_INSTRUCTIONS[id] || ""; },
+      setInstructions: function (id, text) {
+        const t = String(text == null ? "" : text).trim().slice(0, INSTRUCTIONS_MAX);
+        if (t) WIDGET_INSTRUCTIONS[id] = t; else delete WIDGET_INSTRUCTIONS[id];
+        persistWidgetInstructions();
+        return { ok: true, widget_id: id, instructions: t };
+      },
       setColor: function (id, hex) { setWidgetColor(id, hex); },
       rename: function (id, name) { setWidgetTitle(id, name); },
       setIcon: function (id, emoji) { setWidgetIcon(id, emoji); },
@@ -15617,7 +15647,8 @@
          edit tools need back. */
       read: function (id) {
         const type = widgetTypeOf(id);
-        const base = { widget_id: id, type: type, title: WIDGET_TITLES[id] || defaultWidgetTitle(id) };
+        const base = { widget_id: id, type: type, title: WIDGET_TITLES[id] || defaultWidgetTitle(id),
+                       instructions: WIDGET_INSTRUCTIONS[id] || "" };
         if (type === "page" || NOTE_WIDGETS[id]) {
           const ed = pageEditorOf(id);
           return Object.assign(base, { blocks: ed ? nbBlocksInfo(ed) : [] });
@@ -15689,10 +15720,18 @@
          (see the wizard's own comment), so a patch lands on the widget AND on
          the shared key the generator reads. */
       setVocabSettings: function (id, patch) {
-        if (!dynamicWidgets[id] || dynamicWidgets[id].type !== "vocab") return { error: "'" + id + "' is not a Vocabulary widget." };
+        // widgetTypeOf, not dynamicWidgets: the original built-in Vocabulary
+        // widget is static markup with no registry entry, and it is the one
+        // people actually have.
+        if (widgetTypeOf(id) !== "vocab") return { error: "'" + id + "' is not a Vocabulary widget." };
         const opts = window.__vocabOptions || { languages: [], frequencies: [] };
-        const cur = dynamicWidgets[id].vocabSettings || { languages: [], frequency: "daily", counts: {} };
+        // Start from what the generator is really running on, defaults
+        // filled in, so a partial patch never drops a field it didn't name.
+        const cur = window.__vocabConfigRaw ? window.__vocabConfigRaw()
+          : { languages: ["english", "chinese"], frequency: "daily", counts: { english: 1, chinese: 2 } };
         const next = { languages: cur.languages.slice(), frequency: cur.frequency, counts: Object.assign({}, cur.counts) };
+        if (cur.mode) next.mode = cur.mode;
+        if (cur.banks) next.banks = JSON.parse(JSON.stringify(cur.banks));
         if (Array.isArray(patch.languages)) {
           const ok = opts.languages.map(function (l) { return l.id; });
           const bad = patch.languages.filter(function (l) { return ok.indexOf(l) === -1; });
@@ -15711,11 +15750,41 @@
             if (isFinite(n) && n > 0) next.counts[k] = Math.min(50, n);
           });
         }
-        dynamicWidgets[id].vocabSettings = next;
-        persistDynamicWidgets();
+        if (patch.mode != null) {
+          if (patch.mode !== "rotation" && patch.mode !== "shuffle") return { error: "mode must be rotation or shuffle." };
+          next.mode = patch.mode;
+        }
+        /* Bank edits. Each list is normalised (trimmed, de-duplicated
+           case-insensitively, capped) so a bank the AI writes in one breath
+           is as clean as one typed by hand. `remove` resets to the default. */
+        const action = patch.bank_action || "replace";
+        if (["replace", "append", "remove"].indexOf(action) === -1) return { error: "bank_action must be replace, append or remove." };
+        const bankPatch = { english: patch.english_words, business: patch.business_terms, literary: patch.literary_terms };
+        const info = window.__vocabInfo ? window.__vocabInfo() : null;
+        Object.keys(bankPatch).forEach(function (name) {
+          const list = bankPatch[name];
+          if (list == null) return;
+          next.banks = next.banks || {};
+          if (action === "remove") { delete next.banks[name]; return; }
+          if (!Array.isArray(list)) return;
+          const seen = {};
+          let base = action === "append" && info ? (info.banks[name].words || info.banks[name].terms).slice() : [];
+          base.forEach(function (w) { seen[String(w).toLowerCase()] = true; });
+          list.forEach(function (w) {
+            const t = String(w == null ? "" : w).trim();
+            if (!t || t.length > 40 || seen[t.toLowerCase()]) return;
+            seen[t.toLowerCase()] = true;
+            base.push(t);
+          });
+          if (base.length) next.banks[name] = base.slice(0, 2000);
+        });
+        if (next.banks && !Object.keys(next.banks).length) delete next.banks;
+        if (dynamicWidgets[id]) { dynamicWidgets[id].vocabSettings = next; persistDynamicWidgets(); }
         storageSet("vocab-config", JSON.stringify(next));
         if (window.__refreshVocab) { try { window.__refreshVocab(); } catch (e) {} }
-        return { ok: true, widget_id: id, settings: next };
+        const after = window.__vocabInfo ? window.__vocabInfo() : null;
+        return { ok: true, widget_id: id, settings: next,
+                 bank_sizes: after ? { english: after.banks.english.size, business: after.banks.business.size, literary: after.banks.literary.size } : null };
       },
       // Writing straight to the contenteditable and then firing the same
       // "input" event a keystroke would means the widget's own autosave and
@@ -16857,14 +16926,41 @@
   // cleanly back to the start once every entry's been shown. With count=1,
   // periodDays=1 this reduces to the plain "one new word per day" rotation
   // the single-word pipeline always used, so existing defaults are unchanged.
-  function pickWords(list, count, periodDays) {
+  function pickWords(list, count, periodDays, mode) {
     if (!list.length || count <= 0) return [];
     const dayNumber = Math.floor(cacheRolloverDate.getTime() / 86400000);
     const period = Math.floor(dayNumber / periodDays);
+    count = Math.min(count, list.length);
+    if (mode === "shuffle") {
+      // A different random-looking pick each period, but the SAME pick for
+      // the whole of that period from any device: seeded by the period
+      // number, so the cache and a fresh generation always agree.
+      let seed = (period * 2654435761) >>> 0;
+      const rnd = function () { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      const idx = list.map(function (_, i) { return i; });
+      for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = idx[i]; idx[i] = idx[j]; idx[j] = t; }
+      return idx.slice(0, count).map(function (i) { return list[i]; });
+    }
     const start = ((period * count) % list.length + list.length) % list.length;
     const out = [];
     for (let i = 0; i < count; i++) out.push(list[(start + i) % list.length]);
     return out;
+  }
+
+  /* The banks are the defaults, not the law. A config may carry its own
+     lists under `banks` (english / business / literary) -- the AI panel can
+     write those, since a language model can author three hundred advanced
+     words far more easily than a person can type them -- and `mode` decides
+     whether a period walks the bank in order or draws from it at random. */
+  function bankFor(cfg, name, fallback) {
+    const b = cfg && cfg.banks && Array.isArray(cfg.banks[name]) ? cfg.banks[name].filter(Boolean) : null;
+    return b && b.length ? b : fallback;
+  }
+  function bankHash(cfg) {
+    const src = JSON.stringify((cfg && cfg.banks) || null) + "|" + ((cfg && cfg.mode) || "rotation");
+    let h = 0;
+    for (let i = 0; i < src.length; i++) h = ((h * 31) + src.charCodeAt(i)) >>> 0;
+    return h.toString(36);
   }
 
   const DEFAULT_VOCAB_CONFIG = { languages: ["english", "chinese"], frequency: "daily", counts: { english: 1, chinese: 2 } };
@@ -16894,7 +16990,9 @@
   // cache hit on whatever was cached under the previous config.
   function vocabCacheKeySuffix(config) {
     const langs = config.languages.slice().sort().join(",");
-    return langs + ":" + (config.counts.english || 0) + "-" + (config.counts.chinese || 0) + ":" + config.frequency;
+    // The bank hash is what makes "add fifty words" regenerate today's set
+    // rather than serving the cached pick from the old bank.
+    return langs + ":" + (config.counts.english || 0) + "-" + (config.counts.chinese || 0) + ":" + config.frequency + ":" + bankHash(config);
   }
 
   async function generateVocab(config) {
@@ -16910,9 +17008,10 @@
     const businessCount = Math.ceil(chineseCount / 2);
     const everydayCount = chineseCount - businessCount;
 
-    const englishWords = pickWords(ENGLISH_WORDS, englishCount, periodDays);
-    const businessWords = pickWords(BUSINESS_TERMS, businessCount, periodDays);
-    const everydayWords = pickWords(EVERYDAY_TERMS, everydayCount, periodDays);
+    const mode = config.mode === "shuffle" ? "shuffle" : "rotation";
+    const englishWords = pickWords(bankFor(config, "english", ENGLISH_WORDS), englishCount, periodDays, mode);
+    const businessWords = pickWords(bankFor(config, "business", BUSINESS_TERMS), businessCount, periodDays, mode);
+    const everydayWords = pickWords(bankFor(config, "literary", EVERYDAY_TERMS), everydayCount, periodDays, mode);
 
     const [englishEntries, businessEntries, everydayEntries] = await Promise.all([
       resolveEnglishEntries(englishWords),
@@ -16969,6 +17068,7 @@
   /* The widget, explained: schedule, sources, banks, what is showing today.
      Every number here is read off the same constants and state the widget
      runs on, so it cannot drift from what the widget actually does. */
+  window.__vocabConfigRaw = function () { return JSON.parse(JSON.stringify(liveConfig || DEFAULT_VOCAB_CONFIG)); };
   window.__vocabInfo = function () {
     const cfg = liveConfig || DEFAULT_VOCAB_CONFIG;
     const period = periodDaysFor(cfg.frequency);
@@ -16977,9 +17077,22 @@
     const eCount = wantE ? Math.max(1, cfg.counts.english || 1) : 0;
     const cCount = wantC ? Math.max(1, cfg.counts.chinese || 1) : 0;
     const v = liveVocab || { english: [], chinese: [] };
+    const mode = cfg.mode === "shuffle" ? "shuffle" : "rotation";
+    const eBank = bankFor(cfg, "english", ENGLISH_WORDS);
+    const bBank = bankFor(cfg, "business", BUSINESS_TERMS);
+    const lBank = bankFor(cfg, "literary", EVERYDAY_TERMS);
     return {
-      settings: { languages: cfg.languages.slice(), frequency: cfg.frequency, counts: Object.assign({}, cfg.counts),
+      settings: { languages: cfg.languages.slice(), frequency: cfg.frequency, counts: Object.assign({}, cfg.counts), mode: mode,
                   is_default: !liveConfig || liveConfig === DEFAULT_VOCAB_CONFIG },
+      pick_mode: mode === "shuffle"
+        ? "shuffle: each period draws a fresh random set from the bank (seeded by the period, so every device agrees)."
+        : "rotation: the bank is walked in order, one block per period, wrapping around when it ends.",
+      banks: {
+        note: "These are the lists words are drawn from. The AI can replace, extend or prune any of them with configure_vocab; nothing is fixed. A bank marked custom was written by the user or the AI; otherwise it is the built-in default.",
+        english: { size: eBank.length, custom: eBank !== ENGLISH_WORDS, words: eBank },
+        business: { size: bBank.length, custom: bBank !== BUSINESS_TERMS, terms: bBank },
+        literary: { size: lBank.length, custom: lBank !== EVERYDAY_TERMS, terms: lBank }
+      },
       schedule: {
         refresh_every_days: period,
         description: "A new set is generated once every " + period + " day" + (period === 1 ? "" : "s") +
@@ -16989,8 +17102,10 @@
       english: !wantE ? { enabled: false } : {
         enabled: true, words_per_period: eCount,
         source: "Live lookup against api.dictionaryapi.dev (free dictionary API), one request per word per period.",
-        rotation_bank_size: ENGLISH_WORDS.length,
-        rotation: "A fixed list of " + ENGLISH_WORDS.length + " advanced literary words, walked in order in blocks of " + eCount + " per period, wrapping around -- about " + Math.round(ENGLISH_WORDS.length / eCount * period) + " days before a word repeats.",
+        bank_size: eBank.length,
+        rotation: mode === "shuffle"
+          ? "Drawn at random from a bank of " + eBank.length + " words each period."
+          : "A bank of " + eBank.length + " words walked in order in blocks of " + eCount + " per period, wrapping around -- about " + Math.round(eBank.length / eCount * period) + " days before a word repeats.",
         entry_format: "{ word, syllables (word split with dots), pronunciation (IPA in slashes), pos, meaning, example }",
         showing_now: (v.english || []).map(function (e) { return { word: e.word, pos: e.pos, meaning: e.meaning, example: e.example }; })
       },
@@ -16998,7 +17113,7 @@
         enabled: true, terms_per_period: cCount,
         source: "Live lookup against en.wiktionary.org (REST page HTML), scoped to the Chinese section, plus one request per character for pinyin/jyutping of multi-character terms.",
         split: "Terms are split between two categories: business (" + Math.ceil(cCount / 2) + " per period) and literary/chengyu (" + (cCount - Math.ceil(cCount / 2)) + " per period).",
-        rotation_bank_sizes: { business: BUSINESS_TERMS.length, literary: EVERYDAY_TERMS.length },
+        bank_sizes: { business: bBank.length, literary: lBank.length },
         romanization: "Every character carries both Mandarin pinyin (above) and Cantonese jyutping (below); each term has a template example sentence.",
         entry_format: "{ characters[], pinyin, jyutping_chars[], meaning, type ('business'|'everyday'), example: { characters[], pinyin, jyutping_chars[], translation } }",
         showing_now: (v.chinese || []).map(function (c) { return { term: (c.characters || []).join(""), pinyin: c.pinyin, jyutping: (c.jyutping_chars || []).join(" "), meaning: c.meaning, type: c.type }; })
@@ -25966,14 +26081,19 @@
     /* ---- vocabulary ---- */
     {
       name: "configure_vocab",
-      description: "Change a Vocabulary widget's settings: languages (ids from read_widget's options), frequency (daily|3days|weekly), and counts (words per language, keyed by language id). Every Vocabulary widget shares one config.",
+      description: "Change how a Vocabulary widget works. Settings: languages (ids from read_widget's options), frequency (daily|3days|weekly), counts (words per language, keyed by language id), mode (rotation = walk the bank in order; shuffle = a fresh random draw each period). The word banks themselves are editable too: pass english_words / business_terms / literary_terms as arrays with bank_action replace (default), append (add to the current bank, duplicates dropped) or remove (reset that bank to the built-in default). You can author these lists yourself -- e.g. to make English 'ongoing' rather than a fixed rotation, append a few hundred fresh advanced words and set mode to shuffle. Read the current banks with read_widget first. Every Vocabulary widget shares one config.",
       input_schema: {
         type: "object",
         properties: {
           widget_id: { type: "string" },
           languages: { type: "array", items: { type: "string" } },
           frequency: { type: "string" },
-          counts: { type: "object", additionalProperties: { type: "integer" } }
+          counts: { type: "object", additionalProperties: { type: "integer" } },
+          mode: { type: "string", enum: ["rotation", "shuffle"] },
+          bank_action: { type: "string", enum: ["replace", "append", "remove"] },
+          english_words: { type: "array", items: { type: "string" } },
+          business_terms: { type: "array", items: { type: "string" } },
+          literary_terms: { type: "array", items: { type: "string" } }
         },
         required: ["widget_id"]
       }
@@ -26038,6 +26158,15 @@
           js: { type: "string" }
         },
         required: ["widget_id"]
+      }
+    },
+    {
+      name: "set_widget_instructions",
+      description: "Set standing instructions for ANY widget -- how the user wants it kept, edited or filled from now on (e.g. 'always tag new items To-do', 'only finance vocabulary', 'keep this page as a bulleted log, newest first'). They are shown to you on every turn and in read_widget, so follow them whenever you touch that widget. Pass an empty string to clear. Use this when the user describes how a widget should behave rather than asking for a one-off change.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, instructions: { type: "string" } },
+        required: ["widget_id", "instructions"]
       }
     },
     {
@@ -26136,7 +26265,8 @@
     arrange_widget:        { label: "Moving\u2026",       target: "widget_id" },
     create_custom_widget:  { label: "Building\u2026",     target: null },
     update_custom_widget:  { label: "Rebuilding\u2026",   target: "widget_id" },
-    set_custom_widget_store:{ label: "Writing\u2026",     target: "widget_id" }
+    set_custom_widget_store:{ label: "Writing\u2026",     target: "widget_id" },
+    set_widget_instructions:{ label: "Noting\u2026",      target: "widget_id" }
   };
 
   // Tasks and events have no widget_id of their own; the fog goes over the
@@ -26287,7 +26417,11 @@
 
       /* ---- vocabulary ---- */
       case "configure_vocab":
-        return b.setVocabSettings(id, { languages: input.languages, frequency: input.frequency, counts: input.counts });
+        return b.setVocabSettings(id, {
+          languages: input.languages, frequency: input.frequency, counts: input.counts, mode: input.mode,
+          bank_action: input.bank_action, english_words: input.english_words,
+          business_terms: input.business_terms, literary_terms: input.literary_terms
+        });
 
       /* ---- notion ---- */
       case "list_notion_pages": {
@@ -26329,6 +26463,9 @@
         r.lastError = CW.lastError(id);
         return r;
       }
+      case "set_widget_instructions":
+        return b.setInstructions(id, input.instructions);
+
       case "set_custom_widget_store":
         if (!CW || !CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
         return CW.setStore(id, String(input.key || ""), input.value);
@@ -26416,7 +26553,8 @@
         ? widgets.map(function (w) {
             return "- " + w.id + " \u2014 \u201c" + w.title + "\u201d (" + w.type +
                    (w.summary ? ", " + w.summary : "") + ", colour " + w.color +
-                   (w.hidden ? ", currently hidden" : "") + ")";
+                   (w.hidden ? ", currently hidden" : "") + ")" +
+                   (w.instructions ? "\n    instructions: " + String(w.instructions).replace(/\s+/g, " ").slice(0, 240) : "");
           }).join("\n")
         : "- (the board is empty)",
       "",
@@ -26424,6 +26562,8 @@
       focus,
       "",
       "How to work: read before you edit \u2014 read_widget, list_tasks or list_events give you the ids that edit tools need. " +
+      "A widget's `instructions` line is the user's standing preference for it: follow it on every edit to that widget, and when the user describes how a widget should behave from now on, record it with set_widget_instructions. " +
+      "Every widget's composition is data you can change: a Page's blocks, a list's items and categories, a Bookmarks bar's links, Vocabulary's languages, counts, pick mode and the word banks themselves (you can author new banks), and a custom widget's whole code. Only the built-in widgets' rendering code is fixed \u2014 for anything beyond their data, build a custom widget. " +
       "Pages are written in Markdown; prefer append_to_page / replace_page_block over rewriting a whole Page. " +
       "For anything the existing widget types can't do, build a custom widget with create_custom_widget (sandboxed HTML/CSS/JS with the mps store API); revise it with update_custom_widget, and check lastError in the result. " +
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
@@ -26721,6 +26861,7 @@
       case "create_custom_widget": return "Built \u201c" + input.name + "\u201d" + (result.lastError ? " (with a runtime error)" : "");
       case "update_custom_widget": return "Rebuilt " + who + (result.lastError ? " (with a runtime error)" : "");
       case "set_custom_widget_store": return "Wrote to " + who + "'s store";
+      case "set_widget_instructions": return input.instructions ? "Noted how to keep " + who : "Cleared " + who + "'s instructions";
       default: return name;
     }
   }
@@ -26825,7 +26966,8 @@
             if (!yes) out = { cancelled: true, reason: "The user declined." };
           }
 
-          const chip = ui.label ? appendToolChip(ui.label) : null;
+          // No step-by-step in the log: the fog over the widget is the only
+          // trace of work in progress, and the reply says what happened.
           if (out === null && targetId) startFog(targetId, ui.label);
           const started = Date.now();
 
@@ -26846,10 +26988,9 @@
              says what happened; a second line restating it was clutter.
              The one exception is a failure, which the model can soften or
              skip, so that stays on screen as the plain fact. */
-          if (chip) {
-            if (out && out.error) settleToolChip(chip, describeTool(use.name, use.input, out));
-            else chip.remove();
-          }
+          // A failure is the one thing that earns a line of its own, because
+          // it is the one thing the model might soften.
+          if (out && out.error) appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error");
 
           results.push({
             type: "tool_result",
