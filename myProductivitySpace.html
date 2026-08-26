@@ -2791,6 +2791,39 @@
   }
   @keyframes ai-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
   .ai-msg.is-error { border-color: #d8b4b4; color: #7a2020; background: #fdf6f6; }
+  /* A rendered reply. pre-wrap comes off: the Markdown parser owns line
+     structure now, and leaving it on would double every list's spacing.
+     Everything is scaled to the bubble's 13.5px rather than the page's
+     type ramp, since a sidebar heading is a label, not a title. */
+  .ai-msg.ai-md { white-space: normal; }
+  .ai-md p { margin: 0; }
+  .ai-md p + p, .ai-md p + ul, .ai-md p + ol, .ai-md ul + p, .ai-md ol + p,
+  .ai-md pre + p, .ai-md p + pre { margin-top: 8px; }
+  .ai-md ul, .ai-md ol { margin: 0; padding-left: 18px; }
+  .ai-md li { margin: 3px 0; }
+  .ai-md li::marker { color: #6b6b6b; }
+  .ai-md h3, .ai-md h4, .ai-md h5 { margin: 10px 0 4px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+  .ai-md h3 { font-size: 15px; } .ai-md h4 { font-size: 14px; } .ai-md h5 { font-size: 13.5px; }
+  .ai-md h3:first-child, .ai-md h4:first-child, .ai-md h5:first-child { margin-top: 0; }
+  .ai-md b { font-weight: 700; }
+  .ai-md code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+    padding: 1px 5px; border-radius: 4px; background: #f0f0f1; color: var(--ink);
+  }
+  .ai-md pre {
+    margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: #f0f0f1;
+    overflow-x: auto; font-size: 12px; line-height: 1.45;
+  }
+  .ai-md pre code { padding: 0; background: transparent; }
+  .ai-md a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+  /* The streaming caret rides on the last block rather than after the whole
+     bubble, so it sits where the next word will land. */
+  .ai-msg.ai-md.is-streaming::after { display: none; }
+  .ai-msg.ai-md.is-streaming > :last-child::after {
+    content: ""; display: inline-block; vertical-align: -2px;
+    width: 2px; height: 15px; margin-left: 2px; background: var(--ink);
+    animation: ai-caret-blink 1s steps(1, end) infinite;
+  }
   /* An applied edit is a different KIND of event from a sentence, so it reads
      as a receipt in the log rather than as another chat bubble. */
   .ai-tool {
@@ -26395,7 +26428,7 @@
       "For anything the existing widget types can't do, build a custom widget with create_custom_widget (sandboxed HTML/CSS/JS with the mps store API); revise it with update_custom_widget, and check lastError in the result. " +
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
       "",
-      "Style: you are a narrow sidebar, so keep replies short \u2014 usually one or two sentences.",
+      "Style: you are a narrow sidebar, so keep replies short \u2014 usually one or two sentences. Replies render as Markdown: use **bold** for the key term, bullet lists for anything with more than two parts, `code` for ids/keys/formats, and an emoji or two where they help the eye (\ud83d\udcda \u2705 \ud83d\udcc5 \u2728) \u2014 never as decoration on every line.",
       "Confirm what you changed in plain language rather than restating the tool call."
     ].join("\n");
   }
@@ -26504,6 +26537,80 @@
     aiLog.appendChild(b);
     scrollLog();
     return b;
+  }
+
+  /* ---------------- rendering a reply ----------------
+     The model writes Markdown; the bubble used to show it verbatim, so every
+     emphasis arrived as literal asterisks. This turns the small subset a
+     chat reply actually uses -- bold, italic, code, links, headings, bullet
+     and numbered lists, fenced code -- into real markup. Text is escaped
+     FIRST and only the parser's own tags are added after, so nothing the
+     model (or anything it quoted from a widget) writes can land as live
+     HTML. Applied on every streaming delta too: re-rendering a few hundred
+     characters is cheap, and a list should look like a list as it lands,
+     not snap into shape at the end. */
+  function mdEscape(t) {
+    return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function mdInline(t) {
+    let x = mdEscape(t);
+    const codes = [];
+    x = x.replace(/`([^`\n]+)`/g, function (_, c) { codes.push(c); return "\u0000" + (codes.length - 1) + "\u0000"; });
+    x = x.replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    x = x.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+    x = x.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, "$1<i>$2</i>");
+    x = x.replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, "$1<i>$2</i>");
+    x = x.replace(/\u0000(\d+)\u0000/g, function (_, i) { return "<code>" + codes[Number(i)] + "</code>"; });
+    return x;
+  }
+  function renderMarkdown(md) {
+    const lines = String(md == null ? "" : md).replace(/\r\n?/g, "\n").split("\n");
+    const out = [];
+    let list = null;      // "ul" | "ol" while inside a list
+    let para = [];        // pending paragraph lines
+    let fence = null;     // pending fenced-code lines
+    function closeList() { if (list) { out.push("</" + list + ">"); list = null; } }
+    function flushPara() {
+      if (para.length) { out.push("<p>" + para.map(mdInline).join("<br>") + "</p>"); para = []; }
+    }
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (fence !== null) {
+        if (/^```/.test(line)) { out.push("<pre><code>" + mdEscape(fence.join("\n")) + "</code></pre>"); fence = null; }
+        else fence.push(line);
+        continue;
+      }
+      let m;
+      if (/^```/.test(line)) { flushPara(); closeList(); fence = []; continue; }
+      if (!line.trim()) { flushPara(); closeList(); continue; }
+      if ((m = /^(#{1,3})\s+(.*)$/.exec(line))) {
+        flushPara(); closeList();
+        const lvl = Math.min(3, m[1].length) + 2;   // h3..h5: a sidebar has no room for a real h1
+        out.push("<h" + lvl + ">" + mdInline(m[2]) + "</h" + lvl + ">");
+        continue;
+      }
+      if ((m = /^\s*[-*\u2022]\s+(.*)$/.exec(line))) {
+        flushPara();
+        if (list !== "ul") { closeList(); out.push("<ul>"); list = "ul"; }
+        out.push("<li>" + mdInline(m[1]) + "</li>");
+        continue;
+      }
+      if ((m = /^\s*\d+[.)]\s+(.*)$/.exec(line))) {
+        flushPara();
+        if (list !== "ol") { closeList(); out.push("<ol>"); list = "ol"; }
+        out.push("<li>" + mdInline(m[1]) + "</li>");
+        continue;
+      }
+      if (list) closeList();
+      para.push(line);
+    }
+    if (fence !== null) out.push("<pre><code>" + mdEscape(fence.join("\n")) + "</code></pre>");
+    flushPara(); closeList();
+    return out.join("");
+  }
+  function setBubbleMarkdown(bubble, md) {
+    bubble.classList.add("ai-md");
+    bubble.innerHTML = renderMarkdown(md);
   }
 
   const TOOL_ICON =
@@ -26663,7 +26770,7 @@
             bubble.textContent = "";
             bubble.classList.add("is-streaming");
           }
-          bubble.textContent = streamed;
+          setBubbleMarkdown(bubble, streamed);
           scrollLog();
         });
 
@@ -26734,7 +26841,15 @@
             stopFog();
           }
 
-          if (chip) settleToolChip(chip, describeTool(use.name, use.input, out));
+          /* No receipt left behind. The chip is progress -- "reading",
+             "writing" -- and once the work is done the model's own sentence
+             says what happened; a second line restating it was clutter.
+             The one exception is a failure, which the model can soften or
+             skip, so that stays on screen as the plain fact. */
+          if (chip) {
+            if (out && out.error) settleToolChip(chip, describeTool(use.name, use.input, out));
+            else chip.remove();
+          }
 
           results.push({
             type: "tool_result",
