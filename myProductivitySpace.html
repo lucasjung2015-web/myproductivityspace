@@ -26332,7 +26332,22 @@
     // original Bookmarks bar lives outside the grid as "menu" and is still
     // addressable through its own bridge while it floats.
     if (!NO_WIDGET_TOOLS[name]) {
-      if (!id) return { error: "widget_id is required." };
+      if (!id) {
+        /* Some tools have only one possible target. Every Vocabulary widget
+           shares a single config, so configure_vocab needs no id at all;
+           read_widget with no id means the widget the user was last in.
+           Filling those in beats an error that names a field the model
+           then has to guess at. */
+        let guess = null;
+        if (name === "configure_vocab") {
+          guess = (b.list().filter(function (w) { return w.type === "vocab"; })[0] || {}).id || null;
+        } else if (name === "read_widget" && aiTargetWidgetId && b.exists(aiTargetWidgetId)) {
+          guess = aiTargetWidgetId;
+        }
+        if (!guess) return { error: "widget_id is required. Call list_widgets for the current ids." };
+        input.widget_id = guess;
+        return runTool(name, input);
+      }
       const floatingMenu = id === "menu" && window.__bookmarksApi && window.__bookmarksApi.menu;
       if (!b.exists(id) && !floatingMenu) {
         return { error: "No widget with id '" + id + "'. Call list_widgets for the current ids." };
@@ -26951,6 +26966,7 @@
     setBusy(true);
 
     let placeholder = appendThinking();
+    let sawToolError = false;
 
     try {
       for (let turn = 0; turn < AI_MAX_TURNS; turn++) {
@@ -27011,7 +27027,14 @@
         if (!assistantContent.length) assistantContent = [{ type: "text", text: "(no response)" }];
         messages.push({ role: "assistant", content: assistantContent });
 
-        if (!toolUses.length) break;
+        if (!toolUses.length) {
+          // Nothing streamed and nothing was called: the model ended the
+          // exchange silently. Usually that follows a tool failure it
+          // decided not to narrate; the user should not be left with just
+          // the red line and no reply.
+          if (!bubble && sawToolError) appendMessage("ai", "That didn't go through \u2014 tell me how you'd like to proceed, or try the request again.");
+          break;
+        }
 
         const results = [];
         for (const use of toolUses) {
@@ -27061,7 +27084,7 @@
              skip, so that stays on screen as the plain fact. */
           // A failure is the one thing that earns a line of its own, because
           // it is the one thing the model might soften.
-          if (out && out.error) appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error");
+          if (out && out.error) { sawToolError = true; appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error"); }
 
           results.push({
             type: "tool_result",
