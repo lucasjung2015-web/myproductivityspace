@@ -1601,14 +1601,14 @@
      the time picker are reparented out of the widget to escape overflow
      clipping -- they are not descendants of the calendar by the time they
      are on screen. */
-  #calColWrap, .cal-createpanel, .cal-recur-modal, .gt-popover, #gtaskInlineComposer {
+  #calColWrap, .cal-createpanel, .cal-recur-modal, .gt-popover, .gt-time-list, #gtaskInlineComposer {
     accent-color: #000000;
     color-scheme: light;
     caret-color: #000000;
   }
   #calColWrap ::selection, .cal-createpanel ::selection,
   .cal-recur-modal ::selection, .gt-popover ::selection,
-  #gtaskInlineComposer ::selection { background: #d5d5d5; color: #000000; }
+  .gt-time-list ::selection, #gtaskInlineComposer ::selection { background: #d5d5d5; color: #000000; }
   /* A focused field goes black-on-black rather than picking up a blue ring. */
   .cal-field input:focus, .cal-field select:focus, .cal-field textarea:focus,
   .cal-time-btn:focus { outline: 2px solid #000000; outline-offset: 1px; }
@@ -1740,6 +1740,27 @@
   }
   .gt-title-input { font-size: 17px; }
   .gt-title-input::placeholder { color: #70757a; }
+  /* The task composer's title is a <textarea>, so a long name wraps onto a
+     second line instead of scrolling sideways out of sight -- you can read
+     the whole thing while you are still typing it. Everything here exists to
+     stop it LOOKING like a textarea: no drag handle, and no scrollbar,
+     because the height is set to the content height in JS (see gtAutoGrow)
+     and so there is never anything left to scroll.
+
+     Note what is deliberately absent: line-height. Leaving it at the UA
+     default is what keeps the first line box the height the <input> used to
+     be, and the open circle beside it is placed by a hand-tuned margin
+     against that height -- a friendlier multi-line leading here would
+     silently drop the circle off the first line. Scoped to textarea. so
+     Reading List's own .gt-title-input, which is still an <input>, is
+     untouched. */
+  textarea.gt-title-input {
+    display: block; resize: none; overflow: hidden;
+    height: auto; min-height: 0; vertical-align: top;
+    /* A pasted link with no spaces would otherwise widen the field past its
+       column rather than wrapping inside it. */
+    overflow-wrap: anywhere;
+  }
   .gt-notes-row { display: flex; align-items: center; gap: 11px; }
   .gt-notes-row svg { flex: 0 0 auto; width: 17px; height: 17px; color: #5f6368; }
   .gt-notes-input { font-size: 14px; }
@@ -1841,10 +1862,46 @@
 
   /* The 30-minute time list, anchored under whichever "Set time" field opened
      it. Its own layer so it can overhang the popover it belongs to. */
+  /* Two panes, not one scrolling box: the typed-time field and the row it can
+     produce stay pinned while only the presets scroll. A search field that
+     scrolls away with its own results is one you lose the moment you use it.
+     The 220px cap moved down to .gt-time-options, so the preset list is
+     exactly as tall as it always was with the head simply added above it. */
   .gt-time-list {
     position: fixed; z-index: 2110; background: #ffffff; border-radius: 4px;
-    box-shadow: 0 4px 18px rgba(0,0,0,.3); max-height: 220px; overflow-y: auto;
-    width: 190px; padding: 4px 0;
+    box-shadow: 0 4px 18px rgba(0,0,0,.3);
+    width: 190px; padding: 0;
+    display: flex; flex-direction: column; max-height: 268px; overflow: hidden;
+  }
+  .gt-time-head { flex: 0 0 auto; padding: 6px 6px 5px; border-bottom: 1px solid #e8eaed; }
+  .gt-time-search {
+    display: block; width: 100%; box-sizing: border-box;
+    border: 1px solid #dadce0; border-radius: 4px; padding: 7px 10px; background: #ffffff;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px; color: #202124;
+  }
+  /* Black, like every other focused field here, rather than the browser's blue. */
+  .gt-time-search:focus { outline: none; border-color: #000000; }
+  .gt-time-search::placeholder { color: #70757a; }
+  /* The exact time the typed text resolves to. It sits in the head rather
+     than atop the scrolling list because by definition it is NOT one of those
+     rows -- it is the answer to what was typed, and it should not be able to
+     scroll out from under the text that produced it. */
+  .gt-time-custom {
+    display: block; width: 100%; text-align: left; border: none; background: transparent;
+    margin-top: 5px; padding: 8px 10px; border-radius: 4px; cursor: pointer;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px;
+    font-weight: 700; color: #000000;
+  }
+  .gt-time-custom:hover { background: #f1f3f4; }
+  /* position:relative makes this the offsetParent of the option buttons, so
+     the scroll-to-selected arithmetic stays relative to the scrolling pane
+     rather than picking up the head's height as an offset. */
+  .gt-time-options {
+    flex: 1 1 auto; overflow-y: auto; max-height: 220px; padding: 4px 0; position: relative;
+  }
+  .gt-time-empty {
+    padding: 12px 16px; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-size: 13px; color: #70757a;
   }
   .gt-time-option {
     display: block; width: 100%; text-align: left; border: none; background: transparent;
@@ -21879,6 +21936,55 @@
     return h + ":" + String(m).padStart(2, "0") + " " + ap;
   }
 
+  /* Free-typed text -> "HH:MM" on a 24-hour clock, or null when it is not a
+     time at all.
+
+     Deliberately forgiving about how it is WRITTEN, because the whole point
+     of letting people type is that typing beats scrolling a 48-row list:
+     separators are optional and interchangeable, spacing is ignored, and the
+     meridiem can be "pm", "PM", "p.m." or just "p". Deliberately strict about
+     the ANSWER: anything that is not a real clock reading -- "25:00", "9:75",
+     "1315pm" -- comes back null, so the caller can simply decline to offer it
+     rather than having to re-check what it was handed. */
+  function parseTimeInput(str) {
+    const raw = String(str == null ? "" : str).trim().toLowerCase();
+    if (!raw) return null;
+
+    // The meridiem comes off first so the digits can be read on their own,
+    // and so its presence can decide how to read the hour afterwards.
+    const mer = raw.match(/(a|p)\.?m?\.?$/);
+    const ap = mer ? mer[1] : "";
+    const body = (mer ? raw.slice(0, mer.index) : raw).trim();
+
+    let h, m;
+    // An explicit separator states where the hour ends, and is trusted over
+    // digit counting: "9:5" is five past nine, which "95" could never be.
+    const sep = body.match(/^(\d{1,2})\s*[:.h]\s*(\d{1,2})$/);
+    if (sep) {
+      h = Number(sep[1]);
+      m = Number(sep[2]);
+    } else {
+      const digits = body.replace(/\s/g, "");
+      if (!/^\d{1,4}$/.test(digits)) return null;
+      // Otherwise the digit count decides, the way a digital clock reads:
+      // "9" and "21" are whole hours, "915" is h:mm, "0915" is hh:mm.
+      if (digits.length <= 2) { h = Number(digits); m = 0; }
+      else if (digits.length === 3) { h = Number(digits.slice(0, 1)); m = Number(digits.slice(1)); }
+      else { h = Number(digits.slice(0, 2)); m = Number(digits.slice(2)); }
+    }
+
+    if (m > 59) return null;
+    if (ap) {
+      // With a meridiem the hour must be one a clock face carries, and 12 is
+      // the one value that does not simply wrap: 12am is midnight, 12pm noon.
+      if (h < 1 || h > 12) return null;
+      h = h % 12;
+      if (ap === "p") h += 12;
+    } else if (h > 23) return null;
+
+    return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+  }
+
   // "2026-08-12" -> "Aug 12" (or "Aug 12, 2027" when it isn't this year).
   function gtFmtDate(ymdStr) {
     if (!ymdStr) return "";
@@ -21959,36 +22065,188 @@
     el.style.left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - w - 8)) + "px";
   }
 
-  // The 30-minute time list, shared by the date picker and the repeat dialog.
+  // Every half hour of the day as "HH:MM". Built once rather than per open:
+  // the list is rebuilt on every keystroke now, and regenerating 48 strings
+  // each time is work with no reason to repeat.
+  const GT_TIME_PRESETS = (function () {
+    const out = [];
+    for (let mins = 0; mins < 24 * 60; mins += 30) {
+      out.push(String(Math.floor(mins / 60)).padStart(2, "0") + ":" + String(mins % 60).padStart(2, "0"));
+    }
+    return out;
+  })();
+
+  /* The strings a preset can be found by, lowercased and stripped of the
+     punctuation nobody types consistently. 9:00 PM is reachable as "900pm",
+     "9pm", "2100" and "21", so every way somebody might reach for it leads to
+     the same row. The filter is a PREFIX test against these -- the rule that
+     behaves as expected without having to be explained: "9" narrows to the
+     four nine-ish rows, "9pm" to the two evening ones, "0930" to exactly one. */
+  function gtTimeMatchKeys(hhmm) {
+    const h24 = hhmm.slice(0, 2), m = hhmm.slice(3);
+    const h12 = String(Number(h24) % 12 || 12);
+    const ap = Number(h24) < 12 ? "am" : "pm";
+    return [h12 + m + ap, h12 + ap, h24 + m, h24];
+  }
+
+  /* The time list, shared by the event form's Start/End fields, the task
+     due-date popover and the repeat dialog.
+
+     The 48 half-hour presets are the fast path, but they are only half the
+     clock: a 9:15 stand-up or a 6:45 train had no row to click, and the only
+     way to express one was not to. So the list opens with a text field
+     focused, the presets filter as you type, and any text resolving to a real
+     time can be committed exactly as typed. The presets stop being the whole
+     vocabulary and become the shortcut they were meant to be.
+
+     The contract is unchanged -- `current` is "HH:MM" or "", onPick receives
+     "HH:MM" -- which is why all three call sites are untouched. Nothing
+     downstream ever assumed a 30-minute boundary either: a due time is stored
+     as a bare string, and an event's start/end goes into new Date(). */
   function gtOpenTimeList(anchorEl, current, onPick) {
     const list = document.createElement("div");
     list.className = "gt-time-list";
-    for (let mins = 0; mins < 24 * 60; mins += 30) {
-      const hhmm = String(Math.floor(mins / 60)).padStart(2, "0") + ":" + String(mins % 60).padStart(2, "0");
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "gt-time-option" + (hhmm === current ? " is-selected" : "");
-      b.textContent = gtFmtTime(hhmm);
-      b.addEventListener("click", function () {
-        if (list.parentNode) list.parentNode.removeChild(list);
-        onPick(hhmm);
-      });
-      list.appendChild(b);
-    }
-    document.body.appendChild(list);
-    gtPlaceNear(list, anchorEl.getBoundingClientRect(), 2);
-    // Open on the current (or a sensible default) time rather than at midnight,
-    // so the useful part of a 48-entry list is what you actually see.
-    const sel = list.querySelector(".is-selected") || list.children[18];
-    if (sel) list.scrollTop = Math.max(0, sel.offsetTop - 80);
-    // Closing the list is the popover machinery's job too — it lives outside
-    // .gt-popover, hence its own selector in the outside-click test above.
-    const off = function (e) {
+
+    const head = document.createElement("div");
+    head.className = "gt-time-head";
+    const search = document.createElement("input");
+    search.type = "text";
+    search.className = "gt-time-search";
+    search.placeholder = "Type a time";
+    // The browser's own autofill dropdown would cover the very list this
+    // field is filtering, which is the one thing it must never do.
+    search.autocomplete = "off";
+    head.appendChild(search);
+    list.appendChild(head);
+
+    const options = document.createElement("div");
+    options.className = "gt-time-options";
+    list.appendChild(options);
+
+    // Hoisted declarations because these refer to each other: close() detaches
+    // the listener that off() is, and off() calls close().
+    function off(e) {
       const el = e.target && e.target.nodeType === 1 ? e.target : null;
+      // The search field is a descendant of .gt-time-list, so typing in it --
+      // and clicking into it -- already counts as "inside" here, and equally
+      // in the three other outside-click guards naming this same class.
       if (el && el.closest(".gt-time-list")) return;
+      close();
+    }
+    function close() {
       if (list.parentNode) list.parentNode.removeChild(list);
+      // Detached here rather than only on the outside-click path: picking an
+      // option used to remove the list and leave this listener armed against
+      // a node that no longer existed.
       document.removeEventListener("pointerdown", off, true);
-    };
+    }
+    function commit(hhmm) {
+      close();
+      onPick(hhmm);
+    }
+
+    // Whatever Enter should commit right now: the typed time when the text
+    // resolves to one, otherwise null so Enter falls through to the first row
+    // still showing. Kept out here because render() rebuilds everything else.
+    let customTime = null;
+
+    function render(scrollToSelected) {
+      const q = search.value.trim().toLowerCase().replace(/[\s:.]/g, "");
+      customTime = parseTimeInput(search.value);
+
+      const oldCustom = head.querySelector(".gt-time-custom");
+      if (oldCustom) head.removeChild(oldCustom);
+      // Offered only when the typed time is not already one of the rows
+      // below, or the same time would appear twice -- once as "Use 9:00 AM"
+      // and once as "9:00 AM" -- reading as if they did different things.
+      if (customTime && GT_TIME_PRESETS.indexOf(customTime) === -1) {
+        const use = document.createElement("button");
+        use.type = "button";
+        use.className = "gt-time-custom";
+        use.textContent = "Use " + gtFmtTime(customTime);
+        use.addEventListener("click", function () { commit(customTime); });
+        head.appendChild(use);
+      }
+
+      options.innerHTML = "";
+      let shown = 0;
+      GT_TIME_PRESETS.forEach(function (hhmm) {
+        if (q && !gtTimeMatchKeys(hhmm).some(function (k) { return k.indexOf(q) === 0; })) return;
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "gt-time-option" + (hhmm === current ? " is-selected" : "");
+        b.textContent = gtFmtTime(hhmm);
+        b.addEventListener("click", function () { commit(hhmm); });
+        options.appendChild(b);
+        shown++;
+      });
+      // Only when there is no custom row either -- an empty preset list under
+      // a "Use 9:15 PM" row is not a dead end, it is the normal look of
+      // having typed a time the presets do not carry.
+      if (!shown && !customTime) {
+        const empty = document.createElement("div");
+        empty.className = "gt-time-empty";
+        empty.textContent = "Not a time";
+        options.appendChild(empty);
+      }
+
+      if (scrollToSelected) {
+        // Open on the current (or a sensible default) time rather than at
+        // midnight, so the useful part of a 48-entry list is what you see.
+        const sel = options.querySelector(".is-selected") || options.children[18];
+        if (sel) options.scrollTop = Math.max(0, sel.offsetTop - 80);
+      }
+    }
+
+    search.addEventListener("input", function () {
+      // Re-anchor on the selected row only once the field is empty again.
+      // While filtering there is nothing to scroll to: the best match is
+      // already at the top, and jumping the list under a half-typed query is
+      // disorienting.
+      render(!search.value.trim());
+    });
+
+    search.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        // The typed time wins whenever there is one, so "9:15" + Enter can
+        // never silently commit the 9:00 sitting in the list beneath it.
+        const first = options.querySelector(".gt-time-option");
+        if (customTime) commit(customTime);
+        else if (first) first.click();
+        return;
+      }
+      if (e.key === "Escape") {
+        // Closes THIS list and nothing else. stopPropagation matters: the
+        // document-level Escape handlers would otherwise also close the date
+        // popover that opened this list, and the panel behind that, throwing
+        // away a date the user had just picked.
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        // A handoff into the list, not a roving highlight: once focus is on a
+        // preset the options are ordinary buttons, which Tab and Enter
+        // already drive natively.
+        const first = options.querySelector(".gt-time-option");
+        if (first) { e.preventDefault(); first.focus(); }
+      }
+    });
+
+    document.body.appendChild(list);
+    // Rendered before it is placed: gtPlaceNear measures offsetHeight to
+    // decide whether the list fits below the anchor, and an empty one would
+    // measure as a sliver and then grow past the bottom of the window.
+    render(true);
+    gtPlaceNear(list, anchorEl.getBoundingClientRect(), 2);
+    // Focused, not merely present: the field is the reason to open the list
+    // at all now. preventScroll keeps the focus call from yanking the
+    // scrolled panel underneath the popover back to the top.
+    search.focus({ preventScroll: true });
+    // Closing the list is the popover machinery's job too -- it lives outside
+    // .gt-popover, hence its own selector in the outside-click test above.
     setTimeout(function () { document.addEventListener("pointerdown", off, true); }, 0);
   }
 
@@ -22319,6 +22577,19 @@
   // the click deletes rather than completes — see buildTaskEditRow, where
   // that's how a task in edit mode is removed now that there's no standing
   // Delete button.
+  /* A <textarea> has no intrinsic "as tall as its content" height, so it has
+     to be measured by hand. Collapsing to auto first is not optional:
+     scrollHeight never reports less than the element's current height, so a
+     field grown to three lines would stay three lines tall after two of them
+     were deleted. A detached node reports 0, and height:0 is not a state the
+     field recovers from on its own -- hence the isConnected guard rather than
+     a confidently wrong answer. */
+  function gtAutoGrow(ta) {
+    if (!ta || !ta.isConnected) return;
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+  }
+
   function buildTaskComposer(init, opts) {
     opts = opts || {};
     const state = {
@@ -22350,12 +22621,72 @@
     main.className = "gt-composer-main";
     el.appendChild(main);
 
-    const titleInput = document.createElement("input");
-    titleInput.type = "text";
+    /* A <textarea> rather than an <input>: a long task name has to wrap onto a
+       new line and grow the field, not scroll sideways off the end of one.
+       The class is unchanged, so every rule and every querySelector naming
+       .gt-title-input keeps working -- the two focus call sites only ever
+       call .focus() and .setSelectionRange(), both of which a textarea has.
+
+       Multi-line is a DISPLAY capability only. The value itself never holds a
+       newline: Enter is prevented below, and a paste carrying one is
+       collapsed on the way in. */
+    const titleInput = document.createElement("textarea");
     titleInput.className = "gt-title-input";
     titleInput.placeholder = "Title";
-    titleInput.value = init.title || "";
+    titleInput.rows = 1;
+    // Collapsed on the way in as well as on the way through: a title stored
+    // with a newline by some earlier path would otherwise open as a two-line
+    // field claiming to be one line of text.
+    titleInput.value = String(init.title || "").replace(/[\r\n]+/g, " ");
     main.appendChild(titleInput);
+
+    /* Enter commits; it does not open a second line. Bound HERE rather than
+       in each consumer because the consumers do not agree: the task-row
+       editor and the inline composer bind their own Enter handler and call
+       preventDefault themselves, but the New task / Task modal binds nothing
+       at all -- Enter has always been a no-op there, and a bare textarea
+       would have quietly started accepting multi-line titles on that one
+       path. One guard covers all three, and preventing the default does not
+       stop the consumers' handlers, which are added after this one and still
+       run and still commit.
+
+       Shift+Enter is included on purpose: there is no second line to escape
+       to, so it would only produce the newline this field is avoiding. */
+    titleInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") e.preventDefault();
+    });
+
+    /* Two jobs per edit, in this order, so the consumers' own "input"
+       listeners -- bound after this one, so running after it -- always read a
+       settled value. First collapse newlines: Enter cannot produce one now,
+       but pasting a wrapped line out of an email still can, and a title
+       carrying a raw newline would be sent to Google that way. Spaces rather
+       than a rejected paste, because that text IS the title the user meant,
+       just with the wrapping thrown away. Then re-measure, which is the whole
+       point of the textarea. */
+    titleInput.addEventListener("input", function () {
+      const raw = titleInput.value;
+      if (raw.indexOf("\n") !== -1 || raw.indexOf("\r") !== -1) {
+        // The caret is restored against the COLLAPSED string, not the raw
+        // one: a "\r\n" that becomes a single space shortens everything to
+        // its left by a character, and the old offset would land the caret
+        // one place too far right for every break in the paste.
+        const head = raw.slice(0, titleInput.selectionStart).replace(/[\r\n]+/g, " ");
+        titleInput.value = raw.replace(/[\r\n]+/g, " ");
+        titleInput.setSelectionRange(head.length, head.length);
+      }
+      gtAutoGrow(titleInput);
+    });
+
+    /* The first measurement cannot happen inline: the composer is built
+       detached and appended by its caller, and gtAutoGrow refuses to measure
+       a detached node. A frame later it is in the document. That covers both
+       cases that matter -- an existing task opened with a title already too
+       long for one line, and a reopened composer, since every open builds a
+       fresh one. The focus listener is the backstop, because
+       requestAnimationFrame does not fire in a background tab. */
+    requestAnimationFrame(function () { gtAutoGrow(titleInput); });
+    titleInput.addEventListener("focus", function () { gtAutoGrow(titleInput); });
 
     let notesInput = null;
     if (!opts.noNotes) {
