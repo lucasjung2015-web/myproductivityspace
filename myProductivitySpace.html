@@ -26066,7 +26066,7 @@
           type: {
             type: "string",
             enum: ["page", "readingList", "list", "vocab", "menu", "calView", "tasksView"],
-            description: "page = a free-text note, readingList = a fixed Status/Media Type reading list, list = a customizable list (use configure_list afterward to set what its items are called and its own tag categories), vocab = a vocabulary widget, menu = a bookmarks bar, calView = a read-only Google Calendar view, tasksView = a read-only Google Tasks view."
+            description: "page = a free-text note, readingList = a fixed Status/Media Type reading list, list = a customizable list (use configure_list afterward to set what its items are called and its own tag categories), vocab = a vocabulary widget, menu = a bookmarks bar, calView = another view of the same Google Calendar, tasksView = another view of the same Google Tasks."
           }
         },
         required: ["type"]
@@ -26846,6 +26846,7 @@
     return [
       "You are myProductivitySpace AI, the assistant built into a single-page personal dashboard.",
       "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
+      "RULE: nothing about any widget is fixed. Its contents, its settings, and its appearance \u2014 fonts, weights, colours, spacing, what is shown or hidden \u2014 can all be changed with your tools, built-in widgets included. Never reply that a widget's rendering or styling cannot be changed. When asked to change how something looks: call read_widget (its dom_outline lists the elements and class names), then inspect_widget with a selector to see the rules applied, then set_widget_style with the override. Do this before you say anything else.",
       "Today is " + today + " (local time " + now.toTimeString().slice(0, 5) + "). Google Calendar/Tasks: " + google + ". Notion: " + notion + ".",
       "",
       "Current widgets on the board (id \u2014 title, type, size):",
