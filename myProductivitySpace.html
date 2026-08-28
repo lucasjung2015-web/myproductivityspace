@@ -14636,6 +14636,7 @@
       else if (type === "menu" && window.__unwireBookmarksSection) window.__unwireBookmarksSection(id);
       else if (type === "tasksView" && window.__unwireExtraTasksSection) window.__unwireExtraTasksSection(id);
       else if (type === "custom" && window.__unwireCustomSection) window.__unwireCustomSection(id);
+      if (window.__widgetOverlay) { try { window.__widgetOverlay.forget(id); } catch (e) {} }
       // A deleted widget's nickname goes with it, so a later widget that
       // happens to reuse the id can't inherit a name it never had.
       delete WIDGET_TITLES[id];
@@ -15719,6 +15720,12 @@
         const type = widgetTypeOf(id);
         const base = { widget_id: id, type: type, title: WIDGET_TITLES[id] || defaultWidgetTitle(id),
                        instructions: WIDGET_INSTRUCTIONS[id] || "" };
+        if (window.__widgetOverlay) {
+          try {
+            base.style_override_css = window.__widgetOverlay.get(id).css;
+            base.dom_outline = window.__widgetOverlay.outline(id);
+          } catch (e) {}
+        }
         if (type === "page" || NOTE_WIDGETS[id]) {
           const ed = pageEditorOf(id);
           return Object.assign(base, { blocks: ed ? nbBlocksInfo(ed) : [] });
@@ -25160,6 +25167,157 @@
 
 <script>
 /* =====================================================================
+   Widget style overlays + inspection: change how any widget looks
+   ---------------------------------------------------------------------
+   The built-in widgets are one shared file, so their code cannot be
+   rewritten per person. What "make the task titles not bold" actually
+   needs is a stylesheet scoped to that one widget, and a way to see the
+   widget's structure and the rules currently applied -- what a developer
+   does in devtools before writing the override. That is what this is.
+
+   The user's rules are nested inside the widget's own selector, so they
+   cannot leak to the rest of the board, and the wrapper's specificity
+   beats the app's base rules without !important. Inspection walks the
+   live DOM and the document's stylesheets, which is how the AI learns
+   that ".cal-taskrow-title" is the bold thing and which rule makes it so.
+   CSS only: no code runs, so nothing here can read or send anything.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  const CSS_KEY = "widget-css";
+  const css = {};            // id -> source
+  const styleEls = {};
+
+  function widgetEl(id) { return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]'); }
+  function scopeSel(id) { return '.col.collapsible-col-wrap[data-col-id="' + String(id).replace(/(["\\])/g, "\\$1") + '"]'; }
+
+  function applyCss(id) {
+    let el = styleEls[id];
+    if (!css[id]) { if (el) { el.remove(); delete styleEls[id]; } return; }
+    if (!el) {
+      el = document.createElement("style");
+      el.setAttribute("data-widget-css", id);
+      document.head.appendChild(el);
+      styleEls[id] = el;
+    }
+    // Nested: every rule the user wrote becomes a descendant rule of the
+    // widget's selector, element selectors included.
+    el.textContent = scopeSel(id) + " {\n" + css[id] + "\n}";
+  }
+
+  function persist() { window.storageSet(CSS_KEY, JSON.stringify(css)); }
+  (async function load() {
+    let raw = null;
+    try { raw = await window.storageGet(CSS_KEY); } catch (e) {}
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") Object.keys(parsed).forEach(function (k) { if (parsed[k]) css[k] = String(parsed[k]); });
+    } catch (e) {}
+    Object.keys(css).forEach(applyCss);
+  })();
+
+  /* ---- inspection ---- */
+  function shortText(node, n) {
+    const t = (node.textContent || "").replace(/\s+/g, " ").trim();
+    return t.length > n ? t.slice(0, n - 1) + "\u2026" : t;
+  }
+  function describe(node) {
+    let d = node.tagName.toLowerCase();
+    if (node.id) d += "#" + node.id;
+    const cls = Array.prototype.slice.call(node.classList).slice(0, 4);
+    if (cls.length) d += "." + cls.join(".");
+    return d;
+  }
+  function outline(id, maxLines) {
+    const root = widgetEl(id);
+    if (!root) return null;
+    const body = root.querySelector(".collapsible-body") || root;
+    const lines = [];
+    (function walk(node, depth) {
+      if (lines.length >= maxLines || depth > 6) return;
+      const kids = Array.prototype.filter.call(node.children, function (c) { return c.nodeType === 1 && c.tagName.toLowerCase() !== "svg"; });
+      let i = 0;
+      while (i < kids.length && lines.length < maxLines) {
+        const k = kids[i];
+        const sig = describe(k);
+        // Collapse runs of same-shaped siblings ("div.row x14") so a long
+        // list reads as one line, not a hundred.
+        let j = i + 1;
+        while (j < kids.length && describe(kids[j]) === sig) j++;
+        const count = j - i;
+        const hasKids = k.children.length > 0;
+        const txt = !hasKids || k.children.length <= 1 ? shortText(k, 40) : "";
+        lines.push("  ".repeat(depth) + sig + (count > 1 ? "  \u00d7" + count : "") + (txt ? '  "' + txt + '"' : ""));
+        if (hasKids) walk(k, depth + 1);
+        i = j;
+      }
+    })(body, 0);
+    return lines.join("\n");
+  }
+  const STYLE_PROPS = ["display", "font-family", "font-size", "font-weight", "font-style", "line-height", "color", "background-color",
+                       "padding", "margin", "border", "border-radius", "width", "height", "text-decoration", "opacity", "gap"];
+  function matchedRules(el, max) {
+    const out = [];
+    function visit(rules) {
+      for (let i = 0; i < rules.length && out.length < max; i++) {
+        const r = rules[i];
+        if (r.cssRules && (r.type === 4 || r.type === 12)) { visit(r.cssRules); continue; }   // @media, @supports
+        if (!r.selectorText) continue;
+        let hit = false;
+        try { hit = el.matches(r.selectorText); } catch (e) { hit = false; }
+        if (!hit) continue;
+        const own = r.parentStyleSheet && r.parentStyleSheet.ownerNode && r.parentStyleSheet.ownerNode.getAttribute("data-widget-css");
+        out.push((own ? "[widget override] " : "") + r.cssText.slice(0, 320));
+      }
+    }
+    Array.prototype.forEach.call(document.styleSheets, function (sh) { try { if (sh.cssRules) visit(sh.cssRules); } catch (e) {} });
+    return out;
+  }
+  function inspect(id, selector) {
+    const root = widgetEl(id);
+    if (!root) return { error: "No widget element for '" + id + "'." };
+    let nodes;
+    try { nodes = Array.prototype.slice.call(root.querySelectorAll(selector)); }
+    catch (e) { return { error: "Invalid selector: " + selector }; }
+    if (!nodes.length) return { matches: 0, hint: "Nothing matched. Use read_widget's dom_outline to find the right selector." };
+    const first = nodes[0];
+    const cs = getComputedStyle(first);
+    const computed = {};
+    STYLE_PROPS.forEach(function (p) { computed[p] = cs.getPropertyValue(p); });
+    return {
+      matches: nodes.length,
+      elements: nodes.slice(0, 8).map(function (n) { return { element: describe(n), text: shortText(n, 60) }; }),
+      computed_style_of_first: computed,
+      css_rules_matching_first: matchedRules(first, 25),
+      note: "Rules you write with set_widget_style are nested under " + scopeSel(id) + " automatically."
+    };
+  }
+
+  window.__widgetOverlay = {
+    get: function (id) { return { css: css[id] || "" }; },
+    setCss: function (id, src) {
+      const t = String(src == null ? "" : src);
+      if (t.length > 60000) return { error: "CSS too large (60 KB max)." };
+      if (t.trim()) css[id] = t; else delete css[id];
+      applyCss(id);
+      persist();
+      return { ok: true, widget_id: id, css_bytes: (css[id] || "").length };
+    },
+    outline: function (id) { return outline(id, 140); },
+    inspect: inspect,
+    forget: function (id) {
+      delete css[id];
+      if (styleEls[id]) { styleEls[id].remove(); delete styleEls[id]; }
+      persist();
+    }
+  };
+})();
+</script>
+
+<script>
+/* =====================================================================
    Connections + myProductivitySpace AI
    ---------------------------------------------------------------------
    Both are UI shells: no OAuth is performed and no model is called. They
@@ -26261,6 +26419,24 @@
       }
     },
     {
+      name: "inspect_widget",
+      description: "Look inside any widget the way a developer would in devtools: the elements a CSS selector matches (text, classes), the first match's computed style, and the stylesheet rules currently applied to it. Use read_widget first for the dom_outline, pick a selector from it, then inspect to see which rule makes something bold, what size it is, etc. Then change it with set_widget_style.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, selector: { type: "string", description: "A CSS selector, matched inside the widget only, e.g. '.cal-taskrow-title'." } },
+        required: ["widget_id", "selector"]
+      }
+    },
+    {
+      name: "set_widget_style",
+      description: "Change how ANY widget looks -- built-in or custom -- with CSS scoped to that widget. Write ordinary rules using the selectors from read_widget's dom_outline / inspect_widget (e.g. '.cal-taskrow-title { font-weight: 400; }'); they are nested inside the widget's own selector automatically, so they cannot affect anything else, and they outrank the app's base rules without !important. This REPLACES the widget's whole override stylesheet: read the current one from read_widget (style_override_css) and include what should stay. Empty string removes all overrides. Persists and syncs.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" }, css: { type: "string" } },
+        required: ["widget_id", "css"]
+      }
+    },
+    {
       name: "set_widget_instructions",
       description: "Set standing instructions for ANY widget -- how the user wants it kept, edited or filled from now on (e.g. 'always tag new items To-do', 'only finance vocabulary', 'keep this page as a bulleted log, newest first'). They are shown to you on every turn and in read_widget, so follow them whenever you touch that widget. Pass an empty string to clear. Use this when the user describes how a widget should behave rather than asking for a one-off change.",
       input_schema: {
@@ -26366,7 +26542,9 @@
     create_custom_widget:  { label: "Building\u2026",     target: null },
     update_custom_widget:  { label: "Rebuilding\u2026",   target: "widget_id" },
     set_custom_widget_store:{ label: "Writing\u2026",     target: "widget_id" },
-    set_widget_instructions:{ label: "Noting\u2026",      target: "widget_id" }
+    set_widget_instructions:{ label: "Noting\u2026",      target: "widget_id" },
+    inspect_widget:        { label: "Inspecting\u2026",  target: "widget_id" },
+    set_widget_style:      { label: "Restyling\u2026",   target: "widget_id" }
   };
 
   // Tasks and events have no widget_id of their own; the fog goes over the
@@ -26581,6 +26759,13 @@
       case "set_widget_instructions":
         return b.setInstructions(id, input.instructions);
 
+      case "inspect_widget":
+        if (!window.__widgetOverlay) return { error: "Inspection is not available." };
+        return window.__widgetOverlay.inspect(id, String(input.selector || ""));
+      case "set_widget_style":
+        if (!window.__widgetOverlay) return { error: "Styling is not available." };
+        return window.__widgetOverlay.setCss(id, input.css);
+
       case "set_custom_widget_store":
         if (!CW || !CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
         return CW.setStore(id, String(input.key || ""), input.value);
@@ -26678,7 +26863,8 @@
       "",
       "How to work: read before you edit \u2014 read_widget, list_tasks or list_events give you the ids that edit tools need. " +
       "A widget's `instructions` line is the user's standing preference for it: follow it on every edit to that widget, and when the user describes how a widget should behave from now on, record it with set_widget_instructions. " +
-      "Every widget's composition is data you can change: a Page's blocks, a list's items and categories, a Bookmarks bar's links, Vocabulary's languages, counts, pick mode and the word banks themselves (you can author new banks), and a custom widget's whole code. Only the built-in widgets' rendering code is fixed \u2014 for anything beyond their data, build a custom widget. " +
+      "Every widget's composition is data you can change: a Page's blocks, a list's items and categories, a Bookmarks bar's links, Vocabulary's languages, counts, pick mode and the word banks themselves (you can author new banks), and a custom widget's whole code. " +
+      "Every widget's LOOK is yours to change too, built-in ones included: read_widget gives its dom_outline, inspect_widget shows the elements a selector matches and the CSS rules applied to them, and set_widget_style writes CSS scoped to that widget. Never tell the user a widget's appearance is fixed \u2014 inspect it and restyle it. Build a custom widget only for something genuinely new. " +
       "Pages are written in Markdown; prefer append_to_page / replace_page_block over rewriting a whole Page. " +
       "For anything the existing widget types can't do, build a custom widget with create_custom_widget (sandboxed HTML/CSS/JS with the mps store API); revise it with update_custom_widget, and check lastError in the result. " +
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
@@ -27017,6 +27203,8 @@
       case "update_custom_widget": return "Rebuilt " + who + (result.lastError ? " (with a runtime error)" : "");
       case "set_custom_widget_store": return "Wrote to " + who + "'s store";
       case "set_widget_instructions": return input.instructions ? "Noted how to keep " + who : "Cleared " + who + "'s instructions";
+      case "inspect_widget": return "Inspected " + who;
+      case "set_widget_style": return input.css && input.css.trim() ? "Restyled " + who : "Removed " + who + "'s style overrides";
       default: return name;
     }
   }
