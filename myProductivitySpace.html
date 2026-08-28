@@ -747,6 +747,22 @@
     content: "•"; position: absolute; left: 8px; top: 0;
     font-size: 17px; line-height: 1.35; color: var(--ink);
   }
+  /* The marker cycles with depth the way Notion's does -- filled circle,
+     hollow circle, filled square, then back to the filled circle -- so how
+     deep a bullet sits is legible from its shape rather than only from how
+     far it has been pushed across. Depth 0 (no data-i) and every third level
+     after it are already the rule above; only the other two need saying.
+
+     Glyphs rather than drawn boxes: the marker inherits the block's baseline
+     this way, where a sized ::before box would need its `top` hand-tuned
+     against the 15px/1.4 line box. The per-glyph font-size is the price --
+     these three characters are not cut to the same optical size, so the
+     hollow circle is set larger and the square smaller to land them all at
+     roughly the weight of the bullet. */
+  .note-editor [data-b="ul"][data-i="1"]::before,
+  .note-editor [data-b="ul"][data-i="4"]::before { content: "◦"; font-size: 21px; }
+  .note-editor [data-b="ul"][data-i="2"]::before,
+  .note-editor [data-b="ul"][data-i="5"]::before { content: "▪"; font-size: 13px; }
   .note-editor [data-b="ol"]::before {
     content: attr(data-n); position: absolute; left: 0; top: 0; width: 20px;
     text-align: right; font-size: 14px; line-height: 1.45; color: var(--ink);
@@ -2030,8 +2046,11 @@
      should sit level with the FIRST line, the way it does in the reference
      — centering it would drift it down toward the wrapped block's middle. */
   .cal-taskrow-top { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+  /* Regular weight, not semibold: a list where every title is bold has no
+     emphasis left to spend, and the circle beside it already says where a
+     row begins. Shared with the Completed section below, so both read alike. */
   .cal-taskrow-title {
-    flex: 1 1 auto; font-size: 16px; font-weight: 600; line-height: 1.3;
+    flex: 1 1 auto; font-size: 16px; font-weight: 400; line-height: 1.3;
     color: #0a0a0a; min-width: 0; padding-top: 2px;
     overflow-wrap: break-word; word-break: break-word;
   }
@@ -16310,28 +16329,20 @@
         flashWidget(widgetId);
       }
 
-      if (type === "cal") {
-        if (slotOf("cal")) {
-          const id = createDynamicWidgetInstance("calView");
-          flashWidget(id);
-        } else {
-          restoreSingleton("cal");
-        }
-        return;
-      }
+      /* Both of these used to add a second, cut-down COPY when one was already
+         on the board -- a month-only calendar with no create or edit, a task
+         list with no composer or tags. Those copies could only ever drift
+         further behind the real widgets as the real ones grew, which is
+         exactly how they came to read as outdated versions of themselves.
 
-      // Google Tasks: same shape as Calendar above. The first one carries the
-      // real connection and the composer; further ones are additional views of
-      // that same single list — Google gives an account exactly one — so they
-      // reuse the connection rather than asking for another.
-      if (type === "tasks") {
-        if (slotOf("unschedTasks")) {
-          const id = createDynamicWidgetInstance("tasksView");
-          flashWidget(id);
-        } else {
-          restoreSingleton("unschedTasks");
-        }
-      }
+         Google gives an account one calendar and one task list, so a second
+         widget was never showing anything new anyway. Now there is only ever
+         the real one: bring it back if it has been removed, and otherwise
+         just take the user to it. Nothing can fall behind something that
+         does not exist. (The calView/tasksView builders stay registered, so a
+         board that already holds one of the old copies still renders it.) */
+      if (type === "cal") { restoreSingleton("cal"); return; }
+      if (type === "tasks") { restoreSingleton("unschedTasks"); return; }
     });
 
     // ---- Vocabulary "+" setup flow: Language -> Frequency -> Words/Phrases per day ----
@@ -19207,7 +19218,12 @@
       });
       chip.appendChild(check);
     }
-    const statusColor = meta && meta.status && defs && defs.status.colors[meta.status];
+    /* Status belongs to tasks only -- an event is not something you move
+       through To-do/In progress, and its settings panel no longer offers the
+       field. Reading it here anyway would leave an event that was tagged
+       before the change wearing a colour with nothing left to clear it. */
+    const status = kind === "task" && meta && meta.status ? meta.status : "";
+    const statusColor = status && defs && defs.status.colors[status];
     if (statusColor) {
       const dot = document.createElement("span");
       dot.className = "cal-chip-dot";
@@ -19215,14 +19231,14 @@
       chip.appendChild(dot);
     }
     chip.appendChild(document.createTextNode(title));
-    if (meta && meta.status) {
+    if (status) {
       const st = document.createElement("span");
       st.className = "cal-chip-status";
-      st.textContent = meta.status;
+      st.textContent = status;
       if (statusColor) st.style.color = statusColor.dot || statusColor.text;
       chip.appendChild(st);
     }
-    chip.title = title + (meta && meta.status ? " — " + meta.status : "");
+    chip.title = title + (status ? " — " + status : "");
     chip.addEventListener("click", function (e) {
       e.stopPropagation();
       openItemEditor(nsId, title);
@@ -19661,6 +19677,16 @@
     if (typeof opts === "boolean") opts = { includeDuration: opts };
     opts = opts || {};
     const includeDuration = opts.includeDuration !== false;
+    /* Fields this surface does not carry at all. Calendar events pass
+       ["status", "taskType"]: an event is not a thing you move through
+       To-do/In progress, and Ongoing-vs-Deadline is a property of work, not
+       of an appointment that already has a start and an end. */
+    const omit = opts.omit || [];
+    /* Duration is offered even when unset on surfaces that otherwise hide
+       empty slots -- the Unscheduled Tasks rows -- because it is the one tag
+       that gates something visible (the timer button), so an invitation to
+       set it belongs where the task is, not one click inside its editor. */
+    const alwaysShowDuration = opts.alwaysShowDuration === true;
     // Row-level surfaces show only what's actually set. An unset field's
     // placeholder is an invitation to edit, and editing now happens in the
     // row's own inline editor rather than on the collapsed row — so on a row
@@ -19676,6 +19702,7 @@
     // engine's own pattern: a coloured pill once set, an inline picker when not.
     [["status", "Status"], ["taskType", "Task Type"], ["workDepth", "Depth"]].forEach(function (pair) {
       const field = pair[0], label = pair[1];
+      if (omit.indexOf(field) !== -1) return;
       const def = defs[field];
       if (!def) return;
       const value = meta[field] || "";
@@ -19730,7 +19757,7 @@
           openDurationInputs(dur, meta.durationMinutes, function (total) { commit("durationMinutes", total); });
         });
         bar.appendChild(dur);
-      } else if (defs.formatDuration && !hideEmpty) {
+      } else if (defs.formatDuration && (!hideEmpty || alwaysShowDuration)) {
         const add = document.createElement("button");
         add.type = "button";
         add.className = "tag-add-btn";
@@ -19848,8 +19875,10 @@
       function (field, value) { setTagMeta(nsId, field, value, title); refreshTagSurfaces(); },
       // hideEmpty: this is the COLLAPSED row's tag bar, so it reports only
       // what's actually set; every unset slot is offered by the row's inline
-      // editor instead.
-      { hideEmpty: true }
+      // editor instead. Duration is the exception -- see alwaysShowDuration.
+      // This builder is called from exactly one place (renderTasks), so it is
+      // inherently the Google Tasks row and needs no kind of its own.
+      { hideEmpty: true, alwaysShowDuration: true }
     );
     bar.addEventListener("mousedown", function (e) { e.stopPropagation(); });
     // The row this tagbar lives in is HTML5 draggable=true (for drag-to-
@@ -21249,7 +21278,12 @@
   // drops the "Tags" heading — the Task panel/inline composer pass this,
   // since the pills read clearly enough there without it; the Event panel
   // keeps the heading.
-  function buildTagsSection(nsId, title, pending, hideLabel) {
+  /* `kind` is "task" or "event". It is read off the nsId when there is one,
+     and only has to be passed explicitly while staging something that does
+     not exist yet and so has no id to read. Which kind this is decides two
+     things: events carry neither Status nor Task Type, and tasks carry
+     Duration (an event's duration is its start and end, already on the form). */
+  function buildTagsSection(nsId, title, pending, hideLabel, kind) {
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const container = document.createElement("div");
@@ -21259,7 +21293,10 @@
       wrap.appendChild(lab);
     }
     wrap.appendChild(container);
-    const opts = { includeDuration: false };
+    const isEvent = nsId ? nsId.indexOf("event:") === 0 : kind === "event";
+    const opts = isEvent
+      ? { includeDuration: false, omit: ["status", "taskType"] }
+      : { includeDuration: true };
     if (nsId) buildLiveTagRow(nsId, title, container, opts);
     else buildStagingTagRow(pending, container, opts);
     return wrap;
@@ -21706,7 +21743,8 @@
     createPanel.appendChild(description.wrap);
     createPanel.appendChild(settingsRow);
     createPanel.appendChild(notify.wrap);
-    createPanel.appendChild(buildTagsSection(nsId, existing ? existing.title : "", pendingTags));
+    // "event" explicitly: a brand-new event has no nsId to read the kind off.
+    createPanel.appendChild(buildTagsSection(nsId, existing ? existing.title : "", pendingTags, false, "event"));
     if (nsId) createPanel.appendChild(buildWidgetsSection(nsId, existing.title));
     createPanel.appendChild(panelActions(async function (btn) {
       const t = title.input.value.trim();
