@@ -2062,6 +2062,16 @@
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
     background: #000000; color: #ffffff; overflow: hidden;
     border: 1px solid #000000;
+    /* An event can be dragged to a new time and resized from either edge
+       (see wireEventDrag). The cursor is set per-pointer-position in JS,
+       since CSS cannot express "within 6px of my top edge". */
+    cursor: grab; touch-action: none;
+  }
+  /* Lifted while dragging so it rides over its neighbours rather than
+     disappearing behind whichever box it is passing. */
+  .cal-tg-event.is-dragging {
+    z-index: 5; cursor: grabbing; opacity: 0.9;
+    box-shadow: 0 2px 10px rgba(0,0,0,.35);
   }
   /* A timed task placed in its own hour slot (see renderTimeGrid) — the
      exact same .cal-chip.task element the all-day strip uses, just given
@@ -19368,6 +19378,149 @@
     viewport.appendChild(grid);
   }
 
+  /* Pixels per hour on the day/week grid. Module scope rather than inside
+     renderTimeGrid, because the drag handlers below convert a pointer's
+     travel into minutes with it and run long after that function returned. */
+  const HOUR_H = 26;
+
+  /* Dragging an event on the day/week grid.
+
+     Three gestures on one box, told apart by where the press lands: within
+     EDGE px of the top or bottom it resizes that end, anywhere else it moves
+     the whole event. The pointer's own cursor says which before you press,
+     because CSS has no way to ask "am I near this element's top edge".
+
+     Everything is done in minutes and only converted to pixels to draw:
+     HOUR_H is the one place the grid's scale lives, and reasoning about a
+     drag in pixels would have to undo that conversion at every step.
+
+     A press that never travels is still a click -- the editor has to keep
+     opening on a tap -- so the commit only happens past MOVE_MIN px, and the
+     click that follows the drag is swallowed exactly once. */
+  function wireEventDrag(box, ev, day, wrap, days) {
+    const EDGE = 6;             // how close to an end counts as grabbing it
+    const MOVE_MIN = 4;         // below this a press is a click, not a drag
+    const SNAP = 15;            // minutes; matches how people say times
+    const MIN_LEN = 15;         // an event may not be resized shorter than this
+
+    function zoneAt(clientY) {
+      const r = box.getBoundingClientRect();
+      if (clientY - r.top <= EDGE) return "start";
+      if (r.bottom - clientY <= EDGE) return "end";
+      return "move";
+    }
+
+    box.addEventListener("pointermove", function (e) {
+      if (box.classList.contains("is-dragging")) return;
+      box.style.cursor = zoneAt(e.clientY) === "move" ? "grab" : "ns-resize";
+    });
+
+    box.addEventListener("pointerdown", function (e) {
+      if (e.button != null && e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const zone = zoneAt(e.clientY);
+      const startY = e.clientY;
+      const origStart = ev.start.getHours() * 60 + ev.start.getMinutes();
+      const origEnd = Math.max(origStart + MIN_LEN, ev.end.getHours() * 60 + ev.end.getMinutes());
+      let curStart = origStart, curEnd = origEnd, curDay = day, moved = false;
+
+      box.setPointerCapture(e.pointerId);
+
+      function paint() {
+        box.style.top = (curStart / 60) * HOUR_H + "px";
+        box.style.height = Math.max(12, ((curEnd - curStart) / 60) * HOUR_H - 2) + "px";
+        const t = box.querySelector(".cal-tg-event-title");
+        if (t) t.textContent = gtFmtTime(minToHhmm(curStart)) + " " + ev.title;
+      }
+
+      function onMove(me) {
+        const dy = me.clientY - startY;
+        if (!moved && Math.abs(dy) < MOVE_MIN) return;
+        if (!moved) { moved = true; box.classList.add("is-dragging"); }
+
+        const delta = Math.round(dy / HOUR_H * 60 / SNAP) * SNAP;
+        if (zone === "move") {
+          const len = origEnd - origStart;
+          curStart = Math.max(0, Math.min(24 * 60 - len, origStart + delta));
+          curEnd = curStart + len;
+          /* In week view a drag can cross into another day. The box is
+             re-parented into that day's own midnight slot rather than being
+             offset horizontally, so it keeps the column's width and the
+             layout arithmetic never has to know a drag is in progress. */
+          if (days.length > 1) {
+            const over = document.elementsFromPoint(me.clientX, me.clientY)
+              .filter(function (n) { return n.classList && n.classList.contains("cal-tg-slot"); })[0];
+            const overDay = over && over.dataset.day;
+            if (overDay && overDay !== ymd(curDay)) {
+              const target = days.filter(function (d) { return ymd(d) === overDay; })[0];
+              const slot = target && wrap.querySelector('.cal-tg-slot[data-hour="0"][data-day="' + overDay + '"]');
+              if (slot) { curDay = target; slot.appendChild(box); }
+            }
+          }
+        } else if (zone === "start") {
+          curStart = Math.max(0, Math.min(origEnd - MIN_LEN, origStart + delta));
+        } else {
+          curEnd = Math.min(24 * 60, Math.max(origStart + MIN_LEN, origEnd + delta));
+        }
+        paint();
+      }
+
+      function onUp() {
+        box.removeEventListener("pointermove", onMove);
+        box.removeEventListener("pointerup", onUp);
+        box.removeEventListener("pointercancel", onUp);
+        try { box.releasePointerCapture(e.pointerId); } catch (err) {}
+        box.classList.remove("is-dragging");
+        if (!moved) return;                       // a click; the click handler runs
+        // Swallow the click this drag is about to produce, so releasing over
+        // the event does not also open its editor.
+        box.addEventListener("click", function swallow(ce) {
+          ce.stopPropagation();
+          box.removeEventListener("click", swallow, true);
+        }, true);
+        if (curStart === origStart && curEnd === origEnd && sameDay(curDay, day)) return;
+        commitEventTimes(ev, curDay, curStart, curEnd);
+      }
+
+      box.addEventListener("pointermove", onMove);
+      box.addEventListener("pointerup", onUp);
+      box.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  function minToHhmm(mins) {
+    const m = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)));
+    return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  }
+
+  /* Writes a dragged event's new start/end back to Google, as local wall
+     clock plus a zone name -- the same shape the event form sends, and the
+     only one that survives a DST boundary without moving the event by an
+     hour. The local array is updated first so the grid does not flicker back
+     to the old position while the request is in flight; refreshAll() on
+     failure is what restores the truth. */
+  function commitEventTimes(ev, day, startMin, endMin) {
+    const base = ymd(day);
+    const startAt = new Date(base + "T" + minToHhmm(startMin) + ":00");
+    const endAt = new Date(base + "T" + minToHhmm(endMin) + ":00");
+    const prevStart = ev.start, prevEnd = ev.end;
+    ev.start = startAt; ev.end = endAt;
+    renderGrid();
+    api(CAL_API + "/calendars/primary/events/" + encodeURIComponent(ev.id), {
+      method: "PATCH",
+      body: JSON.stringify({
+        start: { dateTime: gcalLocalIso(startAt), timeZone: gcalTimeZone() },
+        end: { dateTime: gcalLocalIso(endAt), timeZone: gcalTimeZone() }
+      })
+    }).catch(function (e) {
+      ev.start = prevStart; ev.end = prevEnd;
+      window.alert("Couldn't move the event: " + (e.message || e));
+      refreshAll();
+    });
+  }
+
   function renderTimeGrid() {
     const days = view === "day" ? [startOfDay(anchor)] : [];
     if (view === "week") {
@@ -19375,7 +19528,6 @@
       for (let i = 0; i < 7; i++) days.push(addDays(s, i));
     }
     const today = startOfDay(new Date());
-    const HOUR_H = 26;
 
     const wrap = document.createElement("div");
     wrap.className = "cal-timegrid" + (view === "week" ? " week" : "");
@@ -19564,6 +19716,7 @@
           ev.stopPropagation();
           openItemEditor(nsId, e.title);
         });
+        wireEventDrag(box, e, day, wrap, days);
         anchorSlot.appendChild(box);
         placed.push({ startMin: startMin, endMin: endMin, el: box });
       });
