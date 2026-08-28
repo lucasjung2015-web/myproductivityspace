@@ -24250,6 +24250,10 @@
 
     wrapEl = document.createElement("div");
     wrapEl.className = "links-row-wrap";
+    // Tagged like a grid widget so anything that addresses widgets by id --
+    // the AI's style overlay and its inspection, in particular -- finds this
+    // bar in its floating form too, not only once it is dropped in the grid.
+    wrapEl.setAttribute("data-col-id", cfg.id);
 
     var header = document.createElement("div");
     header.className = "section-header links-menu-header";
@@ -25189,8 +25193,17 @@
   const css = {};            // id -> source
   const styleEls = {};
 
-  function widgetEl(id) { return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]'); }
-  function scopeSel(id) { return '.col.collapsible-col-wrap[data-col-id="' + String(id).replace(/(["\\])/g, "\\$1") + '"]'; }
+  /* Both shapes a widget can take: an ordinary grid column, or the
+     Bookmarks bar in its floating full-width form. */
+  function widgetEl(id) {
+    const esc = String(id).replace(/(["\\])/g, "\\$1");
+    return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + esc + '"]') ||
+           document.querySelector('.links-row-wrap[data-col-id="' + esc + '"]');
+  }
+  function scopeSel(id) {
+    const esc = String(id).replace(/(["\\])/g, "\\$1");
+    return '.col.collapsible-col-wrap[data-col-id="' + esc + '"], .links-row-wrap[data-col-id="' + esc + '"]';
+  }
 
   function applyCss(id) {
     let el = styleEls[id];
@@ -26762,9 +26775,20 @@
       case "inspect_widget":
         if (!window.__widgetOverlay) return { error: "Inspection is not available." };
         return window.__widgetOverlay.inspect(id, String(input.selector || ""));
-      case "set_widget_style":
+      case "set_widget_style": {
         if (!window.__widgetOverlay) return { error: "Styling is not available." };
+        /* A custom widget draws itself inside a sandboxed iframe, and no
+           stylesheet on this page can reach across that boundary. Sending
+           the CSS to the widget's OWN stylesheet is what the caller meant,
+           and keeps one tool for "restyle this widget" whatever it is. */
+        if (CW && CW.isCustom(id)) {
+          const r = CW.update(id, { css: String(input.css == null ? "" : input.css) });
+          if (r.error) return r;
+          await wait(300);
+          return { ok: true, widget_id: id, version: r.version, applied_to: "the widget's own stylesheet (it renders in a sandboxed frame)", lastError: CW.lastError(id) };
+        }
         return window.__widgetOverlay.setCss(id, input.css);
+      }
 
       case "set_custom_widget_store":
         if (!CW || !CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
