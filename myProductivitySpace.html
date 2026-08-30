@@ -8874,12 +8874,22 @@
      is a redirect rather than an in-page call -- which is exactly why it
      works in places the in-page path does not.
 
-     Guarded by a once-per-session flag: if the redirect comes back still
-     unable to reach Google, trying again would be an infinite bounce through
-     the consent screen, so the second failure falls through to the button. */
+     Guarded by a flag that is set before leaving and never cleared for the
+     life of the tab. That is deliberate and was learned the hard way: clearing
+     it when a Google token came back looked reasonable -- the round trip
+     evidently worked -- but it meant any LATER failure could redirect again,
+     and a token that arrives yet still cannot be used is exactly the case
+     that loops. One attempt per browser session, no exceptions; a second
+     failure lands on the button, which is a dead end but a stationary one.
+     Opening a new tab is what resets it. */
   const GOOGLE_REAUTH_KEY = "unbleep-google-reauth-tried";
   window.__mpsReconnectGoogle = async function () {
     if (!sb || !session) return false;
+    /* Never on a load that IS the return leg. A session carrying a
+       provider_token has just come back from Google, so if the calendar is
+       still unhappy the redirect is not the cure and repeating it is the
+       loop itself. */
+    if (session.provider_token) return false;
     try {
       if (sessionStorage.getItem(GOOGLE_REAUTH_KEY) === "1") return false;
       sessionStorage.setItem(GOOGLE_REAUTH_KEY, "1");
@@ -10993,10 +11003,6 @@
       // Signed in: let a future signed-out boot auto-redirect again.
       try { sessionStorage.removeItem(AUTO_SIGNIN_KEY); } catch (e) {}
 
-      // A session that arrived WITH a Google token is proof the round trip
-      // works, so the once-per-session guard is spent and can be cleared --
-      // otherwise one failure would block every retry for the life of the tab.
-      if (session.provider_token) { try { sessionStorage.removeItem(GOOGLE_REAUTH_KEY); } catch (e) {} }
       seedGoogleProviderToken(session);
       stashGoogleRefreshToken(session);   // fire-and-forget; never blocks boot
       finishNotionConnectIfReturning();   // ditto
