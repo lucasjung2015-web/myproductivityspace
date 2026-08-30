@@ -18917,18 +18917,22 @@
     return h + (m ? ":" + String(m).padStart(2, "0") : "") + ap;
   }
 
-  /* ---------------- auth ---------------- */
-  let tokenClient = null;
-  let accessToken = null;
-  let tokenExpiry = 0;
+  /* ---------------- auth ----------------
+     One Google account, packaged. Everything about being signed in to Google
+     -- the token, when it expires, how it is re-minted, where it is cached --
+     lives inside one of these rather than in module variables, so the board
+     can hold more than one at a time: the calendar you signed in with, and a
+     second widget signed in to a different account entirely.
+
+     `cacheKey` separates their sessionStorage entries. `useBroker` is what
+     the primary account has and an extra one does not: the server-side
+     refresh token, redeemed by the google-token function, which is what keeps
+     Calendar working after the tab is closed. The broker table holds one
+     refresh token per person, so a second account has no room in it yet and
+     reconnects per session instead -- degraded, but honest, and it costs no
+     schema migration to start using. */
   let gisReady = false;
-  let authed = false;
-  // Extra (read-only) Google Calendar view widgets — see
-  // buildExtraCalendarWidgetEl near the end of this script — register
-  // themselves here so they can refresh once sign-in completes, since they
-  // may already be mounted (showing a "connect first" placeholder) at the
-  // moment the user clicks Connect in this, the primary, calendar widget.
-  const extraCalendarRefreshers = [];
+  let sharedTokenClient = null;
 
   function loadGis() {
     return new Promise(function (resolve, reject) {
@@ -18944,8 +18948,8 @@
   }
 
   function initTokenClient() {
-    if (tokenClient) return;
-    tokenClient = window.google.accounts.oauth2.initTokenClient({
+    if (sharedTokenClient) return;
+    sharedTokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPES,
       callback: function () {} // replaced per-request below
@@ -18953,202 +18957,239 @@
     gisReady = true;
   }
 
-  // Access tokens last about an hour and Google issues no refresh token to a
-  // browser client, so the only way to avoid a click on every single reload is
-  // to reuse an unexpired token. It is cached in sessionStorage, not
-  // localStorage: that keeps reloads and in-session navigation free, while the
-  // credential still dies with the tab rather than sitting on disk afterwards.
-  const TOKEN_CACHE_KEY = "unbleep-gcal-token";
+  function createGoogleAuth(cacheKey, opts) {
+    opts = opts || {};
+    const useBroker = opts.useBroker === true;
+    // An extra account must be able to be a DIFFERENT one, so its sign-in
+    // asks Google which account to use instead of silently reusing the one
+    // already in the browser -- otherwise every widget would land on the
+    // same login and the whole feature would be invisible.
+    const promptFor = function (interactive) {
+      if (!interactive) return "";
+      return opts.selectAccount ? "select_account" : "consent";
+    };
 
-  function cacheToken(token, expiresAt) {
-    try {
-      sessionStorage.setItem(TOKEN_CACHE_KEY, JSON.stringify({ t: token, e: expiresAt }));
-    } catch (e) {}
-  }
-  function readCachedToken() {
-    try {
-      const raw = sessionStorage.getItem(TOKEN_CACHE_KEY);
-      if (!raw) return null;
-      const o = JSON.parse(raw);
-      if (o && o.t && o.e && Date.now() < o.e) return o;
-    } catch (e) {}
-    return null;
-  }
-  function clearCachedToken() {
-    try { sessionStorage.removeItem(TOKEN_CACHE_KEY); } catch (e) {}
-  }
+    let accessToken = null, tokenExpiry = 0, authed = false;
+    let onLateToken = null;
 
-  // `interactive:false` asks Google to mint a token from an existing session
-  // without showing UI. When that isn't possible (no session, no prior
-  // consent, or the browser blocks the popup because there was no user
-  // gesture) GIS often just goes quiet — neither callback fires. The timeout
-  // is what turns that silence into a normal rejection, so callers can fall
-  // back to the visible sign-in button instead of hanging forever.
-  function requestToken(interactive) {
-    return new Promise(function (resolve, reject) {
-      if (!tokenClient) return reject(new Error("Google auth not ready"));
-      let settled = false;
-      const finish = function (fn, arg) {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        fn(arg);
-      };
-      /* 10s, not 4s, for the silent mint. This whole boot now runs behind the
-         Supabase hydration gate (storageGet awaits it), so GIS starts later
-         and its request competes with hydration traffic — on the old budget a
-         perfectly good silent mint routinely lost the race. */
-      const timer = setTimeout(function () {
-        finish(reject, new Error("Google sign-in did not respond"));
-      }, interactive ? 120000 : 10000);
-
-      tokenClient.callback = function (resp) {
-        if (resp && resp.access_token) {
-          accessToken = resp.access_token;
-          // Renew a little early so a call can't start on a token that
-          // expires mid-flight.
-          tokenExpiry = Date.now() + ((Number(resp.expires_in) || 3600) - 120) * 1000;
-          authed = true;
-          cacheToken(accessToken, tokenExpiry);
-          /* A success that arrives after the watchdog already rejected. The
-             state above is still correct and the token is still good — but
-             the caller gave up, and boot()'s catch has painted the signed-out
-             Connect button over a session that actually works. finish() would
-             no-op here, so nothing else would ever repair that. This is the
-             state that made the app ask for a Google login on every new tab
-             despite holding a valid token. */
-          if (settled) { adoptLateToken(); return; }
-          finish(resolve, accessToken);
-        } else {
-          finish(reject, new Error((resp && resp.error) || "Authorization failed"));
-        }
-      };
-      tokenClient.error_callback = function (err) {
-        // GIS reports these as raw machine codes ("popup_closed",
-        // "popup_failed_to_open"). None of them is shown to the user any more —
-        // the signed-out state is the Connect button alone, and a closed
-        // sign-in window is a deliberate act, not a failure worth narrating.
-        // The Error still carries a readable message for anything that logs or
-        // inspects the rejection.
-        const type = (err && err.type) || "";
-        finish(reject, new Error(
-          type === "popup_failed_to_open"
-            ? "Your browser blocked the Google sign-in window."
-            : "Google sign-in was cancelled."
-        ));
-      };
+    /* Access tokens last about an hour and Google issues no refresh token to
+       a browser client, so the only way to avoid a click on every reload is
+       to reuse an unexpired one. Cached in sessionStorage, not localStorage:
+       reloads and in-session navigation stay free while the credential still
+       dies with the tab rather than sitting on disk afterwards. */
+    function cacheToken(token, expiresAt) {
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ t: token, e: expiresAt })); } catch (e) {}
+    }
+    function readCachedToken() {
       try {
-        tokenClient.requestAccessToken({ prompt: interactive ? "consent" : "" });
-      } catch (e) { finish(reject, e); }
-    });
-  }
-
-  /* A fresh access token from the server-side broker, which redeems the
-     Google refresh token stored at sign-in. This is the reliable path: it is
-     a plain authenticated fetch, so unlike GIS's silent re-mint it does not
-     depend on third-party cookies and does not quietly stop working. Returns
-     false when there is nothing stored, so callers fall through. */
-  async function mintFromBroker() {
-    if (!window.__mpsGoogleToken) return false;
-    const r = await window.__mpsGoogleToken();
-    if (!r || !r.access_token) return false;
-    accessToken = r.access_token;
-    // Same 120s early-renewal margin as everywhere else.
-    tokenExpiry = Date.now() + ((Number(r.expires_in) || 3600) - 120) * 1000;
-    authed = true;
-    cacheToken(accessToken, tokenExpiry);
-    return true;
-  }
-
-  async function ensureToken() {
-    if (accessToken && Date.now() < tokenExpiry) return accessToken;
-    const cached = readCachedToken();
-    if (cached) {
-      accessToken = cached.t;
-      tokenExpiry = cached.e;
-      authed = true;
-      return accessToken;
-    }
-    // Broker first, GIS second. The silent re-mint stays as the fallback for
-    // an account that signed in before the broker existed, or one whose
-    // consent never returned a refresh token.
-    if (await mintFromBroker()) return accessToken;
-    return requestToken(false);
-  }
-
-  async function api(url, options) {
-    const opts = options || {};
-    const token = await ensureToken();
-    async function call(tok) {
-      return fetch(url, Object.assign({}, opts, {
-        headers: Object.assign({
-          "Authorization": "Bearer " + tok,
-          "Content-Type": "application/json"
-        }, opts.headers || {})
-      }));
-    }
-    let res = await call(token);
-    if (res.status === 401) {
-      // Token rejected (revoked, or expired earlier than advertised) — drop
-      // the cached copy too, then mint a fresh one and replay the request once.
-      accessToken = null; tokenExpiry = 0;
-      clearCachedToken();
-      const fresh = await requestToken(false);
-      res = await call(fresh);
-    }
-    if (!res.ok) {
-      let detail = "";
-      try {
-        const body = await res.json();
-        detail = (body && body.error && body.error.message) || "";
+        const raw = sessionStorage.getItem(cacheKey);
+        if (!raw) return null;
+        const o = JSON.parse(raw);
+        if (o && o.t && o.e && Date.now() < o.e) return o;
       } catch (e) {}
-      throw new Error("Google API " + res.status + (detail ? ": " + detail : ""));
+      return null;
     }
-    if (res.status === 204) return null;
-    return res.json();
+    function clearCachedToken() {
+      try { sessionStorage.removeItem(cacheKey); } catch (e) {}
+    }
+
+    /* `interactive:false` asks Google to mint a token from an existing session
+       without showing UI. When that isn't possible (no session, no prior
+       consent, or the browser blocks the popup because there was no user
+       gesture) GIS often just goes quiet -- neither callback fires. The
+       timeout is what turns that silence into a normal rejection, so callers
+       can fall back to the visible sign-in button instead of hanging. */
+    function requestToken(interactive) {
+      return new Promise(function (resolve, reject) {
+        if (!sharedTokenClient) return reject(new Error("Google auth not ready"));
+        let settled = false;
+        const finish = function (fn, arg) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          fn(arg);
+        };
+        /* 10s, not 4s, for the silent mint. This boot runs behind the Supabase
+           hydration gate, so GIS starts later and its request competes with
+           hydration traffic -- on the old budget a good silent mint routinely
+           lost the race. */
+        const timer = setTimeout(function () {
+          finish(reject, new Error("Google sign-in did not respond"));
+        }, interactive ? 120000 : 10000);
+
+        /* The callback is set per request, not per client: one GIS client is
+           shared by every account here, and whichever sign-in is in flight
+           owns it for the length of that call. */
+        sharedTokenClient.callback = function (resp) {
+          if (resp && resp.access_token) {
+            accessToken = resp.access_token;
+            // Renew a little early so a call cannot start on a token that
+            // expires mid-flight.
+            tokenExpiry = Date.now() + ((Number(resp.expires_in) || 3600) - 120) * 1000;
+            authed = true;
+            cacheToken(accessToken, tokenExpiry);
+            /* A success arriving after the watchdog already rejected. The
+               state above is still correct and the token still good -- but the
+               caller gave up and has painted a signed-out Connect button over
+               a session that actually works. finish() would no-op here, so
+               nothing else would ever repair it. This is the state that made
+               the app ask for a Google login on every new tab despite holding
+               a valid token. */
+            if (settled) { if (onLateToken) { try { onLateToken(); } catch (e) {} } return; }
+            finish(resolve, accessToken);
+          } else {
+            finish(reject, new Error((resp && resp.error) || "Authorization failed"));
+          }
+        };
+        sharedTokenClient.error_callback = function (err) {
+          // GIS reports these as raw machine codes ("popup_closed",
+          // "popup_failed_to_open"). None is shown to the user -- the
+          // signed-out state is the Connect button alone, and a closed
+          // sign-in window is a deliberate act, not a failure worth
+          // narrating. The Error still carries a readable message.
+          const type = (err && err.type) || "";
+          finish(reject, new Error(
+            type === "popup_failed_to_open"
+              ? "Your browser blocked the Google sign-in window."
+              : "Google sign-in was cancelled."
+          ));
+        };
+        try {
+          sharedTokenClient.requestAccessToken({ prompt: promptFor(interactive) });
+        } catch (e) { finish(reject, e); }
+      });
+    }
+
+    /* A fresh access token from the server-side broker, which redeems the
+       Google refresh token stored at sign-in. This is the reliable path: a
+       plain authenticated fetch, so unlike GIS's silent re-mint it does not
+       depend on third-party cookies and does not quietly stop working.
+       Returns false when there is nothing stored, so callers fall through. */
+    async function mintFromBroker() {
+      if (!useBroker || !window.__mpsGoogleToken) return false;
+      const r = await window.__mpsGoogleToken();
+      if (!r || !r.access_token) return false;
+      accessToken = r.access_token;
+      tokenExpiry = Date.now() + ((Number(r.expires_in) || 3600) - 120) * 1000;
+      authed = true;
+      cacheToken(accessToken, tokenExpiry);
+      return true;
+    }
+
+    async function ensureToken() {
+      if (accessToken && Date.now() < tokenExpiry) return accessToken;
+      const cached = readCachedToken();
+      if (cached) {
+        accessToken = cached.t;
+        tokenExpiry = cached.e;
+        authed = true;
+        return accessToken;
+      }
+      // Broker first, GIS second. The silent re-mint stays as the fallback
+      // for an account that signed in before the broker existed, or one whose
+      // consent never returned a refresh token.
+      if (await mintFromBroker()) return accessToken;
+      return requestToken(false);
+    }
+
+    /* Every Google request for THIS account. A 401 means the token was
+       revoked or expired early, so the cached copy is dropped and one fresh
+       one is minted and the call replayed exactly once. */
+    async function apiFor(url, options) {
+      const o = options || {};
+      const token = await ensureToken();
+      async function call(tok) {
+        return fetch(url, Object.assign({}, o, {
+          headers: Object.assign({
+            "Authorization": "Bearer " + tok,
+            "Content-Type": "application/json"
+          }, o.headers || {})
+        }));
+      }
+      let res = await call(token);
+      if (res.status === 401) {
+        accessToken = null; tokenExpiry = 0;
+        clearCachedToken();
+        const fresh = await requestToken(false);
+        res = await call(fresh);
+      }
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const body = await res.json();
+          detail = (body && body.error && body.error.message) || "";
+        } catch (e) {}
+        throw new Error("Google API " + res.status + (detail ? ": " + detail : ""));
+      }
+      if (res.status === 204) return null;
+      return res.json();
+    }
+
+    /* Which account this actually is. `calendars/primary` answers with the
+       address as its id, so no extra scope is needed just to be able to say
+       whose calendar a widget is showing. */
+    async function whoAmI() {
+      try {
+        const r = await apiFor(CAL_API + "/calendars/primary");
+        return (r && r.id) || "";
+      } catch (e) { return ""; }
+    }
+
+    return {
+      ensureToken: ensureToken,
+      api: apiFor,
+      whoAmI: whoAmI,
+      isAuthed: function () { return !!authed; },
+      hasCachedToken: function () { return !!readCachedToken(); },
+      connect: function (interactive) { return requestToken(!!interactive); },
+      onLateToken: function (fn) { onLateToken = fn; },
+      signOut: function () {
+        try {
+          if (accessToken && window.google && window.google.accounts && window.google.accounts.oauth2) {
+            window.google.accounts.oauth2.revoke(accessToken, function () {});
+          }
+        } catch (e) {}
+        accessToken = null;
+        tokenExpiry = 0;
+        authed = false;
+        clearCachedToken();
+      }
+    };
   }
+
+  // The board's own Google account: the one that owns the refresh token, and
+  // the one every existing surface here has always meant by "signed in".
+  const primaryAuth = createGoogleAuth("unbleep-gcal-token", { useBroker: true });
+
+  // Extra (read-only) Google Calendar view widgets register themselves here so
+  // they can refresh once sign-in completes, since they may already be mounted
+  // (showing a "connect first" placeholder) when the user clicks Connect.
+  const extraCalendarRefreshers = [];
+
+  function requestToken(interactive) { return primaryAuth.connect(interactive); }
+  function ensureToken() { return primaryAuth.ensureToken(); }
+  function clearCachedToken() { primaryAuth.signOut(); }
+
+  /* Every Google call the primary widgets make. Unqualified `api(...)` still
+     means "the board's own account", which is what the hundred call sites
+     below have always meant by it; a widget signed in to a second account
+     calls through its own auth object instead. */
+  function api(url, options) { return primaryAuth.api(url, options); }
 
   // Read by the Connections panel so Google Calendar's row reports a real
   // connection state instead of a hardcoded one. Everything else it lists is
   // a placeholder with no auth of its own yet.
-  window.__gcalIsAuthed = function () { return !!authed; };
+  window.__gcalIsAuthed = function () { return primaryAuth.isAuthed(); };
 
-  /* Sign-out for the Google side. accessToken/tokenExpiry/authed are private
-     to this closure and nothing ever reset them — until now the app had no
-     sign-out at all, so `authed` went true once and stayed true for the life
-     of the page. Exposed on window rather than called inline because the
+  /* Sign-out for the Google side. The token and its flags are private to the
+     auth object now, so this is a delegate; it stays on window because the
      auth/sync block that needs it parses thousands of lines before this one
      and has no other way in. */
   window.__gcalSignOut = function () {
-    try {
-      if (accessToken && window.google && window.google.accounts &&
-          window.google.accounts.oauth2) {
-        window.google.accounts.oauth2.revoke(accessToken, function () {});
-      }
-    } catch (e) {}
-    accessToken = null;
-    tokenExpiry = 0;
-    authed = false;
-    clearCachedToken();
-    try { showSignedIn(false); } catch (e) {}
+    primaryAuth.signOut();
+    showSignedIn(false);
   };
 
-  function showSignedIn(on) {
-    signedOutEl.hidden = !!on;
-    signedInEl.hidden = !on;
-    // The Google Tasks widget has its own signed-out block and its own add
-    // button, both outside this subtree, so nothing else toggles them — and
-    // there is no point offering to create a task that can't be sent anywhere.
-    const gtOut = el("gtaskSignedOut");
-    if (gtOut) gtOut.hidden = !!on;
-    const gtBtn = el("addGTaskBtn");
-    if (gtBtn) gtBtn.hidden = !on;
-  }
-
-  /* Everything connect() does on success, minus the token request — for a
-     silent mint that lands after its caller stopped waiting. Safe to run at
-     any time: refreshAll() guards against overlapping runs itself, and
-     showSignedIn is idempotent. */
   function adoptLateToken() {
     try { showSignedIn(true); } catch (e) {}
     try { refreshAll(); } catch (e) {}
@@ -23772,30 +23813,15 @@
       authHint.textContent = "";
       return;
     }
-    // A cached, still-valid token from earlier in this browser session means
-    // a reload costs no click at all. Otherwise try a silent mint, and only
-    // fall back to the button when that fails — the normal "not connected
-    // yet" case, not an error worth surfacing.
-    const cached = readCachedToken();
-    if (cached) {
-      accessToken = cached.t;
-      tokenExpiry = cached.e;
-      authed = true;
-      showSignedIn(true);
-      try {
-        await refreshAll();
-        return;
-      } catch (e) {
-        // Cached token turned out to be unusable — fall through to sign-in.
-        clearCachedToken();
-        accessToken = null; tokenExpiry = 0;
-      }
-    }
-    /* Broker before the silent re-mint, for the same reason ensureToken()
-       prefers it: this is the path that reliably works on a new tab, which is
-       the case that used to demand a Google click on every single one. */
+    /* A cached, still-valid token from earlier in this browser session means
+       a reload costs no click at all; failing that ensureToken() tries the
+       broker and then a silent mint, in that order and for the same reason it
+       always does -- the broker is the path that reliably works on a new tab,
+       which is the case that used to demand a Google click on every one. Only
+       when all of that fails does the Connect button appear, which is the
+       normal "not connected yet" state rather than an error worth surfacing. */
     try {
-      if (await mintFromBroker()) {
+      if (await primaryAuth.ensureToken()) {
         showSignedIn(true);
         await refreshAll();
         extraCalendarRefreshers.forEach(function (fn) { try { fn(); } catch (e) {} });
@@ -23943,7 +23969,7 @@
 
     async function refresh() {
       label.textContent = MON[anchor2.getMonth()] + " " + anchor2.getFullYear();
-      if (!authed) {
+      if (!primaryAuth.isAuthed()) {
         fillWithConnectButton(viewport, "Connect Google Calendar");
         return;
       }
@@ -24025,7 +24051,7 @@
     if (!viewport) return;
 
     function refresh() {
-      if (!authed) {
+      if (!primaryAuth.isAuthed()) {
         fillWithConnectButton(viewport, "Connect Google Tasks");
         return;
       }
