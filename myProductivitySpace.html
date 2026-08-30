@@ -23732,6 +23732,14 @@
     openSubpage(nsId, title);
   }
 
+  // Reachable from an extra Calendar widget's own Create button, which has no
+  // other way into this closure.
+  window.__calOpenCreate = function () {
+    closeViewMenu();
+    if (createPanel.hidden) openChooser();
+    else closePanel();
+  };
+
   createBtn.addEventListener("click", function () {
     closeViewMenu();
     if (createPanel.hidden) openChooser();
@@ -23748,7 +23756,12 @@
      Only CREATE works this way. Opening a task that already exists still goes
      to the modal (openTaskForm), which has tags and the subtask tree to show
      as well and doesn't fit in a widget column. */
-  const inlineComposerEl = el("gtaskInlineComposer");
+  /* `let`, for the same reason viewport and taskListEl are: an extra Tasks
+     widget opens the composer into its OWN slot, so a task typed there
+     appears where you are looking rather than in a widget that may be three
+     screens away. */
+  let inlineComposerEl = el("gtaskInlineComposer");
+  const primaryComposerEl = inlineComposerEl;
   let inlineComposer = null;
   // Tags picked before the task exists — same staging pattern as the New
   // task modal's own pendingTags (see buildTagsSection/buildStagingTagRow).
@@ -23760,6 +23773,9 @@
     inlineComposerPendingTags = {};
     inlineComposerEl.innerHTML = "";
     inlineComposerEl.hidden = true;
+    // Back to the main widget, so the next Add a task from anywhere else
+    // starts from a known place rather than the last widget that borrowed it.
+    inlineComposerEl = primaryComposerEl;
   }
 
   async function commitInlineComposer() {
@@ -24150,7 +24166,7 @@
   document.addEventListener("pointerdown", function (e) {
     const t = e.target && e.target.nodeType === 1 ? e.target : null;
     if (inlineComposer) {
-      if (t && t.closest("#gtaskInlineComposer, #addGTaskBtn, .gt-popover, .gt-time-list")) return;
+      if (t && t.closest("#gtaskInlineComposer, #addGTaskBtn, [data-role=\"composer\"], [data-act=\"add-task\"], .gt-popover, .gt-time-list")) return;
       commitInlineComposer();
       return;
     }
@@ -24172,6 +24188,17 @@
       openInlineComposer();
     });
   }
+
+  /* "Add a task" from an extra Tasks widget. The composer is a singleton --
+     one task is being typed at a time, whichever widget it was started from
+     -- so rather than a second one, the existing composer is pointed at that
+     widget's own slot for as long as it is open. Closing puts it back. */
+  window.__gtaskComposeInto = function (host) {
+    if (inlineComposer) { closeInlineComposer(); }
+    inlineComposerEl = host || primaryComposerEl;
+    openInlineComposer();
+  };
+  window.__gtaskComposerHome = function () { inlineComposerEl = primaryComposerEl; };
 
   // Click-away and Escape both dismiss. The backdrop covers the whole viewport,
   // so a click anywhere outside the panel lands on it.
@@ -24551,6 +24578,7 @@
               '<span data-role="viewlabel">Month</span>' +
               '<svg class="cal-viewtoggle-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
             '</button>' +
+            '<button type="button" class="cal-create-btn" data-act="create">+ Create</button>' +
           '</div>' +
           '<div class="cal-navbar">' +
             '<button type="button" class="cal-navbtn" data-act="prev" title="Previous">&#9664;</button>' +
@@ -24660,6 +24688,15 @@
       ctx.view = ORDER[(ORDER.indexOf(ctx.view) + 1) % ORDER.length];
       refresh();
     });
+    /* Create opens the same chooser the main calendar's button does. The
+       panel is a modal over the whole page, so there is nothing per-widget
+       about it -- and whatever gets created lands in the one Google calendar
+       both widgets are windows onto, so both redraw. */
+    const createBtn2 = wrap.querySelector('[data-act="create"]');
+    if (createBtn2) createBtn2.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (window.__calOpenCreate) window.__calOpenCreate();
+    });
 
     extraCalendarRefreshers.push(refresh);
     refresh();
@@ -24698,6 +24735,8 @@
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
+          '<button type="button" class="add-task-btn" data-act="add-task"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.3V12a9 9 0 1 1-5.3-8.2"/><path d="M8.5 11.5l3 3 9-9"/><path d="M18.5 16v6"/><path d="M15.5 19h6"/></svg>Add a task</button>' +
+          '<div data-role="composer" hidden></div>' +
           '<div class="cal-tasklist" data-role="viewport"><div class="cal-loading">Loading&#8230;</div></div>' +
         '</div>' +
       '</div>' +
@@ -24721,15 +24760,29 @@
        pill, the tag bar, the timer -- and gains whatever the main list gains
        next, because there is no second implementation left to fall behind.
 
-       Creating and editing still belong to the main widget: the composer and
-       the inline editor are singletons keyed to its own elements. An extra
-       view is a window onto the one Google task list, which is what an
-       account has exactly one of. */
+       Adding a task works here too: the composer is a singleton -- one task
+       is being typed at a time whichever widget started it -- so it is
+       pointed at this widget's own slot while it is open, and put back on
+       close. An extra view is a window onto the one Google task list, which
+       is what an account has exactly one of. */
+    const addBtn = el.querySelector('[data-act="add-task"]');
+    const composerHost = el.querySelector('[data-role="composer"]');
+    if (addBtn && composerHost) {
+      addBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        // The composer comes HERE rather than the user being sent to the main
+        // widget for it -- a task typed in this list should appear in it.
+        if (window.__gtaskComposeInto) window.__gtaskComposeInto(composerHost);
+      });
+    }
+
     function refresh() {
       if (!primaryAuth.isAuthed()) {
+        if (addBtn) addBtn.hidden = true;
         fillWithConnectButton(viewport, "Connect Google Tasks");
         return;
       }
+      if (addBtn) addBtn.hidden = false;
       renderTasksInto(viewport);
     }
 
