@@ -18868,11 +18868,20 @@
   const viewToggleBackdrop = el("calViewToggleBackdrop");
   const createBtn = el("calCreateBtn");
   const createPanel = el("calCreatePanel");
-  const viewport = el("calViewport");
-  const rangeLabel = el("calRangeLabel");
+  /* `let`, not `const`: an extra Calendar widget renders through the SAME
+     renderers as the primary one by pointing these at its own elements for
+     the length of one synchronous draw (see renderCalendarInto). That is what
+     lets a second calendar be the real thing -- day/week/month, live event
+     boxes, drag, click-to-edit -- instead of a cut-down copy that drifts
+     further behind the original every time the original grows. */
+  let viewport = el("calViewport");
+  let rangeLabel = el("calRangeLabel");
   const prevBtn = el("calPrevBtn");
   const nextBtn = el("calNextBtn");
-  const taskListEl = el("calTaskList");
+  // `let` for the same reason viewport is (see renderCalendarInto): an extra
+  // Tasks widget draws through the primary's own renderTasks by pointing this
+  // at its own list for one synchronous call.
+  let taskListEl = el("calTaskList");
 
   // Local copy of the Reading List's own edge-autoscroll helper — that one
   // lives inside a separate <script> block's closure and isn't reachable
@@ -19269,12 +19278,22 @@
     showSignedIn(false);
   };
 
+  /* A token that arrives after the watchdog already rejected. The account is
+     genuinely signed in at that point -- the token is good and cached -- but
+     the caller gave up and painted a Connect button over a working session,
+     and nothing else would ever repair it. This is the state that leaves the
+     main Calendar and Tasks widgets asking to connect while the extra views
+     beside them are happily showing data.
+
+     Wired here rather than inside the auth object because repairing the UI is
+     this module's business, not the token's. */
   function adoptLateToken() {
     try { showSignedIn(true); } catch (e) {}
     try { refreshAll(); } catch (e) {}
     extraCalendarRefreshers.forEach(function (fn) { try { fn(); } catch (e) {} });
     extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
   }
+  primaryAuth.onLateToken(adoptLateToken);
 
   async function connect(interactive) {
     try {
@@ -19897,6 +19916,40 @@
     rangeLabel.textContent = rangeText();
     if (view === "month") renderMonth();
     else renderTimeGrid();
+  }
+
+  /* Draw the calendar as some OTHER widget, then put everything back.
+
+     The renderers above read the module's own view/anchor/events/viewport
+     directly, at nineteen separate points between them. Threading a context
+     through all nineteen would be a large, mechanical, error-prone edit;
+     swapping the five variables around one synchronous call is small enough
+     to read in one go and cannot leave them swapped, because the restore is
+     in a finally and nothing in the render path awaits.
+
+     The one rule this depends on: renderGrid and everything under it must
+     stay synchronous. If a renderer ever gains an await, two widgets drawing
+     at once would see each other's state -- and this comment is the warning. */
+  /* The task list, drawn into some other widget's element. Same contract and
+     same warning as renderCalendarInto: synchronous only. renderTasks touches
+     exactly one piece of module state that matters here -- taskListEl -- so
+     this swap is even narrower than the calendar's. */
+  function renderTasksInto(listEl) {
+    const saved = taskListEl;
+    taskListEl = listEl;
+    try { renderTasks(); }
+    finally { taskListEl = saved; }
+  }
+
+  function renderCalendarInto(ctx) {
+    const sv = viewport, sr = rangeLabel, svw = view, sa = anchor, se = events;
+    viewport = ctx.viewport;
+    rangeLabel = ctx.rangeLabel || document.createElement("span");
+    view = ctx.view;
+    anchor = ctx.anchor;
+    events = ctx.events || [];
+    try { renderGrid(); }
+    finally { viewport = sv; rangeLabel = sr; view = svw; anchor = sa; events = se; }
   }
 
   /* ---------------- tag pills on task rows ----------------
@@ -24045,6 +24098,12 @@
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
+          '<div class="cal-toolbar">' +
+            '<button type="button" class="cal-viewtoggle-btn" data-act="cycle-view">' +
+              '<span data-role="viewlabel">Month</span>' +
+              '<svg class="cal-viewtoggle-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
+            '</button>' +
+          '</div>' +
           '<div class="cal-navbar">' +
             '<button type="button" class="cal-navbtn" data-act="prev" title="Previous">&#9664;</button>' +
             '<span class="cal-rangelabel" data-role="label"></span>' +
@@ -24069,93 +24128,92 @@
     return h + (m ? ":" + String(m).padStart(2, "0") : "") + ap;
   }
 
+  /* An extra Calendar widget, drawn by the REAL renderers.
+
+     It used to be a hand-written month grid with no view toggle, no create,
+     no editing and no drag -- a second implementation of the calendar that
+     could only fall further behind the first. Now it keeps its own view,
+     date and events, and hands them to renderCalendarInto, which is the
+     primary widget's own drawing code. Everything the main calendar can do
+     inside its grid, this does, because it is the same code: event boxes
+     with their pills, click to edit, drag to move, resize by the edges.
+
+     What stays per-widget is what should: which day you are looking at and
+     in which view. Two calendars side by side can show today's hours and
+     next month, and neither disturbs the other. */
   function wireExtraCalendarWidget(id) {
     const wrap = document.getElementById(id + "ColWrap");
     if (!wrap) return;
     const navPrev = wrap.querySelector('[data-act="prev"]');
     const navNext = wrap.querySelector('[data-act="next"]');
     const navToday = wrap.querySelector('[data-act="today"]');
+    const cycleBtn = wrap.querySelector('[data-act="cycle-view"]');
+    const viewLabel = wrap.querySelector('[data-role="viewlabel"]');
     const label = wrap.querySelector('[data-role="label"]');
-    const viewport = wrap.querySelector('[data-role="viewport"]');
-    let anchor2 = startOfDay(new Date());
+    const vp = wrap.querySelector('[data-role="viewport"]');
 
-    function renderGrid(gridStart, evs) {
-      const today = calToday();
-      const byDay = {};
-      evs.forEach(function (ev) {
-        const key = startOfDay(ev.start).toDateString();
-        (byDay[key] || (byDay[key] = [])).push(ev);
-      });
-      const head = document.createElement("div");
-      head.className = "cal-month-head";
-      DOW.forEach(function (d) {
-        const s = document.createElement("span");
-        s.textContent = d;
-        head.appendChild(s);
-      });
-      const grid = document.createElement("div");
-      grid.className = "cal-month-grid";
-      for (let i = 0; i < 42; i++) {
-        const day = addDays(gridStart, i);
-        const cell = document.createElement("div");
-        cell.className = "cal-daycell" +
-          (day.getMonth() !== anchor2.getMonth() ? " other-month" : "") +
-          (day.toDateString() === today.toDateString() ? " today" : "");
-        const num = document.createElement("span");
-        num.className = "cal-daynum";
-        num.textContent = day.getDate();
-        cell.appendChild(num);
-        const dayEvs = byDay[day.toDateString()] || [];
-        dayEvs.slice(0, 3).forEach(function (ev) {
-          const chip = document.createElement("span");
-          chip.className = "cal-chip";
-          chip.textContent = (ev.allDay ? "" : fmtChipTime(ev.start) + " ") + ev.title;
-          chip.title = ev.title;
-          cell.appendChild(chip);
-        });
-        if (dayEvs.length > 3) {
-          const more = document.createElement("span");
-          more.className = "cal-chip more";
-          more.textContent = "+" + (dayEvs.length - 3) + " more";
-          cell.appendChild(more);
-        }
-        grid.appendChild(cell);
-      }
-      viewport.innerHTML = "";
-      viewport.appendChild(head);
-      viewport.appendChild(grid);
+    const ctx = { viewport: vp, rangeLabel: label, view: "month", anchor: calToday(), events: [] };
+
+    // The same three views the primary offers, cycled by one button rather
+    // than a menu -- there is no room in an extra widget's header for the
+    // full toggle, and three is few enough to step through.
+    const ORDER = ["day", "week", "month"];
+    function setViewLabel() {
+      if (viewLabel) viewLabel.textContent = VIEW_LABELS[ctx.view] || ctx.view;
+    }
+
+    /* Its own window onto the same calendar. The range comes from whatever
+       view it is in, so a day view fetches a day and a month view a month,
+       and one widget changing date never refetches the other. */
+    function rangeFor() {
+      if (ctx.view === "day") return { start: startOfDay(ctx.anchor), end: addDays(startOfDay(ctx.anchor), 1) };
+      if (ctx.view === "week") { const w = startOfWeek(ctx.anchor); return { start: w, end: addDays(w, 7) }; }
+      const g = startOfWeek(startOfMonth(ctx.anchor));
+      return { start: g, end: addDays(g, 42) };
     }
 
     async function refresh() {
-      label.textContent = MON[anchor2.getMonth()] + " " + anchor2.getFullYear();
+      setViewLabel();
       if (!primaryAuth.isAuthed()) {
-        fillWithConnectButton(viewport, "Connect Google Calendar");
+        fillWithConnectButton(vp, "Connect Google Calendar");
         return;
       }
-      viewport.innerHTML = '<div class="cal-loading">Loading&#8230;</div>';
+      vp.innerHTML = '<div class="cal-loading">Loading&#8230;</div>';
       try {
-        const first = startOfMonth(anchor2);
-        const gridStart = startOfWeek(first);
-        const rangeEnd = addDays(gridStart, 42);
+        const r = rangeFor();
+        // A day of slack at each end, for the same reason the primary fetch
+        // takes it: the range is dates on screen, the fetch is instants, and
+        // a chosen time zone moves the boundary between them.
         const url = CAL_API + "/calendars/primary/events" +
-          "?timeMin=" + encodeURIComponent(gridStart.toISOString()) +
-          "&timeMax=" + encodeURIComponent(rangeEnd.toISOString()) +
+          "?timeMin=" + encodeURIComponent(addDays(r.start, -1).toISOString()) +
+          "&timeMax=" + encodeURIComponent(addDays(r.end, 1).toISOString()) +
           "&singleEvents=true&orderBy=startTime&maxResults=250";
         const data = await api(url);
-        const evs = ((data && data.items) || [])
+        ctx.events = ((data && data.items) || [])
           .filter(function (ev) { return ev.status !== "cancelled" && ev.start; })
           .map(normalizeEvent);
-        renderGrid(gridStart, evs);
+        renderCalendarInto(ctx);
       } catch (e) {
-        viewport.innerHTML = '<div class="cal-loading">Couldn’t load events.</div>';
+        vp.innerHTML = '<div class="cal-loading">Couldn\u2019t load events.</div>';
       }
     }
 
-    navPrev.addEventListener("click", function () { anchor2 = new Date(anchor2.getFullYear(), anchor2.getMonth() - 1, 1); refresh(); });
-    navNext.addEventListener("click", function () { anchor2 = new Date(anchor2.getFullYear(), anchor2.getMonth() + 1, 1); refresh(); });
-    navToday.addEventListener("click", function () { anchor2 = startOfDay(new Date()); refresh(); });
-    extraCalendarRefreshers.push(refresh);
+    function step(dir) {
+      if (ctx.view === "day") ctx.anchor = addDays(ctx.anchor, dir);
+      else if (ctx.view === "week") ctx.anchor = addDays(ctx.anchor, dir * 7);
+      else ctx.anchor = new Date(ctx.anchor.getFullYear(), ctx.anchor.getMonth() + dir, 1);
+      refresh();
+    }
 
+    navPrev.addEventListener("click", function () { step(-1); });
+    navNext.addEventListener("click", function () { step(1); });
+    navToday.addEventListener("click", function () { ctx.anchor = calToday(); refresh(); });
+    if (cycleBtn) cycleBtn.addEventListener("click", function () {
+      ctx.view = ORDER[(ORDER.indexOf(ctx.view) + 1) % ORDER.length];
+      refresh();
+    });
+
+    extraCalendarRefreshers.push(refresh);
     refresh();
   }
 
@@ -24209,27 +24267,22 @@
     const viewport = el.querySelector('[data-role="viewport"]');
     if (!viewport) return;
 
+    /* The real task rows, not a second simplified list. renderTasksInto hands
+       the primary widget's own renderTasks this widget's element, so an extra
+       view gets everything a task row carries -- the complete circle, the due
+       pill, the tag bar, the timer -- and gains whatever the main list gains
+       next, because there is no second implementation left to fall behind.
+
+       Creating and editing still belong to the main widget: the composer and
+       the inline editor are singletons keyed to its own elements. An extra
+       view is a window onto the one Google task list, which is what an
+       account has exactly one of. */
     function refresh() {
       if (!primaryAuth.isAuthed()) {
         fillWithConnectButton(viewport, "Connect Google Tasks");
         return;
       }
-      viewport.innerHTML = "";
-      if (!tasks.length) { viewport.appendChild(buildTasksEmptyState()); return; }
-      // Same row classes the main list uses, so an extra view looks like the
-      // widget it mirrors rather than a second, unrelated list style.
-      tasks.forEach(function (t) {
-        const row = document.createElement("div");
-        row.className = "cal-taskrow";
-        const top = document.createElement("div");
-        top.className = "cal-taskrow-top";
-        const title = document.createElement("span");
-        title.className = "cal-taskrow-title";
-        title.textContent = t.title || "(untitled)";
-        top.appendChild(title);
-        row.appendChild(top);
-        viewport.appendChild(row);
-      });
+      renderTasksInto(viewport);
     }
 
     extraTasksViews.push({ id: id, refresh: refresh });
