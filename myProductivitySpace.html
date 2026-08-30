@@ -20414,12 +20414,12 @@
     const bar = buildTagRowCore(
       function () { return tagMeta(nsId); },
       function (field, value) { setTagMeta(nsId, field, value, title); refreshTagSurfaces(); },
-      // hideEmpty: this is the COLLAPSED row's tag bar, so it reports only
-      // what's actually set; every unset slot is offered by the row's inline
-      // editor instead. Duration is the exception -- see alwaysShowDuration.
-      // This builder is called from exactly one place (renderTasks), so it is
-      // inherently the Google Tasks row and needs no kind of its own.
-      { hideEmpty: true, alwaysShowDuration: true }
+      /* hideEmpty: this is the COLLAPSED row's tag bar, so it reports only
+         what is actually SET. An unset tag on a settled row is an invitation
+         to edit that leads nowhere -- editing happens in the row's own inline
+         editor, which offers every slot including Duration. So a row with no
+         duration shows no duration, and a row with one shows it. */
+      { hideEmpty: true }
     );
     bar.addEventListener("mousedown", function (e) { e.stopPropagation(); });
     // The row this tagbar lives in is HTML5 draggable=true (for drag-to-
