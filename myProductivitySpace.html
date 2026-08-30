@@ -19590,24 +19590,26 @@
      variable instead of a rewrite: every fetch below already goes through
      api(), so pointing api() at a different account is the entire mechanism,
      and nothing that renders has to know it happened. */
-  /* One account per widget, not one for the board. The calendar can be
-     reading a personal account while the task list reads a work one, which is
-     the thing worth having and the thing a single global switch could not
-     express.
+  /* One account per WIDGET.
 
-     Both start as the account you signed in with, and normally stay there --
-     the automatic sign-in is the default and nothing here disturbs it. */
-  let calAuth = primaryAuth, tasksAuth = primaryAuth;
-  let calAccountEmail = "", tasksAccountEmail = "";
+     This was per surface for a while -- one account for calendars, one for
+     task lists -- and that is wrong the moment there are two calendars: you
+     switch one to your work account and the other silently follows, because
+     they were never separate things. Keyed by widget id, two calendars can
+     sit side by side on two accounts, which is the only reason to have two.
 
-  /* Which account a request belongs to is not a question the call sites have
-     to answer, because the URL already knows: everything under the Tasks API
-     is the task list's, everything else is the calendar's. One rule, applied
-     here, and the hundred existing api() calls keep working untouched. */
-  function authForUrl(url) {
-    return String(url).indexOf(TASKS_API) === 0 ? tasksAuth : calAuth;
+     An absent entry means the account you signed in with, so a widget that
+     has never been switched costs nothing and needs no entry at all. */
+  const widgetAuth = {};            // widgetId -> auth object
+  const widgetAccountEmail = {};    // widgetId -> address, for the settings row
+  function authFor(id) { return widgetAuth[id] || primaryAuth; }
+
+  /* The default account, used by everything that is not speaking for a
+     particular widget: creating an event from the shared modal, completing a
+     task, the Connect button. Unqualified api() means this. */
+  function api(url, options) {
+    return authFor(String(url).indexOf(TASKS_API) === 0 ? "unschedTasks" : "cal").api(url, options);
   }
-  function api(url, options) { return authForUrl(url).api(url, options); }
 
   // Sign-in and token plumbing still means the board's own account: it is the
   // one the Connect button connects and the one the broker refreshes.
@@ -19622,12 +19624,11 @@
      still live and still brokered. Otherwise Google's account chooser opens,
      and whoever is picked becomes that surface's account until it is
      switched back. The other surface is left exactly as it was. */
-  async function useGoogleAccount(surface, goHome) {
-    const isTasks = surface === "tasks";
+  async function useGoogleAccount(widgetId, goHome) {
     if (goHome) {
-      if (isTasks) { tasksAuth = primaryAuth; tasksAccountEmail = ""; }
-      else { calAuth = primaryAuth; calAccountEmail = ""; }
-      await refreshAll();
+      delete widgetAuth[widgetId];
+      delete widgetAccountEmail[widgetId];
+      await refreshAllFor(widgetId);
       return { ok: true, email: "" };
     }
     try {
@@ -19638,18 +19639,28 @@
          what decides whose account this actually is. The cache key is per
          surface so the calendar's second account and the task list's do not
          overwrite each other in sessionStorage. */
-      const next = createGoogleAuth("unbleep-gcal-token:" + surface, { selectAccount: true });
+      const next = createGoogleAuth("unbleep-gcal-token:" + widgetId, { selectAccount: true });
       await next.connect(true);
       const who = await next.whoAmI();
-      if (isTasks) { tasksAuth = next; tasksAccountEmail = who || "another account"; }
-      else { calAuth = next; calAccountEmail = who || "another account"; }
-      await refreshAll();
-      return { ok: true, email: isTasks ? tasksAccountEmail : calAccountEmail };
+      widgetAuth[widgetId] = next;
+      widgetAccountEmail[widgetId] = who || "another account";
+      await refreshAllFor(widgetId);
+      return { ok: true, email: widgetAccountEmail[widgetId] };
     } catch (e) {
-      // A cancelled chooser must leave this surface exactly as it was, still
+      // A cancelled chooser must leave this widget exactly as it was, still
       // reading the account it was reading a moment ago.
       return { error: String((e && e.message) || e) };
     }
+  }
+
+  /* Redraw only what changed accounts. Switching one calendar must not
+     refetch the other, which is now reading a different account and would
+     answer differently -- so the primary widgets go through refreshAll and
+     an extra one refreshes itself. */
+  const extraRefreshById = {};
+  async function refreshAllFor(widgetId) {
+    if (extraRefreshById[widgetId]) { await extraRefreshById[widgetId](); return; }
+    await refreshAll();
   }
 
   // Read by the Connections panel so Google Calendar's row reports a real
@@ -19804,8 +19815,22 @@
     // availability, visibility, reminders) without a second GET per open.
     return {
       id: ev.id, title: ev.summary || "(no title)",
-      allDay: allDay, start: start, end: end, kind: "event", raw: ev
+      allDay: allDay, start: start, end: end, kind: "event", raw: ev,
+      /* Which account this event came out of. Stamped at normalisation and
+         carried for life, so dragging or deleting it later writes back to
+         the calendar it actually belongs to -- not whichever account some
+         other widget happens to be showing. Set by the caller, since only
+         the fetch knows whose request it was answering. */
+      __auth: null
     };
+  }
+  function stampAuth(list, auth) {
+    list.forEach(function (e) { e.__auth = auth; });
+    return list;
+  }
+  // The account an event belongs to, falling back to the board's own.
+  function apiForEvent(ev, url, options) {
+    return (ev && ev.__auth ? ev.__auth : primaryAuth).api(url, options);
   }
 
   async function fetchEvents() {
@@ -19821,14 +19846,15 @@
       "?timeMin=" + encodeURIComponent(from.toISOString()) +
       "&timeMax=" + encodeURIComponent(to.toISOString()) +
       "&singleEvents=true&orderBy=startTime&maxResults=250";
-    const data = await api(url);
-    events = ((data && data.items) || [])
+    const auth = authFor("cal");
+    const data = await auth.api(url);
+    events = stampAuth(((data && data.items) || [])
       .filter(function (ev) { return ev.status !== "cancelled" && ev.start; })
-      .map(normalizeEvent);
+      .map(normalizeEvent), auth);
   }
 
   async function fetchTasks() {
-    const data = await api(TASKS_API + "/lists/@default/tasks?showCompleted=false&maxResults=100");
+    const data = await authFor("unschedTasks").api(TASKS_API + "/lists/@default/tasks?showCompleted=false&maxResults=100");
     tasks = ((data && data.items) || []).filter(function (t) { return t.title; });
   }
 
@@ -20090,7 +20116,7 @@
     const prevStart = ev.start, prevEnd = ev.end;
     ev.start = startAt; ev.end = endAt;
     renderGrid();
-    api(CAL_API + "/calendars/primary/events/" + encodeURIComponent(ev.id), {
+    apiForEvent(ev, CAL_API + "/calendars/primary/events/" + encodeURIComponent(ev.id), {
       method: "PATCH",
       body: JSON.stringify({
         start: { dateTime: gcalLocalIso(startAt), timeZone: gcalTimeZone() },
@@ -20359,11 +20385,14 @@
      same warning as renderCalendarInto: synchronous only. renderTasks touches
      exactly one piece of module state that matters here -- taskListEl -- so
      this swap is even narrower than the calendar's. */
-  function renderTasksInto(listEl) {
-    const saved = taskListEl;
+  function renderTasksInto(listEl, list) {
+    const savedEl = taskListEl, savedTasks = tasks;
     taskListEl = listEl;
+    // A widget on another account brings its own list; one on the signed-in
+    // account shares the main widget's, which is the same list anyway.
+    if (list) tasks = list;
     try { renderTasks(); }
-    finally { taskListEl = saved; }
+    finally { taskListEl = savedEl; tasks = savedTasks; }
   }
 
   function renderCalendarInto(ctx) {
@@ -24313,10 +24342,8 @@
      list's. They are two views of one connection -- Google gives an account
      one calendar and one task list -- so switching from either switches both,
      and saying so plainly beats letting someone discover it. */
-  function buildAccountField(body, surface) {
-    const current = function () {
-      return surface === "tasks" ? tasksAccountEmail : calAccountEmail;
-    };
+  function buildAccountField(body, widgetId) {
+    const current = function () { return widgetAccountEmail[widgetId] || ""; };
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const lab = document.createElement("label");
@@ -24352,7 +24379,7 @@
     btn.addEventListener("click", async function () {
       btn.disabled = true;
       btn.textContent = "Choosing\u2026";
-      const r = await useGoogleAccount(surface, false);
+      const r = await useGoogleAccount(widgetId, false);
       btn.disabled = false;
       btn.textContent = "Switch\u2026";
       if (r.error) { note.textContent = r.error; return; }
@@ -24361,7 +24388,7 @@
       note.textContent = "";
     });
     reset.addEventListener("click", async function () {
-      await useGoogleAccount(surface, true);
+      await useGoogleAccount(widgetId, true);
       who.textContent = "Signed-in account";
       reset.hidden = true;
       note.textContent = "";
@@ -24369,9 +24396,7 @@
 
     const explain = document.createElement("div");
     explain.className = "cal-hint";
-    explain.textContent = surface === "tasks"
-      ? "Only this task list changes; the calendar keeps its own account. A switched account lasts for this browser session."
-      : "Only this calendar changes; the task list keeps its own account. A switched account lasts for this browser session.";
+    explain.textContent = "Only this widget changes. Every other widget, including another calendar or task list, keeps its own account. A switched account lasts for this browser session.";
     wrap.appendChild(explain);
     body.appendChild(wrap);
   }
@@ -24442,7 +24467,7 @@
     // have to know that the setting lives in the calendar.
     window.__widgetSettings.register("unschedTasks", {
       title: "Tasks settings",
-      build: function (body) { buildAccountField(body, "tasks"); }
+      build: function (body) { buildAccountField(body, "unschedTasks"); }
     });
   }, 0);
 
@@ -24692,10 +24717,11 @@
           "?timeMin=" + encodeURIComponent(addDays(r.start, -1).toISOString()) +
           "&timeMax=" + encodeURIComponent(addDays(r.end, 1).toISOString()) +
           "&singleEvents=true&orderBy=startTime&maxResults=250";
-        const data = await api(url);
-        ctx.events = ((data && data.items) || [])
+        const auth = authFor(id);
+        const data = await auth.api(url);
+        ctx.events = stampAuth(((data && data.items) || [])
           .filter(function (ev) { return ev.status !== "cancelled" && ev.start; })
-          .map(normalizeEvent);
+          .map(normalizeEvent), auth);
         renderCalendarInto(ctx);
       } catch (e) {
         vp.innerHTML = '<div class="cal-loading">Couldn\u2019t load events.</div>';
@@ -24744,6 +24770,10 @@
     }, 0);
 
     extraCalendarRefreshers.push(refresh);
+    // Registered by id so switching THIS widget's account redraws only this
+    // widget -- the others are on different accounts and would answer
+    // differently to the same request.
+    extraRefreshById[id] = refresh;
     refresh();
   }
 
@@ -24821,26 +24851,44 @@
       });
     }
 
-    function refresh() {
+    /* Its own copy of the list, because it may be reading a different
+       account than the main widget. On the signed-in account this is the
+       same list twice, which costs one request and keeps the two paths
+       identical rather than special-casing the common case. */
+    let ownTasks = null;
+
+    async function refresh() {
       if (!primaryAuth.isAuthed()) {
         if (addBtn) addBtn.hidden = true;
         fillWithConnectButton(viewport, "Connect Google Tasks");
         return;
       }
       if (addBtn) addBtn.hidden = false;
-      renderTasksInto(viewport);
+      const auth = widgetAuth[id];
+      if (!auth) {
+        // Not switched: share the main widget's already-fetched list.
+        ownTasks = null;
+        renderTasksInto(viewport);
+        return;
+      }
+      try {
+        const data = await auth.api(TASKS_API + "/lists/@default/tasks?showCompleted=false&maxResults=100");
+        ownTasks = ((data && data.items) || []).filter(function (t) { return t.title; });
+      } catch (e) { ownTasks = []; }
+      renderTasksInto(viewport, ownTasks);
     }
 
     setTimeout(function () {
       if (window.__widgetSettings) {
         window.__widgetSettings.register(id, {
           title: "Tasks settings",
-          build: function (body) { buildAccountField(body, "tasks"); }
+          build: function (body) { buildAccountField(body, id); }
         });
       }
     }, 0);
 
     extraTasksViews.push({ id: id, refresh: refresh });
+    extraRefreshById[id] = refresh;
     refresh();
   }
 
