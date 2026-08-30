@@ -19264,6 +19264,26 @@
     };
   }
 
+  /* Flip both Google widgets between their connected and signed-out states.
+
+     Restored after being lost in the auth extraction, which is a mistake
+     worth naming: every call to it then threw a ReferenceError, so the
+     widgets could never show themselves as connected NO MATTER how good the
+     token was -- and, because the throw happened before the line that
+     explains a failure, the Connect button could not even say why it was
+     there. A missing function looked exactly like a broken Google login. */
+  function showSignedIn(on) {
+    signedOutEl.hidden = !!on;
+    signedInEl.hidden = !on;
+    // The Google Tasks widget has its own signed-out block and its own add
+    // button, both outside this subtree, so nothing else toggles them — and
+    // there is no point offering to create a task that can't be sent anywhere.
+    const gtOut = el("gtaskSignedOut");
+    if (gtOut) gtOut.hidden = !!on;
+    const gtBtn = el("addGTaskBtn");
+    if (gtBtn) gtBtn.hidden = !on;
+  }
+
   // The board's own Google account: the one that owns the refresh token, and
   // the one every existing surface here has always meant by "signed in".
   const primaryAuth = createGoogleAuth("unbleep-gcal-token", { useBroker: true });
