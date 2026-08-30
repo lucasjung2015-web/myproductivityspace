@@ -11475,12 +11475,14 @@
           }
         });
 
-        // The section-level hide/move pair only means something once a
-        // slot actually stacks more than one widget — with just one, its
-        // own widget-header-controls already hide and drag it, and a
-        // second, redundant chip pinned to the same corner just added
-        // visual noise for a control the widget-level one already covers.
-        if (slot.length > 1) slotEl.appendChild(buildSectionControls(slot));
+        /* On every section, not only the stacked ones. The pair was once
+           gated on slot.length > 1, on the reasoning that a lone widget's
+           own header controls already move and hide it -- true, but it made
+           the board inconsistent in a way that reads as breakage: hover two
+           stacked Pages and the chip appears, hover the Calendar beside them
+           and nothing does. A control that exists on some sections and not
+           others is harder to trust than one that is simply always there. */
+        slotEl.appendChild(buildSectionControls(slot));
         frag.appendChild(slotEl);
 
         if (slotIdx < layout.length - 1) {
