@@ -3774,6 +3774,11 @@
              both widgets — hence the shared handler and the identical styling. -->
         <div id="gtaskSignedOut">
           <button type="button" class="add-task-btn" id="gtaskConnectBtn">Connect Google Tasks</button>
+          <!-- Same contract as the calendar's hint: empty in the ordinary
+               not-connected-yet case, and carrying the reason when something
+               actually went wrong. Both widgets show one Connect button for
+               one connection, so both should be able to explain it. -->
+          <div class="cal-hint" id="gtaskAuthHint"></div>
         </div>
         <!-- Creating a task happens HERE, in the widget, not in a dialog over
              the page: the composer opens directly underneath this button and
@@ -8888,7 +8893,15 @@
        is indistinguishable from one that was never asked, and the difference
        is the whole diagnosis when the board lands on a Connect button it
        should not have needed. */
-    const why = function (msg) { console.warn("[mps] Google token broker:", msg); return null; };
+    const why = function (msg) {
+      console.warn("[mps] Google token broker:", msg);
+      // Kept for the widget to show. The broker failing is usually the ROOT
+      // cause of a Connect button appearing -- the in-page Google call after
+      // it is only the fallback -- so this is the sentence worth reading.
+      window.__mpsGoogleTokenProblem = msg;
+      return null;
+    };
+    window.__mpsGoogleTokenProblem = "";
     if (!session) return why("no Supabase session yet");
     try {
       const jwt = await window.__mpsSync.token();
@@ -18875,6 +18888,14 @@
   const signedInEl = el("calSignedIn");
   const connectBtn = el("calConnectBtn");
   const authHint = el("calAuthHint");
+  const gtaskAuthHint = el("gtaskAuthHint");
+  // Whatever the calendar has to say about the connection, the task list says
+  // too: it is one connection and whichever widget you are looking at is the
+  // one that has to explain it.
+  function setAuthHint(text) {
+    if (authHint) authHint.textContent = text || "";
+    if (gtaskAuthHint) gtaskAuthHint.textContent = text || "";
+  }
   const viewToggle = el("calViewToggle");
   const viewToggleBtn = el("calViewToggleBtn");
   const viewToggleLabel = el("calViewToggleLabel");
@@ -19317,12 +19338,32 @@
   let autoSignInProblem = "";
   function describeAuthFailure(e) {
     const msg = String((e && e.message) || e || "");
-    if (/cancel|popup_closed|did not respond/i.test(msg)) return "";
+    // Only an actual cancellation stays silent: you closed the window, which
+    // you did on purpose. A timeout is NOT that -- it is Google declining to
+    // mint a token without saying so, and it was being swallowed under the
+    // same rule, which is why this button sat there explaining nothing.
+    if (/cancel|popup_closed/i.test(msg)) return "";
+
+    /* The broker is tried before this, and when IT is the thing that failed
+       its reason is the real one -- the in-page attempt afterwards is only
+       the fallback, and its timeout says nothing about why the reliable path
+       did not work. */
+    const broker = window.__mpsGoogleTokenProblem || "";
+    if (broker && /no refresh token|HTTP 404/i.test(broker)) {
+      return "No stored Google connection for this account. Sign out and back in once to restore it.";
+    }
+
     if (/origin/i.test(msg)) {
       return "Google refused this address (" + window.location.origin +
         "). Add it under Authorized JavaScript origins on the OAuth client.";
     }
-    return msg;
+    if (/did not respond/i.test(msg)) {
+      return "Google didn't respond to the silent sign-in" +
+        (broker ? " (broker: " + broker + ")" : "") +
+        ". Press Connect, or check that " + window.location.origin +
+        " is an Authorized JavaScript origin.";
+    }
+    return msg + (broker ? " (broker: " + broker + ")" : "");
   }
 
   async function connect(interactive) {
@@ -19342,7 +19383,7 @@
       // did on purpose; narrating it back at them left a line of status text
       // sitting under the Connect button where the button alone is the whole
       // signed-out state. The error still propagates for callers that care.
-      authHint.textContent = "";
+      setAuthHint(describeAuthFailure(e));
       throw e;
     }
   }
@@ -24046,7 +24087,7 @@
       // Same contract: the Connect button is the signed-out state, and a
       // failure to even load Google's script is something retrying the button
       // (or the network coming back) resolves on its own.
-      authHint.textContent = "";
+      setAuthHint("");
       return;
     }
     /* A cached, still-valid token from earlier in this browser session means
@@ -24082,7 +24123,7 @@
       // has gone wrong. When something has, the button without the reason is
       // a dead end -- so whichever of the two attempts produced a real
       // problem gets to say so here.
-      authHint.textContent = autoSignInProblem || describeAuthFailure(e);
+      setAuthHint(autoSignInProblem || describeAuthFailure(e));
     }
   })();
 
