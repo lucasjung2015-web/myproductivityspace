@@ -19193,52 +19193,63 @@
      variable instead of a rewrite: every fetch below already goes through
      api(), so pointing api() at a different account is the entire mechanism,
      and nothing that renders has to know it happened. */
-  let activeAuth = primaryAuth;
-  let activeAccountEmail = "";        // "" = the signed-in (SSO) account
-  const ACCOUNT_KEY = "google-account-override";
-  let switchedAuth = null;            // the non-primary account, once connected
+  /* One account per widget, not one for the board. The calendar can be
+     reading a personal account while the task list reads a work one, which is
+     the thing worth having and the thing a single global switch could not
+     express.
 
-  function requestToken(interactive) { return activeAuth.connect(interactive); }
-  function ensureToken() { return activeAuth.ensureToken(); }
-  function clearCachedToken() { activeAuth.signOut(); }
+     Both start as the account you signed in with, and normally stay there --
+     the automatic sign-in is the default and nothing here disturbs it. */
+  let calAuth = primaryAuth, tasksAuth = primaryAuth;
+  let calAccountEmail = "", tasksAccountEmail = "";
 
-  /* Every Google call the widgets make. It reads activeAuth rather than a
-     captured token, so a switched account takes effect on the very next
-     request without a single call site changing. */
-  function api(url, options) { return activeAuth.api(url, options); }
+  /* Which account a request belongs to is not a question the call sites have
+     to answer, because the URL already knows: everything under the Tasks API
+     is the task list's, everything else is the calendar's. One rule, applied
+     here, and the hundred existing api() calls keep working untouched. */
+  function authForUrl(url) {
+    return String(url).indexOf(TASKS_API) === 0 ? tasksAuth : calAuth;
+  }
+  function api(url, options) { return authForUrl(url).api(url, options); }
 
-  /* Switch the Google account the board's calendar and tasks are reading.
+  // Sign-in and token plumbing still means the board's own account: it is the
+  // one the Connect button connects and the one the broker refreshes.
+  function requestToken(interactive) { return primaryAuth.connect(interactive); }
+  function ensureToken() { return primaryAuth.ensureToken(); }
+  function clearCachedToken() { primaryAuth.signOut(); }
 
-     `email` empty means "back to the account I signed in with", which needs
-     nothing but pointing activeAuth home again -- that account's token is
-     still live and still brokered. Anything else opens Google's account
-     chooser, and the account you pick becomes the one every Google widget
-     shows until you switch back. */
-  async function useGoogleAccount(email) {
-    if (!email) {   // "" means: go home to the signed-in account
-      activeAuth = primaryAuth;
-      activeAccountEmail = "";
-      storageSet(ACCOUNT_KEY, "");
+  /* Point one surface -- "cal" or "tasks" -- at a different Google account.
+
+     Passing no account means "back to the one I signed in with", which costs
+     nothing but pointing the variable home again: that account's token is
+     still live and still brokered. Otherwise Google's account chooser opens,
+     and whoever is picked becomes that surface's account until it is
+     switched back. The other surface is left exactly as it was. */
+  async function useGoogleAccount(surface, goHome) {
+    const isTasks = surface === "tasks";
+    if (goHome) {
+      if (isTasks) { tasksAuth = primaryAuth; tasksAccountEmail = ""; }
+      else { calAuth = primaryAuth; calAccountEmail = ""; }
       await refreshAll();
       return { ok: true, email: "" };
     }
     try {
       if (!gisReady) { await loadGis(); initTokenClient(); }
-      /* A fresh auth object per switch rather than a cached one per address:
-         the point of the chooser is that you may pick anyone, including
-         somebody you have not used here before, and the token that comes back
-         is what decides whose account this actually is. */
-      const next = createGoogleAuth("unbleep-gcal-token:alt", { selectAccount: true });
+      /* A fresh auth object per switch rather than one cached per address:
+         the point of the chooser is that anyone may be picked, including
+         somebody never used here before, and the token that comes back is
+         what decides whose account this actually is. The cache key is per
+         surface so the calendar's second account and the task list's do not
+         overwrite each other in sessionStorage. */
+      const next = createGoogleAuth("unbleep-gcal-token:" + surface, { selectAccount: true });
       await next.connect(true);
       const who = await next.whoAmI();
-      switchedAuth = next;
-      activeAuth = next;
-      activeAccountEmail = who || "another account";
-      storageSet(ACCOUNT_KEY, activeAccountEmail);
+      if (isTasks) { tasksAuth = next; tasksAccountEmail = who || "another account"; }
+      else { calAuth = next; calAccountEmail = who || "another account"; }
       await refreshAll();
-      return { ok: true, email: activeAccountEmail };
+      return { ok: true, email: isTasks ? tasksAccountEmail : calAccountEmail };
     } catch (e) {
-      // A cancelled chooser must leave the board exactly as it was, still
+      // A cancelled chooser must leave this surface exactly as it was, still
       // reading the account it was reading a moment ago.
       return { error: String((e && e.message) || e) };
     }
@@ -23797,7 +23808,10 @@
      list's. They are two views of one connection -- Google gives an account
      one calendar and one task list -- so switching from either switches both,
      and saying so plainly beats letting someone discover it. */
-  function buildAccountField(body) {
+  function buildAccountField(body, surface) {
+    const current = function () {
+      return surface === "tasks" ? tasksAccountEmail : calAccountEmail;
+    };
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const lab = document.createElement("label");
@@ -23809,24 +23823,13 @@
 
     const who = document.createElement("div");
     who.className = "cal-account-who";
-    who.textContent = activeAccountEmail || "Signed-in account";
+    who.textContent = current() || "Signed-in account";
     row.appendChild(who);
 
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "cal-account-btn";
     btn.textContent = "Switch\u2026";
-    btn.addEventListener("click", async function () {
-      btn.disabled = true;
-      btn.textContent = "Choosing\u2026";
-      const r = await useGoogleAccount("pick");
-      btn.disabled = false;
-      btn.textContent = "Switch\u2026";
-      if (r.error) { note.textContent = r.error; return; }
-      who.textContent = activeAccountEmail || "Signed-in account";
-      reset.hidden = !activeAccountEmail;
-      note.textContent = "";
-    });
     row.appendChild(btn);
     wrap.appendChild(row);
 
@@ -23834,28 +23837,42 @@
     reset.type = "button";
     reset.className = "cal-account-reset";
     reset.textContent = "Use my signed-in account";
-    reset.hidden = !activeAccountEmail;
-    reset.addEventListener("click", async function () {
-      await useGoogleAccount("");
-      who.textContent = "Signed-in account";
-      reset.hidden = true;
-    });
+    reset.hidden = !current();
     wrap.appendChild(reset);
 
     const note = document.createElement("div");
     note.className = "cal-hint";
-    note.textContent = "";
     wrap.appendChild(note);
+
+    btn.addEventListener("click", async function () {
+      btn.disabled = true;
+      btn.textContent = "Choosing\u2026";
+      const r = await useGoogleAccount(surface, false);
+      btn.disabled = false;
+      btn.textContent = "Switch\u2026";
+      if (r.error) { note.textContent = r.error; return; }
+      who.textContent = current() || "Signed-in account";
+      reset.hidden = !current();
+      note.textContent = "";
+    });
+    reset.addEventListener("click", async function () {
+      await useGoogleAccount(surface, true);
+      who.textContent = "Signed-in account";
+      reset.hidden = true;
+      note.textContent = "";
+    });
 
     const explain = document.createElement("div");
     explain.className = "cal-hint";
-    explain.textContent = "Calendar and Tasks share one Google connection, so switching here changes both. A switched account lasts for this browser session.";
+    explain.textContent = surface === "tasks"
+      ? "Only this task list changes; the calendar keeps its own account. A switched account lasts for this browser session."
+      : "Only this calendar changes; the task list keeps its own account. A switched account lasts for this browser session.";
     wrap.appendChild(explain);
     body.appendChild(wrap);
   }
 
   function buildCalSettings(body) {
-    buildAccountField(body);
+    buildAccountField(body, "cal");
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const lab = document.createElement("label");
@@ -23920,7 +23937,7 @@
     // have to know that the setting lives in the calendar.
     window.__widgetSettings.register("unschedTasks", {
       title: "Tasks settings",
-      build: function (body) { buildAccountField(body); }
+      build: function (body) { buildAccountField(body, "tasks"); }
     });
   }, 0);
 
@@ -23964,7 +23981,13 @@
         extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
         return;
       }
-    } catch (e) {}
+    } catch (e) {
+      /* Logged, not swallowed. Landing on the Connect button when you expected
+         to be signed in already is the confusing case, and the reason is
+         always in here -- a broker that could not be reached, an origin
+         Google will not accept -- with no other way to find out. */
+      console.warn("[mps] Google auto sign-in failed:", (e && e.message) || e);
+    }
     try {
       await connect(false);
     } catch (e) {
