@@ -8858,6 +8858,45 @@
     } catch (e) {}
   }
 
+  /* Getting Google back without asking the user to press anything.
+
+     Signing in here already requests the calendar and tasks scopes, so a
+     completed Google sign-in always hands back a token that works for both.
+     What it does not do is survive: Supabase keeps the session but drops the
+     provider_token, so a visit that RESTORES a session has no Google token in
+     hand and has to find one -- the broker if a refresh token was stored, an
+     in-page Google call if not.
+
+     When neither works, this is the way out, and it is better than the
+     Connect button it replaces: the same redirect the user already went
+     through to get here, which asks Google for the same scopes and comes back
+     with a live token. It needs no JavaScript origin registered, because it
+     is a redirect rather than an in-page call -- which is exactly why it
+     works in places the in-page path does not.
+
+     Guarded by a once-per-session flag: if the redirect comes back still
+     unable to reach Google, trying again would be an infinite bounce through
+     the consent screen, so the second failure falls through to the button. */
+  const GOOGLE_REAUTH_KEY = "unbleep-google-reauth-tried";
+  window.__mpsReconnectGoogle = async function () {
+    if (!sb || !session) return false;
+    try {
+      if (sessionStorage.getItem(GOOGLE_REAUTH_KEY) === "1") return false;
+      sessionStorage.setItem(GOOGLE_REAUTH_KEY, "1");
+    } catch (e) { return false; }
+    try {
+      await sb.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin + window.location.pathname,
+          scopes: "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/tasks",
+          queryParams: { access_type: "offline", prompt: "consent" }
+        }
+      });
+      return true;   // the page is leaving; nothing after this runs
+    } catch (e) { return false; }
+  };
+
   /* The refresh token arrives exactly once — on the OAuth callback, and only
      because sign-in asks for access_type=offline. Supabase does not persist
      it, so if this moment is missed it is gone until the next full consent.
@@ -10954,6 +10993,10 @@
       // Signed in: let a future signed-out boot auto-redirect again.
       try { sessionStorage.removeItem(AUTO_SIGNIN_KEY); } catch (e) {}
 
+      // A session that arrived WITH a Google token is proof the round trip
+      // works, so the once-per-session guard is spent and can be cleared --
+      // otherwise one failure would block every retry for the life of the tab.
+      if (session.provider_token) { try { sessionStorage.removeItem(GOOGLE_REAUTH_KEY); } catch (e) {} }
       seedGoogleProviderToken(session);
       stashGoogleRefreshToken(session);   // fire-and-forget; never blocks boot
       finishNotionConnectIfReturning();   // ditto
@@ -24117,12 +24160,29 @@
     }
     try {
       await connect(false);
+      return;
     } catch (e) {
+      /* Every quiet path is spent: no cached token, no broker, and Google
+         would not mint one in-page. Rather than parking on a Connect button,
+         go back through the sign-in the user already completed -- it asks for
+         these same scopes and returns a working token, and being a redirect
+         it does not depend on this address being a registered JavaScript
+         origin. That is the whole reason it succeeds where the attempt above
+         just failed.
+
+         It only fires once per session (see GOOGLE_REAUTH_KEY), so a round
+         trip that comes back still broken lands on the button instead of
+         bouncing through the consent screen forever. */
+      let leaving = false;
+      try {
+        leaving = window.__mpsReconnectGoogle ? await window.__mpsReconnectGoogle() : false;
+      } catch (err) {}
+      if (leaving) return;
+
       showSignedIn(false);
       // The Connect button alone is the right signed-out state when nothing
       // has gone wrong. When something has, the button without the reason is
-      // a dead end -- so whichever of the two attempts produced a real
-      // problem gets to say so here.
+      // a dead end -- so whichever attempt produced a real problem says so.
       setAuthHint(autoSignInProblem || describeAuthFailure(e));
     }
   })();
