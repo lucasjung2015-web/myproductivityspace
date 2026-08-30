@@ -24574,11 +24574,21 @@
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
           '<div class="cal-toolbar">' +
-            '<button type="button" class="cal-viewtoggle-btn" data-act="cycle-view">' +
+            '<button type="button" class="cal-viewtoggle-btn" data-act="view-menu" aria-haspopup="true" aria-expanded="false">' +
               '<span data-role="viewlabel">Month</span>' +
               '<svg class="cal-viewtoggle-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
             '</button>' +
             '<button type="button" class="cal-create-btn" data-act="create">+ Create</button>' +
+          '</div>' +
+          /* The same menu the main calendar opens, with the same classes, so
+             it is the same control rather than one that merely resembles it.
+             Per widget rather than shared, because two calendars can be on
+             two different views and the menu has to tick the right one. */
+          '<div class="cal-viewtoggle-backdrop" data-role="view-backdrop" hidden></div>' +
+          '<div class="cal-viewtoggle-menu" data-role="view-menu" hidden>' +
+            '<button type="button" data-view="day">Day<span class="cal-viewtoggle-shortcut">D</span></button>' +
+            '<button type="button" data-view="week">Week<span class="cal-viewtoggle-shortcut">W</span></button>' +
+            '<button type="button" data-view="month">Month<span class="cal-viewtoggle-shortcut">M</span></button>' +
           '</div>' +
           '<div class="cal-navbar">' +
             '<button type="button" class="cal-navbtn" data-act="prev" title="Previous">&#9664;</button>' +
@@ -24623,19 +24633,37 @@
     const navPrev = wrap.querySelector('[data-act="prev"]');
     const navNext = wrap.querySelector('[data-act="next"]');
     const navToday = wrap.querySelector('[data-act="today"]');
-    const cycleBtn = wrap.querySelector('[data-act="cycle-view"]');
+    const viewBtn = wrap.querySelector('[data-act="view-menu"]');
+    const viewMenu = wrap.querySelector('[data-role="view-menu"]');
+    const viewBackdrop = wrap.querySelector('[data-role="view-backdrop"]');
     const viewLabel = wrap.querySelector('[data-role="viewlabel"]');
     const label = wrap.querySelector('[data-role="label"]');
     const vp = wrap.querySelector('[data-role="viewport"]');
 
     const ctx = { viewport: vp, rangeLabel: label, view: "month", anchor: calToday(), events: [] };
 
-    // The same three views the primary offers, cycled by one button rather
-    // than a menu -- there is no room in an extra widget's header for the
-    // full toggle, and three is few enough to step through.
-    const ORDER = ["day", "week", "month"];
     function setViewLabel() {
       if (viewLabel) viewLabel.textContent = VIEW_LABELS[ctx.view] || ctx.view;
+      if (viewMenu) Array.prototype.forEach.call(viewMenu.querySelectorAll("button"), function (b) {
+        b.classList.toggle("active", b.dataset.view === ctx.view);
+      });
+    }
+    function closeViewMenu2() {
+      if (viewMenu) viewMenu.hidden = true;
+      if (viewBackdrop) viewBackdrop.hidden = true;
+      if (viewBtn) viewBtn.setAttribute("aria-expanded", "false");
+    }
+    function openViewMenu2() {
+      if (!viewMenu || !viewBtn) return;
+      /* position:fixed against the button, exactly as the primary does it --
+         the widget's own body clips its overflow, so a menu laid out inline
+         would be cut off by the widget it belongs to. */
+      const r = viewBtn.getBoundingClientRect();
+      viewMenu.style.setProperty("--menu-top", (r.bottom + 6) + "px");
+      viewMenu.style.setProperty("--menu-left", r.left + "px");
+      viewMenu.hidden = false;
+      if (viewBackdrop) viewBackdrop.hidden = false;
+      viewBtn.setAttribute("aria-expanded", "true");
     }
 
     /* Its own window onto the same calendar. The range comes from whatever
@@ -24684,8 +24712,16 @@
     navPrev.addEventListener("click", function () { step(-1); });
     navNext.addEventListener("click", function () { step(1); });
     navToday.addEventListener("click", function () { ctx.anchor = calToday(); refresh(); });
-    if (cycleBtn) cycleBtn.addEventListener("click", function () {
-      ctx.view = ORDER[(ORDER.indexOf(ctx.view) + 1) % ORDER.length];
+    if (viewBtn) viewBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (viewMenu && viewMenu.hidden) openViewMenu2(); else closeViewMenu2();
+    });
+    if (viewBackdrop) viewBackdrop.addEventListener("click", closeViewMenu2);
+    if (viewMenu) viewMenu.addEventListener("click", function (e) {
+      const b = e.target.closest("button[data-view]");
+      if (!b) return;
+      ctx.view = b.dataset.view;
+      closeViewMenu2();
       refresh();
     });
     /* Create opens the same chooser the main calendar's button does. The
@@ -24697,6 +24733,15 @@
       e.stopPropagation();
       if (window.__calOpenCreate) window.__calOpenCreate();
     });
+
+    /* The same settings this widget's older sibling has. Deferred by a
+       macrotask for the same reason the primary's registration is: the
+       settings module is published by a later script than this one. */
+    setTimeout(function () {
+      if (window.__widgetSettings) {
+        window.__widgetSettings.register(id, { title: "Calendar settings", build: buildCalSettings });
+      }
+    }, 0);
 
     extraCalendarRefreshers.push(refresh);
     refresh();
@@ -24785,6 +24830,15 @@
       if (addBtn) addBtn.hidden = false;
       renderTasksInto(viewport);
     }
+
+    setTimeout(function () {
+      if (window.__widgetSettings) {
+        window.__widgetSettings.register(id, {
+          title: "Tasks settings",
+          build: function (body) { buildAccountField(body, "tasks"); }
+        });
+      }
+    }, 0);
 
     extraTasksViews.push({ id: id, refresh: refresh });
     refresh();
