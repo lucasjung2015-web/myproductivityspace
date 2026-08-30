@@ -1975,6 +1975,21 @@
     border: 1px solid #000000; border-radius: 4px; padding: 0 8px 8px;
   }
   .cal-loading { font-size: 13px; color: #000000; opacity: 0.6; }
+  /* The account row in the calendar/tasks settings popover. */
+  .cal-account-row { display: flex; align-items: center; gap: 8px; }
+  .cal-account-who {
+    flex: 1 1 auto; min-width: 0; font-size: 13px; color: #000000;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cal-account-btn, .cal-account-reset {
+    flex: 0 0 auto; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 600;
+    border: 1px solid #000000; background: transparent; color: #000000;
+  }
+  .cal-account-btn:hover, .cal-account-reset:hover { background: #f2f2f2; }
+  .cal-account-btn:disabled { opacity: 0.5; cursor: default; }
+  .cal-account-reset { margin-top: 8px; display: block; }
+  .cal-account-reset[hidden] { display: none; }
 
   /* Month grid */
   .cal-month-head, .cal-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
@@ -19166,15 +19181,68 @@
   // (showing a "connect first" placeholder) when the user clicks Connect.
   const extraCalendarRefreshers = [];
 
-  function requestToken(interactive) { return primaryAuth.connect(interactive); }
-  function ensureToken() { return primaryAuth.ensureToken(); }
-  function clearCachedToken() { primaryAuth.signOut(); }
+  /* Which account the Google widgets are actually showing.
 
-  /* Every Google call the primary widgets make. Unqualified `api(...)` still
-     means "the board's own account", which is what the hundred call sites
-     below have always meant by it; a widget signed in to a second account
-     calls through its own auth object instead. */
-  function api(url, options) { return primaryAuth.api(url, options); }
+     Normally this IS the primary: you sign in to the board once and Calendar
+     and Tasks come with it, no second button to press. That default is the
+     whole point and nothing here disturbs it.
+
+     It becomes something else only when you deliberately switch accounts from
+     the calendar's or the task list's settings -- one live account at a time,
+     swapped, rather than several at once. That is what makes this a single
+     variable instead of a rewrite: every fetch below already goes through
+     api(), so pointing api() at a different account is the entire mechanism,
+     and nothing that renders has to know it happened. */
+  let activeAuth = primaryAuth;
+  let activeAccountEmail = "";        // "" = the signed-in (SSO) account
+  const ACCOUNT_KEY = "google-account-override";
+  let switchedAuth = null;            // the non-primary account, once connected
+
+  function requestToken(interactive) { return activeAuth.connect(interactive); }
+  function ensureToken() { return activeAuth.ensureToken(); }
+  function clearCachedToken() { activeAuth.signOut(); }
+
+  /* Every Google call the widgets make. It reads activeAuth rather than a
+     captured token, so a switched account takes effect on the very next
+     request without a single call site changing. */
+  function api(url, options) { return activeAuth.api(url, options); }
+
+  /* Switch the Google account the board's calendar and tasks are reading.
+
+     `email` empty means "back to the account I signed in with", which needs
+     nothing but pointing activeAuth home again -- that account's token is
+     still live and still brokered. Anything else opens Google's account
+     chooser, and the account you pick becomes the one every Google widget
+     shows until you switch back. */
+  async function useGoogleAccount(email) {
+    if (!email) {   // "" means: go home to the signed-in account
+      activeAuth = primaryAuth;
+      activeAccountEmail = "";
+      storageSet(ACCOUNT_KEY, "");
+      await refreshAll();
+      return { ok: true, email: "" };
+    }
+    try {
+      if (!gisReady) { await loadGis(); initTokenClient(); }
+      /* A fresh auth object per switch rather than a cached one per address:
+         the point of the chooser is that you may pick anyone, including
+         somebody you have not used here before, and the token that comes back
+         is what decides whose account this actually is. */
+      const next = createGoogleAuth("unbleep-gcal-token:alt", { selectAccount: true });
+      await next.connect(true);
+      const who = await next.whoAmI();
+      switchedAuth = next;
+      activeAuth = next;
+      activeAccountEmail = who || "another account";
+      storageSet(ACCOUNT_KEY, activeAccountEmail);
+      await refreshAll();
+      return { ok: true, email: activeAccountEmail };
+    } catch (e) {
+      // A cancelled chooser must leave the board exactly as it was, still
+      // reading the account it was reading a moment ago.
+      return { error: String((e && e.message) || e) };
+    }
+  }
 
   // Read by the Connections panel so Google Calendar's row reports a real
   // connection state instead of a hardcoded one. Everything else it lists is
@@ -23725,7 +23793,69 @@
     refreshAll();
   }
 
+  /* The account row, shown in both the calendar's settings and the task
+     list's. They are two views of one connection -- Google gives an account
+     one calendar and one task list -- so switching from either switches both,
+     and saying so plainly beats letting someone discover it. */
+  function buildAccountField(body) {
+    const wrap = document.createElement("div");
+    wrap.className = "cal-field";
+    const lab = document.createElement("label");
+    lab.textContent = "Google Account";
+    wrap.appendChild(lab);
+
+    const row = document.createElement("div");
+    row.className = "cal-account-row";
+
+    const who = document.createElement("div");
+    who.className = "cal-account-who";
+    who.textContent = activeAccountEmail || "Signed-in account";
+    row.appendChild(who);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cal-account-btn";
+    btn.textContent = "Switch\u2026";
+    btn.addEventListener("click", async function () {
+      btn.disabled = true;
+      btn.textContent = "Choosing\u2026";
+      const r = await useGoogleAccount("pick");
+      btn.disabled = false;
+      btn.textContent = "Switch\u2026";
+      if (r.error) { note.textContent = r.error; return; }
+      who.textContent = activeAccountEmail || "Signed-in account";
+      reset.hidden = !activeAccountEmail;
+      note.textContent = "";
+    });
+    row.appendChild(btn);
+    wrap.appendChild(row);
+
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "cal-account-reset";
+    reset.textContent = "Use my signed-in account";
+    reset.hidden = !activeAccountEmail;
+    reset.addEventListener("click", async function () {
+      await useGoogleAccount("");
+      who.textContent = "Signed-in account";
+      reset.hidden = true;
+    });
+    wrap.appendChild(reset);
+
+    const note = document.createElement("div");
+    note.className = "cal-hint";
+    note.textContent = "";
+    wrap.appendChild(note);
+
+    const explain = document.createElement("div");
+    explain.className = "cal-hint";
+    explain.textContent = "Calendar and Tasks share one Google connection, so switching here changes both. A switched account lasts for this browser session.";
+    wrap.appendChild(explain);
+    body.appendChild(wrap);
+  }
+
   function buildCalSettings(body) {
+    buildAccountField(body);
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const lab = document.createElement("label");
@@ -23783,9 +23913,15 @@
      the same wait, for the same reason, that the widget-layout module makes
      before it looks for its own builders. */
   setTimeout(function () {
-    if (window.__widgetSettings) {
-      window.__widgetSettings.register("cal", { title: "Calendar settings", build: buildCalSettings });
-    }
+    if (!window.__widgetSettings) return;
+    window.__widgetSettings.register("cal", { title: "Calendar settings", build: buildCalSettings });
+    // The task list gets the account control too. It is the same connection,
+    // but somebody in the task list wanting to change accounts should not
+    // have to know that the setting lives in the calendar.
+    window.__widgetSettings.register("unschedTasks", {
+      title: "Tasks settings",
+      build: function (body) { buildAccountField(body); }
+    });
   }, 0);
 
   (async function boot() {
