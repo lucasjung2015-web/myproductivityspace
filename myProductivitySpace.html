@@ -16398,20 +16398,24 @@
         flashWidget(widgetId);
       }
 
-      /* Both of these used to add a second, cut-down COPY when one was already
-         on the board -- a month-only calendar with no create or edit, a task
-         list with no composer or tags. Those copies could only ever drift
-         further behind the real widgets as the real ones grew, which is
-         exactly how they came to read as outdated versions of themselves.
+      /* Adding a second Calendar or Tasks widget is allowed again. When the
+         real one is off the board it comes back; when it is already there,
+         another view is added beside it.
 
-         Google gives an account one calendar and one task list, so a second
-         widget was never showing anything new anyway. Now there is only ever
-         the real one: bring it back if it has been removed, and otherwise
-         just take the user to it. Nothing can fall behind something that
-         does not exist. (The calView/tasksView builders stay registered, so a
-         board that already holds one of the old copies still renders it.) */
-      if (type === "cal") { restoreSingleton("cal"); return; }
-      if (type === "tasks") { restoreSingleton("unschedTasks"); return; }
+         Those extra views are still the cut-down ones -- a month-only
+         calendar, a read-only task list -- which is the thing to fix next.
+         They are additional windows onto the same single Google calendar and
+         task list, since an account has exactly one of each. */
+      if (type === "cal") {
+        if (slotOf("cal")) flashWidget(createDynamicWidgetInstance("calView"));
+        else restoreSingleton("cal");
+        return;
+      }
+      if (type === "tasks") {
+        if (slotOf("unschedTasks")) flashWidget(createDynamicWidgetInstance("tasksView"));
+        else restoreSingleton("unschedTasks");
+        return;
+      }
     });
 
     // ---- Vocabulary "+" setup flow: Language -> Frequency -> Words/Phrases per day ----
@@ -20627,6 +20631,14 @@
   // counting it up front), so this fetches one page rather than the whole
   // history. The section's count reflects what's been loaded, not a true
   // total — the same tradeoff the native app makes on first paint.
+  // Fetched once as soon as the list is up, rather than only when the section
+  // is first expanded. The count in the header is the reason: a "Completed"
+  // heading with no number beside it reads as though there is nothing behind
+  // it, and the number cannot be known without asking. One page, once.
+  function ensureCompletedCount() {
+    if (completedTasks === null && !completedLoading) loadCompletedTasks();
+  }
+
   function loadCompletedTasks() {
     if (completedLoading) return;
     completedLoading = true;
@@ -20705,6 +20717,9 @@
     header.setAttribute("aria-expanded", String(completedOpen));
     header.innerHTML =
       '<svg class="cal-completed-arrow" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
+      // The number is always shown once it is known, including "(0)" -- an
+      // absent count reads as "unknown", which is a different claim from
+      // "none", and only one of the two is ever true here.
       '<span>Completed' + (completedTasks ? " (" + completedTasks.length + ")" : "") + '</span>';
     header.addEventListener("click", function () {
       completedOpen = !completedOpen;
@@ -23636,6 +23651,9 @@
       await Promise.all([fetchEvents(), fetchTasks()]);
       renderGrid();
       renderTasks();
+      // Not awaited: the count is worth having but nothing waits on it, and
+      // it renders itself in when it lands.
+      ensureCompletedCount();
     } catch (e) {
       viewport.innerHTML = "";
       const err = document.createElement("div");
