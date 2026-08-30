@@ -1,5 +1,9 @@
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- viewport-fit=cover lets the page paint edge to edge on a notched phone,
+     which is what makes env(safe-area-inset-*) below meaningful; without it iOS
+     letterboxes the page away from the notch and the insets all read as 0.
+     No maximum-scale, deliberately: pinch-zoom stays available. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>myProductivitySpace</title>
 
 <!-- Tab icon and link preview. The icons are base64 data URIs rather than
@@ -12,7 +16,21 @@
      page and the auth gate show, squared off onto white. -->
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABe0lEQVR42u2VTYrCQBCFU7HNQkSIgkIWLl25EAOCJ/IQHskjCN7AhSuDIIYENBhRlGjov6pZZCZImBmcxcAw5C0aqgr6o3iPbiAi4zdlGr+sElACSsC/AxCR1vr5dSKivCQiRMzKvE8f+goAn86ICACyMy8LU8MwENE0zZc2yDBxHM9msyAIAEAIAQDb7fZ6vWbXJUmy2+2yvu/7p9PJNM0oilar1e12E0JoraWUnHMpZXEDpRRjbD6fT6fT8Xhs23Z26WazcRyn1+sdDodqtbpcLofDYb1e9zxPCOG6rmVZtVrNsizG2H6/dxynUqmEYTgajVzXRURARAA4Ho9SyiAI0jTtdDrr9TqOY6VUkiSccwBoNpvdbtfzPNu27/d7u91O03SxWEwmE8755XJpNBrn85kx1mq1oijq9/uDwQAR313SWj8eD/qJhBC+7xORlDIMQ6UUESmlsiDkKppciNCz1YX+p/6/mqIXlafoGwyUf3IJKAEl4A8A3gBI5Ezh1bvd+wAAAABJRU5ErkJggg==">
 <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
-<meta name="theme-color" content="#0A0A0A">
+<!-- White, matching --bg. The previous near-black painted a dark browser bar
+     above a white app, which looks like a rendering fault once installed. The
+     dark value now belongs to dark mode, where it is actually true. -->
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)">
+
+<!-- Installable to the home screen. The manifest is a real file rather than a
+     data URI: Safari will not reliably read an inlined one, so this is the
+     second documented exception (after og:image) to the rule that this file
+     works opened straight off a disk. Off a disk it still runs completely --
+     it simply cannot be installed that way. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="myPS">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="myProductivitySpace">
@@ -122,7 +140,14 @@
     }
   }
   html, body {
+    /* dvh after vh, not instead of it: on any desktop the two are identical,
+       so nothing here changes. On mobile Safari 100vh is the LARGE viewport --
+       the one with the toolbar collapsed -- so a 100vh layout puts its own
+       bottom underneath the toolbar until you scroll. dvh tracks the viewport
+       as the toolbar moves, and the vh line stays beneath it as the fallback
+       for anything that does not know the unit. */
     margin: 0; padding: 0; height: 100vh; min-height: 100vh;
+    height: 100dvh; min-height: 100dvh;
     background: var(--bg); color: var(--ink);
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -3473,6 +3498,264 @@
   #authGateBtn:hover { background: #222222; }
   #authGateBtn:active { transform: scale(0.97); }
   #authGateBtn[hidden] { display: none; }
+
+  /* =====================================================================
+     MOBILE
+     ---------------------------------------------------------------------
+     Everything below is additive and gated. Nothing above this line is
+     edited, and none of these rules can match on a desktop -- so the Mac
+     board is byte-for-byte the layout it was before this block existed.
+
+     The gate asks whether the pointer is a FINGER, not how wide the screen
+     is. Width would be the wrong question twice over: a Mac window dragged
+     narrow would get the phone layout while still having a cursor that
+     hovers perfectly well, and a landscape iPhone is ~850px wide and is
+     still a thumb. hover:none says "cannot hover"; pointer:coarse says
+     "imprecise". Both are true of a thumb, neither of a mouse.
+
+     An iPad switches by itself: attached to a Magic Keyboard it reports
+     hover:hover and keeps the desktop board; without it, the phone layout.
+
+     html.force-desktop is the escape hatch, set from the account menu, and
+     it is written into every selector below rather than fought with
+     !important later.
+     ===================================================================== */
+  @media (hover: none) and (pointer: coarse) {
+
+    /* ---------- 1. the shell: one widget per screen ---------- */
+    /* .widget is already a flex row of .col-slot children, which is a
+       pager's shape -- so this is scroll-snap, not a carousel. The browser
+       supplies the swipe, the momentum and the rubber-banding, and there is
+       no gesture code to get wrong. */
+    html:not(.force-desktop) .widget {
+      flex-direction: row;
+      overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      padding: 0; gap: 0;
+      scrollbar-width: none;
+    }
+    html:not(.force-desktop) .widget::-webkit-scrollbar { display: none; }
+    html:not(.force-desktop) .col-slot {
+      flex: 0 0 100% !important; width: 100% !important;
+      min-width: 100%; max-width: 100%;
+      scroll-snap-align: start; scroll-snap-stop: always;
+      padding: 4px 14px 8px;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    /* A section stacking two widgets keeps stacking them -- the unit that
+       gets a screen is the SECTION, which is the thing the user arranged. */
+    html:not(.force-desktop) .col.collapsible-col-wrap {
+      flex: 1 1 auto !important; width: 100% !important; min-height: 0;
+    }
+
+    /* The wordmark is 46px, which makes "myProductivitySpace" about 500px
+       wide -- wider than the phone, so the whole page scrolled sideways.
+       The sign-in screen reuses it, so this was the first thing anyone saw. */
+    html:not(.force-desktop) .page-title,
+    html:not(.force-desktop) .ag-wordmark {
+      padding: 10px 14px 8px; flex: 0 0 auto;
+      padding-top: calc(10px + env(safe-area-inset-top));
+    }
+    html:not(.force-desktop) .page-title .pt-main,
+    html:not(.force-desktop) .page-title .pt-accent,
+    html:not(.force-desktop) .ag-wordmark .pt-main,
+    html:not(.force-desktop) .ag-wordmark .pt-accent { font-size: 21px; }
+    html:not(.force-desktop) .page-title .pt-prefix,
+    html:not(.force-desktop) .ag-wordmark .pt-prefix { font-size: 11px; margin-right: 4px; }
+
+    /* Five 28px buttons 6px apart spanned 176px of a 375px screen, below both
+       the size and the spacing minimum, and sat at z-index 3000 -- ON TOP of
+       the full-screen AI panel. They collapse into one 44pt control. */
+    html:not(.force-desktop) #alwaysOnTopBtn,
+    html:not(.force-desktop) #connectionsBtn,
+    html:not(.force-desktop) #addWidgetBtn { display: none; }
+    html:not(.force-desktop) #aiPanelBtn,
+    html:not(.force-desktop) #profileBtn {
+      top: calc(6px + env(safe-area-inset-top));
+      width: 44px; height: 44px;
+      z-index: 2400;   /* below #aiPanel's 2500, so the panel covers them */
+    }
+    html:not(.force-desktop) #aiPanelBtn { right: calc(52px + env(safe-area-inset-right)); }
+    html:not(.force-desktop) #profileBtn { right: calc(6px + env(safe-area-inset-right)); }
+
+    /* ---------- 2. the bottom bar ---------- */
+    html:not(.force-desktop) .mob-bar {
+      display: flex; align-items: center; gap: 6px;
+      flex: 0 0 auto; overflow-x: auto; scrollbar-width: none;
+      padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+      border-top: 1px solid var(--hair); background: var(--bg);
+    }
+    html:not(.force-desktop) .mob-bar::-webkit-scrollbar { display: none; }
+    .mob-bar { display: none; }
+    .mob-tab {
+      flex: 0 0 auto; min-height: 44px; padding: 6px 14px; border-radius: 999px;
+      border: 1px solid transparent; background: transparent; color: #6b6b6b;
+      font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
+      cursor: pointer;
+    }
+    .mob-tab.is-current { background: var(--ink); color: var(--bg); }
+    .mob-dots { display: flex; gap: 5px; justify-content: center; padding: 6px 0 2px; flex: 0 0 auto; }
+    .mob-dot { width: 6px; height: 6px; border-radius: 50%; background: #d4d4d4; }
+    .mob-dot.is-current { background: var(--ink); }
+    html.force-desktop .mob-bar, html.force-desktop .mob-dots { display: none !important; }
+
+    /* ---------- 3. touch targets ----------
+       The box grows to 44pt around the glyph; the glyph itself is untouched,
+       so nothing looks inflated -- there is simply somewhere to put a thumb. */
+    html:not(.force-desktop) .collapse-btn,
+    html:not(.force-desktop) .widget-icon-btn,
+    html:not(.force-desktop) .col-drag-handle,
+    html:not(.force-desktop) .section-hide-btn,
+    html:not(.force-desktop) .section-drag-handle,
+    html:not(.force-desktop) .cal-navbtn,
+    html:not(.force-desktop) .cal-refreshbtn,
+    html:not(.force-desktop) .collapsible-unhide,
+    html:not(.force-desktop) .mps-x-btn,
+    html:not(.force-desktop) .ai-side-btn,
+    html:not(.force-desktop) .gt-cal-nav,
+    html:not(.force-desktop) .cal-timer-btn,
+    html:not(.force-desktop) .icon-remove-btn,
+    html:not(.force-desktop) .link-add-btn,
+    html:not(.force-desktop) .nl-iconbtn {
+      min-width: 44px; min-height: 44px;
+    }
+    html:not(.force-desktop) .task-complete-btn,
+    html:not(.force-desktop) .ai-send { min-width: 44px; min-height: 44px; }
+    /* Small marks inside dense rows get their hit area from padding plus a
+       negative margin, so the row's spacing does not change at all. */
+    html:not(.force-desktop) .ai-side-item-x,
+    html:not(.force-desktop) .link-remove-btn,
+    html:not(.force-desktop) .tag-remove-btn {
+      padding: 12px; margin: -12px; box-sizing: content-box;
+    }
+    html:not(.force-desktop) .tag-pill,
+    html:not(.force-desktop) .tag-add-btn { min-height: 32px; padding: 6px 12px; font-size: 12px; }
+    html:not(.force-desktop) .cal-tagbar .tag-add-btn,
+    html:not(.force-desktop) .cal-tagbar .tag-pill { font-size: 12px; }
+    html:not(.force-desktop) .gt-time-option,
+    html:not(.force-desktop) .icon-emoji-btn,
+    html:not(.force-desktop) .mps-menu button,
+    html:not(.force-desktop) .cal-viewtoggle-menu button { min-height: 44px; }
+
+    /* ---------- 4. reveal what hover hides ----------
+       These are not merely small on touch, they are UNREACHABLE: a finger
+       cannot hover, so an affordance that only appears on hover does not
+       exist. The Tasks sub-app in this same file already does exactly this
+       (see its `not all and (hover:hover)` block); the board never did. */
+    html:not(.force-desktop) .section-controls,
+    html:not(.force-desktop) .widget-icon-btn,
+    html:not(.force-desktop) .cal-timer-btn,
+    html:not(.force-desktop) .gt-branch-btn,
+    html:not(.force-desktop) .ai-side-item-x,
+    html:not(.force-desktop) .links-row-wrap > .links-menu-controls,
+    html:not(.force-desktop) .nl-grip,
+    html:not(.force-desktop) .task-complete-btn .tcb-check,
+    html:not(.force-desktop) .cal-chip-check .tcb-check {
+      opacity: 1 !important; transform: none !important;
+    }
+    /* display:none, not opacity -- so removing a bookmark was impossible. */
+    html:not(.force-desktop) .links-row.edit-mode .link-item-wrap .link-remove-btn {
+      display: flex !important;
+    }
+
+    /* ---------- 5. inputs at 16px ----------
+       Below 16px iOS Safari ZOOMS the page on focus and the user has to
+       pinch back. This is not a type-scale preference, it is the difference
+       between the app staying still and jumping every time you tap a field. */
+    html:not(.force-desktop) input,
+    html:not(.force-desktop) select,
+    html:not(.force-desktop) textarea,
+    html:not(.force-desktop) [contenteditable="true"] { font-size: 16px !important; }
+    /* Code keeps its monospace face; only the size is forced up. */
+    html:not(.force-desktop) .cw-code { line-height: 1.5; }
+
+    /* ---------- 6. popovers become sheets ----------
+       Several are wider than the screen (.cw-editor 460px, .bookmark-folder-
+       dialog 350px with no clamp at all) and anchored positioning can push
+       any of them off an edge. A sheet cannot be off-screen. */
+    html:not(.force-desktop) .gt-popover,
+    html:not(.force-desktop) .gt-time-list,
+    html:not(.force-desktop) .icon-popover,
+    html:not(.force-desktop) .color-popover,
+    html:not(.force-desktop) .list-config-popover,
+    html:not(.force-desktop) .cal-createpanel.as-menu,
+    html:not(.force-desktop) .cal-viewtoggle-menu,
+    html:not(.force-desktop) .mps-menu,
+    html:not(.force-desktop) #profileMenu {
+      position: fixed !important;
+      left: 0 !important; right: 0 !important; bottom: 0 !important;
+      top: auto !important; width: 100% !important; max-width: 100% !important;
+      max-height: 76dvh; overflow-y: auto;
+      border-radius: 18px 18px 0 0;
+      padding-bottom: calc(14px + env(safe-area-inset-bottom));
+      box-shadow: 0 -8px 40px rgba(0,0,0,.28);
+      animation: mob-sheet-up 0.22s var(--ease-spring);
+    }
+    /* The grab handle every iOS sheet has, so it reads as one. */
+    html:not(.force-desktop) .gt-popover::before,
+    html:not(.force-desktop) .gt-time-list::before,
+    html:not(.force-desktop) .icon-popover::before,
+    html:not(.force-desktop) .color-popover::before,
+    html:not(.force-desktop) .list-config-popover::before,
+    html:not(.force-desktop) #profileMenu::before {
+      content: ""; display: block; width: 38px; height: 5px; border-radius: 999px;
+      background: #d0d0d0; margin: 8px auto 10px;
+    }
+    @keyframes mob-sheet-up { from { transform: translateY(14%); opacity: 0.6; } to { transform: none; opacity: 1; } }
+    html:not(.force-desktop) .cal-createpanel.as-modal,
+    html:not(.force-desktop) .mps-modal,
+    html:not(.force-desktop) #notionLibModal {
+      width: 100% !important; max-width: 100% !important;
+      max-height: 88dvh;
+      border-radius: 18px 18px 0 0;
+      padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    }
+
+    /* ---------- 7. the calendar ----------
+       At 26px an hour, a 30-minute event is 12px tall -- and wireEventDrag's
+       6px edge zones then cover the whole box, so a tap could only ever be
+       read as a resize. Taller rows are what make the middle exist. */
+    html:not(.force-desktop) .cal-tg-slot,
+    html:not(.force-desktop) .cal-tg-hourlabel { height: 48px; }
+    html:not(.force-desktop) .cal-tg-event { font-size: 12px; padding: 3px 5px; }
+    /* pan-y, not none: a finger landing on an event must still be able to
+       scroll the day. Vertical drag is claimed by the event, the page keeps
+       the rest. */
+    html:not(.force-desktop) .cal-tg-event { touch-action: pan-y; }
+    html:not(.force-desktop) .cal-daycell { min-height: 58px; }
+    html:not(.force-desktop) .cal-viewport { min-height: 340px; }
+    html:not(.force-desktop) .cal-chip { font-size: 11px; padding: 3px 5px; }
+
+    /* ---------- 8. the AI panel ---------- */
+    html:not(.force-desktop) .ai-resizer { display: none; }
+    html:not(.force-desktop) #aiPanel { padding-bottom: env(safe-area-inset-bottom); }
+    html:not(.force-desktop) .ai-head { padding-top: calc(12px + env(safe-area-inset-top)); }
+
+    /* ---------- 9. chrome ---------- */
+    html:not(.force-desktop) #gtaskSubpageHost {
+      padding: calc(8px + env(safe-area-inset-top)) 14px env(safe-area-inset-bottom);
+    }
+    html:not(.force-desktop) .collapsed-tabs-bar { display: none !important; }
+  }
+
+  /* Hover states must not LATCH. There are 131 unconditional :hover rules in
+     this stylesheet; on iOS every one fires on first tap and stays lit until
+     you tap something else, so rows and cells sit highlighted for no reason.
+     Only the ones that change something visible enough to read as a bug are
+     wrapped -- the sub-app solved this the same way for its own. */
+  @media (hover: none) and (pointer: coarse) {
+    html:not(.force-desktop) .cal-taskrow:hover { background: transparent; box-shadow: none; }
+    html:not(.force-desktop) .cal-daycell:hover { border-color: transparent; }
+    html:not(.force-desktop) .cal-chip:hover { filter: none; }
+    html:not(.force-desktop) .task-row:hover { background: transparent; }
+    html:not(.force-desktop) .ai-starter:hover { background: transparent; }
+    html:not(.force-desktop) .section-header-title:hover { border-color: transparent; background: transparent; }
+    html:not(.force-desktop) .gt-time-option:hover,
+    html:not(.force-desktop) .icon-emoji-btn:hover { background: transparent; }
+  }
+
 </style>
 
 <!-- Deliberately NOT hidden: the gate renders by default and is only ever
@@ -3923,6 +4206,8 @@
   </div>
 </div>
 
+<div class="mob-dots" id="mobDots" hidden></div>
+<div class="mob-bar" id="mobBar" hidden></div>
 <div class="collapsed-tabs-bar" id="collapsedTabsBar"></div>
 
 <!-- Deleted built-in sections are parked here (not actually destroyed) so
@@ -29033,3 +29318,154 @@
   };
 })();
 </script>
+
+<script>
+/* =====================================================================
+   Mobile shell
+   ---------------------------------------------------------------------
+   The board becomes one widget per screen: the grid is a scroll-snap
+   pager, and this supplies the two things CSS cannot -- a bar that says
+   where you are and takes you somewhere, and the plumbing to keep it in
+   step as the board changes underneath it.
+
+   Everything here is inert unless the pointer is a finger. The same
+   question the stylesheet asks, asked once in JS, so the two can never
+   disagree about what kind of device this is. On a Mac this module
+   installs one listener and then does nothing for the life of the page.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  const TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)");
+  const FORCE_KEY = "force-desktop-layout";
+  const bar = document.getElementById("mobBar");
+  const dots = document.getElementById("mobDots");
+  const grid = document.getElementById("widgetGrid");
+  if (!bar || !dots || !grid) return;
+
+  let observer = null;
+  let current = 0;
+
+  function isMobile() {
+    return TOUCH.matches && !document.documentElement.classList.contains("force-desktop");
+  }
+
+  /* A page is a SLOT, not a widget: a section stacking two widgets is one
+     screen, because the section is the unit the user arranged on the
+     desktop and splitting it here would invent a layout they never chose.
+     The label is the first widget's name, which is how they refer to it. */
+  function slots() {
+    return Array.prototype.filter.call(grid.children, function (n) {
+      return n.classList && n.classList.contains("col-slot") && n.style.display !== "none";
+    });
+  }
+  function labelFor(slot) {
+    const el = slot.querySelector(".col.collapsible-col-wrap[data-col-id]");
+    const id = el && el.getAttribute("data-col-id");
+    let title = "";
+    try {
+      const all = window.__listWidgetTitles ? window.__listWidgetTitles() : [];
+      const hit = all.filter(function (w) { return w.id === id; })[0];
+      if (hit) title = hit.title;
+    } catch (e) {}
+    if (!title) {
+      const h = slot.querySelector(".section-header-title");
+      title = (h && h.textContent.trim()) || "Widget";
+    }
+    // Long widget names would push every other tab off the bar.
+    return title.length > 18 ? title.slice(0, 17) + "…" : title;
+  }
+
+  function setCurrent(i) {
+    current = i;
+    Array.prototype.forEach.call(bar.children, function (b, n) {
+      b.classList.toggle("is-current", n === i);
+      b.setAttribute("aria-current", n === i ? "true" : "false");
+    });
+    Array.prototype.forEach.call(dots.children, function (d, n) {
+      d.classList.toggle("is-current", n === i);
+    });
+    const btn = bar.children[i];
+    // Keep the live tab in view when there are more tabs than fit.
+    if (btn && btn.scrollIntoView) btn.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+  }
+
+  function build() {
+    if (observer) { observer.disconnect(); observer = null; }
+    bar.innerHTML = "";
+    dots.innerHTML = "";
+    const list = slots();
+    if (!isMobile() || list.length < 1) {
+      bar.hidden = true; dots.hidden = true;
+      return;
+    }
+    list.forEach(function (slot, i) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mob-tab";
+      b.textContent = labelFor(slot);
+      b.addEventListener("click", function () {
+        slot.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+        setCurrent(i);
+      });
+      bar.appendChild(b);
+      const d = document.createElement("span");
+      d.className = "mob-dot";
+      dots.appendChild(d);
+    });
+    // Dots are a position indicator, and with one page there is no position
+    // to indicate. The bar stays: it still names what you are looking at.
+    bar.hidden = false;
+    dots.hidden = list.length < 2;
+
+    /* Which page you are on is whichever is most on screen. An observer
+       rather than a scroll handler: it fires only when the answer actually
+       changes, instead of on every frame of a swipe. */
+    observer = new IntersectionObserver(function (entries) {
+      let best = null;
+      entries.forEach(function (e) {
+        if (e.isIntersecting && (!best || e.intersectionRatio > best.intersectionRatio)) best = e;
+      });
+      if (!best) return;
+      const i = list.indexOf(best.target);
+      if (i !== -1 && i !== current) setCurrent(i);
+    }, { root: grid, threshold: [0.5, 0.75] });
+    list.forEach(function (slot) { observer.observe(slot); });
+    setCurrent(Math.min(current, list.length - 1));
+  }
+
+  /* render() rebuilds the grid's children wholesale whenever a widget is
+     added, deleted, hidden or moved, so the bar has to be rebuilt with it.
+     Debounced because a single render can produce several mutations. */
+  let t = null;
+  if (window.MutationObserver) {
+    new MutationObserver(function () {
+      clearTimeout(t);
+      t = setTimeout(build, 80);
+    }).observe(grid, { childList: true });
+  }
+
+  // Re-evaluate when a trackpad is attached to an iPad, which flips the
+  // answer mid-session without a reload.
+  TOUCH.addEventListener("change", function () {
+    document.documentElement.classList.toggle("is-touch", TOUCH.matches);
+    build();
+  });
+  document.documentElement.classList.toggle("is-touch", TOUCH.matches);
+
+  /* The escape hatch. Detection is right almost always; this removes the
+     "almost" for anyone whose device answers the question oddly. */
+  window.__mpsForceDesktop = function (on) {
+    document.documentElement.classList.toggle("force-desktop", !!on);
+    try { window.storageSet(FORCE_KEY, on ? "true" : "false"); } catch (e) {}
+    build();
+  };
+  (async function () {
+    let saved = null;
+    try { saved = await window.storageGet(FORCE_KEY); } catch (e) {}
+    if (saved === "true") document.documentElement.classList.add("force-desktop");
+    build();
+  })();
+})();
+</script>
+
