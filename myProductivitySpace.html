@@ -8882,19 +8882,32 @@
      Returns null rather than throwing when there is nothing stored, so the
      caller can fall through to its own sign-in flow. */
   window.__mpsGoogleToken = async function () {
-    if (!session) return null;
+    /* Still returns null on every failure, because callers fall through to
+       their own sign-in on null and that contract is right. What is new is
+       that it says WHY on the way past: a broker that quietly answers "no"
+       is indistinguishable from one that was never asked, and the difference
+       is the whole diagnosis when the board lands on a Connect button it
+       should not have needed. */
+    const why = function (msg) { console.warn("[mps] Google token broker:", msg); return null; };
+    if (!session) return why("no Supabase session yet");
     try {
       const jwt = await window.__mpsSync.token();
-      if (!jwt) return null;
+      if (!jwt) return why("no Supabase access token");
       const r = await fetch(window.__mpsFnUrl + "/google-token", {
         method: "POST",
         headers: { "content-type": "application/json", "authorization": "Bearer " + jwt },
         body: JSON.stringify({ action: "get" })
       });
-      if (!r.ok) return null;
+      if (!r.ok) {
+        let detail = "";
+        try { detail = JSON.stringify(await r.json()); } catch (e) {}
+        return why("HTTP " + r.status + " " + detail +
+          (r.status === 404 ? " -- no refresh token stored for this account; sign out and back in to store one" : ""));
+      }
       const j = await r.json();
-      return j && j.access_token ? j : null;
-    } catch (e) { return null; }
+      if (!j || !j.access_token) return why("broker returned no access_token");
+      return j;
+    } catch (e) { return why("request failed: " + ((e && e.message) || e)); }
   };
 
   /* ---------------- the gate ----------------
@@ -19295,6 +19308,23 @@
   }
   primaryAuth.onLateToken(adoptLateToken);
 
+  /* Which sign-in failures are worth showing and which are not. A closed or
+     cancelled Google window is a deliberate act; saying it back is noise.
+     Anything else is a configuration problem the user cannot guess at, and
+     origin_mismatch above all -- it means this exact address has not been
+     registered with the OAuth client, which nothing on screen would ever
+     reveal. */
+  let autoSignInProblem = "";
+  function describeAuthFailure(e) {
+    const msg = String((e && e.message) || e || "");
+    if (/cancel|popup_closed|did not respond/i.test(msg)) return "";
+    if (/origin/i.test(msg)) {
+      return "Google refused this address (" + window.location.origin +
+        "). Add it under Authorized JavaScript origins on the OAuth client.";
+    }
+    return msg;
+  }
+
   async function connect(interactive) {
     try {
       if (!gisReady) { await loadGis(); initTokenClient(); }
@@ -24035,18 +24065,24 @@
         return;
       }
     } catch (e) {
-      /* Logged, not swallowed. Landing on the Connect button when you expected
-         to be signed in already is the confusing case, and the reason is
-         always in here -- a broker that could not be reached, an origin
-         Google will not accept -- with no other way to find out. */
+      /* Landing on the Connect button when you expected to be signed in is
+         the confusing case, and the reason was only ever in this discarded
+         error. It is logged, and -- unless it is simply that you closed the
+         window, which you did on purpose and do not need narrated -- it is
+         put on screen under the button, because the person who needs it is
+         looking at the widget and not at a console. */
       console.warn("[mps] Google auto sign-in failed:", (e && e.message) || e);
+      autoSignInProblem = describeAuthFailure(e);
     }
     try {
       await connect(false);
     } catch (e) {
       showSignedIn(false);
-      // Nothing to say: the signed-out state is the Connect button alone.
-      authHint.textContent = "";
+      // The Connect button alone is the right signed-out state when nothing
+      // has gone wrong. When something has, the button without the reason is
+      // a dead end -- so whichever of the two attempts produced a real
+      // problem gets to say so here.
+      authHint.textContent = autoSignInProblem || describeAuthFailure(e);
     }
   })();
 
