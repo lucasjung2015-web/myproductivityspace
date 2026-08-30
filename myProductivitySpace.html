@@ -44,6 +44,25 @@
 <meta name="twitter:title" content="myProductivitySpace">
 <meta name="twitter:description" content="One board for your calendar, tasks, pages and bookmarks.">
 <meta name="twitter:image" content="https://myproductivityspace.netlify.app/og.png">
+<!-- Widget settings registration, available before anything else runs.
+     __widgetSettings is published by nearly the last script block on the page,
+     so every module that owns a settings panel registers before the thing it
+     registers with exists. The old answer was setTimeout(0) -- wait a
+     macrotask and hope the parser has finished -- which is a race, not a
+     guarantee: the timer can fire while the parser is still between two script
+     blocks, and the registration is then dropped in silence, leaving a widget
+     with no gear and nothing in the console to say why. Registrations queue
+     here instead, and the settings module drains the queue when it is ready. -->
+<script>
+  window.__registerWidgetSettings = function (id, entry) {
+    if (window.__widgetSettings && window.__widgetSettings.register) {
+      window.__widgetSettings.register(id, entry);
+      return;
+    }
+    (window.__widgetSettingsQueue = window.__widgetSettingsQueue || []).push([id, entry]);
+  };
+</script>
+
 <style>
   @font-face {
     font-family: 'Neue Montreal';
@@ -24401,8 +24420,8 @@
     body.appendChild(wrap);
   }
 
-  function buildCalSettings(body) {
-    buildAccountField(body, "cal");
+  function buildCalSettings(body, widgetId) {
+    buildAccountField(body, widgetId || "cal");
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const lab = document.createElement("label");
@@ -24453,23 +24472,20 @@
     body.appendChild(wrap);
   }
 
-  /* Deferred by a macrotask, not called inline: __widgetSettings is published
-     by a LATER <script> tag than this one, so registering here and now would
-     find nothing and silently never give the calendar its gear. A setTimeout
-     boundary is what guarantees every remaining script on the page has run --
-     the same wait, for the same reason, that the widget-layout module makes
-     before it looks for its own builders. */
-  setTimeout(function () {
-    if (!window.__widgetSettings) return;
-    window.__widgetSettings.register("cal", { title: "Calendar settings", build: buildCalSettings });
-    // The task list gets the account control too. It is the same connection,
-    // but somebody in the task list wanting to change accounts should not
-    // have to know that the setting lives in the calendar.
-    window.__widgetSettings.register("unschedTasks", {
-      title: "Tasks settings",
-      build: function (body) { buildAccountField(body, "unschedTasks"); }
-    });
-  }, 0);
+  /* Queued, not deferred: the settings module is published by a later
+     <script> than this one, so it does not exist yet. See
+     __registerWidgetSettings. */
+  window.__registerWidgetSettings("cal", {
+    title: "Calendar settings",
+    build: function (body) { buildCalSettings(body, "cal"); }
+  });
+  // The task list gets the account control too. It is the same connection,
+  // but somebody in the task list wanting to change accounts should not have
+  // to know that the setting lives in the calendar.
+  window.__registerWidgetSettings("unschedTasks", {
+    title: "Tasks settings",
+    build: function (body) { buildAccountField(body, "unschedTasks"); }
+  });
 
   (async function boot() {
     /* Before anything is fetched or drawn: every event's displayed time is
@@ -24760,14 +24776,13 @@
       if (window.__calOpenCreate) window.__calOpenCreate();
     });
 
-    /* The same settings this widget's older sibling has. Deferred by a
-       macrotask for the same reason the primary's registration is: the
-       settings module is published by a later script than this one. */
-    setTimeout(function () {
-      if (window.__widgetSettings) {
-        window.__widgetSettings.register(id, { title: "Calendar settings", build: buildCalSettings });
-      }
-    }, 0);
+    /* The same settings this widget's older sibling has -- and bound to THIS
+       widget's id, so the account field switches this calendar rather than the
+       first one on the board. */
+    window.__registerWidgetSettings(id, {
+      title: "Calendar settings",
+      build: function (body) { buildCalSettings(body, id); }
+    });
 
     extraCalendarRefreshers.push(refresh);
     // Registered by id so switching THIS widget's account redraws only this
@@ -24878,14 +24893,10 @@
       renderTasksInto(viewport, ownTasks);
     }
 
-    setTimeout(function () {
-      if (window.__widgetSettings) {
-        window.__widgetSettings.register(id, {
-          title: "Tasks settings",
-          build: function (body) { buildAccountField(body, id); }
-        });
-      }
-    }, 0);
+    window.__registerWidgetSettings(id, {
+      title: "Tasks settings",
+      build: function (body) { buildAccountField(body, id); }
+    });
 
     extraTasksViews.push({ id: id, refresh: refresh });
     extraRefreshById[id] = refresh;
@@ -26539,8 +26550,7 @@
     if (el && el.isConnected) el.textContent = lastError[id] || "";
   }
   function registerGear(id) {
-    if (!window.__widgetSettings) return;
-    window.__widgetSettings.register(id, {
+    window.__registerWidgetSettings(id, {
       title: "Widget code",
       build: function (body) {
         const blob = blobs[id] || normalizeBlob({});
@@ -29305,13 +29315,14 @@
    popover), so a widget that has one is skipped: the goal is exactly one gear
    per widget, not two side by side.
 
-   Widgets with nothing to configure still get the gear — it opens and says so.
-   As real settings surfaces are written, register them here rather than adding
-   another header button:
+   A widget with nothing registered gets NO gear — a button that opens onto
+   "nothing here yet" promises and does not deliver. As real settings surfaces
+   are written, register them through the queue-safe global, which works from
+   any script whether or not this module has run yet:
 
-     window.__widgetSettings.register("cal", {
+     window.__registerWidgetSettings("cal", {
        title: "Calendar settings",
-       build: function (body, id) { ... }   // fill `body`, it's the popover
+       build: function (body) { ... }   // fill `body`, it's the popover
      });
 */
 (function () {
@@ -29471,6 +29482,11 @@
     },
     close: closePopover
   };
+
+  // Everything that registered before this module existed.
+  var queued = window.__widgetSettingsQueue || [];
+  window.__widgetSettingsQueue = null;
+  queued.forEach(function (pair) { window.__widgetSettings.register(pair[0], pair[1]); });
 })();
 </script>
 
