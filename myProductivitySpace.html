@@ -19220,10 +19220,15 @@
   // distinction is resolved once, here.
   function normalizeEvent(ev) {
     const allDay = !!(ev.start && ev.start.date);
-    const start = allDay ? parseYmd(ev.start.date) : new Date(ev.start.dateTime);
+    /* Timed events are shifted into the calendar's chosen zone here, once, so
+       every renderer below can go on reading .getHours() and be right. All-day
+       events are deliberately NOT shifted: they carry a bare date with no time
+       of day, so they mean the same day everywhere, and shifting one could
+       only ever move it off its own date. */
+    const start = allDay ? parseYmd(ev.start.date) : toCalZone(new Date(ev.start.dateTime));
     let end = allDay
       ? (ev.end && ev.end.date ? parseYmd(ev.end.date) : addDays(start, 1))
-      : new Date(ev.end && ev.end.dateTime ? ev.end.dateTime : ev.start.dateTime);
+      : toCalZone(new Date(ev.end && ev.end.dateTime ? ev.end.dateTime : ev.start.dateTime));
     // `raw` keeps the untouched Google resource around so the settings panel
     // can pre-fill the fields this normalized shape drops (guests, description,
     // availability, visibility, reminders) without a second GET per open.
@@ -19235,9 +19240,16 @@
 
   async function fetchEvents() {
     const r = visibleRange();
+    /* A day of slack at each end. The range is computed from dates on the
+       screen, but events are fetched by instant, and once the display is
+       shifted into another zone the two no longer line up -- an event at the
+       very edge of the view could fall outside the request and simply not
+       appear. A day covers every real zone offset, and asking for slightly
+       too much costs one filter pass. */
+    const from = addDays(r.start, -1), to = addDays(r.end, 1);
     const url = CAL_API + "/calendars/primary/events" +
-      "?timeMin=" + encodeURIComponent(r.start.toISOString()) +
-      "&timeMax=" + encodeURIComponent(r.end.toISOString()) +
+      "?timeMin=" + encodeURIComponent(from.toISOString()) +
+      "&timeMax=" + encodeURIComponent(to.toISOString()) +
       "&singleEvents=true&orderBy=startTime&maxResults=250";
     const data = await api(url);
     events = ((data && data.items) || [])
@@ -19316,7 +19328,7 @@
   function renderMonth() {
     const first = startOfMonth(anchor);
     const gridStart = startOfWeek(first);
-    const today = startOfDay(new Date());
+    const today = calToday();   // the chosen zone's today, which can differ from the device's
 
     const head = document.createElement("div");
     head.className = "cal-month-head";
@@ -19527,7 +19539,7 @@
       const s = startOfWeek(anchor);
       for (let i = 0; i < 7; i++) days.push(addDays(s, i));
     }
-    const today = startOfDay(new Date());
+    const today = calToday();   // the chosen zone's today, which can differ from the device's
 
     const wrap = document.createElement("div");
     wrap.className = "cal-timegrid" + (view === "week" ? " week" : "");
@@ -21518,16 +21530,61 @@
     return pad(d.getHours()) + ":" + pad(d.getMinutes());
   }
 
-  /* The browser's IANA zone ("Asia/Shanghai"), which is what Google wants on
-     start/end. Falls back to UTC only if the runtime cannot name one, which
-     is better than sending nothing and having the whole create rejected. */
-  function gcalTimeZone() {
+  /* The device's own IANA zone ("Asia/Shanghai"). Falls back to UTC only if
+     the runtime cannot name one, which is better than sending nothing and
+     having the whole create rejected. */
+  function deviceTimeZone() {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (tz) return tz;
     } catch (e) {}
     return "UTC";
   }
+
+  /* The zone the calendar is READ in, and therefore also the zone anything
+     created here is written in. Empty means "wherever this device is", which
+     is the default and exactly what the app did before this existed. Set from
+     the calendar's settings panel and persisted like any other preference. */
+  let calZone = "";
+  function gcalTimeZone() { return calZone || deviceTimeZone(); }
+
+  /* The heart of showing a calendar in another zone.
+
+     Returns a Date whose LOCAL fields spell out what a clock in `zone` reads
+     at that same instant -- so 14:00 UTC comes back as a Date whose
+     getHours() is 22 for Asia/Shanghai. It is no longer the same moment in
+     time, and that is the point: every renderer downstream asks a Date for
+     its hours and minutes and draws them, so shifting once here puts the
+     whole grid in the chosen zone without touching a single one of them.
+
+     Intl does the zone arithmetic, including whichever DST rule was in force
+     on that particular date -- precisely the part that must not be
+     hand-rolled. */
+  function zoneWallClock(date, zone) {
+    if (!zone) return date;
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone, hour12: false,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+      }).formatToParts(date);
+      const g = {};
+      parts.forEach(function (x) { g[x.type] = x.value; });
+      // Some engines report midnight as hour 24 under h23; % 24 folds it back.
+      return new Date(Number(g.year), Number(g.month) - 1, Number(g.day),
+                      Number(g.hour) % 24, Number(g.minute), Number(g.second));
+    } catch (e) {
+      // An unknown or unsupported zone must not blank the calendar.
+      return date;
+    }
+  }
+  // An instant as the chosen zone reads it. A no-op on the default setting,
+  // so the untouched case costs nothing and behaves exactly as before.
+  function toCalZone(date) { return calZone ? zoneWallClock(date, calZone) : date; }
+  // "Now" and "today" as the chosen zone sees them, which can be a different
+  // date entirely from the device's.
+  function calNow() { return toCalZone(new Date()); }
+  function calToday() { return startOfDay(calNow()); }
 
   /* A Date as local wall-clock ISO with no zone suffix -- "2026-08-24T09:00:00".
      toISOString() cannot be used here: it converts to UTC, which is a
@@ -23590,7 +23647,85 @@
   }
 
   /* ---------------- boot ---------------- */
+  /* The calendar's own settings panel, which is also what brings its gear
+     back -- a gear appears only where a module has registered something for
+     it to open. One setting so far: which zone the calendar is read in. */
+  const CAL_ZONE_KEY = "cal-timezone";
+
+  function applyCalZone(zone, persist) {
+    calZone = zone || "";
+    if (persist) storageSet(CAL_ZONE_KEY, calZone);
+    /* Re-base "today" and re-fetch. The anchor has to move because the chosen
+       zone may already be on a different date than the device, and a refetch
+       is needed because every event's shifted time is computed at
+       normalizeEvent -- the ones already in memory were shifted by the old
+       zone and cannot be corrected in place. */
+    anchor = calToday();
+    refreshAll();
+  }
+
+  function buildCalSettings(body) {
+    const wrap = document.createElement("div");
+    wrap.className = "cal-field";
+    const lab = document.createElement("label");
+    lab.textContent = "Time Zone";
+    wrap.appendChild(lab);
+
+    const sel = document.createElement("select");
+    const dev = deviceTimeZone();
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = "Device time zone (" + dev + ")";
+    sel.appendChild(first);
+
+    /* Every zone the runtime knows, rather than a hand-picked shortlist that
+       would be wrong for somebody. supportedValuesOf is not everywhere yet, so
+       a small fallback keeps the control useful instead of empty. */
+    let zones = [];
+    try { zones = Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []; } catch (e) { zones = []; }
+    if (!zones.length) {
+      zones = ["UTC", "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
+               "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Moscow",
+               "Asia/Dubai", "Asia/Kolkata", "Asia/Bangkok", "Asia/Shanghai", "Asia/Hong_Kong",
+               "Asia/Tokyo", "Asia/Seoul", "Australia/Sydney", "Pacific/Auckland"];
+      if (zones.indexOf(dev) === -1) zones.push(dev);
+    }
+    zones.forEach(function (z) {
+      const o = document.createElement("option");
+      o.value = z;
+      // The offset alongside the name, because "Asia/Kolkata" does not tell
+      // you what it will do to the grid but "+05:30" does.
+      let off = "";
+      try {
+        const p2 = new Intl.DateTimeFormat("en-US", { timeZone: z, timeZoneName: "shortOffset" }).formatToParts(new Date());
+        const hit = p2.filter(function (x) { return x.type === "timeZoneName"; })[0];
+        if (hit) off = " (" + hit.value + ")";
+      } catch (e) {}
+      o.textContent = z.replace(/_/g, " ") + off;
+      sel.appendChild(o);
+    });
+    sel.value = calZone;
+    sel.addEventListener("change", function () { applyCalZone(sel.value, true); });
+    wrap.appendChild(sel);
+
+    const note = document.createElement("div");
+    note.className = "cal-hint";
+    note.textContent = "Events are shown, and new ones created, in this zone. All-day events are unaffected.";
+    wrap.appendChild(note);
+    body.appendChild(wrap);
+  }
+
+  if (window.__widgetSettings) {
+    window.__widgetSettings.register("cal", { title: "Calendar settings", build: buildCalSettings });
+  }
+
   (async function boot() {
+    /* Before anything is fetched or drawn: every event's displayed time is
+       computed from this at normalizeEvent, and "today" depends on it too. */
+    try {
+      const savedZone = await storageGet(CAL_ZONE_KEY);
+      if (savedZone) { calZone = savedZone; anchor = calToday(); }
+    } catch (e) {}
     const savedView = await storageGet("cal-view");
     if (savedView === "day" || savedView === "week" || savedView === "month") view = savedView;
     Array.prototype.forEach.call(viewToggle.querySelectorAll("button"), function (b) {
@@ -23732,7 +23867,7 @@
     let anchor2 = startOfDay(new Date());
 
     function renderGrid(gridStart, evs) {
-      const today = startOfDay(new Date());
+      const today = calToday();
       const byDay = {};
       evs.forEach(function (ev) {
         const key = startOfDay(ev.start).toDateString();
