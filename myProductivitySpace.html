@@ -23715,9 +23715,17 @@
     body.appendChild(wrap);
   }
 
-  if (window.__widgetSettings) {
-    window.__widgetSettings.register("cal", { title: "Calendar settings", build: buildCalSettings });
-  }
+  /* Deferred by a macrotask, not called inline: __widgetSettings is published
+     by a LATER <script> tag than this one, so registering here and now would
+     find nothing and silently never give the calendar its gear. A setTimeout
+     boundary is what guarantees every remaining script on the page has run --
+     the same wait, for the same reason, that the widget-layout module makes
+     before it looks for its own builders. */
+  setTimeout(function () {
+    if (window.__widgetSettings) {
+      window.__widgetSettings.register("cal", { title: "Calendar settings", build: buildCalSettings });
+    }
+  }, 0);
 
   (async function boot() {
     /* Before anything is fetched or drawn: every event's displayed time is
