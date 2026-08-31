@@ -1678,6 +1678,14 @@
     color: #000000; background: #ffffff; min-width: 0; text-align: left; cursor: pointer;
   }
   .cal-time-btn:hover { background: #f5f5f5; }
+  /* Start/End are real text inputs now: you type the time into the field
+     itself and the picker below it filters to match, instead of the field
+     opening a list that carried a second box to type into. */
+  .cal-time-input {
+    width: 100%; box-sizing: border-box; cursor: text;
+  }
+  .cal-time-input:hover { background: #ffffff; }
+  .cal-time-input::placeholder { color: #70757a; }
   /* Anchor for the custom grip that replaces the native one turned off above. */
   .cal-field { position: relative; }
   .cal-field-hint { font-size: 11px; color: #000000; opacity: 0.55; }
@@ -1685,6 +1693,39 @@
   .cal-field-row .cal-field { flex: 1 1 0; min-width: 0; }
   .cal-field-check { display: flex; align-items: center; gap: 6px; }
   .cal-field-check label { font-size: 13px; font-weight: bold; color: #000000; }
+
+  /* ---------- the All day / Time zone line ----------
+     Google puts these two on one line directly under the date and time
+     fields, which is also where they belong here: the checkbox decides
+     whether the times above it exist at all, and the zone decides what they
+     mean, so neither reads correctly anywhere else. */
+  .cal-allday-line { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .cal-allday-line .cal-field-check { flex: 0 0 auto; }
+  .cal-tz {
+    display: flex; flex-direction: column; gap: 1px; align-items: flex-start;
+    min-width: 0;
+  }
+  .cal-tz-btn {
+    border: none; background: transparent; padding: 0; cursor: pointer;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-size: 13px; font-weight: bold; color: #000000; text-decoration: underline;
+  }
+  .cal-tz-btn:hover { opacity: 0.65; }
+  /* The zone actually in force, under the button. Google shows nothing here
+     and makes you open the dialog to find out; the answer is short enough to
+     just say. */
+  .cal-tz-now { font-size: 11px; color: #000000; opacity: 0.55; }
+  .cal-tz-modal .cal-field select { width: 100%; }
+  .cal-tz-modal select:disabled { color: #70757a; background: #f2f2f2; cursor: default; }
+  .cal-tz-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #000000; }
+  .cal-tz-check input[type="checkbox"] { accent-color: #000000; }
+  /* Pushed to the far left of the action row, opposite Cancel/OK — the same
+     place Google's "Use current time zone" sits. */
+  .cal-recur-actions .cal-recur-alt {
+    margin-right: auto; border: none; background: transparent;
+    color: #000000; text-decoration: underline; padding: 7px 0;
+  }
+  .cal-recur-actions .cal-recur-alt:hover { opacity: 0.65; }
 
   /* ---------- custom recurrence dialog ----------
      A small modal centered ON TOP of the event form (its own backdrop, above
@@ -1926,17 +1967,9 @@
   /* Black, like every other focused field here, rather than the browser's blue. */
   .gt-time-search:focus { outline: none; border-color: #000000; }
   .gt-time-search::placeholder { color: #70757a; }
-  /* The exact time the typed text resolves to. It sits in the head rather
-     than atop the scrolling list because by definition it is NOT one of those
-     rows -- it is the answer to what was typed, and it should not be able to
-     scroll out from under the text that produced it. */
-  .gt-time-custom {
-    display: block; width: 100%; text-align: left; border: none; background: transparent;
-    margin-top: 5px; padding: 8px 10px; border-radius: 4px; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px;
-    font-weight: 700; color: #000000;
-  }
-  .gt-time-custom:hover { background: #f1f3f4; }
+  /* A list opened from a field that does the typing itself has no head, so
+     the options are the whole popover. */
+  .gt-time-list.is-headless { max-height: 232px; }
   /* position:relative makes this the offsetParent of the option buttons, so
      the scroll-to-selected arithmetic stays relative to the scrolling pane
      rather than picking up the head's height as an offset. */
@@ -1947,11 +1980,16 @@
     padding: 12px 16px; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
     font-size: 13px; color: #70757a;
   }
+  /* flex rather than block so an end-time row can carry its duration on the
+     right ("11:30 AM      1 hr"). A row with no duration is a single text
+     node and lands in exactly the same place it always did. */
   .gt-time-option {
-    display: block; width: 100%; text-align: left; border: none; background: transparent;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    width: 100%; text-align: left; border: none; background: transparent;
     padding: 9px 16px; cursor: pointer;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px; color: #202124;
   }
+  .gt-time-dur { font-size: 12px; font-weight: 400; color: #70757a; flex: 0 0 auto; }
   .gt-time-option:hover { background: #f1f3f4; }
   .gt-time-option.is-selected { background: #e8eaed; font-weight: 700; }
 
@@ -2853,7 +2891,8 @@
     display: flex; flex-direction: row; min-height: 0;
   }
   #aiPanel[hidden] { display: none; }
-  .ai-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  /* position: the drop overlay is inset:0 against this column. */
+  .ai-main { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   /* ---- saved-chats sidebar ---- */
   .ai-side {
     flex: 0 0 var(--ai-side-w, 0px); width: var(--ai-side-w, 0px); min-height: 0;
@@ -2960,9 +2999,73 @@
   .ai-starter:hover { background: #f5f5f6; border-color: #c9c9c9; }
   .ai-starter:active { transform: scale(0.96); }
   .ai-composer {
+    position: relative;
     flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px;
     padding: 12px 14px; border-top: 1px solid var(--hair);
   }
+  .ai-plus {
+    flex: 0 0 auto; width: 34px; height: 34px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--hair); border-radius: 50%;
+    background: transparent; color: var(--ink); cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s var(--ease-spring);
+  }
+  .ai-plus:hover { background: #f5f5f6; border-color: #c9c9c9; }
+  .ai-plus:active { transform: scale(0.9); }
+  /* Opens upward: the composer is pinned to the bottom of the panel, so a
+     menu below it would be off-screen. */
+  .ai-plus-menu {
+    position: absolute; left: 14px; bottom: 54px; z-index: 20;
+    min-width: 232px; padding: 6px;
+    background: var(--bg); border: 1px solid var(--hair); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .ai-plus-menu[hidden] { display: none; }
+  .ai-plus-item {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border: none; border-radius: 8px;
+    background: transparent; color: var(--ink); cursor: pointer;
+    font-family: inherit; font-size: 13px; text-align: left;
+  }
+  .ai-plus-item:hover { background: #f3f3f4; }
+  .ai-plus-item span { flex: 1 1 auto; }
+  .ai-plus-item kbd {
+    flex: 0 0 auto; font-family: inherit; font-size: 11.5px; color: #9a9a9a;
+  }
+
+  /* Staged files, shown above the composer until the message is sent. */
+  .ai-attachments {
+    flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px;
+    padding: 10px 14px 0;
+  }
+  .ai-attachments[hidden] { display: none; }
+  .ai-chip {
+    display: flex; align-items: center; gap: 6px; max-width: 190px;
+    padding: 4px 6px 4px 5px; border: 1px solid var(--hair); border-radius: 8px;
+    background: #fafafa; font-size: 12px;
+  }
+  .ai-chip img { width: 26px; height: 26px; object-fit: cover; border-radius: 4px; flex: 0 0 auto; }
+  .ai-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ai-chip-x {
+    flex: 0 0 auto; width: 16px; height: 16px; padding: 0; line-height: 1;
+    border: none; border-radius: 50%; background: transparent; color: #8a8a8a;
+    cursor: pointer; font-size: 13px;
+  }
+  .ai-chip-x:hover { background: #ebebeb; color: var(--ink); }
+  /* Thumbnails on a sent message, inside its own bubble. */
+  .ai-msg-files { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .ai-msg-files img { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; }
+  .ai-msg-file { font-size: 11.5px; opacity: 0.85; }
+
+  /* Drag-and-drop target over the whole transcript. */
+  .ai-drop {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: rgba(255,255,255,0.86); color: var(--ink);
+    backdrop-filter: blur(2px);
+  }
+  .ai-drop[hidden] { display: none; }
+  .ai-drop-text { font-size: 13.5px; font-weight: 500; }
   .ai-composer textarea {
     flex: 1 1 auto; min-width: 0; resize: none; max-height: 140px;
     padding: 9px 12px; border: 1px solid var(--hair); border-radius: 10px;
@@ -3112,39 +3215,27 @@
      pseudo-element on the widget: widgets already use ::before/::after for
      their own chrome, and a separate node can be added and removed without
      touching any of that. */
-  .col.collapsible-col-wrap.ai-editing {
-    position: relative;
-    animation: ai-ring-breathe 1.8s ease-in-out infinite;
-  }
-  @keyframes ai-ring-breathe {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.45), 0 0 14px 0 rgba(0,0,0,0.16); }
-    50%      { box-shadow: 0 0 0 2px rgba(0,0,0,0.80), 0 0 26px 3px rgba(0,0,0,0.30); }
-  }
+  .col.collapsible-col-wrap.ai-editing { position: relative; }
+  /* A frame around the widget being worked on, not a cloud over it: the point
+     is to say "here", while leaving the content perfectly readable so you can
+     watch it change. Black rather than the warm hue the same effect uses
+     elsewhere, to stay inside this board's monochrome palette. */
   .ai-fog {
     position: absolute; inset: 0; border-radius: inherit;
-    overflow: hidden; pointer-events: none; z-index: 5;
+    pointer-events: none; z-index: 5;
+    border: 2px solid rgba(0,0,0,0.85);
+    animation: ai-frame-breathe 1.9s ease-in-out infinite;
   }
-  /* Two counter-drifting layers: one alone reads as a moving blob, two at
-     different speeds and opposite directions read as fog. */
-  .ai-fog::before, .ai-fog::after {
-    content: ""; position: absolute; inset: -45%;
-    background:
-      radial-gradient(42% 46% at 32% 38%, rgba(0,0,0,0.55), rgba(0,0,0,0) 68%),
-      radial-gradient(38% 44% at 68% 64%, rgba(0,0,0,0.40), rgba(0,0,0,0) 72%);
-    filter: blur(18px);
-    animation: ai-fog-drift 5.5s ease-in-out infinite,
-               ai-fog-pulse  2.6s ease-in-out infinite;
+  @keyframes ai-frame-breathe {
+    0%, 100% {
+      border-color: rgba(0,0,0,0.60);
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.08), 0 0 10px 0 rgba(0,0,0,0.14);
+    }
+    50% {
+      border-color: rgba(0,0,0,1);
+      box-shadow: inset 0 0 22px rgba(0,0,0,0.16), 0 0 20px 2px rgba(0,0,0,0.26);
+    }
   }
-  .ai-fog::after {
-    animation-duration: 7.8s, 3.5s;
-    animation-direction: reverse;
-    opacity: 0.65;
-  }
-  @keyframes ai-fog-drift {
-    0%, 100% { transform: translate3d(-16%, -9%, 0) scale(1.12); }
-    50%      { transform: translate3d( 14%,  8%, 0) scale(1.30); }
-  }
-  @keyframes ai-fog-pulse { 0%, 100% { opacity: 0.28; } 50% { opacity: 0.58; } }
 
   /* The pointer that shows WHERE the work is landing. Positioned in px by
      script and eased between spots, so it glides rather than teleports. */
@@ -3155,18 +3246,11 @@
     will-change: transform;
   }
   .ai-cursor svg { flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
-  .ai-cursor-label {
-    margin-top: 9px; padding: 3px 8px; border-radius: 999px;
-    background: var(--ink); color: var(--bg);
-    font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.28);
-  }
 
   /* Motion here is decorative status, not information — the label and the
      ring still say "working" without any of it. */
   @media (prefers-reduced-motion: reduce) {
-    .col.collapsible-col-wrap.ai-editing { animation: none; box-shadow: 0 0 0 2px rgba(0,0,0,0.7); }
-    .ai-fog::before, .ai-fog::after { animation: none; opacity: 0.4; }
+    .ai-fog { animation: none; border-color: rgba(0,0,0,0.9); }
     .ai-cursor { transition: none; }
     .ai-msg.is-streaming::after, .ai-thinking i, .ai-tool.is-running svg { animation: none; }
   }
@@ -3956,8 +4040,22 @@
     <button type="button" class="mps-x-btn" id="aiCloseBtn" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="ai-log" id="aiLog"></div>
+  <div class="ai-drop" id="aiDrop" hidden>
+    <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4"/><path d="M12 11v6M9 14h6"/></svg>
+    <div class="ai-drop-text">Drop files here to add to chat</div>
+  </div>
   <div class="ai-starters" id="aiStarters"></div>
+  <div class="ai-attachments" id="aiAttachments" hidden></div>
   <div class="ai-composer">
+    <button type="button" class="ai-plus" id="aiPlusBtn" title="Add files or photos" aria-label="Add files or photos" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+    <div class="ai-plus-menu" id="aiPlusMenu" hidden>
+      <button type="button" class="ai-plus-item" id="aiAddFilesBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1l-8.8 8.8a5 5 0 0 1-7.1-7.1l8.8-8.8a3.3 3.3 0 1 1 4.7 4.7l-8.8 8.8a1.7 1.7 0 0 1-2.4-2.4l8.1-8.1"/></svg>
+        <span>Add files or photos</span>
+        <kbd>&#8984; U</kbd>
+      </button>
+    </div>
+    <input type="file" id="aiFileInput" multiple accept="image/*,application/pdf,text/*,.md,.csv,.json,.log" hidden>
     <textarea id="aiInput" rows="1" placeholder="Write a message..."></textarea>
     <button type="button" class="ai-send" id="aiSendBtn" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button>
   </div>
@@ -12129,6 +12227,24 @@
         resizer.style.display = (leftVisible && rightVisible) ? "" : "none";
       });
 
+      /* Tabs whose widget no longer exists. A hidden widget's strip is moved
+         OUT of its wrapper and into #collapsedTabsBar (just above), so
+         deleting a hidden widget removed the wrapper and left the tab behind
+         -- stranded in the bar, pointing at nothing, and frozen forever on
+         whatever name the widget had when it went, because applyWidgetTitle
+         only ever visits widgets that still exist. Sweeping here fixes it for
+         every delete path at once, and heals a board that already collected
+         one. Deliberately keyed on "not in WIDGET_IDS at all", not on "has no
+         slot": a Calendar/Tasks widget parked in hiddenWidgetsPool is still a
+         real widget and must keep its element. */
+      Array.prototype.forEach.call(
+        collapsedTabsBar.querySelectorAll(".collapsible-strip"),
+        function (tab) {
+          const tid = (tab.id || "").replace(/Strip$/, "");
+          if (!tid || WIDGET_IDS.indexOf(tid) === -1) tab.remove();
+        }
+      );
+
       updateTabsBarVisibility();
       updateResizerStates();
       /* Last, and always: hiding or unhiding changes how many widgets a slot
@@ -15073,6 +15189,14 @@
         if (built) {
           applyWidgetColor(id);
           applyWidgetIcon(id);
+          /* And its name. Every builder hard-codes a placeholder into both the
+             header and the strip ("Google Calendar", "Google Tasks", "Page"),
+             and applyAllWidgetTitles -- which is what replaces those with the
+             real name -- has ALREADY run by the time this sweep builds a
+             widget whose module loaded late. Without this, such a widget kept
+             its builder's placeholder in the tab bar instead of the name it
+             was given. */
+          applyWidgetTitle(id);
         } else {
           missing = true;
         }
@@ -15114,6 +15238,11 @@
       if (idx !== -1) WIDGET_IDS.splice(idx, 1);
       const el = widgetEl(id);
       if (el) el.remove();
+      // The strip is only INSIDE that wrapper while the widget is visible;
+      // once hidden it lives in the tabs bar, so removing the wrapper does
+      // not take it with it.
+      const strip = tabFor(id);
+      if (strip && strip.parentNode) strip.parentNode.removeChild(strip);
       if (type === "vocab" && window.__unwireVocabMirrorSection) window.__unwireVocabMirrorSection(id);
       else if (type === "menu" && window.__unwireBookmarksSection) window.__unwireBookmarksSection(id);
       else if (type === "tasksView" && window.__unwireExtraTasksSection) window.__unwireExtraTasksSection(id);
@@ -19677,6 +19806,22 @@
      answer differently -- so the primary widgets go through refreshAll and
      an extra one refreshes itself. */
   const extraRefreshById = {};
+  /* Each extra Calendar widget keeps its OWN fetched events on its ctx --
+     they are a different account's, so they cannot share the primary list.
+     Registered here because clicking a chip has to be able to find the event
+     behind it whichever widget drew it. */
+  const extraCtxById = {};
+  function findEventById(rawId) {
+    const mine = events.filter(function (x) { return x.id === rawId; })[0];
+    if (mine) return mine;
+    const ids = Object.keys(extraCtxById);
+    for (let i = 0; i < ids.length; i++) {
+      const list = (extraCtxById[ids[i]] || {}).events || [];
+      const hit = list.filter(function (x) { return x.id === rawId; })[0];
+      if (hit) return hit;
+    }
+    return null;
+  }
   async function refreshAllFor(widgetId) {
     if (extraRefreshById[widgetId]) { await extraRefreshById[widgetId](); return; }
     await refreshAll();
@@ -21881,11 +22026,28 @@
   /* ---------------- create ---------------- */
   const createBackdrop = el("calCreateBackdrop");
 
+  /* Which calendar widget's + Create was pressed. There is ONE create panel
+     for the whole board, so without this it always behaved as though the
+     press came from the original calendar: the menu anchored under that
+     widget's button (so pressing Create on a second calendar opened a menu
+     over a different widget), and the save went to that widget's account (so
+     the event landed in the wrong Google account entirely). Reset on close so
+     a stale owner can never outlive the panel that set it. */
+  let createOwnerId = "cal";
+  function createBtnFor(id) {
+    if (!id || id === "cal") return createBtn;
+    const wrap = document.querySelector(
+      '.col.collapsible-col-wrap[data-col-id="' + String(id).replace(/(["\\])/g, "\\$1") + '"]'
+    );
+    return (wrap && wrap.querySelector('[data-act="create"]')) || createBtn;
+  }
+
   function closePanel() {
     createPanel.hidden = true;
     createPanel.innerHTML = "";
     createPanel.classList.remove("as-menu", "as-modal");
     if (createBackdrop) createBackdrop.hidden = true;
+    createOwnerId = "cal";
   }
 
   // Frames the panel as either the anchored dropdown or the centered dialog.
@@ -21908,7 +22070,7 @@
     if (mode === "menu") {
       // Anchor under the + Create button, nudged left so a 190px menu stays
       // on screen when the calendar column is narrow or near the viewport edge.
-      const r = createBtn.getBoundingClientRect();
+      const r = createBtnFor(createOwnerId).getBoundingClientRect();
       const left = Math.max(8, Math.min(r.right - 190, window.innerWidth - 198));
       createPanel.style.setProperty("--menu-top", (r.bottom + 6) + "px");
       createPanel.style.setProperty("--menu-left", left + "px");
@@ -21942,7 +22104,8 @@
   // of a native <input type="time">. A native one shows 24-hour or 12-hour
   // purely by OS/browser locale, with no lever this app can pull either way;
   // this always shows and always inserts "1:00 PM", never "13:00".
-  function timeField(labelText, value) {
+  function timeField(labelText, value, opts) {
+    opts = opts || {};
     const wrap = document.createElement("div");
     wrap.className = "cal-field";
     const lab = document.createElement("label");
@@ -21953,21 +22116,64 @@
     input.type = "hidden";
     input.value = value || "";
 
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "cal-time-btn";
-    btn.textContent = gtFmtTime(input.value) || "Set time";
-    btn.addEventListener("click", function (e) {
-      e.stopPropagation();
-      gtOpenTimeList(btn, input.value, function (hhmm) {
-        input.value = hhmm;
-        btn.textContent = gtFmtTime(hhmm);
-        input.dispatchEvent(new Event("change", { bubbles: true }));
+    /* The field IS the search box. It used to be a button that opened a list
+       carrying its own "Type a time" input, so one value had two fields:
+       you clicked here and then typed over there. Now typing here filters the
+       list directly, and the list is purely a set of suggestions for what
+       has been typed. */
+    const box = document.createElement("input");
+    box.type = "text";
+    box.className = "cal-time-btn cal-time-input";
+    box.autocomplete = "off";
+    box.spellcheck = false;
+    box.placeholder = "Set time";
+    box.value = gtFmtTime(input.value) || "";
+
+    function setTime(hhmm) {
+      input.value = hhmm;
+      box.value = gtFmtTime(hhmm);
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    /* Half-typed text must never survive as if it were the value. On close,
+       text that resolves to a time commits it; anything else snaps back to
+       the time the event actually has. */
+    function syncFromText() {
+      const t = parseTimeInput(box.value);
+      if (t) setTime(t);
+      else box.value = gtFmtTime(input.value) || "";
+    }
+
+    /* Guarded on the node itself rather than a boolean: other popover
+       machinery on this page can detach the list without going through its
+       own close(), and a flag would then stay stuck at "open" and refuse to
+       reopen it for the rest of the panel's life. */
+    let listEl = null;
+    function openList() {
+      if (listEl && listEl.isConnected) return;
+      listEl = gtOpenTimeList(box, input.value, setTime, {
+        searchInput: box,
+        // An End field hands over the Start field's value, which turns the
+        // list into Google's: it begins at the first time after the start and
+        // every row is labelled with the length it would make the event.
+        durationFrom: opts.durationFrom || null,
+        onClose: function () { listEl = null; syncFromText(); }
       });
-    });
-    wrap.appendChild(btn);
+      // Selected, not just focused: the first keystroke should replace the
+      // time that is there, the way typing over a highlighted value does
+      // everywhere else.
+      try { box.select(); } catch (e) {}
+    }
+    box.addEventListener("focus", openList);
+    // Clicking a field that already has focus fires no focus event, so a
+    // list dismissed by Escape could not be reopened without tabbing away.
+    box.addEventListener("click", function (e) { e.stopPropagation(); openList(); });
+
+    wrap.appendChild(box);
     wrap.appendChild(input);
-    return { wrap: wrap, input: input };
+    // `set` exists for the one caller that writes a time the user did not
+    // type: dragging the Start forward carries the End along with it, and the
+    // visible box has to follow the hidden value.
+    return { wrap: wrap, input: input, set: setTime };
   }
 
   function textareaField(labelText, placeholder) {
@@ -22572,6 +22778,202 @@
     };
   }
 
+  /* ================= event time zone =================
+     What "10:30 AM" actually means. Google puts a Time zone link beside the
+     All day checkbox and opens a dialog holding one zone for the whole event
+     -- or two, once "Use separate start and end time zones" is ticked, which
+     is the only honest way to write down a flight that leaves New York and
+     lands in London. Those are exactly the two values the Calendar API's
+     start.timeZone and end.timeZone carry, so nothing is invented here.
+
+     The default is the zone the calendar is being READ in (calZone, or this
+     device's), because that is already the zone every time in this panel is
+     assumed to be in. */
+
+  // Every zone the runtime knows. supportedValuesOf is not everywhere yet, so
+  // a shortlist stands in rather than leaving the control empty.
+  function calZoneList() {
+    let zones = [];
+    try { zones = Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []; } catch (e) { zones = []; }
+    if (!zones.length) {
+      zones = ["UTC", "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
+               "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Moscow",
+               "Asia/Dubai", "Asia/Kolkata", "Asia/Bangkok", "Asia/Shanghai", "Asia/Hong_Kong",
+               "Asia/Tokyo", "Asia/Seoul", "Australia/Sydney", "Pacific/Auckland"];
+    }
+    return zones;
+  }
+
+  // The zone's current offset, "(GMT-04:00)"-style. Empty when the runtime
+  // will not name one, so a label never ends up with a dangling bracket.
+  function calZoneOffset(z) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", { timeZone: z, timeZoneName: "shortOffset" }).formatToParts(new Date());
+      const hit = parts.filter(function (x) { return x.type === "timeZoneName"; })[0];
+      if (hit) return hit.value;
+    } catch (e) {}
+    return "";
+  }
+
+  // "America/New_York" -> "America/New York (GMT-4)". The offset is the half
+  // that answers the question people actually have.
+  function calZoneLabel(z) {
+    const off = calZoneOffset(z);
+    return z.replace(/_/g, " ") + (off ? " (" + off + ")" : "");
+  }
+
+  // The same thing said in the width of a hint line: "New York (GMT-4)".
+  function calZoneShort(z) {
+    const off = calZoneOffset(z);
+    return z.split("/").pop().replace(/_/g, " ") + (off ? " (" + off + ")" : "");
+  }
+
+  function calZoneSelect(value) {
+    const sel = document.createElement("select");
+    calZoneList().forEach(function (z) {
+      const o = document.createElement("option");
+      o.value = z;
+      o.textContent = calZoneLabel(z);
+      sel.appendChild(o);
+    });
+    // A zone the runtime did not list (an event written elsewhere) still has
+    // to be selectable, or opening the dialog would silently rewrite it.
+    if (value && !Array.prototype.some.call(sel.options, function (o) { return o.value === value; })) {
+      const o = document.createElement("option");
+      o.value = value; o.textContent = calZoneLabel(value);
+      sel.insertBefore(o, sel.firstChild);
+    }
+    sel.value = value;
+    return sel;
+  }
+
+  /* The Time zone control: a link, the zone(s) in force underneath it, and
+     the dialog behind it. `rawEv` is the Google resource being edited (or {}
+     for a new event) -- an event that already carries two different zones
+     opens with the separate-zones box already ticked, since that is what it
+     already means. */
+  function buildTimeZoneField(rawEv) {
+    const evStart = (rawEv.start && rawEv.start.timeZone) || "";
+    const evEnd = (rawEv.end && rawEv.end.timeZone) || "";
+    let startZone = evStart || gcalTimeZone();
+    let endZone = evEnd || startZone;
+    let separate = !!(evStart && evEnd && evStart !== evEnd);
+
+    const wrap = document.createElement("div");
+    wrap.className = "cal-tz";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cal-tz-btn";
+    btn.textContent = "Time zone";
+    const now = document.createElement("div");
+    now.className = "cal-tz-now";
+    wrap.appendChild(btn);
+    wrap.appendChild(now);
+
+    function paint() {
+      now.textContent = separate
+        ? calZoneShort(startZone) + " \u2192 " + calZoneShort(endZone)
+        : calZoneShort(startZone);
+    }
+    paint();
+
+    btn.addEventListener("click", function () {
+      const backdrop = document.createElement("div");
+      backdrop.className = "cal-recur-backdrop";
+      const modal = document.createElement("div");
+      modal.className = "cal-recur-modal cal-tz-modal";
+
+      const title = document.createElement("div");
+      title.className = "cal-modal-title";
+      title.textContent = "Event time zone";
+      modal.appendChild(title);
+
+      const sepLabel = document.createElement("label");
+      sepLabel.className = "cal-tz-check";
+      const sepBox = document.createElement("input");
+      sepBox.type = "checkbox";
+      sepBox.checked = separate;
+      sepLabel.appendChild(sepBox);
+      sepLabel.appendChild(document.createTextNode("Use separate start and end time zones"));
+      modal.appendChild(sepLabel);
+
+      const startField = document.createElement("div");
+      startField.className = "cal-field";
+      const startLab = document.createElement("label");
+      startLab.textContent = "Event start time zone";
+      const startSel = calZoneSelect(startZone);
+      startField.appendChild(startLab);
+      startField.appendChild(startSel);
+      modal.appendChild(startField);
+
+      const endField = document.createElement("div");
+      endField.className = "cal-field";
+      const endLab = document.createElement("label");
+      endLab.textContent = "Event end time zone";
+      const endSel = calZoneSelect(separate ? endZone : startZone);
+      endField.appendChild(endLab);
+      endField.appendChild(endSel);
+      modal.appendChild(endField);
+
+      /* One zone means one zone: the end select stays disabled and mirrors
+         the start, so the dialog never shows two values while claiming to
+         hold one. */
+      function syncSep() {
+        endSel.disabled = !sepBox.checked;
+        if (!sepBox.checked) endSel.value = startSel.value;
+      }
+      sepBox.addEventListener("change", syncSep);
+      startSel.addEventListener("change", syncSep);
+      syncSep();
+
+      const actions = document.createElement("div");
+      actions.className = "cal-recur-actions";
+
+      const useNow = document.createElement("button");
+      useNow.type = "button";
+      useNow.className = "cal-recur-cancel cal-recur-alt";
+      useNow.textContent = "Use current time zone";
+      useNow.addEventListener("click", function () {
+        startSel.value = gcalTimeZone();
+        sepBox.checked = false;
+        syncSep();
+      });
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "cal-recur-cancel";
+      cancelBtn.textContent = "Cancel";
+      function closeDlg() { if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop); }
+      cancelBtn.addEventListener("click", closeDlg);
+
+      const okBtn = document.createElement("button");
+      okBtn.type = "button";
+      okBtn.className = "cal-recur-done";
+      okBtn.textContent = "OK";
+      okBtn.addEventListener("click", function () {
+        separate = sepBox.checked;
+        startZone = startSel.value;
+        endZone = separate ? endSel.value : startSel.value;
+        closeDlg();
+        paint();
+      });
+
+      actions.appendChild(useNow);
+      actions.appendChild(cancelBtn);
+      actions.appendChild(okBtn);
+      modal.appendChild(actions);
+      backdrop.appendChild(modal);
+      backdrop.addEventListener("mousedown", function (e) { if (e.target === backdrop) closeDlg(); });
+      document.body.appendChild(backdrop);
+    });
+
+    return {
+      wrap: wrap,
+      getStart: function () { return startZone; },
+      getEnd: function () { return separate ? endZone : startZone; }
+    };
+  }
+
   // `existing` is a normalized event (see normalizeEvent) to edit, or null/
   // undefined to create a new one. Both modes render the same panel; edit mode
   // pre-fills every field, PATCHes instead of POSTs, and gains the Widgets
@@ -22580,6 +22982,9 @@
   // `existing`.
   function openEventForm(existing) {
     const nsId = existing ? nsEvent(existing.id) : null;
+    // Read now, not at save time: closePanel() resets it, and the save runs
+    // after that.
+    const owner = createOwnerId;
     const rawEv = (existing && existing.raw) || {};
     createPanel.innerHTML = "";
     createPanel.hidden = false;
@@ -22587,18 +22992,53 @@
     createPanel.appendChild(panelHeading(existing ? "Event" : "New event"));
     const title = field("Event title", "text", existing ? existing.title : "");
     const date = field("Date", "date", existing ? ymd(existing.start) : ymd(anchor));
+    /* The second date, shown only while All day is on -- Google's own
+       all-day row is "Monday, August 31 - Monday, August 31" and its timed
+       row is a single date with two times. Google's end.date is EXCLUSIVE
+       (a one-day event ends the following morning), but the day shown here
+       is the last day the event actually covers, the way Google shows it;
+       the save puts the extra day back on. */
+    const endDate = field("End date", "date",
+      existing && existing.allDay ? ymd(addDays(existing.end, -1))
+        : (existing ? ymd(existing.start) : ymd(anchor)));
+    const dates = document.createElement("div");
+    dates.className = "cal-field-row";
+    dates.appendChild(date.wrap);
+    dates.appendChild(endDate.wrap);
+
     const startT = timeField("Start", existing && !existing.allDay ? hhmm(existing.start) : "09:00");
-    const endT = timeField("End", existing && !existing.allDay ? hhmm(existing.end) : "10:00");
+    // The End list is measured from whatever the Start box holds right now:
+    // it opens on the first time after it and labels every row with the
+    // length ("1 hr", "14 hrs 30 min"), exactly as Google's does.
+    const endT = timeField("End", existing && !existing.allDay ? hhmm(existing.end) : "10:00",
+      { durationFrom: function () { return startT.input.value; } });
     const times = document.createElement("div");
     times.className = "cal-field-row";
     times.appendChild(startT.wrap);
     times.appendChild(endT.wrap);
+
+    /* Moving the Start carries the End with it, keeping the length the event
+       already had -- 10:30-11:30 dragged to 2:00 becomes 2:00-3:00, not a
+       backwards event. Same rule Google follows, and the reason the End is
+       never left in an impossible place by a Start edit alone. */
+    let lastStart = startT.input.value;
+    startT.input.addEventListener("change", function () {
+      const next = startT.input.value;
+      if (!next || next === lastStart) { lastStart = next || lastStart; return; }
+      const span = gtSpanFrom(lastStart, endT.input.value || lastStart);
+      lastStart = next;
+      endT.set(gtHhmm(gtMinutes(next) + span));
+    });
+
     // An all-day event has no meaningful start/end time, and showing the
     // inputs would invite silently converting it into a timed one on save.
     // display:none rather than the `hidden` attribute: .cal-field-row sets
     // display:flex, and an author rule beats the UA stylesheet's [hidden].
-    const isAllDay = !!(existing && existing.allDay);
-    if (isAllDay) times.style.display = "none";
+    const allDay = checkField("All day");
+    allDay.input.checked = !!(existing && existing.allDay);
+    // Read through a function rather than captured once: the checkbox is now
+    // a live control, and the save has to ask it what it says at save time.
+    function isAllDay() { return allDay.input.checked; }
 
     // Google represents "no recurrence" as either a missing `recurrence`
     // field or an empty array — an event's own array can also carry EXDATE/
@@ -22606,8 +23046,38 @@
     // way to edit and so leaves untouched by only ever reading/writing the
     // first RRULE: entry.
     const initialRuleStr = (rawEv.recurrence || []).filter(function (s) { return /^RRULE:/.test(s); })[0] || null;
-    const repeat = buildRepeatField(initialRuleStr, date.input.value, isAllDay);
-    date.input.addEventListener("change", function () { repeat.setDate(date.input.value); });
+    const repeat = buildRepeatField(initialRuleStr, date.input.value, isAllDay());
+
+    const tz = buildTimeZoneField(rawEv);
+    const allDayLine = document.createElement("div");
+    allDayLine.className = "cal-allday-line";
+    allDayLine.appendChild(allDay.wrap);
+    allDayLine.appendChild(tz.wrap);
+
+    /* Everything the checkbox governs, in one place: which of the two rows is
+       on screen, and the fact that an all-day recurrence has to write its
+       UNTIL as a bare date (see rruleFromCustom). The zone goes with the
+       times, because an all-day event is the same day everywhere and has no
+       zone to state. */
+    function syncAllDay() {
+      const on = isAllDay();
+      times.style.display = on ? "none" : "";
+      endDate.wrap.style.display = on ? "" : "none";
+      tz.wrap.style.display = on ? "none" : "";
+      repeat.setAllDay(on);
+      if (on && (!endDate.input.value || endDate.input.value < date.input.value)) {
+        endDate.input.value = date.input.value;
+      }
+    }
+    allDay.input.addEventListener("change", syncAllDay);
+    syncAllDay();
+
+    date.input.addEventListener("change", function () {
+      repeat.setDate(date.input.value);
+      // The end can never sit before the start; dragging the start past it
+      // pushes it along rather than leaving a span that reads backwards.
+      if (endDate.input.value < date.input.value) endDate.input.value = date.input.value;
+    });
 
     const guests = field("Add guests", "text",
       (rawEv.attendees || []).map(function (a) { return a.email; }).filter(Boolean).join(", "));
@@ -22665,8 +23135,9 @@
     const pendingTags = {};
 
     createPanel.appendChild(title.wrap);
-    createPanel.appendChild(date.wrap);
+    createPanel.appendChild(dates);
     createPanel.appendChild(times);
+    createPanel.appendChild(allDayLine);
     createPanel.appendChild(repeat.wrap);
     createPanel.appendChild(guests.wrap);
     createPanel.appendChild(meet.wrap);
@@ -22681,10 +23152,17 @@
       if (!t) return showError("Give the event a title.");
       if (!date.input.value) return showError("Pick a date.");
       let startAt = null, endAt = null;
-      if (!isAllDay) {
+      if (isAllDay()) {
+        if (!endDate.input.value) return showError("Pick an end date.");
+        if (endDate.input.value < date.input.value) return showError("The end date can't be before the start date.");
+      } else {
         startAt = new Date(date.input.value + "T" + (startT.input.value || "09:00") + ":00");
         endAt = new Date(date.input.value + "T" + (endT.input.value || "10:00") + ":00");
-        if (!(endAt > startAt)) return showError("End time must be after the start time.");
+        /* An end at or before the start is the ordinary way to say "runs past
+           midnight" -- it is what picking 1:00 AM from a 10:30 AM start means,
+           and the End list said so out loud ("14 hrs 30 min") when it was
+           picked. So it rolls onto the next day rather than being refused. */
+        if (endAt <= startAt) endAt = new Date(endAt.getTime() + 86400000);
       }
       btn.disabled = true;
       btn.textContent = existing ? "Saving…" : "Creating…";
@@ -22699,12 +23177,13 @@
           // alone — omitting the field only means "don't touch what's there".
           recurrence: repeat.getRule() ? [repeat.getRule()] : []
         };
-        if (isAllDay) {
-          // Keep an all-day event all-day. Google's end.date is exclusive, so
-          // preserve the original span rather than recomputing it.
-          const days = Math.max(1, Math.round((existing.end - existing.start) / 86400000));
+        if (isAllDay()) {
+          /* Google's end.date is exclusive, so the day after the last day the
+             event covers is what goes on the wire -- the field itself holds
+             that last day, which is what the calendar shows and what anyone
+             reading the form means by "ends". */
           body.start = { date: date.input.value, timeZone: gcalTimeZone() };
-          body.end = { date: ymd(addDays(parseYmd(date.input.value), days)), timeZone: gcalTimeZone() };
+          body.end = { date: ymd(addDays(parseYmd(endDate.input.value), 1)), timeZone: gcalTimeZone() };
         } else {
           /* Local wall-clock time plus a named zone, not a UTC instant.
 
@@ -22717,8 +23196,8 @@
              rest of the calendar stayed put. Sending the time the user
              actually typed, with the zone their browser is in, is the only
              form that means what the form says. */
-          body.start = { dateTime: gcalLocalIso(startAt), timeZone: gcalTimeZone() };
-          body.end = { dateTime: gcalLocalIso(endAt), timeZone: gcalTimeZone() };
+          body.start = { dateTime: gcalLocalIso(startAt), timeZone: tz.getStart() };
+          body.end = { dateTime: gcalLocalIso(endAt), timeZone: tz.getEnd() };
         }
         const guestEmails = guests.input.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
         // On an edit, an emptied-but-changed field still sends [] — that's how
@@ -22748,13 +23227,18 @@
         let url = CAL_API + "/calendars/primary/events";
         if (existing) url += "/" + encodeURIComponent(existing.id);
         if (addMeet) url += "?conferenceDataVersion=1";
-        const saved = await api(url, {
-          method: existing ? "PATCH" : "POST",
-          body: JSON.stringify(body)
-        });
+        /* A new event goes to the account of the widget whose + Create was
+           pressed; an edit goes back to the account the event was actually
+           read from (stampAuth put it on the event). The unqualified api()
+           that used to be here resolved to authFor("cal") in BOTH cases, so
+           an event created from a second calendar was written into the first
+           one's account and then never appeared where it was made. */
+        const saved = existing
+          ? await apiForEvent(existing, url, { method: "PATCH", body: JSON.stringify(body) })
+          : await authFor(owner).api(url, { method: "POST", body: JSON.stringify(body) });
         if (!existing && saved && saved.id) applyStagedTags(nsEvent(saved.id), t, pendingTags);
         closePanel();
-        await refreshAll();
+        await refreshAllFor(owner);
       } catch (e) {
         btn.disabled = false;
         btn.textContent = existing ? "Save" : "Create";
@@ -22949,6 +23433,48 @@
     return out;
   })();
 
+  // "HH:MM" <-> minutes since midnight, the arithmetic form every duration
+  // and every start/end comparison below is done in.
+  function gtMinutes(hhmm) {
+    const p = String(hhmm || "").split(":");
+    return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0);
+  }
+  function gtHhmm(mins) {
+    const m = ((mins % 1440) + 1440) % 1440;
+    return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+  }
+
+  /* How long an event running from one time to the other would be, worded the
+     way Google words it in the end-time list: "45 min", "1 hr", "1 hr 30 min",
+     "2 hrs", and "1 day" for the full turn of the clock. */
+  function gtFmtDuration(mins) {
+    if (mins >= 1440) return "1 day";
+    const h = Math.floor(mins / 60), m = mins % 60;
+    if (!h) return m + " min";
+    return h + (h === 1 ? " hr" : " hrs") + (m ? " " + m + " min" : "");
+  }
+
+  /* Minutes from `from` forward to `hhmm`, wrapping past midnight — so an end
+     of 1:00 AM against a 10:30 AM start is 14 hrs 30 min, not a negative
+     number. A slot equal to the start is a full day away, not zero, which is
+     why the list can end on the start time again. */
+  function gtSpanFrom(from, hhmm) {
+    const d = (gtMinutes(hhmm) - gtMinutes(from) + 1440) % 1440;
+    return d === 0 ? 1440 : d;
+  }
+
+  /* The 48 presets rotated to begin at the first slot AFTER `from` and
+     wrapping around to it — exactly the order Google's end-time list uses, so
+     the first row you see is the shortest event you could make rather than
+     midnight. Without a `from` the plain midnight-to-midnight order stands. */
+  function gtPresetsFrom(from) {
+    if (!from) return GT_TIME_PRESETS;
+    const base = gtMinutes(from);
+    let i = 0;
+    while (i < GT_TIME_PRESETS.length && gtMinutes(GT_TIME_PRESETS[i]) <= base) i++;
+    return GT_TIME_PRESETS.slice(i).concat(GT_TIME_PRESETS.slice(0, i));
+  }
+
   /* The strings a preset can be found by, lowercased and stripped of the
      punctuation nobody types consistently. 9:00 PM is reachable as "900pm",
      "9pm", "2100" and "21", so every way somebody might reach for it leads to
@@ -22976,21 +23502,34 @@
      "HH:MM" -- which is why all three call sites are untouched. Nothing
      downstream ever assumed a 30-minute boundary either: a due time is stored
      as a bare string, and an event's start/end goes into new Date(). */
-  function gtOpenTimeList(anchorEl, current, onPick) {
+  function gtOpenTimeList(anchorEl, current, onPick, opts) {
+    opts = opts || {};
     const list = document.createElement("div");
     list.className = "gt-time-list";
 
-    const head = document.createElement("div");
-    head.className = "gt-time-head";
-    const search = document.createElement("input");
-    search.type = "text";
-    search.className = "gt-time-search";
-    search.placeholder = "Type a time";
-    // The browser's own autofill dropdown would cover the very list this
-    // field is filtering, which is the one thing it must never do.
-    search.autocomplete = "off";
-    head.appendChild(search);
-    list.appendChild(head);
+    /* Where the typing happens. When the caller already owns a text field --
+       the Start and End boxes in the event form type straight into this list
+       -- we drive theirs and render no head at all. There used to be a
+       "Type a time" input in here as well, which meant one value had two
+       places to look at and two places to type into. */
+    const external = opts.searchInput || null;
+    let head = null, search;
+    if (external) {
+      search = external;
+      list.classList.add("is-headless");
+    } else {
+      head = document.createElement("div");
+      head.className = "gt-time-head";
+      search = document.createElement("input");
+      search.type = "text";
+      search.className = "gt-time-search";
+      search.placeholder = "Type a time";
+      // The browser's own autofill dropdown would cover the very list this
+      // field is filtering, which is the one thing it must never do.
+      search.autocomplete = "off";
+      head.appendChild(search);
+      list.appendChild(head);
+    }
 
     const options = document.createElement("div");
     options.className = "gt-time-options";
@@ -23004,14 +23543,28 @@
       // and clicking into it -- already counts as "inside" here, and equally
       // in the three other outside-click guards naming this same class.
       if (el && el.closest(".gt-time-list")) return;
+      // The caller's own field is the list's search box, so clicking into it
+      // is "inside" too -- otherwise the list closes the moment you go back
+      // to the thing you are typing in.
+      if (external && el === external) return;
       close();
     }
+    let closed = false;
     function close() {
+      if (closed) return;
+      closed = true;
       if (list.parentNode) list.parentNode.removeChild(list);
       // Detached here rather than only on the outside-click path: picking an
       // option used to remove the list and leave this listener armed against
       // a node that no longer existed.
       document.removeEventListener("pointerdown", off, true);
+      // A borrowed field outlives the list, so its listeners must not: two
+      // opens would otherwise leave two of each attached to it.
+      if (external) {
+        search.removeEventListener("input", onSearchInput);
+        search.removeEventListener("keydown", onSearchKey);
+      }
+      if (opts.onClose) { try { opts.onClose(); } catch (e) {} }
     }
     function commit(hhmm) {
       close();
@@ -23023,40 +23576,61 @@
     // still showing. Kept out here because render() rebuilds everything else.
     let customTime = null;
 
-    function render(scrollToSelected) {
-      const q = search.value.trim().toLowerCase().replace(/[\s:.]/g, "");
-      customTime = parseTimeInput(search.value);
+    /* A borrowed field arrives holding the CURRENT value ("9:00 AM"), and
+       treating that as a query would open the list filtered down to the one
+       row you already have. It only becomes a filter once something is
+       actually typed; until then the list is the full set, scrolled to the
+       current time. */
+    let valueIsNotAQueryYet = !!external;
 
-      const oldCustom = head.querySelector(".gt-time-custom");
-      if (oldCustom) head.removeChild(oldCustom);
-      // Offered only when the typed time is not already one of the rows
-      // below, or the same time would appear twice -- once as "Use 9:00 AM"
-      // and once as "9:00 AM" -- reading as if they did different things.
-      if (customTime && GT_TIME_PRESETS.indexOf(customTime) === -1) {
-        const use = document.createElement("button");
-        use.type = "button";
-        use.className = "gt-time-custom";
-        use.textContent = "Use " + gtFmtTime(customTime);
-        use.addEventListener("click", function () { commit(customTime); });
-        head.appendChild(use);
-      }
+    function render(scrollToSelected) {
+      const raw = valueIsNotAQueryYet ? "" : search.value;
+      const q = raw.trim().toLowerCase().replace(/[\s:.]/g, "");
+      customTime = parseTimeInput(raw);
+
+      /* An End field passes the Start field's current value in, and every row
+         then says how long the event would be if you picked it. Read fresh on
+         every render rather than captured at open, because the start can be
+         retyped while this very list is up. */
+      const from = opts.durationFrom ? (opts.durationFrom() || "") : "";
 
       options.innerHTML = "";
       let shown = 0;
-      GT_TIME_PRESETS.forEach(function (hhmm) {
-        if (q && !gtTimeMatchKeys(hhmm).some(function (k) { return k.indexOf(q) === 0; })) return;
+
+      // One row: the time on the left, its duration (when there is a start to
+      // measure from) on the right.
+      function timeRow(hhmm, selected) {
         const b = document.createElement("button");
         b.type = "button";
-        b.className = "gt-time-option" + (hhmm === current ? " is-selected" : "");
-        b.textContent = gtFmtTime(hhmm);
+        b.className = "gt-time-option" + (selected ? " is-selected" : "");
+        const t = document.createElement("span");
+        t.textContent = gtFmtTime(hhmm);
+        b.appendChild(t);
+        if (from) {
+          const d = document.createElement("span");
+          d.className = "gt-time-dur";
+          d.textContent = gtFmtDuration(gtSpanFrom(from, hhmm));
+          b.appendChild(d);
+        }
         b.addEventListener("click", function () { commit(hhmm); });
         options.appendChild(b);
         shown++;
+      }
+
+      /* The time the typed text resolves to, offered as an ordinary row at
+         the top of the list. It used to sit above the list as a bold
+         "Use 9:25 AM", which made it read as a different KIND of thing from
+         the times underneath -- it is the same kind of thing, so it now looks
+         like one. Offered only when it is not already one of the presets, or
+         the same time would appear twice. */
+      if (customTime && GT_TIME_PRESETS.indexOf(customTime) === -1) timeRow(customTime, false);
+      gtPresetsFrom(from).forEach(function (hhmm) {
+        if (q && !gtTimeMatchKeys(hhmm).some(function (k) { return k.indexOf(q) === 0; })) return;
+        timeRow(hhmm, hhmm === current);
       });
-      // Only when there is no custom row either -- an empty preset list under
-      // a "Use 9:15 PM" row is not a dead end, it is the normal look of
-      // having typed a time the presets do not carry.
-      if (!shown && !customTime) {
+      // shown already counts the typed-time row, so this is only reached when
+      // the text resolves to no time at all.
+      if (!shown) {
         const empty = document.createElement("div");
         empty.className = "gt-time-empty";
         empty.textContent = "Not a time";
@@ -23066,26 +23640,35 @@
       if (scrollToSelected) {
         // Open on the current (or a sensible default) time rather than at
         // midnight, so the useful part of a 48-entry list is what you see.
-        const sel = options.querySelector(".is-selected") || options.children[18];
+        // A duration-ordered list already opens on the useful end of itself
+        // (the shortest event), so it starts at the top unless the time the
+        // field already holds is further down.
+        const sel = options.querySelector(".is-selected") || (from ? options.children[0] : options.children[18]);
         if (sel) options.scrollTop = Math.max(0, sel.offsetTop - 80);
       }
     }
 
-    search.addEventListener("input", function () {
+    // Named, so close() can take them off a field it does not own.
+    function onSearchInput() {
+      valueIsNotAQueryYet = false;
       // Re-anchor on the selected row only once the field is empty again.
       // While filtering there is nothing to scroll to: the best match is
       // already at the top, and jumping the list under a half-typed query is
       // disorienting.
       render(!search.value.trim());
-    });
+    }
+    search.addEventListener("input", onSearchInput);
 
-    search.addEventListener("keydown", function (e) {
+    function onSearchKey(e) {
       if (e.key === "Enter") {
         e.preventDefault();
         // The typed time wins whenever there is one, so "9:15" + Enter can
         // never silently commit the 9:00 sitting in the list beneath it.
         const first = options.querySelector(".gt-time-option");
         if (customTime) commit(customTime);
+        // Enter without having typed anything means "this is fine as it is",
+        // not "take whatever row happens to be at the top of the full list".
+        else if (valueIsNotAQueryYet) close();
         else if (first) first.click();
         return;
       }
@@ -23106,7 +23689,8 @@
         const first = options.querySelector(".gt-time-option");
         if (first) { e.preventDefault(); first.focus(); }
       }
-    });
+    }
+    search.addEventListener("keydown", onSearchKey);
 
     document.body.appendChild(list);
     // Rendered before it is placed: gtPlaceNear measures offsetHeight to
@@ -23116,11 +23700,15 @@
     gtPlaceNear(list, anchorEl.getBoundingClientRect(), 2);
     // Focused, not merely present: the field is the reason to open the list
     // at all now. preventScroll keeps the focus call from yanking the
-    // scrolled panel underneath the popover back to the top.
-    search.focus({ preventScroll: true });
+    // scrolled panel underneath the popover back to the top. A borrowed field
+    // already has focus -- that is usually what opened the list.
+    if (!external) search.focus({ preventScroll: true });
     // Closing the list is the popover machinery's job too -- it lives outside
     // .gt-popover, hence its own selector in the outside-click test above.
     setTimeout(function () { document.addEventListener("pointerdown", off, true); }, 0);
+    // Handed back so a caller driving this from its own field can tell
+    // whether the list it opened is still standing.
+    return list;
   }
 
   // The month grid + Set time + Repeat popover. `state` is {due, dueTime,
@@ -23769,7 +24357,12 @@
   function openItemEditor(nsId, title) {
     const rawId = nsId.replace(/^(task|event):/, "");
     if (nsId.indexOf("event:") === 0) {
-      const ev = events.filter(function (x) { return x.id === rawId; })[0];
+      // Every calendar widget's events, not just the primary one's. Searching
+      // only `events` meant a chip clicked in a second calendar was never
+      // found, and every such click fell through to the subpage below --
+      // which is why clicking an event there opened Branch AI instead of the
+      // event's own editor.
+      const ev = findEventById(rawId);
       if (ev) return openEventForm(ev);
     } else {
       const t = tasks.filter(function (x) { return x.id === rawId; })[0];
@@ -23782,15 +24375,15 @@
 
   // Reachable from an extra Calendar widget's own Create button, which has no
   // other way into this closure.
-  window.__calOpenCreate = function () {
+  window.__calOpenCreate = function (widgetId) {
     closeViewMenu();
-    if (createPanel.hidden) openChooser();
+    if (createPanel.hidden) { createOwnerId = widgetId || "cal"; openChooser(); }
     else closePanel();
   };
 
   createBtn.addEventListener("click", function () {
     closeViewMenu();
-    if (createPanel.hidden) openChooser();
+    if (createPanel.hidden) { createOwnerId = "cal"; openChooser(); }
     else closePanel();
   });
 
@@ -24436,29 +25029,15 @@
     sel.appendChild(first);
 
     /* Every zone the runtime knows, rather than a hand-picked shortlist that
-       would be wrong for somebody. supportedValuesOf is not everywhere yet, so
-       a small fallback keeps the control useful instead of empty. */
-    let zones = [];
-    try { zones = Intl.supportedValuesOf ? Intl.supportedValuesOf("timeZone") : []; } catch (e) { zones = []; }
-    if (!zones.length) {
-      zones = ["UTC", "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
-               "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Moscow",
-               "Asia/Dubai", "Asia/Kolkata", "Asia/Bangkok", "Asia/Shanghai", "Asia/Hong_Kong",
-               "Asia/Tokyo", "Asia/Seoul", "Australia/Sydney", "Pacific/Auckland"];
-      if (zones.indexOf(dev) === -1) zones.push(dev);
-    }
+       would be wrong for somebody -- the same list, labelled the same way
+       ("Asia/Kolkata (GMT+5:30)"), that an event's own Time zone dialog
+       offers, so the two controls cannot drift apart. */
+    const zones = calZoneList();
+    if (zones.indexOf(dev) === -1) zones.push(dev);
     zones.forEach(function (z) {
       const o = document.createElement("option");
       o.value = z;
-      // The offset alongside the name, because "Asia/Kolkata" does not tell
-      // you what it will do to the grid but "+05:30" does.
-      let off = "";
-      try {
-        const p2 = new Intl.DateTimeFormat("en-US", { timeZone: z, timeZoneName: "shortOffset" }).formatToParts(new Date());
-        const hit = p2.filter(function (x) { return x.type === "timeZoneName"; })[0];
-        if (hit) off = " (" + hit.value + ")";
-      } catch (e) {}
-      o.textContent = z.replace(/_/g, " ") + off;
+      o.textContent = calZoneLabel(z);
       sel.appendChild(o);
     });
     sel.value = calZone;
@@ -24635,7 +25214,9 @@
             '<button type="button" class="cal-navbtn" data-act="prev" title="Previous">&#9664;</button>' +
             '<span class="cal-rangelabel" data-role="label"></span>' +
             '<button type="button" class="cal-navbtn" data-act="next" title="Next">&#9654;</button>' +
-            '<button type="button" class="cal-todaybtn" data-act="today">Today</button>' +
+            /* No Today button on an extra calendar: the arrows either side of
+               the date already move the view, and the row is narrow enough
+               that a third control crowded them. */
           '</div>' +
           '<div class="cal-viewport" data-role="viewport"><div class="cal-loading">Loading&#8230;</div></div>' +
         '</div>' +
@@ -24668,6 +25249,10 @@
      What stays per-widget is what should: which day you are looking at and
      in which view. Two calendars side by side can show today's hours and
      next month, and neither disturbs the other. */
+  // Where an extra calendar's chosen view lives. Keyed by widget id, since
+  // each one keeps its own view.
+  function CALVIEW_KEY(id) { return "calview-view:" + id; }
+
   function wireExtraCalendarWidget(id) {
     const wrap = document.getElementById(id + "ColWrap");
     if (!wrap) return;
@@ -24753,7 +25338,8 @@
 
     navPrev.addEventListener("click", function () { step(-1); });
     navNext.addEventListener("click", function () { step(1); });
-    navToday.addEventListener("click", function () { ctx.anchor = calToday(); refresh(); });
+    // Guarded: these widgets no longer render a Today button.
+    if (navToday) navToday.addEventListener("click", function () { ctx.anchor = calToday(); refresh(); });
     if (viewBtn) viewBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       if (viewMenu && viewMenu.hidden) openViewMenu2(); else closeViewMenu2();
@@ -24763,17 +25349,23 @@
       const b = e.target.closest("button[data-view]");
       if (!b) return;
       ctx.view = b.dataset.view;
+      // Remembered per widget, the way the main calendar remembers its own
+      // (storageSet("cal-view") in setView). Two calendars side by side can
+      // sit on two different views, so the id is part of the key -- one
+      // shared key would have them overwriting each other's choice.
+      storageSet(CALVIEW_KEY(id), ctx.view);
       closeViewMenu2();
       refresh();
     });
-    /* Create opens the same chooser the main calendar's button does. The
-       panel is a modal over the whole page, so there is nothing per-widget
-       about it -- and whatever gets created lands in the one Google calendar
-       both widgets are windows onto, so both redraw. */
+    /* Create opens the same chooser the main calendar's button does, but it
+       has to say WHICH widget asked. These widgets can be on different Google
+       accounts (see the settings registration just below), so the panel needs
+       the id both to anchor itself under this button and to save into this
+       widget's account rather than the board's default one. */
     const createBtn2 = wrap.querySelector('[data-act="create"]');
     if (createBtn2) createBtn2.addEventListener("click", function (e) {
       e.stopPropagation();
-      if (window.__calOpenCreate) window.__calOpenCreate();
+      if (window.__calOpenCreate) window.__calOpenCreate(id);
     });
 
     /* The same settings this widget's older sibling has -- and bound to THIS
@@ -24784,12 +25376,27 @@
       build: function (body) { buildCalSettings(body, id); }
     });
 
+    // So a click on one of this widget's event chips can find the event.
+    extraCtxById[id] = ctx;
     extraCalendarRefreshers.push(refresh);
     // Registered by id so switching THIS widget's account redraws only this
     // widget -- the others are on different accounts and would answer
     // differently to the same request.
     extraRefreshById[id] = refresh;
-    refresh();
+
+    /* Open on the view this widget was last left in, rather than on Month
+       every time. The read is async, so the label is set once it lands and
+       the first fetch is made for the RIGHT range -- starting in Month and
+       correcting afterwards would pull six weeks of events only to throw
+       them away when a saved Day view replaced them a moment later. */
+    (async function () {
+      try {
+        const saved = await storageGet(CALVIEW_KEY(id));
+        if (saved === "day" || saved === "week" || saved === "month") ctx.view = saved;
+      } catch (e) {}
+      setViewLabel();
+      refresh();
+    })();
   }
 
   window.__buildExtraCalendarSection = buildExtraCalendarWidgetEl;
@@ -26314,12 +26921,15 @@
   const STORE_PREFIX = function (id) { return "cw:" + id + ":"; };
   const KEYS_KEY = function (id) { return "cw:" + id + ":__keys"; };
   const MAX_KEYS = 200, MAX_VALUE = 64 * 1024, MAX_CODE = 200 * 1024;
+  const PROBE_MS = 1500;   // a frame that threw on load never answers; don't hang on it
   const KEY_RE = /^[\w.\-]{1,64}$/;
 
   const blobs = {};        // id -> { name, html, css, js, version, net, createdAt, updatedAt }
   const stores = {};       // id -> { key: value }
   const frames = new Map();// iframe -> id
   const lastError = {};    // id -> string
+  const logs = {};         // id -> [{ level, text, at }], newest last
+  const MAX_LOGS = 100;    // a runaway loop must not grow this without bound
   const themes = {};       // id -> hex
 
   /* ---- what runs inside the frame, before the widget's own script ---- */
@@ -26330,16 +26940,45 @@
     "  function send(m){ parent.postMessage(m, '*'); }",
     "  function ask(m){ return new Promise(function(res, rej){ m.rid = ++rid; pending[m.rid] = {res:res, rej:rej}; send(m); }); }",
     "  function emit(ev, v){ (handlers[ev]||[]).forEach(function(fn){ try{ fn(v); }catch(e){} }); }",
+    /* Console capture. The parent cannot see into an opaque-origin frame, so
+       without this the model writes code blind. With it, it can drop a
+       console.log into the widget's js and read the value back on the next
+       turn -- which is the entire debugging loop, and the thing it was
+       missing relative to a real dev setup. */
+    "  function fmt(a){",
+    "    if (a instanceof Error) return String(a.message) + (a.stack ? ' -- ' + a.stack : '');",
+    "    if (typeof a === 'string') return a;",
+    "    if (a === undefined) return 'undefined';",
+    "    try { return JSON.stringify(a); } catch(e){ return String(a); }",
+    "  }",
+    "  ['log','info','warn','error','debug'].forEach(function(level){",
+    "    var orig = console[level];",
+    "    console[level] = function(){",
+    "      var args = Array.prototype.slice.call(arguments);",
+    "      try { send({t:'log', level: level, text: args.map(fmt).join(' ').slice(0, 2000)}); } catch(e){}",
+    "      if (orig) try { orig.apply(console, args); } catch(e){}",
+    "    };",
+    "  });",
     "  window.addEventListener('message', function(e){",
     "    var m = e.data || {}; if (e.source !== parent) return;",
     "    if (m.t === 'init'){ snap = m.store || {}; theme = m.theme || theme; size = m.size || size; mps.theme = theme; mps.size = size; readyResolve(); emit('ready'); }",
     "    else if (m.t === 'reply'){ var p = pending[m.rid]; if (p){ delete pending[m.rid]; m.ok ? p.res(m.value) : p.rej(new Error(m.error||'store error')); } }",
     "    else if (m.t === 'theme'){ theme = m.value; mps.theme = theme; document.documentElement.style.setProperty('--mps-bg', theme); emit('theme', theme); }",
     "    else if (m.t === 'size'){ size = m.value; mps.size = size; emit('size', size); }",
+    "    else if (m.t === 'probe'){ var r = {t:'probeReply', rid: m.rid};",
+    "      try { r.html = document.body.innerHTML; r.text = document.body.innerText; }",
+    "      catch(err){ r.error = String(err && err.message || err); }",
+    "      send(r); }",
     "  });",
     "  var mps = window.mps = {",
     "    ready: ready, theme: theme, size: size,",
-    "    on: function(ev, fn){ (handlers[ev] = handlers[ev]||[]).push(fn); if (ev==='ready') ready.then(function(){ fn(); }); },",
+    /* 'ready' takes the promise path ONLY. It used to also sit in handlers,
+       and init calls readyResolve() AND emit('ready') -- so every widget that
+       followed the documented "wait for mps.on('ready')" advice ran its whole
+       initialiser twice: double fetches, doubled DOM, two timers. The promise
+       path is the one to keep, because it also fires for a handler registered
+       after ready has already passed. */
+    "    on: function(ev, fn){ if (ev === 'ready'){ ready.then(function(){ try { fn(); } catch(e){} }); return; } (handlers[ev] = handlers[ev]||[]).push(fn); },",
     "    store: {",
     "      get: function(k){ return Object.prototype.hasOwnProperty.call(snap, k) ? snap[k] : null; },",
     "      getJSON: function(k, d){ var v = snap[k]; if (v == null) return d; try { return JSON.parse(v); } catch(e){ return d; } },",
@@ -26349,8 +26988,8 @@
     "      all: function(){ var o = {}; for (var k in snap) o[k] = snap[k]; return o; }",
     "    }",
     "  };",
-    "  window.addEventListener('error', function(e){ send({t:'error', message: String(e.message||e) + (e.lineno ? ' (line ' + e.lineno + ')' : '')}); });",
-    "  window.addEventListener('unhandledrejection', function(e){ send({t:'error', message: 'Unhandled promise rejection: ' + String(e.reason && e.reason.message || e.reason)}); });",
+    "  window.addEventListener('error', function(e){ send({t:'error', message: String(e.message||e) + (e.lineno ? ' (line ' + e.lineno + ')' : '') + (e.error && e.error.stack ? ' -- ' + e.error.stack : '')}); });",
+    "  window.addEventListener('unhandledrejection', function(e){ var r = e.reason; send({t:'error', message: 'Unhandled promise rejection: ' + String(r && r.message || r) + (r && r.stack ? ' -- ' + r.stack : '')}); });",
     "  document.documentElement.style.setProperty('--mps-bg', theme);",
     "  send({t:'ready'});",
     "})();"
@@ -26427,6 +27066,7 @@
       return;
     }
     delete lastError[id];
+    delete logs[id];
     const frame = document.createElement("iframe");
     frame.className = "cw-frame";
     frame.setAttribute("sandbox", "allow-scripts");
@@ -26452,6 +27092,26 @@
   function post(id, msg) {
     const f = frameOf(id);
     if (f && f.contentWindow) { try { f.contentWindow.postMessage(msg, "*"); } catch (e) {} }
+  }
+
+  /* The one thing the parent cannot do by reading its own DOM: see inside an
+     opaque-origin frame. So ask it. Resolves rather than rejects on timeout --
+     a widget whose script threw before it wired its listener is a normal
+     outcome here, and the caller wants to report it, not catch it. */
+  let probeRid = 0;
+  const probePending = {};
+  function probe(id) {
+    return new Promise(function (resolve) {
+      const f = frameOf(id);
+      if (!f || !f.contentWindow) return resolve({ error: "That widget is not mounted." });
+      const rid = ++probeRid;
+      const timer = setTimeout(function () {
+        delete probePending[rid];
+        resolve({ error: "The widget frame did not answer within " + PROBE_MS + "ms -- its script may have thrown before it finished loading. Check the console and lastError." });
+      }, PROBE_MS);
+      probePending[rid] = function (v) { clearTimeout(timer); resolve(v); };
+      post(id, { t: "probe", rid: rid });
+    });
   }
 
   /* ---- the parent side of the protocol ----
@@ -26497,8 +27157,26 @@
       }
       case "error":
         lastError[id] = String(m.message || "error").slice(0, 500);
+        // Errors join the same timeline as the logs, so the model reads one
+        // ordered story instead of correlating two lists by eye.
+        pushLog(id, "error", lastError[id]);
         refreshGearError(id);
         break;
+      case "log":
+        pushLog(id, String(m.level || "log"), String(m.text == null ? "" : m.text).slice(0, 2000));
+        break;
+      case "probeReply": {
+        const fn = probePending[m.rid];
+        if (fn) {
+          delete probePending[m.rid];
+          fn({
+            html: m.html == null ? null : String(m.html).slice(0, 4000),
+            text: m.text == null ? null : String(m.text).slice(0, 2000),
+            error: m.error || null
+          });
+        }
+        break;
+      }
     }
   });
 
@@ -26545,6 +27223,12 @@
 
   /* ---- the gear: a code editor ---- */
   const gearErrEls = {};
+  function pushLog(id, level, text) {
+    const arr = logs[id] || (logs[id] = []);
+    arr.push({ level: level, text: text, at: new Date().toISOString() });
+    if (arr.length > MAX_LOGS) arr.splice(0, arr.length - MAX_LOGS);
+  }
+
   function refreshGearError(id) {
     const el = gearErrEls[id];
     if (el && el.isConnected) el.textContent = lastError[id] || "";
@@ -26632,7 +27316,7 @@
     Object.keys(store).forEach(function (k) { window.storageSet(STORE_PREFIX(id) + k, ""); });
     window.storageSet(KEYS_KEY(id), "");
     window.storageSet(BLOB_KEY(id), "");
-    delete blobs[id]; delete stores[id]; delete lastError[id]; delete themes[id];
+    delete blobs[id]; delete stores[id]; delete lastError[id]; delete logs[id]; delete themes[id];
   };
 
   const api = {
@@ -26643,7 +27327,7 @@
       o = o || {};
       const b = window.__aiBoard;
       if (!b) return { error: "The board is not ready." };
-      const blob = normalizeBlob({ name: o.name, html: o.html, css: o.css, js: o.js, version: 1 });
+      const blob = normalizeBlob({ name: o.name, html: o.html, css: o.css, js: o.js, version: 1, net: o.net });
       if (!blob.html.trim() && !blob.js.trim()) return { error: "Provide at least html or js." };
       if (codeTooBig(blob)) return { error: "Widget code is too large (200 KB max)." };
       const id = b.create("custom");
@@ -26679,10 +27363,30 @@
       if (!b) return null;
       return {
         name: b.name, html: b.html, css: b.css, js: b.js, version: b.version, net: b.net,
-        store: Object.assign({}, stores[id] || {}), lastError: lastError[id] || null
+        store: Object.assign({}, stores[id] || {}), lastError: lastError[id] || null,
+        console: (logs[id] || []).slice()
       };
     },
     lastError: function (id) { return lastError[id] || null; },
+
+    /* Everything the frame will tell you about its CURRENT run, in one call:
+       what it rendered, what it logged, what it threw, what it saved. This is
+       the read half of write-run-read -- without it the model can only guess
+       whether the code it just shipped did anything. */
+    inspect: async function (id) {
+      const b = blobs[id];
+      if (!b) return { error: "No custom widget with id '" + id + "'." };
+      const p = await probe(id);
+      return {
+        widget_id: id, name: b.name, version: b.version, net: b.net,
+        rendered_html: p.html || null,
+        rendered_text: p.text || null,
+        frame_error: p.error || null,
+        console: (logs[id] || []).slice(),
+        lastError: lastError[id] || null,
+        store: Object.assign({}, stores[id] || {})
+      };
+    },
     setStore: function (id, key, value) {
       if (!blobs[id]) return { error: "No custom widget with id '" + id + "'." };
       if (!KEY_RE.test(String(key))) return { error: "Invalid key." };
@@ -27474,7 +28178,11 @@
   const AI_MODEL = "claude-sonnet-5";
   // A ceiling on tool round-trips, so a model that keeps calling tools can't
   // spin the panel forever.
-  const AI_MAX_TURNS = 10;
+  /* How many tool round-trips one request may take before the loop stops
+     asking for more. Ten was too few for the ordinary shape of a real job --
+     read the DOM, inspect two or three widgets, then write -- and the ceiling
+     was being hit before the model ever got to its answer. */
+  const AI_MAX_TURNS = 24;
 
   function board() { return window.__aiBoard || null; }
 
@@ -27512,8 +28220,9 @@
 
     fogCursor = document.createElement("div");
     fogCursor.className = "ai-cursor";
-    fogCursor.innerHTML = CURSOR_SVG + '<span class="ai-cursor-label"></span>';
-    fogCursor.querySelector(".ai-cursor-label").textContent = label;
+    // No caption. The frame plus the pointer already say "working, here",
+    // and a word like "Inspecting" was noise on top of that.
+    fogCursor.innerHTML = CURSOR_SVG;
     host.appendChild(fogCursor);
 
     // Kept inside the widget's own box, and off the edges, so the label never
@@ -27937,24 +28646,26 @@
     /* ---- custom widgets ---- */
     {
       name: "create_custom_widget",
-      description: "Build a brand-new widget from your own HTML, CSS and JavaScript and add it to the board. It runs in a sandboxed iframe (about 300x280px by default, resizable by the user) with NO network access and no access to the page — only the `mps` API injected before your script:\n" +
+      description: "Build a brand-new widget from your own HTML, CSS and JavaScript and add it to the board. It runs in a sandboxed iframe (about 300x280px by default, resizable by the user) with no access to this page or to the board's data — only the `mps` API injected before your script:\n" +
         "  mps.store.get(key) -> string|null (sync), mps.store.getJSON(key, fallback), mps.store.set(key, value) (persists; objects are JSON-stringified), mps.store.remove(key), mps.store.keys();\n" +
         "  mps.theme (the widget's background hex; also CSS var --mps-bg), mps.size ({w,h}), mps.on('ready'|'theme'|'size', fn), mps.ready (Promise).\n" +
-        "Wait for mps.on('ready') before reading the store. Keep all state in mps.store so it survives code updates. Inline styles/scripts only; no external URLs except https images. Write complete, working, self-contained code — the body is your html; do not include <html>/<head>/<body> tags.",
+        "Wait for mps.on('ready') before reading the store. Keep all state in mps.store so it survives code updates. Inline styles/scripts only; no external URLs except https images. Write complete, working, self-contained code — the body is your html; do not include <html>/<head>/<body> tags.\n" +
+        "Network is OFF by default. Set net:true when the widget genuinely needs to fetch from https endpoints (a public API, RSS, prices) -- the user is asked to approve it. Even with net:true the frame holds NO credentials of any kind, so it can never reach the user's own Google or Notion data: use the calendar, tasks and Notion tools for those, not a widget.",
       input_schema: {
         type: "object",
         properties: {
           name: { type: "string", description: "Short title shown in the widget's header." },
           html: { type: "string" },
           css: { type: "string" },
-          js: { type: "string" }
+          js: { type: "string" },
+          net: { type: "boolean", description: "Allow the widget to fetch from https endpoints. Defaults to false. Only pass true when the widget cannot work without it; the user is shown a confirm before it is granted." }
         },
         required: ["name", "html"]
       }
     },
     {
       name: "update_custom_widget",
-      description: "Replace some or all of a custom widget's code (html, css, js) or its name. Omitted fields stay as they were; the widget's store is preserved. Read the current code with read_widget first. The result includes any runtime error the new code threw, so you can fix it.",
+      description: "Replace some or all of a custom widget's code (html, css, js), its name, or its network permission (net). Omitted fields stay as they were; the widget's store is preserved. Read the current code with read_widget first. The result includes any runtime error the new code threw, so you can fix it.",
       input_schema: {
         type: "object",
         properties: {
@@ -27962,8 +28673,73 @@
           name: { type: "string" },
           html: { type: "string" },
           css: { type: "string" },
-          js: { type: "string" }
+          js: { type: "string" },
+          net: { type: "boolean", description: "Turn network access on or off. Omit to leave it as it is; read_widget reports the current value." }
         },
+        required: ["widget_id"]
+      }
+    },
+    {
+      name: "read_dom",
+      description: "Read any part of the live page, not just a widget: pass a CSS selector and get back each matching element's tag, id, classes, visible text, key attributes and its children. " +
+        "Use this for UI that is NOT inside a widget -- modals, dropdowns, the event/task create panel, settings sheets -- and whenever you need exact class names before writing CSS. " +
+        "Panels like the create form only exist in the DOM while they are open, so open one with click_element FIRST and then read it. Never ask the user to hold a popup open for you; open it yourself. Omit the selector to get the page's top-level structure.\n" +
+        "Selector rules: STANDARD CSS ONLY -- ':has-text(...)' and other Playwright/testing-library syntax are not valid here and will be rejected. " +
+        "A widget is NOT '#<widget_id>': widgets are addressed as '.col.collapsible-col-wrap[data-col-id=\"<widget_id>\"]'. " +
+        "To find a control by its wording, read_dom its container and pick the element out of the result by its text, then click it by tag/class/id.",
+      input_schema: {
+        type: "object",
+        properties: {
+          selector: { type: "string", description: "A CSS selector. Defaults to 'body > *' when omitted." },
+          max_depth: { type: "number", description: "How many levels of children to include. Default 3, max 8." }
+        },
+        required: []
+      }
+    },
+    {
+      name: "read_source",
+      description: "Read the app's OWN source code. The whole dashboard is one self-contained HTML file \u2014 markup, CSS and JavaScript together \u2014 and this searches it.\n" +
+        "Use it BEFORE answering any question about how a built-in feature behaves, and before saying a behaviour does not exist. The settings panel is not the source of truth: plenty of behaviour is wired in code with no toggle exposed for it, so 'there is no setting for X' is never evidence that X does not happen. Search for it and find out.\n" +
+        "Two modes. Pass `query` to grep: every matching line comes back with its line number and surrounding context. Pass `start_line` (and optionally `end_line`) instead to read a specific stretch, which is how you read a whole function after grep has found it.\n" +
+        "Good queries are the literal strings the code would contain: a storage key ('cal-view'), a function name ('function setView'), a CSS class ('.cal-taskrow-title'), an id ('calCreateBtn'), a label the user sees ('All day').\n" +
+        "This is READ-ONLY. You cannot edit the app's source \u2014 the file is served from disk and the page cannot write back to it. So use what you find to answer accurately, to tell the user a feature already exists, or to describe precisely what would have to change and where (quote the line numbers). Never offer to rebuild a built-in widget as a custom one to add behaviour it may already have: look first.",
+      input_schema: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Text to search for. Case-insensitive substring by default; a regular expression when regex is true." },
+          regex: { type: "boolean", description: "Treat query as a JavaScript regular expression. Default false." },
+          context_lines: { type: "number", description: "Lines of context around each match. Default 4, max 30." },
+          max_matches: { type: "number", description: "How many matches to return. Default 20, max 60." },
+          start_line: { type: "number", description: "Read a range instead of searching: the first line, 1-based." },
+          end_line: { type: "number", description: "Last line of the range. Defaults to start_line + 60. At most 400 lines per call." }
+        },
+        required: []
+      }
+    },
+    {
+      name: "click_element",
+      description: "Click something on the page, exactly as the user would. Use it to OPEN the transient UI you then want to read with read_dom -- a + Create button, a settings gear, a dropdown toggle. " +
+        "Do NOT use it to press a destructive control (Delete, Remove, Sign out) or to submit a form on the user's behalf: use the proper tool for that, or ask. " +
+        "Returns what was clicked AND an outline of whatever appeared as a result, so you never have to guess at the new panel's class names -- read the 'opened' field instead of inventing a selector. " +
+        "Some controls open a chooser first (+ Create gives Event / Task); when 'opened' shows a chooser, click the option you want and look at 'opened' again.\n" +
+        "Same selector rules as read_dom: standard CSS only (no ':has-text(...)'), and a widget is '.col.collapsible-col-wrap[data-col-id=\"<widget_id>\"]', never '#<widget_id>'. " +
+        "A widget's own Create button is '[data-col-id=\"<widget_id>\"] [data-act=\"create\"]'; the original calendar's is '#calCreateBtn'.",
+      input_schema: {
+        type: "object",
+        properties: {
+          selector: { type: "string", description: "CSS selector for the element to click. The FIRST match is used, so be specific." }
+        },
+        required: ["selector"]
+      }
+    },
+    {
+      name: "inspect_custom_widget",
+      description: "See what a custom widget is doing RIGHT NOW: the HTML it has actually rendered, its visible text, everything it has written to console (console.log/info/warn/error, oldest first), any uncaught error with its stack, and its store. " +
+        "This is how you debug your own code: put console.log calls in the widget's js, then read them back here. " +
+        "create_custom_widget and update_custom_widget already return this snapshot, but they take it a few hundred milliseconds after the frame boots -- so call this again whenever the widget does anything asynchronous (a fetch, a timer, a user click) and you need to see how it turned out.",
+      input_schema: {
+        type: "object",
+        properties: { widget_id: { type: "string" } },
         required: ["widget_id"]
       }
     },
@@ -28009,7 +28785,11 @@
   const NO_WIDGET_TOOLS = {
     list_widgets: 1, create_widget: 1, list_tasks: 1, create_task: 1, update_task: 1, complete_task: 1,
     delete_task: 1, list_events: 1, create_event: 1, update_event: 1, delete_event: 1,
-    list_notion_pages: 1, create_page_from_notion: 1, create_custom_widget: 1
+    list_notion_pages: 1, create_page_from_notion: 1, create_custom_widget: 1,
+    // These two address the page by CSS selector, not by widget.
+    read_dom: 1, click_element: 1,
+    // And this one addresses the app's own source file.
+    read_source: 1
   };
   // Tools that pause for a real answer from the user before they run. The
   // value is a function of the input that returns the question to ask, or
@@ -28050,6 +28830,21 @@
       // One line is just a title on an otherwise empty Page: nothing to lose.
       if (!text || text.indexOf("\n") === -1) return null;
       return "Replace everything in “" + widgetNameFor(i.widget_id) + "”?";
+    },
+    /* Not destructive, but network access is the one thing a widget must not
+       be handed silently: the gear panel makes a person tick a box for it, so
+       the model gets the same beat rather than a free upgrade. Asked only when
+       the flag is actually going ON -- turning it off, or leaving it alone,
+       needs no question. */
+    create_custom_widget: function (i) {
+      if (!i.net) return null;
+      return "Let the new widget \u201c" + (i.name || "widget") + "\u201d make network requests (https)?";
+    },
+    update_custom_widget: function (i) {
+      if (!i.net) return null;
+      // Already on: this call is not a grant, so don't ask again.
+      try { if (window.__customWidgets.read(i.widget_id).net) return null; } catch (e) {}
+      return "Let " + widgetNameFor(i.widget_id) + " make network requests (https)?";
     }
   };
 
@@ -28091,6 +28886,9 @@
     create_custom_widget:  { label: "Building\u2026",     target: null },
     update_custom_widget:  { label: "Rebuilding\u2026",   target: "widget_id" },
     set_custom_widget_store:{ label: "Writing\u2026",     target: "widget_id" },
+    inspect_custom_widget: { label: "Checking\u2026",    target: "widget_id" },
+    read_dom:              { label: "Reading\u2026",     target: null },
+    click_element:         { label: "Clicking\u2026",    target: null },
     set_widget_instructions:{ label: "Noting\u2026",      target: "widget_id" },
     inspect_widget:        { label: "Inspecting\u2026",  target: "widget_id" },
     set_widget_style:      { label: "Restyling\u2026",   target: "widget_id" }
@@ -28130,6 +28928,162 @@
     const t = typeOfWidget(id);
     if (types.indexOf(t) !== -1) return null;
     return { error: "'" + id + "' is a " + (t || "unknown") + " widget, not " + what + "." };
+  }
+
+  /* ---------------- reading the page itself ----------------
+     read_widget stops at a widget's boundary, which left every modal, menu
+     and create panel invisible to the model -- so when it needed to know what
+     was in one, all it could do was ask the user to hold it open and describe
+     the fields. This walks any part of the document instead. Text is trimmed
+     hard and depth is capped, because an untruncated outline of this page is
+     far larger than a tool result should ever be. */
+  const DOM_MAX_NODES = 220;
+  function describeNode(node, depth, budget) {
+    if (budget.n >= DOM_MAX_NODES) return null;
+    budget.n++;
+    const out = { tag: node.tagName.toLowerCase() };
+    if (node.id) out.id = node.id;
+    if (node.className && typeof node.className === "string") out.classes = node.className.trim();
+    ["type", "placeholder", "value", "href", "title", "aria-label", "data-act", "data-role", "hidden"]
+      .forEach(function (a) {
+        const v = node.getAttribute ? node.getAttribute(a) : null;
+        if (v != null && v !== "") (out.attrs = out.attrs || {})[a] = String(v).slice(0, 80);
+      });
+    // Own text only: the concatenated textContent of a container repeats
+    // every descendant's words and drowns the structure.
+    const own = Array.prototype.filter.call(node.childNodes, function (c) { return c.nodeType === 3; })
+      .map(function (c) { return c.nodeValue; }).join(" ").replace(/\s+/g, " ").trim();
+    if (own) out.text = own.slice(0, 120);
+    if (node.offsetParent === null && node.tagName !== "BODY") out.notVisible = true;
+    if (depth > 0) {
+      const kids = [];
+      Array.prototype.forEach.call(node.children, function (c) {
+        const d = describeNode(c, depth - 1, budget);
+        if (d) kids.push(d);
+      });
+      if (kids.length) out.children = kids;
+    } else if (node.children.length) {
+      out.childrenOmitted = node.children.length;
+    }
+    return out;
+  }
+
+  function readDomOutline(selector, maxDepth) {
+    const sel = String(selector || "body > *");
+    const depth = Math.max(0, Math.min(8, typeof maxDepth === "number" ? maxDepth : 3));
+    let nodes;
+    try { nodes = document.querySelectorAll(sel); }
+    catch (e) { return { error: "Not a valid CSS selector: " + String(e.message || e) }; }
+    if (!nodes.length) {
+      return { error: "Nothing matches '" + sel + "' right now. If it is a panel that opens on demand, click_element the control that opens it first, then read it." };
+    }
+    const budget = { n: 0 };
+    const matches = Array.prototype.slice.call(nodes, 0, 20)
+      .map(function (n) { return describeNode(n, depth, budget); })
+      .filter(Boolean);
+    const r = { selector: sel, match_count: nodes.length, matches: matches };
+    if (budget.n >= DOM_MAX_NODES) r.truncated = "Hit the node budget -- narrow the selector or lower max_depth to see more detail.";
+    return r;
+  }
+
+  /* ---------------- the app's own source ----------------
+     The dashboard is one self-contained HTML file, so it can simply fetch
+     the document it was served from and read itself. Cached for the life of
+     the tab: the file cannot change under a running page, and it is large
+     enough that re-fetching it per call would be waste.
+
+     Read-only on purpose, and not for want of trying: the file lives on a
+     server's disk and a browser has no way to write back to it. What this
+     buys is accuracy -- the model can find out how a built-in feature
+     actually behaves instead of inferring it from whether a settings panel
+     happens to expose a toggle, which is exactly the guess that had it
+     offering to rebuild the calendar to add persistence the calendar
+     already had. */
+  let appSourceText = null;
+  async function appSource() {
+    if (appSourceText !== null) return appSourceText;
+    const res = await fetch(location.href, { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not read the app source (HTTP " + res.status + ").");
+    appSourceText = await res.text();
+    return appSourceText;
+  }
+
+  // Single lines in this file run to many thousands of characters (an
+  // embedded sub-app, a data URI), and one of them would swamp a whole
+  // result. Long lines are cut rather than allowed to crowd out the match
+  // the model was actually looking for.
+  const SRC_LINE_MAX = 300;
+  const SRC_TOTAL_MAX = 24000;
+  function srcLine(n, text) {
+    const t = text.length > SRC_LINE_MAX ? text.slice(0, SRC_LINE_MAX) + " \u2026[" + (text.length - SRC_LINE_MAX) + " more chars]" : text;
+    return n + "\t" + t;
+  }
+
+  async function readSource(input) {
+    let lines;
+    try { lines = (await appSource()).split("\n"); }
+    catch (e) { return { error: String((e && e.message) || e) }; }
+
+    // Range mode: read a stretch outright, which is what you want once grep
+    // has told you where the function starts.
+    if (!input.query && input.start_line) {
+      const start = Math.max(1, Math.floor(input.start_line));
+      const end = Math.min(lines.length, Math.max(start, Math.floor(input.end_line || (start + 60))), start + 399);
+      const out = [];
+      for (let i = start; i <= end; i++) out.push(srcLine(i, lines[i - 1]));
+      let body = out.join("\n");
+      let cut = false;
+      if (body.length > SRC_TOTAL_MAX) { body = body.slice(0, SRC_TOTAL_MAX); cut = true; }
+      return { file_lines: lines.length, start_line: start, end_line: end, truncated: cut, source: body };
+    }
+
+    const q = String(input.query || "");
+    if (!q) return { error: "Pass `query` to search, or `start_line` to read a range." };
+
+    let test;
+    if (input.regex) {
+      let re;
+      try { re = new RegExp(q, "i"); }
+      catch (e) { return { error: "That is not a valid regular expression: " + String((e && e.message) || e) }; }
+      test = function (line) { return re.test(line); };
+    } else {
+      const needle = q.toLowerCase();
+      test = function (line) { return line.toLowerCase().indexOf(needle) !== -1; };
+    }
+
+    const ctx = Math.min(30, Math.max(0, Math.floor(input.context_lines == null ? 4 : input.context_lines)));
+    const cap = Math.min(60, Math.max(1, Math.floor(input.max_matches || 20)));
+
+    const hits = [];
+    for (let i = 0; i < lines.length; i++) if (test(lines[i])) hits.push(i + 1);
+
+    const shown = hits.slice(0, cap);
+    const matches = [];
+    let total = 0, cut = false;
+    for (const n of shown) {
+      const from = Math.max(1, n - ctx), to = Math.min(lines.length, n + ctx);
+      const body = [];
+      for (let i = from; i <= to; i++) body.push(srcLine(i, lines[i - 1]));
+      const text = body.join("\n");
+      // Stop cleanly at the budget rather than returning half a match.
+      if (total + text.length > SRC_TOTAL_MAX) { cut = true; break; }
+      total += text.length;
+      matches.push({ line: n, excerpt: text });
+    }
+
+    return {
+      query: q,
+      file_lines: lines.length,
+      total_matches: hits.length,
+      showing: matches.length,
+      truncated: cut || hits.length > shown.length,
+      // Said plainly, because "0 matches" is a real answer the model should
+      // report rather than retry blindly with the same string.
+      note: hits.length
+        ? (matches.length < hits.length ? "More matches exist than are shown; narrow the query or raise max_matches." : undefined)
+        : "No line in the app's source contains that. Try a shorter or different string before concluding the feature does not exist.",
+      matches: matches
+    };
   }
 
   async function runTool(name, input) {
@@ -28177,6 +29131,9 @@
 
       case "read_widget":
         return b.read(id);
+
+      case "read_source":
+        return await readSource(input);
 
       /* ---- pages ---- */
       case "set_page_content": {
@@ -28290,20 +29247,18 @@
       /* ---- custom widgets ---- */
       case "create_custom_widget": {
         if (!CW) return { error: "Custom widgets are not available." };
-        const r = CW.create({ name: input.name, html: input.html, css: input.css, js: input.js });
+        const r = CW.create({ name: input.name, html: input.html, css: input.css, js: input.js, net: input.net });
         if (r.error) return r;
         await wait(400);   // let the frame boot so a syntax error is reported now
-        r.lastError = CW.lastError(r.widget_id);
-        return r;
+        return Object.assign(r, await CW.inspect(r.widget_id));
       }
       case "update_custom_widget": {
         if (!CW) return { error: "Custom widgets are not available." };
         if (!CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
-        const r = CW.update(id, { name: input.name, html: input.html, css: input.css, js: input.js });
+        const r = CW.update(id, { name: input.name, html: input.html, css: input.css, js: input.js, net: input.net });
         if (r.error) return r;
         await wait(400);
-        r.lastError = CW.lastError(id);
-        return r;
+        return Object.assign(r, await CW.inspect(id));
       }
       case "set_widget_instructions":
         return b.setInstructions(id, input.instructions);
@@ -28325,6 +29280,65 @@
         }
         return window.__widgetOverlay.setCss(id, input.css);
       }
+
+      case "read_dom":
+        return readDomOutline(input.selector, input.max_depth);
+
+      case "click_element": {
+        const sel = String(input.selector || "");
+        if (!sel) return { error: "Give a CSS selector." };
+        let target = null;
+        try { target = document.querySelector(sel); }
+        catch (e) { return { error: "Not a valid CSS selector: " + String(e.message || e) }; }
+        if (!target) return { error: "Nothing matches '" + sel + "' right now. Call read_dom to see what is on the page." };
+        /* Snapshot before AND after, so the result can say WHAT opened rather
+           than just how many nodes appeared. A count alone left the model
+           guessing at class names for a panel it had just successfully
+           opened, which is how it ended up inventing '.cal-event-modal'. */
+        const seen = new Set();
+        const wasVisible = new Set();
+        Array.prototype.forEach.call(document.body.querySelectorAll("*"), function (n) {
+          seen.add(n);
+          if (n.offsetParent !== null) wasVisible.add(n);
+        });
+
+        try { target.click(); } catch (e) { return { error: String(e.message || e) }; }
+        // A panel usually renders on the same tick, but anything animated or
+        // awaited needs a beat before it is actually in the DOM to be read.
+        await wait(350);
+
+        /* Two ways a panel arrives: freshly built (new nodes), or an existing
+           shell that was hidden and is now shown with new contents. Report the
+           OUTERMOST of each, so the answer is "#calCreatePanel appeared" and
+           not a list of forty descendants. */
+        const roots = [];
+        const budget = { n: 0 };
+        Array.prototype.forEach.call(document.body.querySelectorAll("*"), function (n) {
+          if (roots.length >= 6) return;
+          const isNew = !seen.has(n);
+          const justShown = seen.has(n) && !wasVisible.has(n) && n.offsetParent !== null;
+          if (!isNew && !justShown) return;
+          // Outermost only: skip anything whose parent also just arrived.
+          const p = n.parentElement;
+          if (p && p !== document.body && (!seen.has(p) || (!wasVisible.has(p) && p.offsetParent !== null))) return;
+          const d = describeNode(n, 3, budget);
+          if (d) roots.push(d);
+        });
+
+        return {
+          ok: true,
+          clicked: { selector: sel, tag: target.tagName.toLowerCase(), id: target.id || null,
+                     text: String(target.textContent || "").trim().slice(0, 80) },
+          opened: roots,
+          next: roots.length
+            ? "That is what appeared. If it is a chooser rather than the thing you wanted, click the right option in it and look again."
+            : "Nothing new became visible. This control may toggle something closed, or the panel may need a different trigger."
+        };
+      }
+
+      case "inspect_custom_widget":
+        if (!CW || !CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
+        return await CW.inspect(id);
 
       case "set_custom_widget_store":
         if (!CW || !CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
@@ -28427,7 +29441,11 @@
       "Every widget's composition is data you can change: a Page's blocks, a list's items and categories, a Bookmarks bar's links, Vocabulary's languages, counts, pick mode and the word banks themselves (you can author new banks), and a custom widget's whole code. " +
       "Every widget's LOOK is yours to change too, built-in ones included: read_widget gives its dom_outline, inspect_widget shows the elements a selector matches and the CSS rules applied to them, and set_widget_style writes CSS scoped to that widget. Never tell the user a widget's appearance is fixed \u2014 inspect it and restyle it. Build a custom widget only for something genuinely new. " +
       "Pages are written in Markdown; prefer append_to_page / replace_page_block over rewriting a whole Page. " +
-      "For anything the existing widget types can't do, build a custom widget with create_custom_widget (sandboxed HTML/CSS/JS with the mps store API); revise it with update_custom_widget, and check lastError in the result. " +
+      "For anything the existing widget types can't do, build a custom widget with create_custom_widget (sandboxed HTML/CSS/JS with the mps store API, plus net:true when it needs to fetch from https endpoints); revise it with update_custom_widget. " +
+      "Work on widget code the way a developer does, not in one blind shot: every create/update returns what the frame actually rendered, everything it logged and anything it threw (with a stack). READ that before you reply. If it is wrong or empty, add console.log calls, update, and read again -- inspect_custom_widget re-reads at any time, which is what you need after a fetch or a timer has had a chance to run. Never tell the user a widget works when the snapshot you got back shows an error or an empty body. " +
+      "A widget frame carries no credentials, so it can never reach the user's own Google or Notion data -- that is what the calendar, tasks and Notion tools are for. Never tell the user a widget cannot use the network at all. " +
+      "You can see and drive the whole page, not just widgets: read_dom reads any selector, and click_element presses any control. UI that only exists while it is open -- the + Create panel, dropdowns, settings sheets -- is reachable by clicking the thing that opens it and THEN reading it. So never ask the user to open a panel and describe its fields to you, and never say you cannot see something because it is not rendered yet: open it yourself and look. Do not click destructive controls (Delete, Remove, Sign out) or submit a form on the user's behalf. " +
+      "You can also read the app's own source with read_source: the whole dashboard is one HTML file, and that file is the only authority on how a built-in feature behaves. Search it BEFORE you answer any \u201cdoes it / can it / why doesn't it\u201d question about built-in behaviour, and ALWAYS before you say a behaviour does not exist or is not implemented. A missing toggle in a settings panel proves nothing \u2014 most behaviour here is wired in code with no setting exposed. Check whether the thing is already implemented before proposing to build it: offering to rebuild a built-in widget as a custom one, to add something it already does, is the worst answer you can give. read_source is read-only (the file is on disk and the page cannot write to it), so when a real code change IS needed, say what would have to change and quote the line numbers rather than claiming you can make it.",
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
       "",
       "Style: you are a narrow sidebar, so keep replies short \u2014 usually one or two sentences. Replies render as Markdown: use **bold** for the key term, bullet lists for anything with more than two parts, `code` for ids/keys/formats, and an emoji or two where they help the eye (\ud83d\udcda \u2705 \ud83d\udcc5 \u2728) \u2014 never as decoration on every line.",
@@ -28440,7 +29458,7 @@
      blocks are accumulated (their input arrives as a stream of JSON fragments
      and is only parseable once the block closes) and returned for the caller
      to execute. */
-  async function streamTurn(apiMessages, onText, onToolStart) {
+  async function streamTurn(apiMessages, onText, onToolStart, opts) {
     // The proxy authenticates the CALLER, not Anthropic — it holds the real
     // key itself. getSession() (behind token()) refreshes an access token
     // that is near expiry, which is what keeps a long-lived tab authorised.
@@ -28480,7 +29498,10 @@
         max_tokens: 8192,
         stream: true,
         system: systemPrompt(),
-        tools: AI_TOOLS,
+        // Omitted entirely on the wrap-up turn: with no tools on the table
+        // the model has nothing to do but write the answer, which is the
+        // whole point of that last call. JSON.stringify drops the key.
+        tools: opts && opts.noTools ? undefined : AI_TOOLS,
         messages: apiMessages
       })
     });
@@ -28578,6 +29599,28 @@
     const b = el("div", "ai-msg " + (role === "user" ? "is-user" : "is-ai"), text);
     aiLog.appendChild(b);
     scrollLog();
+    return b;
+  }
+
+  // A sent message carries its files with it: thumbnails for pictures, a
+  // named row for anything else, so the transcript still shows what was asked
+  // about after the composer has been cleared.
+  function appendUserMessage(text, files) {
+    const b = appendMessage("user", text);
+    if (files && files.length) {
+      const row = el("div", "ai-msg-files");
+      files.forEach(function (a) {
+        if (a.kind === "image") {
+          const img = document.createElement("img");
+          img.src = a.dataUrl; img.alt = a.name;
+          row.appendChild(img);
+        } else {
+          row.appendChild(el("div", "ai-msg-file", "\ud83d\udcce " + a.name));
+        }
+      });
+      b.appendChild(row);
+      scrollLog();
+    }
     return b;
   }
 
@@ -28760,9 +29803,12 @@
       case "list_notion_pages": return "Listed Notion pages";
       case "create_page_from_notion": return "Imported " + t(result) + " from Notion";
       case "arrange_widget": return "Moved " + who;
-      case "create_custom_widget": return "Built \u201c" + input.name + "\u201d" + (result.lastError ? " (with a runtime error)" : "");
-      case "update_custom_widget": return "Rebuilt " + who + (result.lastError ? " (with a runtime error)" : "");
+      case "create_custom_widget": return "Built \u201c" + input.name + "\u201d" + (input.net ? " (networked)" : "") + (result.lastError ? " (with a runtime error)" : "");
+      case "update_custom_widget": return "Rebuilt " + who + (input.net ? " (networked)" : "") + (result.lastError ? " (with a runtime error)" : "");
       case "set_custom_widget_store": return "Wrote to " + who + "'s store";
+      case "inspect_custom_widget": return "Checked " + who;
+      case "read_dom": return "Read the page";
+      case "click_element": return "Clicked " + (input.selector || "an element");
       case "set_widget_instructions": return input.instructions ? "Noted how to keep " + who : "Cleared " + who + "'s instructions";
       case "inspect_widget": return "Inspected " + who;
       case "set_widget_style": return input.css && input.css.trim() ? "Restyled " + who : "Removed " + who + "'s style overrides";
@@ -28779,7 +29825,9 @@
 
   async function sendAiMessage(text) {
     const clean = String(text || "").trim();
-    if (!clean || aiBusy) return;
+    const files = attachments.slice();
+    // Files alone are a legitimate message -- "what is this?" with a photo.
+    if ((!clean && !files.length) || aiBusy) return;
 
     // If the panel was opened before the user had touched anything, take the
     // freshest reading now rather than staying null for the whole session.
@@ -28789,9 +29837,28 @@
       } catch (e) {}
     }
 
-    messages.push({ role: "user", content: clean });
-    appendMessage("user", clean);
-    ensureChat(clean);
+    /* A plain string while there is nothing attached: that is the shape the
+       rest of this file (trimMessages, maybeTitleChat) already keys off, and
+       there is no reason to make every text-only turn pay for the block form. */
+    let content = clean;
+    if (files.length) {
+      content = [];
+      if (clean) content.push({ type: "text", text: clean });
+      files.forEach(function (a) {
+        if (a.kind === "image") {
+          content.push({ type: "image", source: { type: "base64", media_type: a.mediaType, data: a.data } });
+        } else if (a.kind === "pdf") {
+          content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: a.data } });
+        } else {
+          content.push({ type: "text", text: "--- " + a.name + " ---\n" + a.text });
+        }
+      });
+    }
+    messages.push({ role: "user", content: content });
+    appendUserMessage(clean, files);
+    attachments = [];
+    renderAttachments();
+    ensureChat(clean || (files[0] && files[0].name) || "Files");
     saveCurrentChat();
     // The starter row is an empty state, so it goes the moment there is a
     // real message, not when the panel closes.
@@ -28802,6 +29869,13 @@
 
     let placeholder = appendThinking();
     let sawToolError = false;
+    /* Every tool call made during THIS request, keyed by name+input and
+       holding what it returned. A model cannot tell from a result that it
+       has seen that result before; this is how it gets told. */
+    const seenCalls = new Map();
+    // Did the loop run out of turns rather than finishing? Cleared by the
+    // break below, so only exhaustion leaves it true.
+    let hitCap = true;
 
     try {
       for (let turn = 0; turn < AI_MAX_TURNS; turn++) {
@@ -28869,6 +29943,7 @@
           // decided not to narrate; the user should not be left with just
           // the red line and no reply.
           if (!bubble && sawToolError) appendMessage("ai", "That didn't go through \u2014 tell me how you'd like to proceed, or try the request again.");
+          hitCap = false;
           break;
         }
 
@@ -28922,6 +29997,23 @@
           // it is the one thing the model might soften.
           if (out && out.error) { sawToolError = true; appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error"); }
 
+          /* The loop-breaker. The same tool, the same input, the same answer
+             as earlier in this very request means the model is going in a
+             circle -- which is exactly what happened here: read_dom and
+             inspect_widget called over and over with identical arguments
+             until the turn cap ran out and the panel went quiet. The result
+             is returned untouched, with one extra field saying it is a
+             repeat, because nothing but the model can break the circle and
+             it has no other way to notice. */
+          const sig = use.name + "|" + JSON.stringify(use.input || {});
+          const outStr = JSON.stringify(out);
+          if (seenCalls.get(sig) === outStr && out && typeof out === "object" && !Array.isArray(out)) {
+            out = Object.assign({}, out, {
+              _repeat: "You already made this exact call earlier in this request and got this exact result. Nothing has changed since. Do not call it again \u2014 answer the user with what you have."
+            });
+          }
+          seenCalls.set(sig, outStr);
+
           results.push({
             type: "tool_result",
             tool_use_id: use.id,
@@ -28939,6 +30031,41 @@
         // tool-only turn leaves a spinner stranded above the reply forever.
         if (placeholder && placeholder.parentNode) { aiLog.appendChild(placeholder); scrollLog(); }
         else placeholder = appendThinking();
+      }
+
+      /* Out of turns. Every path out of the loop above ends in a sentence
+         except this one, which used to end in nothing at all: the dots were
+         cleared in `finally` and the request simply evaporated, which is
+         precisely what "why isn't this loading" looked like. So spend one
+         last call with NO tools attached -- the model can then only write --
+         and the run always finishes by saying something.
+
+         The nudge goes in as a block-shaped user message rather than a plain
+         string, so openChat (which renders only string user messages) never
+         shows this piece of plumbing as something the user said. */
+      if (hitCap) {
+        messages.push({ role: "user", content: [{ type: "text", text:
+          "You have used every tool call allowed for this request. Do not call any more tools. " +
+          "Answer now in plain language: what you found, what you changed, and what is still left to do." }] });
+        let wrapBubble = null, wrapped = "";
+        const wrap = await streamTurn(messages, function (delta) {
+          wrapped += delta;
+          if (!wrapBubble) {
+            wrapBubble = placeholder || appendMessage("ai", "");
+            placeholder = null;
+            wrapBubble.textContent = "";
+          }
+          setBubbleMarkdown(wrapBubble, wrapped);
+          scrollLog();
+        }, null, { noTools: true });
+        const wrapText = (wrap.blocks || []).filter(function (b) { return b.type === "text" && b.text; })
+          .map(function (b) { return b.text; }).join("");
+        messages.push({ role: "assistant", content: [{ type: "text", text: wrapText || "(no response)" }] });
+        // Even the wrap-up can come back empty. Say so rather than leaving
+        // the same silence this whole branch exists to prevent.
+        if (!wrapText) {
+          appendMessage("ai", "I ran out of tool calls on this one before I got to an answer. Ask again, or narrow it to a single widget and I'll go straight there.").classList.add("is-error");
+        }
       }
     } catch (err) {
       const msg = String((err && err.message) || err);
@@ -28990,10 +30117,35 @@
     if (entry) entry.updatedAt = Date.now();
     chats.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
     try {
-      window.storageSet(chatKey(currentChatId), JSON.stringify({ id: currentChatId, messages: messages }));
+      window.storageSet(chatKey(currentChatId), JSON.stringify({ id: currentChatId, messages: persistableMessages() }));
       window.storageSet(CHATS_KEY, JSON.stringify(chats));
     } catch (e) {}
     renderSidebar();
+  }
+
+  /* Images and PDFs are kept in memory for the live conversation but never
+     written to storage: a few 4 MB base64 blobs per chat would blow well past
+     what a synced row should carry, and every chat in the index would pay for
+     it. A reopened chat therefore shows the model a placeholder where the
+     picture was, which is at least honest about what it can still see. */
+  function persistableMessages() {
+    return messages.map(function (m) {
+      if (typeof m.content === "string" || !Array.isArray(m.content)) return m;
+      return { role: m.role, content: m.content.map(function (b) {
+        if (b.type === "image") return { type: "text", text: "[an image was attached here; it is no longer in context]" };
+        if (b.type === "document") return { type: "text", text: "[a PDF was attached here; it is no longer in context]" };
+        return b;
+      }) };
+    });
+  }
+
+  // The first user message as plain text, whichever shape it took.
+  function userTextOf(m) {
+    if (!m) return "";
+    if (typeof m.content === "string") return m.content;
+    if (!Array.isArray(m.content)) return "";
+    return m.content.filter(function (b) { return b.type === "text" && b.text; })
+                    .map(function (b) { return b.text; }).join(" ");
   }
 
   /* One tiny non-streaming call names the chat after its first exchange --
@@ -29004,7 +30156,7 @@
     const id = currentChatId;
     const entry = chatIndexEntry(id);
     if (!entry || entry.titled) return;
-    const firstUser = messages.filter(function (m) { return m.role === "user" && typeof m.content === "string"; })[0];
+    const firstUser = messages.filter(function (m) { return m.role === "user" && userTextOf(m); })[0];
     const firstReply = messages.filter(function (m) { return m.role === "assistant"; })
       .map(function (m) { return m.content.filter(function (b) { return b.type === "text" && b.text && b.text !== "(no response)"; }).map(function (b) { return b.text; }).join(" "); })
       .filter(Boolean)[0];
@@ -29019,7 +30171,7 @@
         body: JSON.stringify({
           model: AI_MODEL, max_tokens: 24, stream: false,
           system: "You title conversations for a sidebar. Reply with only the title: three to six words, Title Case, no quotes, no trailing punctuation.",
-          messages: [{ role: "user", content: "First message:\n" + firstUser.content.slice(0, 600) + "\n\nReply:\n" + firstReply.slice(0, 600) }]
+          messages: [{ role: "user", content: "First message:\n" + userTextOf(firstUser).slice(0, 600) + "\n\nReply:\n" + firstReply.slice(0, 600) }]
         })
       });
       const raw = await res.text();
@@ -29255,6 +30407,148 @@
   }
   const aiCloseBtn = $("aiCloseBtn");
   if (aiCloseBtn) aiCloseBtn.addEventListener("click", function () { setAiPanelOpen(false, true); });
+  /* ---------------- attachments ----------------
+     Files staged for the NEXT message. Images become image blocks, PDFs
+     document blocks, anything text-shaped is inlined as text -- which is the
+     whole set the API accepts, so a binary that is none of those is refused
+     here rather than silently dropped on the way out. */
+  const aiAttachments = $("aiAttachments");
+  const aiPlusBtn = $("aiPlusBtn");
+  const aiPlusMenu = $("aiPlusMenu");
+  const aiAddFilesBtn = $("aiAddFilesBtn");
+  const aiFileInput = $("aiFileInput");
+  const aiDrop = $("aiDrop");
+  const AI_MAX_FILE = 4 * 1024 * 1024;
+  const AI_MAX_FILES = 8;
+  let attachments = [];
+
+  function attachErr(msg) { appendMessage("ai", msg).classList.add("is-error"); }
+
+  function readAttachment(file) {
+    return new Promise(function (resolve, reject) {
+      const r = new FileReader();
+      r.onerror = function () { reject(new Error("Could not read " + file.name + ".")); };
+      const isImage = /^image\//.test(file.type);
+      const isPdf = file.type === "application/pdf";
+      if (isImage || isPdf) {
+        r.onload = function () {
+          const url = String(r.result);
+          resolve({
+            id: "f" + Math.random().toString(36).slice(2, 9),
+            name: file.name, kind: isPdf ? "pdf" : "image",
+            mediaType: file.type, data: url.slice(url.indexOf(",") + 1), dataUrl: url
+          });
+        };
+        r.readAsDataURL(file);
+      } else {
+        r.onload = function () {
+          resolve({ id: "f" + Math.random().toString(36).slice(2, 9),
+                    name: file.name, kind: "text", text: String(r.result) });
+        };
+        r.readAsText(file);
+      }
+    });
+  }
+
+  async function addFiles(list) {
+    const files = Array.prototype.slice.call(list || []);
+    for (const f of files) {
+      if (attachments.length >= AI_MAX_FILES) { attachErr("Eight files is the limit for one message."); break; }
+      if (f.size > AI_MAX_FILE) { attachErr("“" + f.name + "” is over 4 MB, so it wasn't attached."); continue; }
+      const isImage = /^image\//.test(f.type);
+      const isPdf = f.type === "application/pdf";
+      const looksText = /^text\//.test(f.type) || /\.(md|csv|json|log|txt)$/i.test(f.name) || !f.type;
+      if (!isImage && !isPdf && !looksText) {
+        attachErr("“" + f.name + "” isn't an image, a PDF or a text file, so it wasn't attached.");
+        continue;
+      }
+      try { attachments.push(await readAttachment(f)); }
+      catch (e) { attachErr(String((e && e.message) || e)); }
+    }
+    renderAttachments();
+  }
+
+  function renderAttachments() {
+    aiAttachments.innerHTML = "";
+    aiAttachments.hidden = !attachments.length;
+    attachments.forEach(function (a) {
+      const chip = el("div", "ai-chip");
+      if (a.kind === "image") {
+        const img = document.createElement("img");
+        img.src = a.dataUrl; img.alt = "";
+        chip.appendChild(img);
+      }
+      chip.appendChild(el("span", "ai-chip-name", a.name));
+      const x = el("button", "ai-chip-x", "×");
+      x.type = "button";
+      x.title = "Remove";
+      x.addEventListener("click", function () {
+        attachments = attachments.filter(function (o) { return o.id !== a.id; });
+        renderAttachments();
+      });
+      chip.appendChild(x);
+      aiAttachments.appendChild(chip);
+    });
+  }
+
+  function closePlusMenu() { aiPlusMenu.hidden = true; aiPlusBtn.setAttribute("aria-expanded", "false"); }
+  aiPlusBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (aiPlusMenu.hidden) { aiPlusMenu.hidden = false; aiPlusBtn.setAttribute("aria-expanded", "true"); }
+    else closePlusMenu();
+  });
+  document.addEventListener("click", function (e) {
+    if (aiPlusMenu.hidden) return;
+    const t = e.target && e.target.nodeType === 1 ? e.target : null;
+    if (t && (t.closest(".ai-plus-menu") || t.closest(".ai-plus"))) return;
+    closePlusMenu();
+  });
+  aiAddFilesBtn.addEventListener("click", function () { closePlusMenu(); aiFileInput.click(); });
+  aiFileInput.addEventListener("change", function () {
+    addFiles(aiFileInput.files);
+    // Cleared, or picking the same file twice in a row fires no change event.
+    aiFileInput.value = "";
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!(e.metaKey || e.ctrlKey) || (e.key !== "u" && e.key !== "U")) return;
+    if (aiPanel.hidden) return;
+    e.preventDefault();
+    closePlusMenu();
+    aiFileInput.click();
+  });
+
+  /* Drag and drop over the whole panel. Counted rather than toggled: dragging
+     across a child fires dragleave for the element being left, and a plain
+     toggle would flicker the overlay off halfway across the panel. */
+  let dragDepth = 0;
+  function dragHasFiles(e) {
+    const types = e.dataTransfer && e.dataTransfer.types;
+    return !!types && Array.prototype.indexOf.call(types, "Files") !== -1;
+  }
+  aiPanel.addEventListener("dragenter", function (e) {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepth++;
+    aiDrop.hidden = false;
+  });
+  aiPanel.addEventListener("dragover", function (e) {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  aiPanel.addEventListener("dragleave", function (e) {
+    if (!dragHasFiles(e)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) aiDrop.hidden = true;
+  });
+  aiPanel.addEventListener("drop", function (e) {
+    if (!dragHasFiles(e)) return;
+    e.preventDefault();
+    dragDepth = 0;
+    aiDrop.hidden = true;
+    addFiles(e.dataTransfer.files);
+  });
+
   aiSendBtn.addEventListener("click", function () { sendAiMessage(aiInput.value); });
   aiInput.addEventListener("input", autoGrow);
   aiInput.addEventListener("keydown", function (e) {
