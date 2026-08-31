@@ -1,0 +1,43 @@
+name: Deploy to GitHub Pages
+
+# A mirror of what netlify.toml does for the Netlify deploy: publish this
+# repo's static files as-is, with myProductivitySpace.html copied to
+# index.html at build time so the served URL is a bare "/" -- the same path
+# an OAuth redirect URI has to match. Renaming the real file in git would
+# churn the whole project for no reason, so the copy happens here instead.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time; a newer push wins over one still in flight
+# rather than letting two race to publish.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cp myProductivitySpace.html index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          # The whole repo except git/CI internals -- same publish root
+          # (".") netlify.toml uses. Nothing here is a secret: the anon key
+          # and Supabase URL are meant to ship to the browser (see the
+          # comment above SUPABASE_ANON_KEY in myProductivitySpace.html).
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
