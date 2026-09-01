@@ -16324,6 +16324,10 @@
             color: WIDGET_COLORS[id] || "#FFFFFF",
             icon: WIDGET_ICONS[id] || "",
             hidden: !!hidden[id],
+            // Whether this widget is currently blown up over the whole page.
+            // Reported so a reader of the board can tell that what it is
+            // looking at is the maximized view, not the normal one.
+            maximized: maximizedId === id,
             isNote: isNote,
             summary: widgetSummary(id, type),
             section: slot ? layout.indexOf(slot) : null,
@@ -16345,6 +16349,23 @@
       rename: function (id, name) { setWidgetTitle(id, name); },
       setIcon: function (id, emoji) { setWidgetIcon(id, emoji); },
       setHidden: function (id, value) { setHidden(id, !!value); },
+
+      /* Fullscreen, as state rather than as a button to hunt for.
+
+         The Full screen control is a plain toggle in a widget's header, so
+         anything driving the board from outside -- the AI panel -- could
+         only click it and hope: there was no way to ASK whether a widget is
+         maximized, and no way to leave the mode except pressing the same
+         button again or Escape, neither of which is reachable from a tool.
+         An agent that maximizes a widget to check something and cannot then
+         restore the board has broken the board. These two make the mode
+         addressable in both directions. */
+      maximized: function () { return maximizedId; },
+      setMaximized: function (id) {
+        if (id && WIDGET_IDS.indexOf(id) === -1) return { error: "No widget with id '" + id + "'." };
+        setMaximized(id || null);
+        return { ok: true, maximized: maximizedId };
+      },
       create: function (type) { return createDynamicWidgetInstance(type); },
       remove: function (id) { deleteWidget(id); },
 
@@ -16355,7 +16376,8 @@
       read: function (id) {
         const type = widgetTypeOf(id);
         const base = { widget_id: id, type: type, title: WIDGET_TITLES[id] || defaultWidgetTitle(id),
-                       instructions: WIDGET_INSTRUCTIONS[id] || "" };
+                       instructions: WIDGET_INSTRUCTIONS[id] || "",
+                       maximized: maximizedId === id };
         if (window.__widgetOverlay) {
           try {
             base.style_override_css = window.__widgetOverlay.get(id).css;
@@ -28251,7 +28273,18 @@
      asking for more. Ten was too few for the ordinary shape of a real job --
      read the DOM, inspect two or three widgets, then write -- and the ceiling
      was being hit before the model ever got to its answer. */
-  const AI_MAX_TURNS = 24;
+  /* How many assistant turns one request may take before the loop stops and
+     asks for a plain-language wrap-up.
+
+     Was 24, which is plenty for "recolour this" and nowhere near enough for
+     the work this panel is actually asked to do: verifying a behaviour end
+     to end -- read the source, open the widget, click through it, check the
+     result, put it back -- routinely spends a dozen turns before anything is
+     even confirmed, and the run then ended with "I hit my tool-call limit"
+     instead of an answer. A cap exists to stop a runaway loop, and the
+     repeat-detector below is what actually catches those; this only needs to
+     be past the length of honest work. */
+  const AI_MAX_TURNS = 60;
 
   function board() { return window.__aiBoard || null; }
 
@@ -28370,6 +28403,21 @@
           hidden: { type: "boolean", description: "true hides the widget, false shows it again." }
         },
         required: ["widget_id", "hidden"]
+      }
+    },
+    {
+      name: "set_widget_fullscreen",
+      description: "Blow one widget up over the whole page, or come back out. This is the same Full screen control in the widget's header, and it is how you VERIFY anything about the maximized view \u2014 whether a button is still reachable there, whether an edit made in it sticks, whether something is cut off. " +
+        "Maximize, then read_widget / read_dom / inspect_widget as usual: they see the maximized DOM, and read_widget's `maximized` field confirms which state you are in. " +
+        "Only one widget is maximized at a time, so maximizing a second one releases the first. " +
+        "ALWAYS come back out (fullscreen: false) when you are done looking \u2014 leaving the board maximized hides every other widget behind this one, and the user did not ask for that.",
+      input_schema: {
+        type: "object",
+        properties: {
+          widget_id: { type: "string" },
+          fullscreen: { type: "boolean", description: "true maximizes this widget over the page, false returns the board to normal." }
+        },
+        required: ["widget_id", "fullscreen"]
       }
     },
     {
@@ -28924,6 +28972,7 @@
     rename_widget:         { label: "Renaming\u2026",     target: "widget_id" },
     set_widget_icon:       { label: "Setting icon\u2026", target: "widget_id" },
     set_widget_visibility: { label: "Updating\u2026",     target: "widget_id" },
+    set_widget_fullscreen: { label: "Opening\u2026",     target: "widget_id" },
     set_note_text:         { label: "Writing\u2026",      target: "widget_id" },
     delete_widget:         { label: "Removing\u2026",     target: "widget_id" },
     create_widget:         { label: "Building\u2026",     target: null },
@@ -29434,6 +29483,23 @@
         b.setHidden(id, !!input.hidden);
         return { ok: true, widget_id: id, hidden: !!input.hidden };
 
+      case "set_widget_fullscreen": {
+        if (!b.setMaximized) return { error: "This board can't be maximized from here." };
+        /* Turning fullscreen OFF names a widget too, but the mode is the
+           board's and not that widget's -- so a false for a widget that
+           isn't the maximized one must leave the actual maximized one
+           alone rather than silently exiting on its behalf. */
+        if (!input.fullscreen && b.maximized() !== id) {
+          return { ok: true, widget_id: id, maximized: b.maximized(), note: "'" + id + "' was not maximized; nothing changed." };
+        }
+        const res = b.setMaximized(input.fullscreen ? id : null);
+        if (res && res.error) return res;
+        // A layout this large repaints over a frame or two; the DOM a
+        // read_widget on the next line would see should be the settled one.
+        await wait(60);
+        return { ok: true, widget_id: id, maximized: b.maximized() };
+      }
+
       case "set_note_text": {
         const target = b.list().filter(function (w) { return w.id === id; })[0];
         if (!target || !target.isNote) {
@@ -29514,6 +29580,7 @@
       "Work on widget code the way a developer does, not in one blind shot: every create/update returns what the frame actually rendered, everything it logged and anything it threw (with a stack). READ that before you reply. If it is wrong or empty, add console.log calls, update, and read again -- inspect_custom_widget re-reads at any time, which is what you need after a fetch or a timer has had a chance to run. Never tell the user a widget works when the snapshot you got back shows an error or an empty body. " +
       "A widget frame carries no credentials, so it can never reach the user's own Google or Notion data -- that is what the calendar, tasks and Notion tools are for. Never tell the user a widget cannot use the network at all. " +
       "You can see and drive the whole page, not just widgets: read_dom reads any selector, and click_element presses any control. UI that only exists while it is open -- the + Create panel, dropdowns, settings sheets -- is reachable by clicking the thing that opens it and THEN reading it. So never ask the user to open a panel and describe its fields to you, and never say you cannot see something because it is not rendered yet: open it yourself and look. Do not click destructive controls (Delete, Remove, Sign out) or submit a form on the user's behalf. " +
+      "A widget's fullscreen view is a state you can enter, not a mode only the user can reach: set_widget_fullscreen maximizes a widget, everything you read afterwards sees the maximized DOM, and set_widget_fullscreen with false brings the board back. So a question about how something behaves in fullscreen -- is the control still there, does an edit made there stick, is anything cut off -- is one you ANSWER by going there and doing it, never one you hand back to the user as a step for them to run. Finish the check, then leave fullscreen. " +
       "You can also read the app's own source with read_source: the whole dashboard is one HTML file, and that file is the only authority on how a built-in feature behaves. Search it BEFORE you answer any \u201cdoes it / can it / why doesn't it\u201d question about built-in behaviour, and ALWAYS before you say a behaviour does not exist or is not implemented. A missing toggle in a settings panel proves nothing \u2014 most behaviour here is wired in code with no setting exposed. Check whether the thing is already implemented before proposing to build it: offering to rebuild a built-in widget as a custom one, to add something it already does, is the worst answer you can give. read_source is read-only (the file is on disk and the page cannot write to it), so when a real code change IS needed, say what would have to change and quote the line numbers rather than claiming you can make it.",
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
       "",
@@ -29845,6 +29912,7 @@
         ? "Set " + who + "'s icon to " + input.emoji
         : "Removed " + who + "'s icon";
       case "set_widget_visibility": return (input.hidden ? "Hid " : "Unhid ") + who;
+      case "set_widget_fullscreen": return input.fullscreen ? "Opened " + who + " full screen" : "Closed full screen";
       case "set_note_text":
       case "set_page_content": return "Rewrote " + who;
       case "append_to_page": return "Added to " + who;
