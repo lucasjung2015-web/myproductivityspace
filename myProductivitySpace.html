@@ -11902,8 +11902,20 @@
       // Check if this widget is a page and if the slot has any pages
       const isPage = NOTE_WIDGETS[id];
       const slotHasPages = slot.some(mid => NOTE_WIDGETS[mid]);
+      const isLast = slot.indexOf(id) === slot.length - 1;
 
       if (slotHasPages && isPage) {
+        /* The last VISIBLE widget in the stack always absorbs whatever
+           height its siblings don't use, full stop -- even one carrying a
+           manually-set height from a time when it wasn't last. Without this,
+           a page that was ever dragged to a fixed height keeps that height
+           forever, and if whatever used to sit below it (providing the fill)
+           is later hidden or moved away, the empty space it leaves behind
+           just sits there under a rigid sibling that never reclaims it.
+           Once this widget stops being last again -- a hidden sibling comes
+           back, say -- its remembered height re-applies on its own, since
+           nothing here forgets it; only priority while it IS last changes. */
+        if (isLast) { el.style.flex = "1 1 auto"; return; }
         // For pages in a multi-page slot, check if manually resized
         const isManuallySet = MANUALLY_RESIZED[id];
         if (isManuallySet) {
@@ -11917,7 +11929,6 @@
       }
 
       // Fallback: old behavior for non-page widgets or mixed slots
-      const isLast = slot.indexOf(id) === slot.length - 1;
       el.style.flex = isLast ? "1 1 auto" : "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
     }
 
@@ -11977,7 +11988,14 @@
         slotEl.appendChild(buildSectionControls(slot));
         frag.appendChild(slotEl);
 
-        if (slotIdx < layout.length - 1) {
+        /* One after every slot now, the trailing one included -- it grabs
+           `previousElementSibling` same as any other (see wireColResizer),
+           which for this one is the LAST slot, so it needs no code of its
+           own. Before this, that slot's width was a real stored pixel value
+           like every other column's, just with no handle that ever touched
+           it: every seam in the row looked draggable except this one, which
+           silently wasn't. */
+        {
           const colResizer = document.createElement("div");
           colResizer.className = "col-resizer";
           colResizer.title = "Drag to resize";
@@ -12006,15 +12024,21 @@
       applyHiddenState();
     }
 
-    // A column-resizer is only draggable when there is a visible slot on its
-    // left AND at least one visible slot somewhere to its right to absorb the
-    // width change.
+    // A column-resizer is only draggable when the slot it actually resizes
+    // (its own leader, immediately before it) is visible. It used to also
+    // require a visible slot somewhere to its right, on the theory that
+    // growing a column means shrinking its neighbor -- but reservedWidth
+    // below shows that isn't how it works: a resizer grows its leader
+    // against the ROW's total free space, not against one specific
+    // neighbor. That old rule just meant the last widget on screen lost its
+    // working handle the moment anything hidden trailed after it in the
+    // layout, which is the ordinary case once a board has any hidden
+    // widgets at all -- not a rare edge case worth disabling for.
     function updateResizerStates() {
       const colResizers = Array.prototype.slice.call(widget.querySelectorAll(".col-resizer"));
       colResizers.forEach(function (resizer, i) {
         const leftHidden = slotAllHidden(layout[i]);
-        const rightAllHidden = layout.slice(i + 1).every(slotAllHidden);
-        resizer.classList.toggle("disabled", leftHidden || rightAllHidden);
+        resizer.classList.toggle("disabled", leftHidden);
       });
     }
 
@@ -12221,10 +12245,11 @@
         slotEl.style.display = seenVisible ? "" : "none";
       });
 
+      // No "visible slot to the right" requirement here either -- see the
+      // comment on updateResizerStates above for why that rule came out.
       Array.prototype.forEach.call(widget.querySelectorAll(".col-resizer"), function (resizer, i) {
         const leftVisible = layout.slice(0, i + 1).some(function (s) { return !slotAllHidden(s); });
-        const rightVisible = layout.slice(i + 1).some(function (s) { return !slotAllHidden(s); });
-        resizer.style.display = (leftVisible && rightVisible) ? "" : "none";
+        resizer.style.display = leftVisible ? "" : "none";
       });
 
       /* Tabs whose widget no longer exists. A hidden widget's strip is moved
