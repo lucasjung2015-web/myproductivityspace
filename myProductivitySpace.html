@@ -20047,8 +20047,45 @@
     tasks = ((data && data.items) || []).filter(function (t) { return t.title; });
   }
 
+  /* Which widget's calendar is being drawn right now.
+
+     null means the main Calendar widget; an extra calendar sets it to its own
+     id for the length of one synchronous render (see renderCalendarInto). It
+     exists because the grid renderers below reach for module state rather
+     than taking a context, and the task chips they draw have to know which
+     account they are being drawn for. */
+  let gridWidgetId = null;
+
+  /* Do two widgets read the same Google account?
+
+     Identity of the auth object settles it for anything that has never been
+     switched -- they all share the primary. Two widgets switched separately
+     to the same address get two different auth objects, though, so the
+     address decides those; it is only trusted when it is a real one, since a
+     lookup that failed leaves the placeholder text there instead. */
+  function sameAccount(a, b) {
+    if (authFor(a) === authFor(b)) return true;
+    const ea = widgetAccountEmail[a] || "", eb = widgetAccountEmail[b] || "";
+    return ea.indexOf("@") > 0 && ea === eb;
+  }
+
+  /* The task chips the calendar widget `id` may draw.
+
+     Google Tasks belong to an account exactly as events do, and the board
+     fetches exactly one account's list: the one the Tasks widget is pointed
+     at. A calendar pointed somewhere else has no claim on that list --
+     drawing it there put one account's to-dos on another account's calendar,
+     which is the precise thing the per-widget account switch exists to stop.
+     It draws no task chips rather than somebody else's; its own account's
+     tasks are not fetched instead, because every task interaction on the grid
+     (open the subtask tree, retag, reschedule, complete) writes back through
+     the board's own account and would be editing the wrong list. */
+  function tasksFor(id) {
+    return sameAccount(id, "unschedTasks") ? tasks : [];
+  }
+
   function tasksOnDay(dayStr) {
-    return tasks.filter(function (t) {
+    return tasksFor(gridWidgetId || "cal").filter(function (t) {
       return t.due && t.due.slice(0, 10) === dayStr;
     });
   }
@@ -20585,14 +20622,18 @@
   }
 
   function renderCalendarInto(ctx) {
-    const sv = viewport, sr = rangeLabel, svw = view, sa = anchor, se = events;
+    const sv = viewport, sr = rangeLabel, svw = view, sa = anchor, se = events, sg = gridWidgetId;
     viewport = ctx.viewport;
     rangeLabel = ctx.rangeLabel || document.createElement("span");
     view = ctx.view;
     anchor = ctx.anchor;
     events = ctx.events || [];
+    // Whose calendar this is, so tasksOnDay answers for this widget's account
+    // rather than the main widget's. Swapped with the rest of the state and
+    // restored the same way.
+    gridWidgetId = ctx.widgetId || null;
     try { renderGrid(); }
-    finally { viewport = sv; rangeLabel = sr; view = svw; anchor = sa; events = se; }
+    finally { viewport = sv; rangeLabel = sr; view = svw; anchor = sa; events = se; gridWidgetId = sg; }
   }
 
   /* ---------------- tag pills on task rows ----------------
@@ -25291,7 +25332,10 @@
     const label = wrap.querySelector('[data-role="label"]');
     const vp = wrap.querySelector('[data-role="viewport"]');
 
-    const ctx = { viewport: vp, rangeLabel: label, view: "month", anchor: calToday(), events: [] };
+    /* widgetId travels with the context so the shared renderers can tell
+       whose calendar they are drawing -- which decides, among other things,
+       whether the board's Google Tasks belong on it (see tasksFor). */
+    const ctx = { viewport: vp, rangeLabel: label, view: "month", anchor: calToday(), events: [], widgetId: id };
 
     function setViewLabel() {
       if (viewLabel) viewLabel.textContent = VIEW_LABELS[ctx.view] || ctx.view;
