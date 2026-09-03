@@ -1694,6 +1694,48 @@
   .cal-field-check { display: flex; align-items: center; gap: 6px; }
   .cal-field-check label { font-size: 13px; font-weight: bold; color: #000000; }
 
+  /* ---------- the event colour swatch ----------
+     Google's own control, in this board's terms: a button wearing the colour
+     the event currently has, which opens the eleven colours Google offers
+     plus Default. The grid drops in place rather than floating over the
+     panel — it lives inside a scrolling modal, and an absolutely positioned
+     popover in there is a clipping problem plus a positioning one, for a
+     control that is only ever opened for a second. */
+  .cal-color-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 7px; border: 1px solid #000000; border-radius: 4px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px;
+    color: #000000; background: #ffffff; cursor: pointer; text-align: left;
+  }
+  .cal-color-btn:hover { background: #f5f5f5; }
+  .cal-color-btn:focus { outline: 2px solid #000000; outline-offset: 1px; }
+  .cal-color-dot {
+    flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.25);
+  }
+  .cal-color-name {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cal-color-caret { flex: 0 0 auto; font-size: 9px; opacity: 0.55; }
+  .cal-color-grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    margin-top: 6px; padding: 9px; border: 1px solid #000000; border-radius: 4px;
+    background: #ffffff;
+  }
+  /* display:grid would otherwise beat the attribute. */
+  .cal-color-grid[hidden] { display: none; }
+  .cal-color-swatch {
+    width: 20px; height: 20px; border-radius: 50%; padding: 0; cursor: pointer;
+    border: 1px solid rgba(0,0,0,0.25); background: #ffffff;
+  }
+  .cal-color-swatch:hover { transform: scale(1.12); }
+  /* The chosen one wears a ring, not a tick: at 20px a checkmark is mush, and
+     a ring is legible against all eleven colours without needing to know
+     which of them are dark. */
+  .cal-color-swatch.is-on { box-shadow: 0 0 0 2px #ffffff, 0 0 0 3.5px #000000; }
+  .cal-color-swatch:focus { outline: 2px solid #000000; outline-offset: 3px; }
+
   /* ---------- the All day / Time zone line ----------
      Google puts these two on one line directly under the date and time
      fields, which is also where they belong here: the checkbox decides
@@ -20305,6 +20347,20 @@
     "10": "#0b8043", // Basil
     "11": "#d50000"  // Tomato
   };
+  /* Google's own names for them, in Google's own order. Shown in the colour
+     picker, reported to the AI, and the vocabulary the AI writes back in --
+     "banana" is a thing a person can say out loud, "5" is not. */
+  const GCAL_COLOR_NAMES = {
+    "1": "Lavender", "2": "Sage", "3": "Grape", "4": "Flamingo",
+    "5": "Banana", "6": "Tangerine", "7": "Peacock", "8": "Graphite",
+    "9": "Blueberry", "10": "Basil", "11": "Tomato"
+  };
+  // The same table read backwards, for turning a name the AI used into the id
+  // Google wants.
+  const GCAL_COLOR_IDS = {};
+  Object.keys(GCAL_COLOR_NAMES).forEach(function (id) {
+    GCAL_COLOR_IDS[GCAL_COLOR_NAMES[id].toLowerCase()] = id;
+  });
   /* Black text on a light fill, white on a dark one. Perceived luminance
      rather than a fixed white, because Banana and Flamingo are far too light
      to read white on -- and so adding a colour above never comes with a
@@ -22621,6 +22677,85 @@
     return { wrap: wrap, input: inp };
   }
 
+  /* The event's colour, as a swatch button that opens Google's own palette.
+
+     "Default" is the ABSENCE of a colour rather than a twelfth one -- the
+     event carries no colorId and is drawn in the board's black -- which is
+     why its value here is "" and why the save below has to tell "never had a
+     colour" apart from "had one and cleared it": those are the same empty
+     string but different requests.
+
+     Returns {wrap, get, changed} rather than the usual {wrap, input}: there
+     is no <input> for a save site to read .value off, and `changed` is the
+     question this particular field is actually asked. */
+  function colorField(initialColorId) {
+    const initial = GCAL_EVENT_COLORS[String(initialColorId)] ? String(initialColorId) : "";
+    let value = initial;
+
+    const wrap = document.createElement("div");
+    wrap.className = "cal-field";
+    const lab = document.createElement("label");
+    lab.textContent = "Colour";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cal-color-btn";
+    const dot = document.createElement("span");
+    dot.className = "cal-color-dot";
+    const name = document.createElement("span");
+    name.className = "cal-color-name";
+    const caret = document.createElement("span");
+    caret.className = "cal-color-caret";
+    caret.textContent = "\u25BC";
+    btn.appendChild(dot);
+    btn.appendChild(name);
+    btn.appendChild(caret);
+
+    const grid = document.createElement("div");
+    grid.className = "cal-color-grid";
+    grid.hidden = true;
+
+    function paint() {
+      dot.style.background = GCAL_EVENT_COLORS[value] || "#000000";
+      name.textContent = value ? GCAL_COLOR_NAMES[value] : "Default";
+      Array.prototype.forEach.call(grid.children, function (sw) {
+        sw.classList.toggle("is-on", sw.dataset.colorId === value);
+      });
+    }
+
+    /* Default first, then Google's eleven in Google's order -- integer-like
+       keys enumerate numerically, so this is 1..11, not 1,10,11,2. Matching
+       the order matters: someone picking "the third one" here should get the
+       same colour they would have picked over there. */
+    [""].concat(Object.keys(GCAL_EVENT_COLORS)).forEach(function (id) {
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = "cal-color-swatch";
+      sw.dataset.colorId = id;
+      sw.style.background = GCAL_EVENT_COLORS[id] || "#000000";
+      sw.title = id ? GCAL_COLOR_NAMES[id] : "Default";
+      sw.setAttribute("aria-label", sw.title);
+      sw.addEventListener("click", function () {
+        value = id;
+        grid.hidden = true;
+        paint();
+      });
+      grid.appendChild(sw);
+    });
+
+    btn.addEventListener("click", function () { grid.hidden = !grid.hidden; });
+
+    wrap.appendChild(lab);
+    wrap.appendChild(btn);
+    wrap.appendChild(grid);
+    paint();
+    return {
+      wrap: wrap,
+      get: function () { return value; },
+      changed: function () { return value !== initial; }
+    };
+  }
+
   function checkField(labelText) {
     const wrap = document.createElement("div");
     wrap.className = "cal-field-check";
@@ -23507,6 +23642,9 @@
     meet.input.checked = hadMeet;
     const description = textareaField("Add description", "");
     description.input.value = rawEv.description || "";
+    // Directly under the description, the same place Google's own event
+    // editor puts it. Pre-filled from the colour the event already carries.
+    const color = colorField(rawEv.colorId);
     const busy = selectField("Availability", [
       { value: "opaque", label: "Busy" },
       { value: "transparent", label: "Free" }
@@ -23556,6 +23694,7 @@
     createPanel.appendChild(guests.wrap);
     createPanel.appendChild(meet.wrap);
     createPanel.appendChild(description.wrap);
+    createPanel.appendChild(color.wrap);
     createPanel.appendChild(settingsRow);
     createPanel.appendChild(notify.wrap);
     // "event" explicitly: a brand-new event has no nsId to read the kind off.
@@ -23621,6 +23760,12 @@
         }
         const desc = description.input.value.trim();
         if (desc || existing) body.description = desc;
+        /* Untouched means untouched: an event whose colour nobody opened is
+           not rewritten. A chosen colour goes as Google's own colorId; going
+           back to Default sends null, which is how a patch clears a field
+           rather than leaving it alone -- and only ever on an edit, since
+           there is nothing to clear on an event that does not exist yet. */
+        if (color.changed()) body.colorId = color.get() || null;
         if (!existing || notifyTouched) {
           body.reminders = notify.input.value
             ? { useDefault: false, overrides: [{ method: "popup", minutes: Number(notify.input.value) }] }
@@ -24944,9 +25089,12 @@
       start: e.allDay ? ymd(e.start) : gcalLocalIso(e.start),
       end: e.allDay ? ymd(e.end) : gcalLocalIso(e.end),
       description: raw.description || "",
-      // The event's own Google colour as a hex, "" when it has none and is
-      // therefore drawn in the default black.
-      color: eventColor(e),
+      /* The event's own Google colour. The name is what to pass back to
+         create_event/update_event; the hex is for anything drawing it. Both
+         are "" when the event has no colour of its own and is therefore
+         drawn in the default black. */
+      color: raw.colorId ? (GCAL_COLOR_NAMES[String(raw.colorId)] || "").toLowerCase() : "",
+      color_hex: eventColor(e),
       recurrence: raw.recurrence || (raw.recurringEventId ? ["(instance of a recurring event)"] : []),
       guests: (raw.attendees || []).map(function (a) { return a.email; })
     };
@@ -25016,6 +25164,26 @@
         const rule = rrulePresetString(r, startDate);
         if (!rule) return { error: "repeat must be none, daily, weekly, monthly, yearly, weekday, or an RRULE: string." };
         body.recurrence = [rule];
+      }
+    }
+    if (f.color != null) {
+      /* Taken by name, not by number: "banana" is what a person says and what
+         read_events reports back, and Google's own ids mean nothing to anyone
+         reading the conversation. A hex or a bare id is accepted too, since a
+         model that has seen one in a widget will sometimes reach for it. */
+      const c = String(f.color).toLowerCase().trim();
+      if (!c || c === "default" || c === "none") {
+        // Nothing to clear on an event that does not exist yet; on an edit,
+        // null is how a patch removes the colour rather than leaving it.
+        if (existing) body.colorId = null;
+      } else {
+        const id = GCAL_COLOR_IDS[c] || (GCAL_EVENT_COLORS[c] ? c : null) ||
+          Object.keys(GCAL_EVENT_COLORS).filter(function (k) { return GCAL_EVENT_COLORS[k] === c; })[0];
+        if (!id) {
+          return { error: "color must be default or one of: " +
+            Object.keys(GCAL_COLOR_IDS).join(", ") + "." };
+        }
+        body.colorId = id;
       }
     }
     if (Array.isArray(f.guests)) body.attendees = f.guests.map(function (e) { return { email: String(e).trim() }; }).filter(function (a) { return a.email; });
@@ -29366,7 +29534,7 @@
     },
     {
       name: "create_event",
-      description: "Create a Google Calendar event. Omit start_time and end_time for an all-day event (end_date for a multi-day one). Times are HH:MM 24h local; end_time defaults to one hour after start. repeat: none|daily|weekly|monthly|yearly|weekday or a raw RRULE: string. reminder_minutes sets one popup reminder.",
+      description: "Create a Google Calendar event. Omit start_time and end_time for an all-day event (end_date for a multi-day one). Times are HH:MM 24h local; end_time defaults to one hour after start. repeat: none|daily|weekly|monthly|yearly|weekday or a raw RRULE: string. reminder_minutes sets one popup reminder. color takes one of Google's own colour names and is what the event is drawn in, on the board and in Google Calendar alike.",
       input_schema: {
         type: "object",
         properties: {
@@ -29378,6 +29546,7 @@
           repeat: { type: "string" },
           description: { type: "string" },
           reminder_minutes: { type: "integer" },
+          color: { type: "string", description: "Event colour, by name: lavender, sage, grape, flamingo, banana, tangerine, peacock, graphite, blueberry, basil, tomato — or \"default\" for no colour of its own (drawn black). list_events reports the current one." },
           guests: { type: "array", items: { type: "string" } }
         },
         required: ["title", "date"]
@@ -29399,6 +29568,7 @@
           repeat: { type: "string" },
           description: { type: "string" },
           reminder_minutes: { type: "integer" },
+          color: { type: "string", description: "Event colour, by name: lavender, sage, grape, flamingo, banana, tangerine, peacock, graphite, blueberry, basil, tomato — or \"default\" for no colour of its own (drawn black). list_events reports the current one." },
           guests: { type: "array", items: { type: "string" } }
         },
         required: ["event_id"]
