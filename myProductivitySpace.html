@@ -22756,6 +22756,87 @@
     };
   }
 
+  /* ---------- extension points ----------
+
+     The create/edit panels are built inside this closure, and nothing outside
+     it can reach them: `openEventForm` is not on window and never will be. So
+     a stored patch cannot monkey-patch its way into one -- an extension point
+     has to be OFFERED or it does not exist. These are the offer, and the
+     patch runtime at the end of this file is what attaches to them.
+
+     A hook is handed a small, stable context rather than the panel's
+     internals. A patch written against `busy.input` or `settingsRow` would
+     break silently the next time anything in here is renamed, and a broken
+     patch is a field that quietly stops saving -- the worst failure this
+     could have. What is passed instead is the app's own field builders and a
+     way to contribute to the save, both of which are contracts worth keeping. */
+  function formHookContext(kind, extra) {
+    const saves = [];
+    /* A hook's field is built by the SAME builders the panel used a few lines
+       above, so it is indistinguishable from a built-in one -- same markup,
+       same class names, same focus ring -- and stays that way when the styling
+       changes. Appended where the hook fired unless append is false. */
+    function attach(f, append) {
+      if (append !== false) createPanel.appendChild(f.wrap);
+      return f;
+    }
+    const ctx = {
+      kind: kind,
+      panel: createPanel,
+      field: function (label, type, value, append) {
+        return attach(field(label, type || "text", value == null ? "" : value), append);
+      },
+      select: function (label, options, append) {
+        return attach(selectField(label, (options || []).map(function (o) {
+          return typeof o === "string" ? { value: o, label: o } : o;
+        })), append);
+      },
+      check: function (label, append) { return attach(checkField(label), append); },
+      textarea: function (label, placeholder, append) {
+        return attach(textareaField(label, placeholder || ""), append);
+      },
+      // Several fields side by side, the way Availability and Visibility sit.
+      row: function (fields) {
+        const r = document.createElement("div");
+        r.className = "cal-field-row";
+        (fields || []).forEach(function (f) { r.appendChild(f.wrap); });
+        createPanel.appendChild(r);
+        return r;
+      },
+      add: function (elm) { createPanel.appendChild(elm); return elm; },
+      /* Called with the request body just before it goes to Google, so a hook
+         can put its own field into the save. Mutate `body` and return
+         nothing; async is fine and is awaited. */
+      /* Recorded with the patch that registered it. A save handler runs long
+         after its hook returned, so there is nothing to infer the owner from
+         by then -- and an unattributed failure is one list_patches cannot
+         show, which is exactly where someone would go looking for it. */
+      onSave: function (fn) {
+        if (typeof fn !== "function") return;
+        saves.push({ fn: fn, owner: (window.__mpsBlameNow && window.__mpsBlameNow()) || null });
+      },
+      __saves: saves
+    };
+    Object.keys(extra || {}).forEach(function (k) { ctx[k] = extra[k]; });
+    try {
+      if (window.__mpsRunHook) window.__mpsRunHook(kind, ctx);
+    } catch (e) {}
+    return ctx;
+  }
+  /* Each save handler is isolated. A patch that throws here must not take
+     down the save the user actually asked for -- they pressed Save on an
+     event, not on a patch -- nor stop the handlers after it. */
+  async function runFormSaves(ctx, body) {
+    for (const h of (ctx && ctx.__saves) || []) {
+      try { await h.fn(body, ctx); }
+      catch (e) {
+        try { console.error("[mps patch] a " + ctx.kind + " save handler failed:", e); } catch (e2) {}
+        try { window.__mpsPatchError && window.__mpsPatchError(h.owner, e); } catch (e2) {}
+      }
+    }
+    return body;
+  }
+
   function checkField(labelText) {
     const wrap = document.createElement("div");
     wrap.className = "cal-field-check";
@@ -23697,6 +23778,14 @@
     createPanel.appendChild(color.wrap);
     createPanel.appendChild(settingsRow);
     createPanel.appendChild(notify.wrap);
+    /* Extension point. Fields added by a patch land here -- after the
+       built-in ones, above the Tags row -- and whatever the patch registers
+       with onSave contributes to the Google request below. */
+    const formHooks = formHookContext("event-form", {
+      isNew: !existing,
+      event: existing ? publicEvent(existing) : null,
+      raw: rawEv
+    });
     // "event" explicitly: a brand-new event has no nsId to read the kind off.
     createPanel.appendChild(buildTagsSection(nsId, existing ? existing.title : "", pendingTags, false, "event"));
     if (nsId) createPanel.appendChild(buildWidgetsSection(nsId, existing.title));
@@ -23783,6 +23872,8 @@
             }
           };
         }
+        // Last, so a hook sees the finished body and can amend anything in it.
+        await runFormSaves(formHooks, body);
         let url = CAL_API + "/calendars/primary/events";
         if (existing) url += "/" + encodeURIComponent(existing.id);
         if (addMeet) url += "?conferenceDataVersion=1";
@@ -24851,6 +24942,11 @@
     const pendingTags = {};
 
     createPanel.appendChild(composer.el);
+    // The same extension point as the event panel, for the task one.
+    const formHooks = formHookContext("task-form", {
+      isNew: !existing,
+      task: existing ? publicTask(existing) : null
+    });
     createPanel.appendChild(buildTagsSection(nsId, existing ? existing.title : "", pendingTags, true));
     if (nsId) createPanel.appendChild(buildWidgetsSection(nsId, existing.title));
     createPanel.appendChild(panelActions(async function (btn) {
@@ -24880,6 +24976,7 @@
         // (which moves the task back into the Unscheduled list).
         if (due.input.value) body.due = due.input.value + "T00:00:00.000Z";
         else if (existing) body.due = null;
+        await runFormSaves(formHooks, body);
         let url = TASKS_API + "/lists/@default/tasks";
         if (existing) {
           url += "/" + encodeURIComponent(existing.id);
@@ -29729,7 +29826,7 @@
         "Use it BEFORE answering any question about how a built-in feature behaves, and before saying a behaviour does not exist. The settings panel is not the source of truth: plenty of behaviour is wired in code with no toggle exposed for it, so 'there is no setting for X' is never evidence that X does not happen. Search for it and find out.\n" +
         "Two modes. Pass `query` to grep: every matching line comes back with its line number and surrounding context. Pass `start_line` (and optionally `end_line`) instead to read a specific stretch, which is how you read a whole function after grep has found it.\n" +
         "Good queries are the literal strings the code would contain: a storage key ('cal-view'), a function name ('function setView'), a CSS class ('.cal-taskrow-title'), an id ('calCreateBtn'), a label the user sees ('All day').\n" +
-        "This is READ-ONLY. You cannot edit the app's source \u2014 the file is served from disk and the page cannot write back to it. So use what you find to answer accurately, to tell the user a feature already exists, or to describe precisely what would have to change and where (quote the line numbers). Never offer to rebuild a built-in widget as a custom one to add behaviour it may already have: look first.",
+        "This tool is read-only \u2014 the file is served off a CDN and the page cannot write back to it \u2014 but you are NOT read-only on the app. write_patch runs your own CSS and JS in the page itself, which is how you change built-in UI: a field on the event popup, a restyle outside any widget, behaviour the app does not have. So the honest answer to \"can you change X\" is: read the source to find where X is built, check list_patches, then patch it. Never tell the user a change needs someone to edit the source file, and never offer to rebuild a built-in widget as a custom one to add behaviour it may already have: look first, then patch.",
       input_schema: {
         type: "object",
         properties: {
@@ -29787,6 +29884,48 @@
         properties: { widget_id: { type: "string" }, css: { type: "string" } },
         required: ["widget_id", "css"]
       }
+    },
+    {
+      name: "list_patches",
+      description: "List the app patches this board is running, and the extension points they can attach to.\n" +
+        "A PATCH is how you change the app itself -- the built-in panels, the page chrome, behaviour that lives outside any widget. The dashboard is one static HTML file served off a CDN and the page cannot write back to it, so `read_source` is read-only and always will be. A patch is the writable half: named CSS and/or JS, stored and synced like everything else on the board, run in the page's own context at every boot.\n" +
+        "Call this FIRST whenever you are about to change built-in UI, so you see what is already patched (and can amend it instead of adding a second patch that fights it) and which hooks exist.",
+      input_schema: { type: "object", properties: {}, required: [] }
+    },
+    {
+      name: "read_patch",
+      description: "Read one patch's full css and js. list_patches gives you the names and sizes; this gives you the code, which is what you need before amending a patch rather than replacing it.",
+      input_schema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] }
+    },
+    {
+      name: "write_patch",
+      description: "Create or replace a patch: real CSS and JS that run in the app itself. This is the tool that lets you change built-in UI -- add a field to the event popup, restyle the page outside any widget, add behaviour the app does not have. The user is shown a confirm button, since this is code that will run on their board at every load.\n" +
+        "HOW TO ATTACH. The app's own functions live inside closures and are NOT on window: you cannot monkey-patch `openEventForm`. You attach at a named hook instead:\n" +
+        "  mps.on('event-form', function (ctx) { ... })   -- the add/edit Event panel\n" +
+        "  mps.on('task-form',  function (ctx) { ... })   -- the add/edit Task panel\n" +
+        "  mps.on('boot',       function () { ... })      -- once, after the board starts\n" +
+        "ctx gives you the app's OWN field builders, so what you add is indistinguishable from a built-in field: ctx.field(label, type, value) -> {wrap, input}; ctx.select(label, options); ctx.check(label); ctx.textarea(label, placeholder); ctx.row([f1, f2]) to put fields side by side; ctx.add(element) for anything else. Each appends itself to the panel where the hook fires (after the built-in fields, above the Tags row).\n" +
+        "ctx.onSave(fn) is how a field actually saves: fn(body) is called with the Google request body just before it goes out, and may change it. ctx.isNew says create vs edit; ctx.event / ctx.task is the item being edited (null when new); ctx.raw is the untouched Google resource on the event panel.\n" +
+        "The js runs as a function body with `mps` in scope: mps.on, mps.log(...) for debugging, and mps.get(key)/mps.set(key, value) for the patch's own synced storage. The whole page is reachable too -- document, window, the __mps* bridges -- since it runs in the page, not a frame.\n" +
+        "WRITE HOOKS, NOT ONE-OFF DOM EDITS. A patch is re-run every boot and re-applied whenever you rewrite it; work done inside a hook is idempotent, work done at install time (poking the DOM directly) happens twice and is not undone when the patch is rewritten.\n" +
+        "SAFETY, so you can tell the user honestly: a patch that throws while installing is switched off automatically and the board carries on; a patch that kills the page outright is disabled on the next load by a crash sentinel; and ?safe=1 on the URL skips every patch. So a bad patch costs a reload, never the board.\n" +
+        "This REPLACES the named patch's code. Read it with read_patch and include what should stay. Use read_source first to find the real class names and behaviour you are attaching to.",
+      input_schema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Lowercase letters, digits and hyphens, 2-40 chars. Reusing a name replaces that patch." },
+          js: { type: "string", description: "The patch body. Runs with `mps` in scope. Omit to leave an existing patch's js alone." },
+          css: { type: "string", description: "Plain CSS, applied to the whole page (not scoped to a widget -- use set_widget_style for that). Omit to leave an existing patch's css alone." },
+          note: { type: "string", description: "One line saying what this patch is for. Shown to the user in list_patches." },
+          enabled: { type: "boolean", description: "Default true. Pass false to keep a patch but stop it running." }
+        },
+        required: ["name"]
+      }
+    },
+    {
+      name: "delete_patch",
+      description: "Delete a patch permanently. The user is shown a confirm button. To switch one off without losing the code, write_patch with enabled:false instead.",
+      input_schema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] }
     },
     {
       name: "set_widget_instructions",
@@ -29870,6 +30009,15 @@
   // null when this particular call is not destructive after all (a Page
   // that is still empty, say).
   const DESTRUCTIVE = {
+    /* Not destructive so much as consequential: a patch is code that will run
+       on this board at every load, in the page's own context. One click is a
+       fair price for that, and it is the same click the deletes ask for. */
+    write_patch: function (i) {
+      const n = String(i.name || "").trim() || "a patch";
+      const what = String(i.note || "").trim();
+      return "Run the patch \u201c" + n + "\u201d on this board" + (what ? " (" + what + ")" : "") + "?";
+    },
+    delete_patch: function (i) { return "Delete the patch \u201c" + String(i.name || "") + "\u201d?"; },
     delete_widget: function (i) { return "Delete the widget “" + widgetNameFor(i.widget_id) + "”?"; },
     delete_task: function (i) {
       const t = window.__aiTasks && window.__aiTasks.taskTitle(i.task_id);
@@ -29968,7 +30116,11 @@
     click_element:         { label: "Clicking\u2026",    target: null },
     set_widget_instructions:{ label: "Noting\u2026",      target: "widget_id" },
     inspect_widget:        { label: "Inspecting\u2026",  target: "widget_id" },
-    set_widget_style:      { label: "Restyling\u2026",   target: "widget_id" }
+    set_widget_style:      { label: "Restyling\u2026",   target: "widget_id" },
+    list_patches:          { label: "Reading patches\u2026", target: null },
+    read_patch:            { label: "Reading\u2026",     target: null },
+    write_patch:           { label: "Patching\u2026",    target: null },
+    delete_patch:          { label: "Removing\u2026",    target: null }
   };
 
   // Tasks and events have no widget_id of their own; the fog goes over the
@@ -30214,6 +30366,28 @@
 
       case "read_source":
         return await readSource(input);
+
+      /* ---- patches: the writable half of read_source ---- */
+      case "list_patches": {
+        const P = window.__mpsPatches;
+        if (!P) return { error: "The patch runtime is not ready yet." };
+        return P.list();
+      }
+      case "read_patch": {
+        const P = window.__mpsPatches;
+        if (!P) return { error: "The patch runtime is not ready yet." };
+        return P.get(String(input.name || ""));
+      }
+      case "write_patch": {
+        const P = window.__mpsPatches;
+        if (!P) return { error: "The patch runtime is not ready yet." };
+        return await P.write(input || {});
+      }
+      case "delete_patch": {
+        const P = window.__mpsPatches;
+        if (!P) return { error: "The patch runtime is not ready yet." };
+        return await P.remove(String(input.name || ""));
+      }
 
       /* ---- pages ---- */
       case "set_page_content": {
@@ -30545,7 +30719,7 @@
       "A widget frame carries no credentials, so it can never reach the user's own Google or Notion data -- that is what the calendar, tasks and Notion tools are for. Never tell the user a widget cannot use the network at all. " +
       "You can see and drive the whole page, not just widgets: read_dom reads any selector, and click_element presses any control. UI that only exists while it is open -- the + Create panel, dropdowns, settings sheets -- is reachable by clicking the thing that opens it and THEN reading it. So never ask the user to open a panel and describe its fields to you, and never say you cannot see something because it is not rendered yet: open it yourself and look. Do not click destructive controls (Delete, Remove, Sign out) or submit a form on the user's behalf. " +
       "A widget's fullscreen view is a state you can enter, not a mode only the user can reach: set_widget_fullscreen maximizes a widget, everything you read afterwards sees the maximized DOM, and set_widget_fullscreen with false brings the board back. So a question about how something behaves in fullscreen -- is the control still there, does an edit made there stick, is anything cut off -- is one you ANSWER by going there and doing it, never one you hand back to the user as a step for them to run. Finish the check, then leave fullscreen. " +
-      "You can also read the app's own source with read_source: the whole dashboard is one HTML file, and that file is the only authority on how a built-in feature behaves. Search it BEFORE you answer any \u201cdoes it / can it / why doesn't it\u201d question about built-in behaviour, and ALWAYS before you say a behaviour does not exist or is not implemented. A missing toggle in a settings panel proves nothing \u2014 most behaviour here is wired in code with no setting exposed. Check whether the thing is already implemented before proposing to build it: offering to rebuild a built-in widget as a custom one, to add something it already does, is the worst answer you can give. read_source is read-only (the file is on disk and the page cannot write to it), so when a real code change IS needed, say what would have to change and quote the line numbers rather than claiming you can make it.",
+      "You can also read the app's own source with read_source: the whole dashboard is one HTML file, and that file is the only authority on how a built-in feature behaves. Search it BEFORE you answer any \u201cdoes it / can it / why doesn't it\u201d question about built-in behaviour, and ALWAYS before you say a behaviour does not exist or is not implemented. A missing toggle in a settings panel proves nothing \u2014 most behaviour here is wired in code with no setting exposed. Check whether the thing is already implemented before proposing to build it: offering to rebuild a built-in widget as a custom one, to add something it already does, is the worst answer you can give. read_source itself is read-only, but you are NOT read-only on the app: write_patch runs your own CSS and JS inside the page, which is how the built-in UI gets changed \u2014 a new field on the event or task popup, a restyle outside any widget, behaviour the app does not have. The app offers named hooks for the panels it builds in closures (event-form, task-form, boot); list_patches shows them and what is already patched. So when a real code change is needed, the answer is to read the source, then patch it \u2014 never to tell the user that the file is read-only, that this needs whoever maintains the app, or to quote line numbers as if they were the end of the matter. Say what you are about to change, then change it.",
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
       "",
       "Style: you are a narrow sidebar, so keep replies short \u2014 usually one or two sentences. Replies render as Markdown: use **bold** for the key term, bullet lists for anything with more than two parts, `code` for ids/keys/formats, and an emoji or two where they help the eye (\ud83d\udcda \u2705 \ud83d\udcc5 \u2728) \u2014 never as decoration on every line.",
@@ -30913,6 +31087,10 @@
       case "set_widget_instructions": return input.instructions ? "Noted how to keep " + who : "Cleared " + who + "'s instructions";
       case "inspect_widget": return "Inspected " + who;
       case "set_widget_style": return input.css && input.css.trim() ? "Restyled " + who : "Removed " + who + "'s style overrides";
+      case "list_patches": return "Read the board's patches";
+      case "read_patch": return "Read the patch \u201c" + String(input.name || "") + "\u201d";
+      case "write_patch": return "Patched the app: \u201c" + String(input.name || "") + "\u201d";
+      case "delete_patch": return "Deleted the patch \u201c" + String(input.name || "") + "\u201d";
       default: return name;
     }
   }
@@ -32035,3 +32213,263 @@
 })();
 </script>
 
+<script>
+/* ===================== stored patches =====================
+
+   The board is one static HTML file served off a CDN. The page cannot write
+   back to it, so "let the AI change the app" cannot mean "edit the source" --
+   there is no writable source at runtime. What it means instead is this: a
+   small set of named patches, each a bit of CSS and/or JS, kept in the same
+   synced storage as everything else and run at every boot. They execute in
+   the page's OWN context, not a sandboxed frame, because the entire point is
+   to reach things a frame deliberately cannot.
+
+   That is real power, so the failure mode has to be designed for rather than
+   hoped about. A patch that throws while installing takes the board down with
+   it, and the board is where you would go to fix the patch. Three things stop
+   that being a one-way door:
+
+     1. Every patch installs inside try/catch. An ordinary throw is recorded
+        and the patch is switched off; the rest of the board carries on.
+     2. Before a patch runs, its name goes into localStorage; after it
+        returns, the name is cleared. A hard crash -- an infinite loop, a
+        stack overflow, anything that stops the page dead -- leaves the name
+        behind, and the NEXT boot sees it, disables that patch, and says so.
+        So even a patch that cannot be caught costs one reload, not the board.
+     3. ?safe=1 on the URL skips all of them, which is the escape hatch that
+        needs nothing to be working in order to work.
+
+   Patches attach through hooks (see formHookContext in the calendar module)
+   rather than by monkey-patching, because the app's own functions live in
+   closures and are not reachable. Registrations are tagged with the patch
+   that made them, so rewriting a patch can cleanly remove the old one's hooks
+   instead of leaving two copies of a field on the panel.  */
+(function () {
+  const KEY = "mps-patches-v1";
+  // Deliberately localStorage and deliberately NOT synced: it is a record of
+  // "this device crashed on that patch a moment ago", which is true here and
+  // nowhere else, and it has to be readable before any async storage is.
+  const RUNNING_KEY = "mps-patch-running";
+  const SAFE = /[?&]safe=1(?:&|$)/.test(location.search) || location.hash === "#safe";
+  const MAX_BYTES = 200000;
+
+  const patches = {};          // name -> {name, css, js, note, enabled, updatedAt, lastError}
+  const hooks = {};            // hook name -> [{fn, owner}]
+  const styleEls = {};         // patch name -> its <style>
+  let installing = null;       // whose registrations are being recorded right now
+  let ready = false;
+
+  /* The hook points the app offers. Listed here rather than discovered,
+     because this is what the AI is told it may attach to -- a name that is
+     not in this list is a typo, and silently registering it would look
+     exactly like a patch that does not work. */
+  const HOOKS = {
+    "event-form": "The add/edit Event panel, fired after the built-in fields and before the Tags row. ctx: {isNew, event, raw, field, select, check, textarea, row, add, onSave, panel}.",
+    "task-form": "The add/edit Task panel, same shape. ctx: {isNew, task, field, select, check, textarea, row, add, onSave, panel}.",
+    "boot": "Once, after the board has finished starting up. No ctx."
+  };
+
+  function noteError(name, e) {
+    const msg = String((e && e.stack) || (e && e.message) || e || "unknown error");
+    if (patches[name]) patches[name].lastError = msg.slice(0, 900);
+    try { console.error("[mps patch] " + name + ":", e); } catch (e2) {}
+  }
+
+  window.__mpsHooks = {
+    on: function (name, fn) {
+      if (typeof fn !== "function") return;
+      if (!HOOKS[name]) throw new Error('No hook called "' + name + '". Available: ' + Object.keys(HOOKS).join(", "));
+      (hooks[name] || (hooks[name] = [])).push({ fn: fn, owner: installing });
+    },
+    off: function (name, fn) {
+      hooks[name] = (hooks[name] || []).filter(function (h) { return h.fn !== fn; });
+    },
+    names: function () { return Object.keys(HOOKS); }
+  };
+
+  /* Called by the app at each extension point. Every handler is isolated:
+     one patch throwing must not stop the next one, and must not stop the
+     panel it was decorating from opening. */
+  let blame = null;   // whose hook is on the stack right now
+  window.__mpsRunHook = function (name) {
+    const args = Array.prototype.slice.call(arguments, 1);
+    (hooks[name] || []).slice().forEach(function (h) {
+      const prev = blame;
+      blame = h.owner;
+      try { h.fn.apply(null, args); }
+      catch (e) { noteError(h.owner || "(unknown patch)", e); }
+      finally { blame = prev; }
+    });
+  };
+  /* Read by the app while a hook is running, so anything the hook registers
+     for later -- a save handler, a listener -- can be traced back to the
+     patch that asked for it once it eventually fails. */
+  window.__mpsBlameNow = function () { return blame; };
+  window.__mpsPatchError = function (owner, e) { if (owner) noteError(owner, e); };
+
+  // Everything a patch's js is handed. It also has the whole page, since it
+  // runs in it -- this is just the part that is a promise rather than an
+  // accident of what happens to be global today.
+  function apiFor(name) {
+    return {
+      on: window.__mpsHooks.on,
+      hooks: Object.keys(HOOKS),
+      name: name,
+      log: function () {
+        try { console.log.apply(console, ["[patch " + name + "]"].concat([].slice.call(arguments))); } catch (e) {}
+      },
+      // A patch's own corner of the synced store, so two patches cannot
+      // tread on each other's keys.
+      get: function (k) { return window.storageGet("mps-patch-data:" + name + ":" + k); },
+      set: function (k, v) { return window.storageSet("mps-patch-data:" + name + ":" + k, String(v)); }
+    };
+  }
+
+  function removeInstallation(name) {
+    Object.keys(hooks).forEach(function (n) {
+      hooks[n] = hooks[n].filter(function (h) { return h.owner !== name; });
+    });
+    if (styleEls[name]) { styleEls[name].remove(); delete styleEls[name]; }
+  }
+
+  /* Install one patch. Returns null on success or the error message, and
+     never throws: the caller is either the boot loop (which must finish) or
+     a tool call (which wants the message to hand back to the model). */
+  function apply(p) {
+    removeInstallation(p.name);
+    if (!p.enabled) return null;
+    try {
+      localStorage.setItem(RUNNING_KEY, p.name);
+    } catch (e) {}
+    try {
+      if (p.css) {
+        const st = document.createElement("style");
+        st.dataset.patch = p.name;
+        st.textContent = p.css;
+        document.head.appendChild(st);
+        styleEls[p.name] = st;
+      }
+      if (p.js) {
+        installing = p.name;
+        // Function, not eval: the patch gets its own scope and cannot see or
+        // clobber the locals in here.
+        new Function("mps", p.js)(apiFor(p.name));
+      }
+      p.lastError = "";
+      return null;
+    } catch (e) {
+      noteError(p.name, e);
+      p.enabled = false;
+      removeInstallation(p.name);
+      return String((e && e.message) || e);
+    } finally {
+      installing = null;
+      try { localStorage.removeItem(RUNNING_KEY); } catch (e) {}
+    }
+  }
+
+  async function persist() {
+    try { await window.storageSet(KEY, JSON.stringify(patches)); } catch (e) {}
+  }
+
+  function publicList() {
+    return Object.keys(patches).map(function (n) {
+      const p = patches[n];
+      return {
+        name: p.name, note: p.note || "", enabled: !!p.enabled,
+        css_bytes: (p.css || "").length, js_bytes: (p.js || "").length,
+        updated_at: p.updatedAt || null, last_error: p.lastError || ""
+      };
+    });
+  }
+
+  window.__mpsPatches = {
+    ready: function () { return ready; },
+    safeMode: SAFE,
+    hooks: HOOKS,
+    list: function () {
+      return {
+        patches: publicList(),
+        hooks: HOOKS,
+        safe_mode: SAFE,
+        note: SAFE
+          ? "Running in safe mode (?safe=1): patches are loaded but NOT applied. Reload without ?safe=1 to run them."
+          : ""
+      };
+    },
+    get: function (name) {
+      const p = patches[String(name)];
+      if (!p) return { error: 'No patch called "' + name + '".' };
+      return { name: p.name, note: p.note || "", enabled: !!p.enabled, css: p.css || "", js: p.js || "", last_error: p.lastError || "" };
+    },
+    write: async function (o) {
+      const name = String((o && o.name) || "").trim();
+      if (!/^[a-z0-9][a-z0-9-]{0,38}[a-z0-9]$/.test(name)) {
+        return { error: "Patch names are lowercase letters, digits and hyphens, 2-40 characters." };
+      }
+      const prev = patches[name];
+      const p = {
+        name: name,
+        css: o.css != null ? String(o.css) : (prev ? prev.css : ""),
+        js: o.js != null ? String(o.js) : (prev ? prev.js : ""),
+        note: o.note != null ? String(o.note) : (prev ? prev.note : ""),
+        enabled: o.enabled != null ? !!o.enabled : (prev ? prev.enabled : true),
+        updatedAt: new Date().toISOString(),
+        lastError: ""
+      };
+      if ((p.css.length + p.js.length) > MAX_BYTES) return { error: "Patch too large (200 KB max)." };
+      patches[name] = p;
+      const err = SAFE ? null : apply(p);
+      await persist();
+      return {
+        ok: !err, name: name, enabled: p.enabled, error: err || undefined,
+        applied: !SAFE && !err,
+        note: SAFE ? "Saved, but not applied: the page is in safe mode (?safe=1)."
+          : err ? "The patch threw while installing, so it has been switched off. Fix it and write it again."
+          : "Applied to the running page and saved. Its hooks are live now; a reload is only needed if the js did something outside a hook."
+      };
+    },
+    remove: async function (name) {
+      const n = String(name || "");
+      if (!patches[n]) return { error: 'No patch called "' + n + '".' };
+      removeInstallation(n);
+      delete patches[n];
+      await persist();
+      return { ok: true, removed: n, note: "Removed and saved. Anything its js already did to the live page stays until a reload." };
+    }
+  };
+
+  (async function bootPatches() {
+    /* A name left in here means the last boot started that patch and never
+       finished -- the page died inside it. It does not get a second try. */
+    let crashed = null;
+    try { crashed = localStorage.getItem(RUNNING_KEY); localStorage.removeItem(RUNNING_KEY); } catch (e) {}
+
+    let raw = null;
+    try { raw = await window.storageGet(KEY); } catch (e) {}
+    try {
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === "object") {
+        Object.keys(parsed).forEach(function (n) {
+          const p = parsed[n];
+          if (p && typeof p === "object") patches[n] = p;
+        });
+      }
+    } catch (e) {}
+
+    if (crashed && patches[crashed]) {
+      patches[crashed].enabled = false;
+      patches[crashed].lastError = "Disabled automatically: the previous load stopped dead while this patch was installing.";
+      persist();
+    }
+
+    if (!SAFE) {
+      Object.keys(patches).forEach(function (n) { apply(patches[n]); });
+    } else if (Object.keys(patches).length) {
+      try { console.warn("[mps] safe mode: " + Object.keys(patches).length + " patch(es) loaded but not applied."); } catch (e) {}
+    }
+    ready = true;
+    if (!SAFE) window.__mpsRunHook("boot");
+  })();
+})();
+</script>
