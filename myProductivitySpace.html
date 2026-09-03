@@ -2092,9 +2092,10 @@
     width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   }
   .cal-daynum { font-size: 11px; font-weight: bold; color: #000000; }
-  /* Same default as .cal-tg-event: black with white text until a status
-     colour is set. Events and tasks share it — the status dot inside the
-     chip is what distinguishes state, not the chip's own colour. */
+  /* Same default as .cal-tg-event: black with white text. Events and tasks
+     share it — the status dot inside the chip is what distinguishes state,
+     not the chip's own colour. The one thing that overrides the black is a
+     colour set on the event in Google Calendar, applied inline by makeChip. */
   .cal-chip {
     font-size: 10px; line-height: 1.25; padding: 1px 3px; border-radius: 3px;
     background: #000000; color: #ffffff; cursor: pointer;
@@ -2151,9 +2152,10 @@
   }
   .cal-tg-slot { height: 26px; border-top: 1px solid #ececec; position: relative; min-width: 0; }
   .cal-tg-slot.daystart { border-left: 1px solid #ececec; }
-  /* Solid black with white text, unconditionally — a status tag never
-     recolours the box itself, only its own pill inside it (see
-     renderTimeGrid). */
+  /* Solid black with white text by default — a status tag never recolours the
+     box itself, only its own pill inside it (see renderTimeGrid). An event
+     given a colour in Google Calendar overrides this inline, from the same
+     palette Google uses (see GCAL_EVENT_COLORS). */
   .cal-tg-event {
     position: absolute; left: 1px; right: 1px; z-index: 1;
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
@@ -3187,8 +3189,16 @@
     color: var(--ink); background: #fafafa; outline: none; white-space: pre; tab-size: 2;
   }
   .cw-code:focus { border-color: var(--ink); }
-  .cw-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #4a4a4a; }
+  /* Wraps because this row grew from one checkbox to the widget's whole
+     permission sheet: network, four data scopes, and the two topic lists. */
+  .cw-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12px; color: #4a4a4a; }
   .cw-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  /* The topic fields are text, not checkboxes: the name IS the contract, so
+     it has to be readable and editable rather than picked from a list. */
+  .cw-row .cw-topics { flex: 1 1 190px; min-width: 150px; cursor: default; }
+  .cw-row .cw-topics input { flex: 1; min-width: 0; font: inherit; color: inherit;
+    padding: 3px 6px; border: 1px solid #d8d8d8; border-radius: 5px; background: #fff; }
+  .cw-row .cw-topics input:focus { outline: none; border-color: #a8a8a8; }
   .cw-err { font-size: 11.5px; color: #7a2020; white-space: pre-wrap; word-break: break-word; }
   .cw-err:empty { display: none; }
   .cw-actions { display: flex; gap: 6px; justify-content: flex-end; }
@@ -3220,38 +3230,64 @@
      is to say "here", while leaving the content perfectly readable so you can
      watch it change. Black rather than the warm hue the same effect uses
      elsewhere, to stay inside this board's monochrome palette. */
+  /* Haze, not a hairline. The old version was a crisp 2px rectangle that
+     breathed -- it said "selected" more than "something is happening in
+     here". This is a real fog: clear through the middle so the content stays
+     perfectly readable and you can watch it change, thickening toward the
+     edges, with the glow reaching a little way outside the widget too. The
+     gradient is what makes it soft; the shadows are what make it deep. */
   .ai-fog {
     position: absolute; inset: 0; border-radius: inherit;
     pointer-events: none; z-index: 5;
-    border: 2px solid rgba(0,0,0,0.85);
-    animation: ai-frame-breathe 1.9s ease-in-out infinite;
+    background: radial-gradient(112% 112% at 50% 50%,
+                rgba(0,0,0,0) 42%, rgba(0,0,0,0.10) 72%, rgba(0,0,0,0.30) 100%);
+    animation: ai-fog-breathe 2.6s ease-in-out infinite;
   }
-  @keyframes ai-frame-breathe {
+  @keyframes ai-fog-breathe {
     0%, 100% {
-      border-color: rgba(0,0,0,0.60);
-      box-shadow: inset 0 0 12px rgba(0,0,0,0.08), 0 0 10px 0 rgba(0,0,0,0.14);
+      box-shadow:
+        inset 0 0 0 1.5px rgba(0,0,0,0.50),
+        inset 0 0 30px 6px rgba(0,0,0,0.18),
+        0 0 20px 1px rgba(0,0,0,0.16);
     }
     50% {
-      border-color: rgba(0,0,0,1);
-      box-shadow: inset 0 0 22px rgba(0,0,0,0.16), 0 0 20px 2px rgba(0,0,0,0.26);
+      box-shadow:
+        inset 0 0 0 2.5px rgba(0,0,0,0.95),
+        inset 0 0 58px 14px rgba(0,0,0,0.34),
+        0 0 38px 6px rgba(0,0,0,0.32);
     }
   }
 
   /* The pointer that shows WHERE the work is landing. Positioned in px by
-     script and eased between spots, so it glides rather than teleports. */
+     script and eased between spots, so it glides rather than teleports.
+
+     Deliberately much larger than a real cursor and drawn as an OUTLINE --
+     pale body, heavy black edge. At system-cursor size and filled solid it
+     read as a second, confusing mouse pointer; oversized and hollow it reads
+     as an annotation on the page, which is what it is. The glow ties it to
+     the fog around it. */
   .ai-cursor {
     position: absolute; top: 0; left: 0; z-index: 6; pointer-events: none;
     display: flex; align-items: flex-start; gap: 5px;
     transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
     will-change: transform;
   }
-  .ai-cursor svg { flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+  .ai-cursor svg {
+    flex: 0 0 auto;
+    filter: drop-shadow(0 0 7px rgba(0,0,0,0.40)) drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+    animation: ai-cursor-pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes ai-cursor-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.08); }
+  }
 
   /* Motion here is decorative status, not information — the label and the
      ring still say "working" without any of it. */
   @media (prefers-reduced-motion: reduce) {
-    .ai-fog { animation: none; border-color: rgba(0,0,0,0.9); }
+    .ai-fog { animation: none; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.85), inset 0 0 30px 6px rgba(0,0,0,0.18); }
     .ai-cursor { transition: none; }
+    .ai-cursor svg { animation: none; }
     .ai-msg.is-streaming::after, .ai-thinking i, .ai-tool.is-running svg { animation: none; }
   }
 
@@ -5570,12 +5606,15 @@
           }
         });
         loadedOk = true;
+        // The baseline this frame will be compared against on the way out.
+        lastPersisted = JSON.stringify({roots:roots, links:links});
         return;
       }
       // A clean read that found nothing is still a successful read: this is a
       // genuinely empty board, and saving over it later is correct.
       roots = []; links = [];
       loadedOk = true;
+      lastPersisted = JSON.stringify({roots:roots, links:links});
       return;
     }catch(e){}
     /* The read failed. Leave loadedOk false, which keeps save() shut for the
@@ -5585,10 +5624,31 @@
     roots = []; links = [];
   }
 
+  /* Exactly what this frame last read from storage, or last wrote to it.
+
+     `loadedOk` above answers "have we read yet"; this answers the other
+     question that has to be asked before writing -- "have WE changed
+     anything since". They are different, and only having the first one is a
+     silent data-loss bug once the board is open in two tabs, which is the
+     ordinary case rather than an exotic one.
+
+     Both frames load the same tree. Tab A edits it. Tab B's copy is now
+     stale -- nothing pushes a change into an already-running frame -- and the
+     three unload listeners below fire in tab B the moment you switch away
+     from it, writing its pre-edit tree back over tab A's work. No typing in
+     tab B required. Comparing against this is what makes an unchanged frame
+     write nothing at all. */
+  var lastPersisted = null;
+
   async function save(){
     // Never write a state that was never read. See loadedOk above.
     if(!loadedOk) return;
-    try{ await window.storage.set(KEY, JSON.stringify({roots:roots, links:links}), true); }catch(e){} // shared
+    var payload = JSON.stringify({roots:roots, links:links});
+    // Nothing this frame did changed the tree, so it has nothing to say --
+    // and saying it would overwrite whatever another tab has since written.
+    if(payload === lastPersisted) return;
+    lastPersisted = payload;
+    try{ await window.storage.set(KEY, payload, true); }catch(e){} // shared
   }
 
   /* ---------- autosave safeguard ---------- */
@@ -9083,15 +9143,31 @@
   let retryDelay = 2000;
 
   function queue(key, value) {
-    if (!session || !isSyncable(key)) return;
+    if (!isSyncable(key)) return;
+    /* Marked dirty BEFORE either bail-out below, and this ordering is the
+       whole point.
+
+       "Dirty" does not mean "queued to push", it means "local holds work the
+       server has not got" -- and that is true the instant the value is
+       written, whether or not this queue can do anything with it. It used to
+       be set after both guards, so a write made with no session (signed out,
+       auth still settling, a session that expired mid-use) and a write too
+       large to push both landed in localStorage looking clean. Hydration's
+       rule is "not dirty => server wins", so the next boot adopted the server
+       copy straight over them. The edit was never in danger of failing to
+       save locally; it was in danger of being overwritten afterwards, which
+       looks identical from the outside and is what makes it so hard to
+       pin down. */
+    markDirty(key);
+    if (!session) return;
     if (value && value.length > MAX_VALUE_BYTES) { setStatus("error"); return; }
     pending.set(key, value);
-    // Synchronous, and the reason the unload path needs no heroics:
-    // sendBeacon cannot set an Authorization header and keepalive fetch caps
-    // bodies at 64KB (gtask-tree-v1 exceeds that), so neither can save us on
-    // close. But the value is already in localStorage from storageSet, and
-    // this marks it — so the next boot finds it dirty and pushes it.
-    markDirty(key);
+    // markDirty above is synchronous, and the reason the unload path needs no
+    // heroics: sendBeacon cannot set an Authorization header and keepalive
+    // fetch caps bodies at 64KB (gtask-tree-v1 exceeds that), so neither can
+    // save us on close. But the value is already in localStorage from
+    // storageSet, and it is marked — so the next boot finds it dirty and
+    // pushes it.
     if (!oldestPendingAt) oldestPendingAt = Date.now();
     scheduleFlush();
   }
@@ -9199,6 +9275,13 @@
       let v = T.localGet(k);
       if (v == null) v = await T.idbGet(k);
       if (v == null) continue;
+      /* Too big to push, and the server would reject the whole batch -- which
+         throws out of hydrate() and leaves `ready` rejected, i.e. the board
+         never opens. Such a key stays dirty on purpose (see queue): local is
+         still the only copy of it, and must not be overwritten by a pull.
+         Skipping it here costs that ONE key its sync and keeps everything
+         else, instead of one oversized value taking the whole board down. */
+      if (v.length > MAX_VALUE_BYTES) { setStatus("error"); continue; }
       toPush.push({ user_id: userId, key: k, value: v, writer: WRITER_ID });
     }
 
@@ -9231,6 +9314,16 @@
         if (dirty.has(row.key)) return;
         T.localSet(row.key, row.value);
         T.idbSet(row.key, row.value);
+        /* And into the editor itself, if that Page is on screen right now.
+
+           Writing only to the tiers left every open editor showing the copy
+           it booted with, which is how a second tab becomes a stale writer in
+           the first place -- it cannot know it is behind. The setter declines
+           while that editor has focus (you are mid-sentence in it, and your
+           copy should win), and clears its `touched` flag when it accepts, so
+           an adopted Page stops being something this tab argues about. */
+        const setter = window.__mpsNoteSetters && window.__mpsNoteSetters[row.key];
+        if (setter) { try { setter(row.value); } catch (e) {} }
       });
       writeCursor(cursor);
     } catch (e) {}
@@ -11882,6 +11975,19 @@
     // siblings don't use (flex:1), matching how Reading List used to
     // absorb whatever Unscheduled Tasks left over — every other widget in
     // the stack gets its own remembered pixel height.
+    //
+    // That remembered height is a PREFERENCE, not a floor: every fixed row
+    // below is "0 1 Npx", never "0 0 Npx". A height is dragged against
+    // whatever the slot measured that day, and the slot shrinks afterwards
+    // for reasons the stored number knows nothing about — the window gets
+    // shorter, the AI panel opens, a widget is hidden to the tab bar and
+    // that bar appears and takes its own strip of the viewport. With
+    // shrink at 0 the stack simply stayed as tall as the sum of those old
+    // numbers and spilled straight out of the grid, painting over the
+    // collapsed-tabs bar underneath it. Letting the rows shrink makes them
+    // give up height in proportion instead, and because only the USED size
+    // changes (the basis is still the remembered px), every row springs
+    // back to its dragged height the moment the room returns.
     function applyHeightInSlot(id) {
       const el = widgetEl(id);
       if (!el) return;
@@ -11920,7 +12026,7 @@
         const isManuallySet = MANUALLY_RESIZED[id];
         if (isManuallySet) {
           // User manually dragged the row-resizer, respect the fixed pixel height
-          el.style.flex = "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
+          el.style.flex = "0 1 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
         } else {
           // Default: split evenly with sibling pages using flex-basis 0
           el.style.flex = "1 1 0%";
@@ -11929,7 +12035,7 @@
       }
 
       // Fallback: old behavior for non-page widgets or mixed slots
-      el.style.flex = isLast ? "1 1 auto" : "0 0 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
+      el.style.flex = isLast ? "1 1 auto" : "0 1 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
     }
 
     // Hide is per widget now, so — unlike the old per-slot collapse control —
@@ -12140,7 +12246,20 @@
       if (titlesRaw) {
         try {
           const parsed = JSON.parse(titlesRaw);
-          if (parsed && typeof parsed === "object") Object.assign(WIDGET_TITLES, parsed);
+          if (parsed && typeof parsed === "object") {
+            /* Drop any stored "Untitled" on the way in. setWidgetTitle can no
+               longer create one, but boards that ran the old code already have
+               them written down, and a stored nickname wins over the Page's
+               own first line forever -- so the fix has to reach backwards or
+               those Pages stay stuck on it. Written back below only when
+               something actually changed, so a clean board does no write. */
+            let healed = false;
+            Object.keys(parsed).forEach(function (k) {
+              if (String(parsed[k] || "").trim() === UNTITLED) { delete parsed[k]; healed = true; }
+            });
+            Object.assign(WIDGET_TITLES, parsed);
+            if (healed) persistWidgetTitles();
+          }
         } catch (e) {}
       }
       const instrRaw = await storageGet(WIDGET_INSTRUCTIONS_STORAGE_KEY);
@@ -12697,7 +12816,7 @@
           const slotHeight = slotEl.getBoundingClientRect().height;
           const maxH = Math.max(MIN_ROW, slotHeight - MIN_ROW - 14);
           heights[aboveId] = clamp(startH + dy, MIN_ROW, maxH);
-          aboveEl.style.flex = "0 0 " + heights[aboveId] + "px";
+          aboveEl.style.flex = "0 1 " + heights[aboveId] + "px";
           ev.preventDefault();
         }
         function onUp() {
@@ -13943,6 +14062,23 @@
 
       function currentHtml() { return nbSerialize(editorEl); }
       function saveLocalNow() {
+        /* Nothing was typed into THIS editor, in THIS tab, so it has nothing
+           to contribute -- and writing anyway is actively destructive.
+
+           Two tabs open on the board is the ordinary case, not an exotic one.
+           Tab A edits a Page; tab B still holds the pre-edit copy in its DOM,
+           because nothing pushes a change into an already-rendered editor.
+           Then the flushers below fire in tab B on pagehide/visibilitychange
+           -- which is to say, simply switching away from tab B -- and it
+           writes its stale body over tab A's edit, marks the key dirty, and
+           the stale copy wins on the server too. No typing required, no error
+           shown, and it happens on every tab switch. That is exactly what
+           "parts don't save" looks like from the outside.
+
+           `touched` is already the flag for "someone typed here" (it guards
+           the async load below from landing on live edits); a tab that never
+           set it is a reader, and readers do not write. */
+        if (!touched) return;
         localSet(storageKey, currentHtml());
         /* This path deliberately bypasses storageSet — it runs on every
            keystroke and on pagehide, where a debounced write is too slow —
@@ -13977,6 +14113,14 @@
         function (html) {
           if (document.activeElement === editorEl) return false;
           nbSetContent(editorEl, html);
+          /* This editor now holds exactly what storage holds, so it is back
+             to being a reader: whatever it had typed earlier in this tab is
+             no longer news, and letting it stay `touched` would have it
+             writing this adopted value straight back out again -- and, on
+             the next tab switch after another device edited the same Page,
+             writing the copy it had BEFORE adopting. Clearing it here is
+             what stops a second tab being a permanent stale writer. */
+          touched = false;
           try { applyWidgetTitle(id); } catch (e) {}
           return true;
         };
@@ -14003,7 +14147,10 @@
         clearTimeout(saveTimer);
         // An equation left mid-edit renders on the way out.
         setTimeout(function () { nbRefresh(editorEl); }, 0);
-        storageSet(storageKey, currentHtml());
+        // Same rule as saveLocalNow: clicking into a Page and back out again
+        // without typing is not an edit, and in a second tab that write is a
+        // stale one landing on top of the other tab's real work.
+        if (touched) storageSet(storageKey, currentHtml());
       });
       editorEl.addEventListener("keydown", function (e) {
         if (e.key === "Enter") {
@@ -16093,6 +16240,10 @@
        their header title is hidden and their name IS the note's first line. */
     const WIDGET_TITLE_STORAGE_KEY = "widget-titles";
     const WIDGET_TITLES = {};
+    /* What a Page with nothing written in it yet is called. It is the ABSENCE
+       of a name, not a name -- which is why setWidgetTitle refuses to store it
+       as one. See the note there. */
+    const UNTITLED = "Untitled";
     /* Standing instructions per widget, written by the user through the AI
        ("for this list, always tag new items To-do"; "keep Vocabulary to
        finance terms"). The consumer is the AI itself: they ride in the
@@ -16174,7 +16325,7 @@
           ? (window.__mpsNoteText ? window.__mpsNoteText(ed) : String(ed.textContent || ""))
           : "";
         const firstLine = String(text).split("\n")[0].trim();
-        return firstLine || "Untitled";
+        return firstLine || UNTITLED;
       }
       const label = WIDGET_FAMILY_LABEL[family];
       if (!label) return "";
@@ -16588,10 +16739,23 @@
 
     function setWidgetTitle(id, name) {
       const trimmed = (name || "").trim();
-      // Clearing the field, or typing the original name back, both mean "no
-      // nickname" — storing either would pin the widget to a name that should
-      // still follow the default if it ever changes.
-      if (trimmed && trimmed !== defaultWidgetTitle(id)) WIDGET_TITLES[id] = trimmed;
+      /* Clearing the field, or typing the original name back, both mean "no
+         nickname" — storing either would pin the widget to a name that should
+         still follow the default if it ever changes.
+
+         "Untitled" means it too, and this is the one that actually bit. It is
+         the placeholder a Page wears before anything is typed into it, so it
+         is a name nobody chooses — but it arrives here as a real string from
+         writers that never saw the Page: the Notion sync reads a page's title
+         back from Notion, and a Page pushed while its content had not finished
+         loading was pushed AS "Untitled". Coming home it no longer matched the
+         default (the Page had its first line by then), so it was stored as a
+         deliberate nickname and pinned the widget to "Untitled" for good —
+         in its header, and in its tab down in the collapsed bar, where it was
+         most visible and looked like hiding had caused it. A Page's name is
+         its own first line; nothing should be able to overwrite that with the
+         word that means it hasn't got one. */
+      if (trimmed && trimmed !== UNTITLED && trimmed !== defaultWidgetTitle(id)) WIDGET_TITLES[id] = trimmed;
       else delete WIDGET_TITLES[id];
       applyWidgetTitle(id);
       persistWidgetTitles();
@@ -18151,7 +18315,19 @@
 
     function uid() { return Math.random().toString(36).slice(2, 9); }
 
-    function persist() { storageSet(STORAGE_KEY, JSON.stringify(items)); }
+    /* Whether the stored list has actually been read yet -- the same
+       distinction the Pages editor draws with `touched` and the task tree
+       with `loadedOk`, and for the same reason. `items` starts [], and an
+       empty list in memory means either "this list is empty" or "we have not
+       looked yet"; only one of those may be written back. The load below is
+       async, so an item added in the gap used to persist [thatOneItem] over
+       the real stored list, and then be discarded itself when the load landed
+       and reassigned `items`. Both halves of that are data loss. */
+    let loaded = false;
+    function persist() {
+      if (!loaded) return;
+      storageSet(STORAGE_KEY, JSON.stringify(items));
+    }
 
     // Same ring+checkmark the Google Tasks list uses (see TASK_CHECK_ICON in
     // the calendar module) — duplicated locally since this widget lives in
@@ -19081,8 +19257,22 @@
       }
       const raw = await storageGet(STORAGE_KEY);
       if (raw) {
-        try { items = JSON.parse(raw) || []; } catch (e) { items = []; }
+        /* Anything added while this read was in flight is real work and must
+           survive it: the stored list goes UNDER those, not over them. Keyed
+           by id, so a stored copy of an item that was also edited in the gap
+           does not come back as a duplicate. */
+        let stored = [];
+        try { stored = JSON.parse(raw) || []; } catch (e) { stored = []; }
+        if (items.length) {
+          const have = {};
+          items.forEach(function (it) { if (it && it.id) have[it.id] = true; });
+          items = stored.filter(function (it) { return !(it && it.id && have[it.id]); }).concat(items);
+        } else {
+          items = stored;
+        }
       }
+      // Only now may this list be written back. See `loaded` above.
+      loaded = true;
       renderReadingList();
     })();
   }
@@ -19642,7 +19832,15 @@
           ));
         };
         try {
-          sharedTokenClient.requestAccessToken({ prompt: promptFor(interactive) });
+          /* login_hint names WHICH account to mint for. Without it a silent
+             re-mint answers with whichever Google account the browser
+             considers current -- which for a widget deliberately pointed at a
+             second account is the wrong one, and silently so. With it, a
+             restored second account comes back on its own after a reload and
+             never quietly becomes the first. */
+          const req = { prompt: promptFor(interactive) };
+          if (opts.loginHint) req.login_hint = opts.loginHint;
+          sharedTokenClient.requestAccessToken(req);
         } catch (e) { finish(reject, e); }
       });
     }
@@ -19799,6 +19997,75 @@
   const widgetAccountEmail = {};    // widgetId -> address, for the settings row
   function authFor(id) { return widgetAuth[id] || primaryAuth; }
 
+  /* Which widget is on which account, written down.
+
+     This map used to live only in memory, so the choice lasted exactly as
+     long as the page did: every reload dropped it, authFor() fell back to the
+     primary, and a calendar deliberately pointed at a second account quietly
+     went back to showing the first one's events. Reverting is the worst
+     possible failure here -- it does not look like a failure. The widget
+     still draws a full, confident calendar; it is just the wrong person's.
+
+     Google issues browser clients no refresh token, so what is stored is the
+     ADDRESS, not a credential. On the next load that address is handed to
+     Google as a login_hint and a token is minted silently against the session
+     already in the browser -- no click, no chooser, and no chance of landing
+     on a different account than the one written here. */
+  const WIDGET_ACCOUNTS_KEY = "gcal-widget-accounts";
+  /* Widgets whose stored account could not be re-established this load --
+     the Google session for it is gone, or consent was withdrawn. They are
+     NOT quietly handed the primary account: the widget says it needs
+     reconnecting instead, because showing the wrong account's data without
+     saying so is the exact bug this whole map exists to prevent. */
+  const widgetAccountStale = {};
+  function persistWidgetAccounts() {
+    try { storageSet(WIDGET_ACCOUNTS_KEY, JSON.stringify(widgetAccountEmail)); } catch (e) {}
+  }
+
+  /* Put every widget back on the account it was left on. Runs once at boot,
+     after the primary sign-in has settled -- these mints go through the same
+     shared GIS client and asking before it is ready gets nothing. */
+  let accountsRestored = false;
+  async function restoreWidgetAccounts() {
+    if (accountsRestored) return;
+    accountsRestored = true;
+    let raw = null;
+    try { raw = await storageGet(WIDGET_ACCOUNTS_KEY); } catch (e) {}
+    if (!raw) return;
+    let saved = null;
+    try { saved = JSON.parse(raw); } catch (e) { return; }
+    if (!saved || typeof saved !== "object") return;
+
+    const ids = Object.keys(saved).filter(function (id) { return saved[id]; });
+    /* One at a time, deliberately. Every mint runs through the one shared
+       token client, whose callback is set per request (see requestToken) --
+       two in flight at once and the second overwrites the first's callback,
+       so one of them hangs until its watchdog fires. */
+    for (const id of ids) {
+      const email = String(saved[id]);
+      const auth = createGoogleAuth("unbleep-gcal-token:" + id, { loginHint: email });
+      widgetAuth[id] = auth;
+      widgetAccountEmail[id] = email;
+      try {
+        await auth.ensureToken();
+        /* And CHECK. login_hint is a hint: Google is free to ignore one it
+           has no session for and mint against whichever account is current
+           instead -- which would hand this widget the primary's calendar
+           while every label on screen still said the second account. A token
+           that came back for the wrong person is worth exactly as much as no
+           token, so it is treated as none. */
+        const who = await auth.whoAmI();
+        if (who && who.toLowerCase() !== email.toLowerCase()) throw new Error("wrong account: " + who);
+        delete widgetAccountStale[id];
+      } catch (e) {
+        // Kept pointed at the account it belongs to, marked as needing a
+        // click. See widgetAccountStale above for why it is not sent home.
+        widgetAccountStale[id] = true;
+      }
+      await refreshAllFor(id);
+    }
+  }
+
   /* The default account, used by everything that is not speaking for a
      particular widget: creating an event from the shared modal, completing a
      task, the Connect button. Unqualified api() means this. */
@@ -19823,6 +20090,8 @@
     if (goHome) {
       delete widgetAuth[widgetId];
       delete widgetAccountEmail[widgetId];
+      delete widgetAccountStale[widgetId];
+      persistWidgetAccounts();
       await refreshAllFor(widgetId);
       return { ok: true, email: "" };
     }
@@ -19839,6 +20108,10 @@
       const who = await next.whoAmI();
       widgetAuth[widgetId] = next;
       widgetAccountEmail[widgetId] = who || "another account";
+      delete widgetAccountStale[widgetId];
+      // Written down now, so the next load puts this widget back here rather
+      // than silently on the account the board itself signed in with.
+      persistWidgetAccounts();
       await refreshAllFor(widgetId);
       return { ok: true, email: widgetAccountEmail[widgetId] };
     } catch (e) {
@@ -19952,6 +20225,10 @@
       // Extra Tasks views read the same `tasks` array the main widget just
       // refreshed, so they only need redrawing — no second fetch.
       extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
+      // Connecting the board for the first time this session is also the
+      // moment the other accounts can be put back (boot's own attempt found
+      // no primary token and returned before reaching this).
+      await restoreWidgetAccounts();
     } catch (e) {
       showSignedIn(false);
       // Nothing is written into the hint on the way out, in either direction.
@@ -20010,6 +20287,41 @@
   // Google returns timed events as start.dateTime and all-day events as
   // start.date. They need different handling everywhere downstream, so the
   // distinction is resolved once, here.
+  /* Google's own event-colour palette, keyed by the colorId Google stamps on
+     an event when you give it a colour in Google Calendar. An event without
+     one has no colour of its own and keeps the board's default black; one
+     with a colour is drawn in it, so a colour set over there means the same
+     thing here. */
+  const GCAL_EVENT_COLORS = {
+    "1": "#7986cb",  // Lavender
+    "2": "#33b679",  // Sage
+    "3": "#8e24aa",  // Grape
+    "4": "#e67c73",  // Flamingo
+    "5": "#f6bf26",  // Banana
+    "6": "#f4511e",  // Tangerine
+    "7": "#039be5",  // Peacock
+    "8": "#616161",  // Graphite
+    "9": "#3f51b5",  // Blueberry
+    "10": "#0b8043", // Basil
+    "11": "#d50000"  // Tomato
+  };
+  /* Black text on a light fill, white on a dark one. Perceived luminance
+     rather than a fixed white, because Banana and Flamingo are far too light
+     to read white on -- and so adding a colour above never comes with a
+     contrast decision attached. */
+  function readableOn(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+    return lum > 150 ? "#000000" : "#ffffff";
+  }
+  /* The colour one event should be drawn in, or "" for the default black.
+     Read off the untouched Google resource kept on .raw, so every renderer
+     asks the same question in the same place. */
+  function eventColor(e) {
+    const id = e && e.raw && e.raw.colorId;
+    return (id && GCAL_EVENT_COLORS[String(id)]) || "";
+  }
+
   function normalizeEvent(ev) {
     const allDay = !!(ev.start && ev.start.date);
     /* Timed events are shifted into the calendar's chosen zone here, once, so
@@ -20119,9 +20431,17 @@
   // editable tag bar lives in the item's settings panel, which is what
   // clicking any chip — task or event — opens. The subpage is one step
   // further in, via that panel's Widgets section.
-  function makeChip(nsId, title, kind) {
+  function makeChip(nsId, title, kind, color) {
     const chip = document.createElement("span");
     chip.className = "cal-chip" + (kind === "task" ? " task" : "");
+    /* An event coloured in Google Calendar wears that colour here too (see
+       eventColor). Nothing else recolours a chip -- tasks and uncoloured
+       events stay black -- so on the grid, colour reads as "I gave this one
+       a colour", never as anything the board decided on its own. */
+    if (color) {
+      chip.style.background = color;
+      chip.style.color = readableOn(color);
+    }
     const meta = tagMeta(nsId);
     const defs = tagDefs();
     // A task chip gets its own ring+checkmark at the left edge, same
@@ -20206,13 +20526,13 @@
       });
       const dayTasks = tasksOnDay(dayStr);
       const items = dayEvents.map(function (e) {
-        return { title: e.title, kind: "event", nsId: nsEvent(e.id) };
+        return { title: e.title, kind: "event", nsId: nsEvent(e.id), color: eventColor(e) };
       }).concat(dayTasks.map(function (t) {
-        return { title: t.title, kind: "task", nsId: nsTask(t.id) };
+        return { title: t.title, kind: "task", nsId: nsTask(t.id), color: "" };
       }));
 
       items.slice(0, 2).forEach(function (it) {
-        cell.appendChild(makeChip(it.nsId, it.title, it.kind));
+        cell.appendChild(makeChip(it.nsId, it.title, it.kind, it.color));
       });
       if (items.length > 2) {
         const more = document.createElement("span");
@@ -20401,7 +20721,7 @@
       events.filter(function (e) {
         return e.allDay && day >= startOfDay(e.start) && day < startOfDay(e.end);
       }).forEach(function (e) {
-        allDayRow.appendChild(makeChip(nsEvent(e.id), prefix + e.title, "event"));
+        allDayRow.appendChild(makeChip(nsEvent(e.id), prefix + e.title, "event", eventColor(e)));
       });
       tasksOnDay(ymd(day)).forEach(function (t) {
         if (taskDueTime(t, tagMeta(nsTask(t.id)))) return;
@@ -20520,11 +20840,17 @@
         box.style.top = (startMin / 60) * HOUR_H + "px";
         box.style.height = height + "px";
 
-        // Deliberately NOT recoloured by status: the block keeps its own black
-        // /white styling whatever its tags say, and status colour lives only on
-        // the Status pill rendered inside it (see the pills row below). One
-        // event box therefore always looks like every other event box, and
-        // colour means "this pill", never "this whole event".
+        // Deliberately NOT recoloured by status: the block keeps its own
+        // styling whatever its tags say, and status colour lives only on the
+        // Status pill rendered inside it (see the pills row below). The one
+        // thing that does recolour the box is the colour set on the event in
+        // Google Calendar itself; without one it stays black.
+        const color = eventColor(e);
+        if (color) {
+          box.style.background = color;
+          box.style.borderColor = color;
+          box.style.color = readableOn(color);
+        }
 
         const line = document.createElement("div");
         line.className = "cal-tg-event-title";
@@ -24618,6 +24944,9 @@
       start: e.allDay ? ymd(e.start) : gcalLocalIso(e.start),
       end: e.allDay ? ymd(e.end) : gcalLocalIso(e.end),
       description: raw.description || "",
+      // The event's own Google colour as a hex, "" when it has none and is
+      // therefore drawn in the default black.
+      color: eventColor(e),
       recurrence: raw.recurrence || (raw.recurringEventId ? ["(instance of a recurring event)"] : []),
       guests: (raw.attendees || []).map(function (a) { return a.email; })
     };
@@ -24999,6 +25328,11 @@
   let refreshing = false;
   async function refreshAll() {
     if (refreshing) return;
+    /* The main Calendar can be on a second account too, and when that account
+       cannot be re-established the honest answer is to say so and offer to
+       reconnect it -- not to fetch, fail, and print a Google error, and above
+       all not to fall back to the board's own account. */
+    if (widgetAccountStale["cal"]) { fillWithReconnectButton(viewport, "cal"); return; }
     refreshing = true;
     rangeLabel.textContent = rangeText();
     try {
@@ -25192,6 +25526,9 @@
         await refreshAll();
         extraCalendarRefreshers.forEach(function (fn) { try { fn(); } catch (e) {} });
         extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
+        // Last, and only now: these mints share the one token client, so they
+        // have to queue behind the primary rather than race it.
+        await restoreWidgetAccounts();
         return;
       }
     } catch (e) {
@@ -25247,6 +25584,29 @@
     btn.className = "add-task-btn cal-connect-btn";
     btn.textContent = label;
     btn.addEventListener("click", function () { connect(true).catch(function () {}); });
+    viewport.appendChild(btn);
+  }
+
+  /* A widget whose second account could not be re-established silently.
+
+     Deliberately NOT the plain Connect button: that one signs into the
+     board's own account, and pressing it here would be the very thing this
+     is preventing -- the widget quietly filling with the wrong account's
+     calendar. This says whose account is missing and reconnects THAT one. */
+  function fillWithReconnectButton(viewport, widgetId) {
+    viewport.innerHTML = "";
+    const who = widgetAccountEmail[widgetId] || "another account";
+    const note = document.createElement("div");
+    note.className = "cal-loading";
+    note.textContent = "Signed out of " + who;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "add-task-btn cal-connect-btn";
+    btn.textContent = "Reconnect";
+    btn.addEventListener("click", function () {
+      useGoogleAccount(widgetId).catch(function () {});
+    });
+    viewport.appendChild(note);
     viewport.appendChild(btn);
   }
 
@@ -25395,7 +25755,11 @@
 
     async function refresh() {
       setViewLabel();
-      if (!primaryAuth.isAuthed()) {
+      // Its own account first: a widget pointed somewhere else is not signed
+      // out just because the board is signed in, and must not borrow the
+      // board's account to look like it worked.
+      if (widgetAccountStale[id]) { fillWithReconnectButton(vp, id); return; }
+      if (!widgetAuth[id] && !primaryAuth.isAuthed()) {
         fillWithConnectButton(vp, "Connect Google Calendar");
         return;
       }
@@ -25571,7 +25935,12 @@
     let ownTasks = null;
 
     async function refresh() {
-      if (!primaryAuth.isAuthed()) {
+      if (widgetAccountStale[id]) {
+        if (addBtn) addBtn.hidden = true;
+        fillWithReconnectButton(viewport, id);
+        return;
+      }
+      if (!widgetAuth[id] && !primaryAuth.isAuthed()) {
         if (addBtn) addBtn.hidden = true;
         fillWithConnectButton(viewport, "Connect Google Tasks");
         return;
@@ -27015,6 +27384,85 @@
   const PROBE_MS = 1500;   // a frame that threw on load never answers; don't hang on it
   const KEY_RE = /^[\w.\-]{1,64}$/;
 
+  /* ---- data scopes ----
+     What a frame may ASK the parent for. The frame still holds no token and
+     still cannot see this page; it posts a request and the parent, which does
+     hold the session, calls the same accessors the AI panel uses and posts
+     the rows back. So the sandbox is unchanged -- what widens is the doorway,
+     not the room. Each scope is granted per widget, the way `net` is, because
+     "read my calendar" should be something a person ticked rather than
+     something generated code assumed. Read-only on purpose: a widget written
+     unattended may look at the board, not rewrite it. */
+  /* ---- topics: the labelled boxes widgets leave things in ----
+     A widget's own store is private and, more to the point, disposable: the
+     model rewrites a widget wholesale to change its colour, and whatever key
+     names it happened to use go with it. Nothing outside that file records
+     that anyone depended on them, so the reader just quietly renders nothing.
+
+     A topic is the opposite. The name lives on the widget's config -- the
+     user approved it, the gear shows it, read_widget reports it -- so it is
+     in front of the model as existing state when the code is regenerated,
+     and a widget that stops honouring its declared topics is a mismatch you
+     can see rather than an empty box that looks like a slow news day.
+
+     Topics persist through storageSet like everything else, so a reader does
+     not need the publisher to be mounted, running, or even visible. That is
+     the half a live event bus cannot do: frames here are torn down on every
+     edit and hidden widgets are not running at all. */
+  const TOPIC_KEY = function (n) { return "cw-topic:" + n; };
+  const TOPIC_INDEX = "cw-topic:__index";
+  const TOPIC_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+  const MAX_TOPICS = 50;
+  const topics = {};       // name -> { value, at, from }
+  let topicsReady = null;
+  function loadTopics() {
+    if (topicsReady) return topicsReady;
+    topicsReady = (async function () {
+      let names = [];
+      try { names = JSON.parse((await window.storageGet(TOPIC_INDEX)) || "[]") || []; } catch (e) {}
+      for (const n of names) {
+        try {
+          const raw = await window.storageGet(TOPIC_KEY(n));
+          if (raw) topics[n] = JSON.parse(raw);
+        } catch (e) {}
+      }
+    })();
+    return topicsReady;
+  }
+  function normalizeTopics(v) {
+    if (!Array.isArray(v)) return [];
+    const out = [];
+    v.forEach(function (x) {
+      const n = String(x == null ? "" : x).toLowerCase().trim();
+      if (TOPIC_RE.test(n) && out.indexOf(n) === -1 && out.length < 12) out.push(n);
+    });
+    return out;
+  }
+
+  const DATA_SCOPES = ["tasks", "calendar", "bookmarks", "board"];
+  const SCOPE_LABEL = {
+    tasks: "read your Google Tasks",
+    calendar: "read your calendar",
+    bookmarks: "read your bookmarks",
+    board: "see the board's widgets"
+  };
+  function normalizeScopes(v) {
+    if (!Array.isArray(v)) return [];
+    const out = [];
+    v.forEach(function (x) {
+      const k = String(x == null ? "" : x).toLowerCase().trim();
+      if (DATA_SCOPES.indexOf(k) !== -1 && out.indexOf(k) === -1) out.push(k);
+    });
+    return out;
+  }
+  // Which scope each request type spends, so the guard is one lookup.
+  const SCOPE_FOR = {
+    "data.tasks": "tasks",
+    "data.events": "calendar",
+    "data.bookmarks": "bookmarks",
+    "data.widgets": "board"
+  };
+
   const blobs = {};        // id -> { name, html, css, js, version, net, createdAt, updatedAt }
   const stores = {};       // id -> { key: value }
   const frames = new Map();// iframe -> id
@@ -27052,10 +27500,17 @@
     "  });",
     "  window.addEventListener('message', function(e){",
     "    var m = e.data || {}; if (e.source !== parent) return;",
-    "    if (m.t === 'init'){ snap = m.store || {}; theme = m.theme || theme; size = m.size || size; mps.theme = theme; mps.size = size; readyResolve(); emit('ready'); }",
+    "    if (m.t === 'init'){ snap = m.store || {}; theme = m.theme || theme; size = m.size || size; mps.theme = theme; mps.size = size;",
+    "      mps.scopes = m.scopes || []; mps.publishes = m.publishes || []; mps.reads = m.reads || [];",
+    /* The board's own palette, forwarded as CSS variables. A frame is style
+       isolated, so without this every generated widget invents its own greys
+       and reads as a guest on the page. */
+    "      if (m.tokens) { for (var tk in m.tokens) { try { document.documentElement.style.setProperty(tk, m.tokens[tk]); } catch(e){} } }",
+    "      readyResolve(); emit('ready'); }",
     "    else if (m.t === 'reply'){ var p = pending[m.rid]; if (p){ delete pending[m.rid]; m.ok ? p.res(m.value) : p.rej(new Error(m.error||'store error')); } }",
     "    else if (m.t === 'theme'){ theme = m.value; mps.theme = theme; document.documentElement.style.setProperty('--mps-bg', theme); emit('theme', theme); }",
     "    else if (m.t === 'size'){ size = m.value; mps.size = size; emit('size', size); }",
+    "    else if (m.t === 'topic'){ emit('topic', {topic: m.topic, value: m.value, at: m.at, from: m.from}); }",
     "    else if (m.t === 'probe'){ var r = {t:'probeReply', rid: m.rid};",
     "      try { r.html = document.body.innerHTML; r.text = document.body.innerText; }",
     "      catch(err){ r.error = String(err && err.message || err); }",
@@ -27077,6 +27532,25 @@
     "      remove: function(k){ delete snap[k]; return ask({t:'store.remove', key:k}); },",
     "      keys: function(){ return Object.keys(snap); },",
     "      all: function(){ var o = {}; for (var k in snap) o[k] = snap[k]; return o; }",
+    "    },",
+    /* Every call returns a Promise and rejects with a readable message when
+       the scope was not granted or the account is not connected -- so a
+       widget can render "Connect Google" instead of silently showing nothing. */
+    "    scopes: [], publishes: [], reads: [],",
+    /* The labelled boxes. publish() persists, so a reader gets the value
+       whether or not the publisher is still mounted; the 'topic' event is
+       only the bonus for readers that happen to be open at the time. */
+    "    publish: function(topic, value){ return ask({t:'topic.publish', topic:topic, value: typeof value === 'string' ? value : JSON.stringify(value)}); },",
+    "    read: function(topic){ return ask({t:'topic.read', topic:topic}); },",
+    "    readJSON: function(topic, d){ return ask({t:'topic.read', topic:topic}).then(function(e){",
+    "      if (!e || e.value == null) return d;",
+    "      try { return JSON.parse(e.value); } catch(err){ return d; }",
+    "    }); },",
+    "    data: {",
+    "      tasks: function(){ return ask({t:'data.tasks'}); },",
+    "      events: function(o){ o = o || {}; return ask({t:'data.events', from:o.from, to:o.to}); },",
+    "      bookmarks: function(){ return ask({t:'data.bookmarks'}); },",
+    "      widgets: function(){ return ask({t:'data.widgets'}); }",
     "    }",
     "  };",
     "  window.addEventListener('error', function(e){ send({t:'error', message: String(e.message||e) + (e.lineno ? ' (line ' + e.lineno + ')' : '') + (e.error && e.error.stack ? ' -- ' + e.error.stack : '')}); });",
@@ -27205,6 +27679,132 @@
     });
   }
 
+  /* ---- the data bridge ----
+     The frame asks; this side answers. Identity is already settled by the
+     listener below (e.source must be a frame this module built), so by the
+     time serveData runs we know which widget is asking and can check what it
+     was granted. Nothing that can write is reachable here, and no token ever
+     crosses into the frame -- only rows.
+
+     The accessors are deliberately the same ones the AI panel calls, so a
+     widget and the sidebar can never disagree about what today looks like. */
+  function serveData(id, m, reply) {
+    const blob = blobs[id];
+    const granted = (blob && blob.data) || [];
+    const need = SCOPE_FOR[m.t];
+    if (!need) return reply(false, null, "Unknown data request.");
+    if (granted.indexOf(need) === -1) {
+      return reply(false, null,
+        "This widget has not been granted the \"" + need + "\" data scope. Tick it in the widget's gear, " +
+        "or pass data:[\"" + need + "\"] when creating it.");
+    }
+    Promise.resolve().then(function () {
+      const T = window.__aiTasks;
+      switch (m.t) {
+        case "data.tasks":
+          if (!T) throw new Error("Google Tasks is not connected.");
+          return T.listTasks();
+        case "data.events":
+          if (!T) throw new Error("Google Calendar is not connected.");
+          return T.listEventsBetween(m.from, m.to);
+        case "data.bookmarks": {
+          /* Bookmarks are per widget (plus the floating menu), so there is no
+             single list to hand back -- return each source with its rows and
+             let the widget decide whether it cares which bar they came from. */
+          const reg = window.__bookmarksApi || {};
+          const sources = [];
+          Object.keys(reg).forEach(function (k) {
+            const bm = reg[k];
+            if (!bm || typeof bm.list !== "function") return;
+            try { sources.push({ widget_id: k, entries: bm.list() }); } catch (e) {}
+          });
+          return { sources: sources };
+        }
+        case "data.widgets": {
+          const b = window.__aiBoard;
+          if (!b) throw new Error("The board is not ready.");
+          /* noteText is stripped for the same reason the AI panel strips it:
+             a widget asking "what is on the board" wants the shape of it, not
+             the contents of every note on the page. */
+          return { widgets: b.list().map(function (w) {
+            const c = Object.assign({}, w); delete c.noteText; return c;
+          }) };
+        }
+      }
+      return null;
+    }).then(function (v) {
+      reply(true, v == null ? null : v);
+    }).catch(function (e) {
+      reply(false, null, String((e && e.message) || e) || "That request failed.");
+    });
+  }
+
+  /* A widget may write only the topics it declared and read only the ones it
+     declared, and both lists were approved by a person. Publishing is the one
+     write in this whole bridge, and it writes to a space that belongs to no
+     widget in particular -- never into another widget's own store, which is
+     what keeps "A rewrote B's data" impossible rather than merely discouraged. */
+  function serveTopic(id, m, reply) {
+    const blob = blobs[id];
+    const name = String(m.topic == null ? "" : m.topic).toLowerCase().trim();
+    const writing = m.t === "topic.publish";
+    if (!TOPIC_RE.test(name)) {
+      return reply(false, null, "Topic names are lowercase letters, digits and hyphens, up to 40 characters.");
+    }
+    const allowed = (blob && (writing ? blob.publishes : blob.reads)) || [];
+    if (allowed.indexOf(name) === -1) {
+      return reply(false, null, writing
+        ? "This widget has not been allowed to publish to \"" + name + "\". Add it to the widget's `publishes` list."
+        : "This widget has not been allowed to read \"" + name + "\". Add it to the widget's `reads` list.");
+    }
+    loadTopics().then(function () {
+      if (!writing) {
+        const e = topics[name];
+        return reply(true, e ? { value: e.value, at: e.at, from: e.from } : null);
+      }
+      const v = typeof m.value === "string" ? m.value : JSON.stringify(m.value);
+      if (v.length > MAX_VALUE) return reply(false, null, "Value too large (64 KB max).");
+      if (!(name in topics) && Object.keys(topics).length >= MAX_TOPICS) {
+        return reply(false, null, "Too many topics (" + MAX_TOPICS + " max).");
+      }
+      const entry = { value: v, at: new Date().toISOString(), from: id };
+      topics[name] = entry;
+      window.storageSet(TOPIC_KEY(name), JSON.stringify(entry));
+      window.storageSet(TOPIC_INDEX, JSON.stringify(Object.keys(topics)));
+      broadcastTopic(name, entry, id);
+      reply(true, { at: entry.at });
+    }).catch(function (e) {
+      reply(false, null, String((e && e.message) || e) || "That topic write failed.");
+    });
+  }
+
+  /* Readers that happen to be mounted hear about it immediately. Everyone
+     else picks it up from storage whenever they next start. */
+  function broadcastTopic(name, entry, fromId) {
+    frames.forEach(function (fid, f) {
+      if (fid === fromId || !f.isConnected) return;
+      const b = blobs[fid];
+      if (!b || (b.reads || []).indexOf(name) === -1) return;
+      post(fid, { t: "topic", topic: name, value: entry.value, at: entry.at, from: entry.from });
+    });
+  }
+
+  /* The handful of board variables worth forwarding into a frame. Read off
+     the live root rather than hard-coded, so a theme change carries through
+     on the next mount. */
+  const TOKEN_KEYS = ["--ink", "--ink-soft", "--hair", "--panel", "--bg", "--radius", "--ease-spring"];
+  function designTokens() {
+    const out = {};
+    try {
+      const cs = getComputedStyle(document.documentElement);
+      TOKEN_KEYS.forEach(function (k) {
+        const v = String(cs.getPropertyValue(k) || "").trim();
+        if (v) out[k] = v;
+      });
+    } catch (e) {}
+    return out;
+  }
+
   /* ---- the parent side of the protocol ----
      Trust comes from e.source: it must be the contentWindow of a frame this
      module created, and that is the only thing that identifies which
@@ -27222,7 +27822,14 @@
     }
     switch (m.t) {
       case "ready":
-        post(id, { t: "init", theme: themes[id] || "#FFFFFF", size: sizeOf(id), store: Object.assign({}, store) });
+        post(id, {
+          t: "init", theme: themes[id] || "#FFFFFF", size: sizeOf(id),
+          store: Object.assign({}, store),
+          scopes: (blobs[id] && blobs[id].data) || [],
+          publishes: (blobs[id] && blobs[id].publishes) || [],
+          reads: (blobs[id] && blobs[id].reads) || [],
+          tokens: designTokens()
+        });
         break;
       case "store.set": {
         const k = String(m.key || "");
@@ -27246,6 +27853,18 @@
         reply(true, null);
         break;
       }
+      case "data.tasks":
+      case "data.events":
+      case "data.bookmarks":
+      case "data.widgets":
+        serveData(id, m, reply);
+        break;
+
+      case "topic.publish":
+      case "topic.read":
+        serveTopic(id, m, reply);
+        break;
+
       case "error":
         lastError[id] = String(m.message || "error").slice(0, 500);
         // Errors join the same timeline as the logs, so the model reads one
@@ -27301,7 +27920,8 @@
     return {
       name: String(b.name || "Widget").slice(0, 80),
       html: String(b.html || ""), css: String(b.css || ""), js: String(b.js || ""),
-      version: Number(b.version) || 1, net: !!b.net,
+      version: Number(b.version) || 1, net: !!b.net, data: normalizeScopes(b.data),
+      publishes: normalizeTopics(b.publishes), reads: normalizeTopics(b.reads),
       createdAt: b.createdAt || new Date().toISOString(), updatedAt: b.updatedAt || new Date().toISOString()
     };
   }
@@ -27329,7 +27949,11 @@
       title: "Widget code",
       build: function (body) {
         const blob = blobs[id] || normalizeBlob({});
-        const draft = { html: blob.html, css: blob.css, js: blob.js, net: blob.net };
+        const draft = {
+          html: blob.html, css: blob.css, js: blob.js, net: blob.net,
+          data: (blob.data || []).slice(),
+          publishes: (blob.publishes || []).slice(), reads: (blob.reads || []).slice()
+        };
         const box = document.createElement("div");
         box.className = "cw-editor";
         const tabs = document.createElement("div");
@@ -27360,6 +27984,43 @@
         netLabel.appendChild(net);
         netLabel.appendChild(document.createTextNode("Allow network requests (https)"));
         row.appendChild(netLabel);
+        /* The data grants sit next to the network one because they are the
+           same kind of decision: everything else in this panel changes what
+           the widget looks like, and these two change what it can reach. */
+        const scopeBoxes = {};
+        DATA_SCOPES.forEach(function (scope) {
+          const lab = document.createElement("label");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = (draft.data || []).indexOf(scope) !== -1;
+          scopeBoxes[scope] = cb;
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode("Let it " + SCOPE_LABEL[scope]));
+          row.appendChild(lab);
+        });
+        function draftScopes() {
+          return DATA_SCOPES.filter(function (sc) { return scopeBoxes[sc].checked; });
+        }
+        /* The declared topics, shown as plain text because a name is the whole
+           contract: this is the line you check when a widget that used to show
+           something starts showing nothing. */
+        function topicField(labelText, initial) {
+          const wrap = document.createElement("label");
+          wrap.className = "cw-topics";
+          wrap.appendChild(document.createTextNode(labelText));
+          const inp = document.createElement("input");
+          inp.type = "text";
+          inp.placeholder = "e.g. headlines, daily-brief";
+          inp.value = (initial || []).join(", ");
+          wrap.appendChild(inp);
+          row.appendChild(wrap);
+          return inp;
+        }
+        const pubInput = topicField("Publishes to", draft.publishes);
+        const readInput = topicField("Reads", draft.reads);
+        function parseTopics(v) {
+          return String(v || "").split(",").map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean);
+        }
         const err = document.createElement("div");
         err.className = "cw-err";
         err.textContent = lastError[id] || "";
@@ -27370,13 +28031,22 @@
         reset.type = "button"; reset.className = "cw-reset"; reset.textContent = "Reset";
         reset.addEventListener("click", function () {
           draft.html = blob.html; draft.css = blob.css; draft.js = blob.js; draft.net = blob.net;
+          draft.data = (blob.data || []).slice();
+          draft.publishes = (blob.publishes || []).slice();
+          draft.reads = (blob.reads || []).slice();
           area.value = draft[cur]; net.checked = blob.net;
+          DATA_SCOPES.forEach(function (sc) { scopeBoxes[sc].checked = draft.data.indexOf(sc) !== -1; });
+          pubInput.value = draft.publishes.join(", ");
+          readInput.value = draft.reads.join(", ");
         });
         const apply = document.createElement("button");
         apply.type = "button"; apply.className = "cw-apply"; apply.textContent = "Apply";
         apply.addEventListener("click", function () {
           draft[cur] = area.value;
-          const r = api.update(id, { html: draft.html, css: draft.css, js: draft.js, net: net.checked });
+          const r = api.update(id, {
+            html: draft.html, css: draft.css, js: draft.js, net: net.checked, data: draftScopes(),
+            publishes: parseTopics(pubInput.value), reads: parseTopics(readInput.value)
+          });
           if (r && r.error) err.textContent = r.error;
         });
         actions.appendChild(reset);
@@ -27395,7 +28065,7 @@
   window.__buildCustomSection = buildSection;
   window.__wireCustomSection = function (id) {
     registerGear(id);
-    Promise.all([loadBlob(id), loadStore(id)]).then(function () { mount(id); });
+    Promise.all([loadBlob(id), loadStore(id), loadTopics()]).then(function () { mount(id); });
   };
   window.__unwireCustomSection = function (id) {
     const host = hostOf(id);
@@ -27418,7 +28088,8 @@
       o = o || {};
       const b = window.__aiBoard;
       if (!b) return { error: "The board is not ready." };
-      const blob = normalizeBlob({ name: o.name, html: o.html, css: o.css, js: o.js, version: 1, net: o.net });
+      const blob = normalizeBlob({ name: o.name, html: o.html, css: o.css, js: o.js, version: 1, net: o.net,
+        data: o.data, publishes: o.publishes, reads: o.reads });
       if (!blob.html.trim() && !blob.js.trim()) return { error: "Provide at least html or js." };
       if (codeTooBig(blob)) return { error: "Widget code is too large (200 KB max)." };
       const id = b.create("custom");
@@ -27440,6 +28111,9 @@
         css: patch.css != null ? patch.css : cur.css,
         js: patch.js != null ? patch.js : cur.js,
         version: cur.version + 1, net: patch.net != null ? !!patch.net : cur.net,
+        data: patch.data != null ? patch.data : cur.data,
+        publishes: patch.publishes != null ? patch.publishes : cur.publishes,
+        reads: patch.reads != null ? patch.reads : cur.reads,
         createdAt: cur.createdAt, updatedAt: new Date().toISOString()
       });
       if (codeTooBig(next)) return { error: "Widget code is too large (200 KB max)." };
@@ -27454,6 +28128,8 @@
       if (!b) return null;
       return {
         name: b.name, html: b.html, css: b.css, js: b.js, version: b.version, net: b.net,
+        data: (b.data || []).slice(),
+        publishes: (b.publishes || []).slice(), reads: (b.reads || []).slice(),
         store: Object.assign({}, stores[id] || {}), lastError: lastError[id] || null,
         console: (logs[id] || []).slice()
       };
@@ -27470,6 +28146,8 @@
       const p = await probe(id);
       return {
         widget_id: id, name: b.name, version: b.version, net: b.net,
+        data: (b.data || []).slice(),
+        publishes: (b.publishes || []).slice(), reads: (b.reads || []).slice(),
         rendered_html: p.html || null,
         rendered_text: p.text || null,
         frame_error: p.error || null,
@@ -27494,7 +28172,23 @@
       themes[id] = hex;
       post(id, { t: "theme", value: hex });
     },
-    isCustom: function (id) { return !!blobs[id]; }
+    isCustom: function (id) { return !!blobs[id]; },
+
+    /* What is currently sitting in each labelled box, so the model can wire a
+       reader to a publisher that already exists instead of inventing a second
+       name for the same thing. Values are summarised, not dumped: the point is
+       discovery, and a 64 KB payload in a tool result helps nobody. */
+    topics: function () {
+      return Object.keys(topics).map(function (n) {
+        const e = topics[n] || {};
+        const v = String(e.value == null ? "" : e.value);
+        return {
+          name: n, updated_at: e.at || null, published_by: e.from || null,
+          bytes: v.length, preview: v.slice(0, 120)
+        };
+      });
+    },
+    topicsReady: loadTopics
   };
   window.__customWidgets = api;
 })();
@@ -28304,9 +28998,12 @@
     );
   }
 
+  /* Outlined, not filled, and about twice the size of a real pointer -- see
+     .ai-cursor in the stylesheet for why. The pale body keeps whatever it is
+     sitting over partly visible; the heavy edge is what you actually read. */
   const CURSOR_SVG =
-    '<svg viewBox="0 0 24 24" width="17" height="17" fill="#000000" stroke="#ffffff" ' +
-    'stroke-width="1.4" stroke-linejoin="round" aria-hidden="true">' +
+    '<svg viewBox="0 0 24 24" width="34" height="34" fill="rgba(255,255,255,0.92)" ' +
+    'stroke="#000000" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true">' +
     '<path d="M5 2.6l12.2 8.1-5.1.5-2.6 5.6z"/></svg>';
 
   function startFog(id, label) {
@@ -28332,8 +29029,10 @@
     function drift() {
       if (!fogCursor || !fogHost) return;
       const r = fogHost.getBoundingClientRect();
-      const x = 18 + Math.random() * Math.max(10, r.width - 130);
-      const y = 16 + Math.random() * Math.max(10, r.height - 70);
+      // Inset by the cursor's own size now that it is 34px, so an oversized
+      // pointer still lands wholly inside the widget it is annotating.
+      const x = 18 + Math.random() * Math.max(10, r.width - 80);
+      const y = 16 + Math.random() * Math.max(10, r.height - 80);
       fogCursor.style.transform = "translate3d(" + Math.round(x) + "px," + Math.round(y) + "px,0)";
     }
     drift();
@@ -28767,7 +29466,18 @@
         "  mps.store.get(key) -> string|null (sync), mps.store.getJSON(key, fallback), mps.store.set(key, value) (persists; objects are JSON-stringified), mps.store.remove(key), mps.store.keys();\n" +
         "  mps.theme (the widget's background hex; also CSS var --mps-bg), mps.size ({w,h}), mps.on('ready'|'theme'|'size', fn), mps.ready (Promise).\n" +
         "Wait for mps.on('ready') before reading the store. Keep all state in mps.store so it survives code updates. Inline styles/scripts only; no external URLs except https images. Write complete, working, self-contained code — the body is your html; do not include <html>/<head>/<body> tags.\n" +
-        "Network is OFF by default. Set net:true when the widget genuinely needs to fetch from https endpoints (a public API, RSS, prices) -- the user is asked to approve it. Even with net:true the frame holds NO credentials of any kind, so it can never reach the user's own Google or Notion data: use the calendar, tasks and Notion tools for those, not a widget.",
+        "Network is OFF by default. Set net:true when the widget genuinely needs to fetch from https endpoints (a public API, RSS, prices) -- the user is asked to approve it. Even with net:true the frame holds NO credentials, so it can never call Google or Notion itself.\n" +
+        "What it CAN do is ask this page for that data, through mps.data -- the page makes the call and hands back the rows, so no token ever enters the frame. Every method returns a Promise and rejects with a readable message when the account is not connected, so render that message rather than an empty box:\n" +
+        "  mps.data.tasks() -> {tasks, tag_options};  mps.data.events({from,to}) -> the calendar between two YYYY-MM-DD dates (defaults: today, +14d);\n" +
+        "  mps.data.bookmarks() -> {sources:[{widget_id, entries}]};  mps.data.widgets() -> {widgets} (the board's own widgets).\n" +
+        "Each needs its scope granted in `data`: \"tasks\", \"calendar\", \"bookmarks\", \"board\". Ask for ONLY what the widget renders -- the user approves the list, and an over-broad ask is a worse widget. mps.scopes holds what was actually granted. This is READ-only: to change a task or an event, use the task and calendar tools, never a widget.\n" +
+        "The board's palette arrives as CSS variables --ink, --ink-soft, --hair, --panel, --bg, --radius. Use them instead of inventing greys, so the widget looks like it belongs on the page.\n" +
+        "TOPICS -- how two widgets share. A topic is a named box on the board that any widget may be allowed to write or read:\n" +
+        "  mps.publish(topic, value) -> persists the value under that name;  mps.read(topic) -> {value, at, from} or null;  mps.readJSON(topic, fallback);\n" +
+        "  mps.on('topic', fn) fires when a topic this widget reads is republished while it is open.\n" +
+        "Declare them: `publishes` lists the topics a widget may write, `reads` the ones it may read; names are lowercase letters, digits and hyphens. Both are approved by the user and reported by read_widget.\n" +
+        "Use a topic, NEVER another widget's store -- a store is private and is thrown away whenever that widget's code is regenerated, so a reader of it breaks silently. A topic name survives on the widget's config, so it is still in front of you next time you rewrite either side.\n" +
+        "Call list_widgets first to see which topics already exist and who publishes them: wire a new reader to the name that is already there rather than inventing a second name for the same data. Published values persist, so a reader does NOT need the publisher mounted, open, or unhidden.",
       input_schema: {
         type: "object",
         properties: {
@@ -28775,7 +29485,22 @@
           html: { type: "string" },
           css: { type: "string" },
           js: { type: "string" },
-          net: { type: "boolean", description: "Allow the widget to fetch from https endpoints. Defaults to false. Only pass true when the widget cannot work without it; the user is shown a confirm before it is granted." }
+          net: { type: "boolean", description: "Allow the widget to fetch from https endpoints. Defaults to false. Only pass true when the widget cannot work without it; the user is shown a confirm before it is granted." },
+          data: {
+            type: "array",
+            items: { type: "string", enum: ["tasks", "calendar", "bookmarks", "board"] },
+            description: "Board data the widget may read through mps.data. Defaults to none. Ask only for what it actually renders; the user confirms the list."
+          },
+          publishes: {
+            type: "array",
+            items: { type: "string" },
+            description: "Topic names this widget may write with mps.publish. Lowercase letters, digits and hyphens."
+          },
+          reads: {
+            type: "array",
+            items: { type: "string" },
+            description: "Topic names this widget may read with mps.read. Check list_widgets for topics that already exist before inventing one."
+          }
         },
         required: ["name", "html"]
       }
@@ -28791,7 +29516,22 @@
           html: { type: "string" },
           css: { type: "string" },
           js: { type: "string" },
-          net: { type: "boolean", description: "Turn network access on or off. Omit to leave it as it is; read_widget reports the current value." }
+          net: { type: "boolean", description: "Turn network access on or off. Omit to leave it as it is; read_widget reports the current value." },
+          data: {
+            type: "array",
+            items: { type: "string", enum: ["tasks", "calendar", "bookmarks", "board"] },
+            description: "Replace the widget's data scopes. Omit to leave them alone; read_widget reports the current list. Pass [] to revoke all."
+          },
+          publishes: {
+            type: "array",
+            items: { type: "string" },
+            description: "Topic names this widget may write with mps.publish. Lowercase letters, digits and hyphens."
+          },
+          reads: {
+            type: "array",
+            items: { type: "string" },
+            description: "Topic names this widget may read with mps.read. Check list_widgets for topics that already exist before inventing one."
+          }
         },
         required: ["widget_id"]
       }
@@ -28908,6 +29648,53 @@
     // And this one addresses the app's own source file.
     read_source: 1
   };
+  /* Turns a grant request into the tail of one plain-English question, or
+     null when the call asks for nothing it does not already hold. Kept as
+     one sentence deliberately: three checkboxes' worth of consent split
+     across three dialogs is how people learn to click through them. */
+  const SCOPE_WORDS = {
+    tasks: "read your Google Tasks",
+    calendar: "read your calendar",
+    bookmarks: "read your bookmarks",
+    board: "see what widgets are on your board"
+  };
+  function quoteList(names) {
+    return names.map(function (n) { return "\u201c" + n + "\u201d"; }).join(", ");
+  }
+  function added(want, held) {
+    if (!Array.isArray(want)) return [];
+    return want.filter(function (x) { return (held || []).indexOf(x) === -1; });
+  }
+  /* req is what this call asks for, held is what the widget already has.
+     Only the difference is worth a question -- a widget already reading the
+     calendar should not re-ask every time its code changes. */
+  function grantPhrases(req, held) {
+    held = held || {};
+    const parts = [];
+    if (req.net && !held.net) parts.push("make network requests (https)");
+    added(req.data, held.data).forEach(function (sc) {
+      const word = SCOPE_WORDS[sc];
+      if (word && parts.indexOf(word) === -1) parts.push(word);
+    });
+    const pub = added(req.publishes, held.publishes);
+    if (pub.length) parts.push("publish to " + quoteList(pub));
+    const rd = added(req.reads, held.reads);
+    if (rd.length) parts.push("read " + quoteList(rd) + " from other widgets");
+    if (!parts.length) return null;
+    const phrase = parts.length === 1 ? parts[0]
+      : parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1];
+    /* The one combination worth spelling out. A networked widget is otherwise
+       safe BECAUSE it can see nothing but its own store; let it also read what
+       other widgets publish and it becomes a route off the board for all of
+       it. Saying so is the difference between consent and a reflex. */
+    const willRead = (req.reads != null ? req.reads : held.reads || []).length > 0;
+    const willNet = req.net != null ? req.net : !!held.net;
+    if (willRead && willNet) {
+      return phrase + " \u2014 which together let it send other widgets\u2019 data off the board";
+    }
+    return phrase;
+  }
+
   // Tools that pause for a real answer from the user before they run. The
   // value is a function of the input that returns the question to ask, or
   // null when this particular call is not destructive after all (a Page
@@ -28954,14 +29741,16 @@
        the flag is actually going ON -- turning it off, or leaving it alone,
        needs no question. */
     create_custom_widget: function (i) {
-      if (!i.net) return null;
-      return "Let the new widget \u201c" + (i.name || "widget") + "\u201d make network requests (https)?";
+      const wants = grantPhrases(i, {});
+      if (!wants) return null;
+      return "Let the new widget \u201c" + (i.name || "widget") + "\u201d " + wants + "?";
     },
     update_custom_widget: function (i) {
-      if (!i.net) return null;
-      // Already on: this call is not a grant, so don't ask again.
-      try { if (window.__customWidgets.read(i.widget_id).net) return null; } catch (e) {}
-      return "Let " + widgetNameFor(i.widget_id) + " make network requests (https)?";
+      let held = {};
+      try { held = window.__customWidgets.read(i.widget_id) || {}; } catch (e) {}
+      const wants = grantPhrases(i, held);
+      if (!wants) return null;
+      return "Let " + widgetNameFor(i.widget_id) + " " + wants + "?";
     }
   };
 
@@ -29245,7 +30034,10 @@
     switch (name) {
       case "list_widgets":
         return { widgets: b.list().map(function (w) { const c = Object.assign({}, w); delete c.noteText; return c; }),
-                 layout: window.__aiLayout ? window.__aiLayout.describe() : null };
+                 layout: window.__aiLayout ? window.__aiLayout.describe() : null,
+                 // The labelled boxes that already exist, so a new reader is
+                 // wired to the real publisher instead of a second name for it.
+                 topics: CW && CW.topics ? CW.topics() : [] };
 
       case "read_widget":
         return b.read(id);
@@ -29365,7 +30157,8 @@
       /* ---- custom widgets ---- */
       case "create_custom_widget": {
         if (!CW) return { error: "Custom widgets are not available." };
-        const r = CW.create({ name: input.name, html: input.html, css: input.css, js: input.js, net: input.net });
+        const r = CW.create({ name: input.name, html: input.html, css: input.css, js: input.js, net: input.net, data: input.data,
+          publishes: input.publishes, reads: input.reads });
         if (r.error) return r;
         await wait(400);   // let the frame boot so a syntax error is reported now
         return Object.assign(r, await CW.inspect(r.widget_id));
@@ -29373,7 +30166,8 @@
       case "update_custom_widget": {
         if (!CW) return { error: "Custom widgets are not available." };
         if (!CW.isCustom(id)) return { error: "'" + id + "' is not a custom widget." };
-        const r = CW.update(id, { name: input.name, html: input.html, css: input.css, js: input.js, net: input.net });
+        const r = CW.update(id, { name: input.name, html: input.html, css: input.css, js: input.js, net: input.net, data: input.data,
+          publishes: input.publishes, reads: input.reads });
         if (r.error) return r;
         await wait(400);
         return Object.assign(r, await CW.inspect(id));
