@@ -225,3 +225,74 @@ drop trigger if exists notion_pages_touch_trg on public.notion_pages;
 create trigger notion_pages_touch_trg
   before insert or update on public.notion_pages
   for each row execute function public.kv_touch();
+
+-- ---------------------------------------------------------------------------
+-- 6. Custom connectors
+-- ---------------------------------------------------------------------------
+-- An MCP server the user has pointed the board at: a name, an endpoint, and
+-- optionally a bearer token for it.
+--
+-- Split across TWO tables on purpose, the same way notion_tokens is split
+-- from notion_pages. The token is a credential and must never leave the
+-- server, so it lives in its own table with RLS on and no policies. The rest
+-- is what the Connectors modal draws -- name, URL, tool list, when it was
+-- last reachable -- and the client needs to read that on every open, so it
+-- gets ordinary owner policies.
+--
+-- Putting them in one table would mean either the client cannot read its own
+-- connector list, or a select that returns the token to the browser the first
+-- time someone widens the policy by one column.
+
+create table if not exists public.connectors (
+  user_id      uuid        not null references auth.users(id) on delete cascade,
+  -- Stable id the widget grants and the AI's calls address. Not the name:
+  -- renaming a connector must not silently revoke every grant against it.
+  id           text        not null,
+  name         text        not null,
+  url          text        not null,
+  -- What tools/list returned when this was last probed, as JSON. Cached so
+  -- the modal and the widget-permission UI can show tool names without a
+  -- round trip to a server that may be slow or down.
+  tools        text        not null default '[]',
+  tools_at     timestamptz,
+  last_error   text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  primary key (user_id, id)
+);
+
+create index if not exists connectors_user_idx on public.connectors (user_id);
+
+alter table public.connectors enable row level security;
+
+drop policy if exists connectors_select on public.connectors;
+create policy connectors_select on public.connectors for select to authenticated
+  using (auth.uid() = user_id);
+-- Insert/update/delete deliberately absent: every write goes through the mcp
+-- Edge Function, which probes the server before saving and is the only place
+-- that knows how to keep the token table in step with this one. A client that
+-- could insert here could register a connector that had never been reached.
+
+drop trigger if exists connectors_touch_trg on public.connectors;
+create trigger connectors_touch_trg
+  before insert or update on public.connectors
+  for each row execute function public.kv_touch();
+
+-- The credential half. Same shape and same reasoning as notion_tokens: RLS on
+-- with ZERO policies, so only service_role reads it and the browser never can.
+create table if not exists public.connector_secrets (
+  user_id      uuid        not null references auth.users(id) on delete cascade,
+  id           text        not null,
+  access_token text,
+  updated_at   timestamptz not null default now(),
+  primary key (user_id, id),
+  foreign key (user_id, id) references public.connectors(user_id, id) on delete cascade
+);
+
+alter table public.connector_secrets enable row level security;
+-- Deliberately no policies. Do not add any.
+
+drop trigger if exists connector_secrets_touch_trg on public.connector_secrets;
+create trigger connector_secrets_touch_trg
+  before insert or update on public.connector_secrets
+  for each row execute function public.kv_touch();
