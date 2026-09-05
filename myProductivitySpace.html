@@ -9790,7 +9790,20 @@
       const j = await r.json().catch(function () { return null; });
       return { ok: r.ok, status: r.status, body: j };
     } catch (e) {
-      return { ok: false, status: 0, body: { error: String((e && e.message) || e) } };
+      /* A rejected fetch means the request never reached a server that would
+         talk to us: the function is not deployed, so Supabase answers 404
+         WITHOUT the CORS headers the function itself would have set, and the
+         browser reports a bare "Failed to fetch".
+
+         Worth spelling out rather than passing through. The model that reads
+         "Failed to fetch" has no way to tell a missing deploy from a dropped
+         packet, so it retries, retries again, and reports a transient backend
+         hiccup -- which is what happened the first time this fired. A
+         permanent condition should not read as a flaky one. */
+      return { ok: false, status: 0, body: { error: String((e && e.message) || e),
+        note: "The request never reached the server. This almost always means the Edge Function " +
+          "has not been deployed yet, in which case retrying will never help and the board's " +
+          "owner needs to deploy it. Say that plainly rather than calling it a transient failure." } };
     }
   }
 
@@ -30409,6 +30422,14 @@
     list_notion_pages: 1, create_page_from_notion: 1, create_custom_widget: 1,
     // These two address the page by CSS selector, not by widget.
     read_dom: 1, click_element: 1,
+    /* The patch tools address a patch by NAME, and were left out of this list
+       when they were added -- which meant the guard below demanded a widget_id
+       none of them take, and every one of them failed with "widget_id is
+       required. Call list_widgets for the current ids." That is a confusing
+       error to receive about a tool that has no widget: the model's reasonable
+       reading is that the endpoint is glitching, which is exactly how it read
+       it. The whole patch feature had never once run. */
+    list_patches: 1, read_patch: 1, write_patch: 1, delete_patch: 1,
     // And these address the app's own source file, not a widget.
     read_source: 1, repo_status: 1, commit_source: 1,
     // And these address a connector, which is not a widget either.
@@ -30805,7 +30826,20 @@
       const j = await r.json().catch(function () { return null; });
       return { ok: r.ok, status: r.status, body: j };
     } catch (e) {
-      return { ok: false, status: 0, body: { error: String((e && e.message) || e) } };
+      /* A rejected fetch means the request never reached a server that would
+         talk to us: the function is not deployed, so Supabase answers 404
+         WITHOUT the CORS headers the function itself would have set, and the
+         browser reports a bare "Failed to fetch".
+
+         Worth spelling out rather than passing through. The model that reads
+         "Failed to fetch" has no way to tell a missing deploy from a dropped
+         packet, so it retries, retries again, and reports a transient backend
+         hiccup -- which is what happened the first time this fired. A
+         permanent condition should not read as a flaky one. */
+      return { ok: false, status: 0, body: { error: String((e && e.message) || e),
+        note: "The request never reached the server. This almost always means the Edge Function " +
+          "has not been deployed yet, in which case retrying will never help and the board's " +
+          "owner needs to deploy it. Say that plainly rather than calling it a transient failure." } };
     }
   }
 
@@ -30970,6 +31004,7 @@
         if (!C) return { error: "Connectors are not ready yet." };
         const r = await C.list();
         if (!r || !r.body) return { error: "Could not reach the connector service." };
+        if (r.status === 0) return { error: "Connectors are unreachable.", note: r.body.note };
         if (!r.ok) return { error: (r.body && r.body.error) || "Could not read your connectors." };
         const rows = (r.body.connectors || []);
         return {
@@ -30984,6 +31019,7 @@
         if (!C) return { error: "Connectors are not ready yet." };
         const r = await C.call(String(input.connector_id || ""), String(input.tool || ""), input.arguments || {});
         if (!r || !r.body) return { error: "Could not reach the connector service." };
+        if (r.status === 0) return { error: "Connectors are unreachable.", note: r.body.note };
         if (!r.ok) return r.body;
         /* Re-stated on every single result, not just in the tool description.
            The description is read once at the top of a long conversation; this
@@ -31000,6 +31036,7 @@
       case "repo_status": {
         const r = await githubCall({ action: "status" });
         if (!r || !r.body) return { error: "Could not reach the source proxy." };
+        if (r.status === 0) return { error: "Source editing is unreachable.", note: r.body.note };
         return r.body;
       }
       case "commit_source": {
@@ -31010,6 +31047,7 @@
           message: String(input.message || "")
         });
         if (!r || !r.body) return { error: "Could not reach the source proxy." };
+        if (r.status === 0) { forgetSourceCaches(); return { error: "Source editing is unreachable.", note: r.body.note }; }
         /* Both cached copies go, and on failure too. A refused commit can
            still mean the read was stale -- that is the commonest reason an
            edit matches nothing -- and leaving the stale text cached would
