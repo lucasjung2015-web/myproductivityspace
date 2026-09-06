@@ -2167,7 +2167,14 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
-  .cal-tg-event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Wraps inside the box instead of truncating to one line. A 6pm event in a
+     narrow day column rendered as "6p…", which names nothing at all -- the
+     ellipsis was spending the only characters that could have identified it.
+     The parent .cal-tg-event keeps overflow:hidden, so a title longer than the
+     event is tall still clips; it just clips after as many lines as the event
+     has room for rather than after three characters. overflow-wrap:anywhere so
+     one long unbroken word (a URL in a title) breaks rather than overflowing. */
+  .cal-tg-event-title { overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
   .cal-tg-event-pills { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 1px; }
   .cal-tg-event-pills .tag-pill {
     font-size: 9px; line-height: 1.3; padding: 0 4px; border-radius: 999px;
@@ -2219,11 +2226,24 @@
      the timed event box's own absolute positioning instead of sitting
      inline in a flex row. */
   .cal-tg-task-pos { position: absolute; left: 1px; right: 1px; z-index: 1; }
+  /* A real row of day columns, sharing the hour grid's own track sizes so an
+     all-day item sits above the day it belongs to. It used to be one flex
+     band that wrapped, which is why every chip had to carry a "Tu "/"Th "
+     prefix: nothing about its POSITION said which day it was, so the day had
+     to be spelled into the title. Columns are set in renderTimeGrid from the
+     same string the grid below uses, so the two can never drift apart. */
   .cal-allday-row {
-    display: flex; flex-wrap: wrap; gap: 3px; padding-bottom: 6px; margin-bottom: 4px;
+    display: grid; gap: 3px; padding-bottom: 6px; margin-bottom: 4px;
     border-bottom: 1px solid #ececec;
   }
-  .cal-allday-row:empty { display: none; }
+  .cal-allday-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  /* A seventh of the width is not enough for an ellipsis to leave anything
+     readable -- "MO 221 Student Information Survey…" became "MO…" -- so these
+     wrap instead. Scoped to this row: month-view chips sit in fixed-height
+     cells where wrapping would push the day out of shape. */
+  .cal-allday-row .cal-chip {
+    white-space: normal; overflow-wrap: anywhere; align-items: flex-start;
+  }
 
   /* Task list under the grid. Settled rows (once a task is done being named/
      edited) are a plain, borderless list — big circle, big title allowed to
@@ -19709,6 +19729,134 @@
   const nsTask = (id) => "task:" + id;
   const nsEvent = (id) => "event:" + id;
 
+  /* ---------- which Google Tasks list this board is showing ----------
+
+     A Google account has SEVERAL task lists ("My Tasks" plus any you make),
+     and every call in this file used to name "@default", so the rest were
+     invisible from here. This is the one place that decision now lives:
+     TASK_LIST_KEY persists it through the same synced store as cal-view, so
+     the choice follows the account rather than the browser.
+
+     "@default" stays the value until something else is picked. It is an alias
+     Google resolves server-side, so it must reach the URL verbatim -- a real
+     list id is an opaque token that still deserves escaping, hence the split
+     below rather than one unconditional encodeURIComponent. */
+  const TASK_LIST_KEY = "gtask-list-ids-v1";
+  const TASK_LIST_KEY_V0 = "gtask-list-id";   // one id for the whole board
+  const PRIMARY_TASKS_ID = "unschedTasks";
+  let taskListById = {};   // widget id -> Google task list id
+  let taskLists = [];      // the account's lists, [{id, title}]
+
+  /* Which Tasks widget the code is acting for right now.
+
+     Exactly the idiom renderCalendarInto already uses with gridWidgetId, and
+     for the same reason: renderTasks() is ONE renderer that every Tasks widget
+     draws through, so the alternative is threading a widget id through fifteen
+     call sites and every row handler they reach. Swapped for the length of a
+     synchronous render or a single write, and always restored in a finally.
+
+     Safe across the async writes because every one of them builds its URL
+     synchronously -- api(tasksUrl(...), ...) evaluates the argument before it
+     suspends -- so the swap only has to survive the call, not the round trip. */
+  let activeTaskWidgetId = PRIMARY_TASKS_ID;
+
+  function listIdFor(widgetId) {
+    return taskListById[widgetId || PRIMARY_TASKS_ID] || "@default";
+  }
+  function tasksUrl(suffix) {
+    const id = listIdFor(activeTaskWidgetId);
+    // "@default" is an alias Google resolves itself and must survive verbatim;
+    // a real list id is an opaque token that still deserves escaping.
+    const seg = id === "@default" ? "@default" : encodeURIComponent(id);
+    return TASKS_API + "/lists/" + seg + "/tasks" + (suffix || "");
+  }
+  /* Each extra widget's own fetched rows, by widget id. Absent means the
+     widget shares the primary's array because it is on the same list. */
+  const tasksByWidget = {};
+
+  /* Find a task AND the widget whose array holds it.
+
+     The bug this exists to end: every edit path used to do
+     `tasks.filter(...)[0]` and then `if (!t) return;`. Once a second Tasks
+     widget had its own array, any task belonging to it was absent from
+     `tasks`, so the lookup returned undefined and the guard treated that as
+     "nothing to do". The edit vanished with no error, no console line and no
+     failed request. Three separate symptoms -- cannot edit a row, cannot set
+     a due date, cannot delete -- were all this one line.
+
+     Task ids are opaque and per-list, so a hit in another widget's array is
+     genuinely that task and not a collision. Whatever is active wins first,
+     so a click in one widget never resolves to a row somewhere else. */
+  function findTaskOwner(rawId) {
+    const here = tasks.filter(function (x) { return x.id === rawId; })[0];
+    if (here) return { task: here, owner: activeTaskWidgetId };
+    const ids = Object.keys(tasksByWidget);
+    for (let i = 0; i < ids.length; i++) {
+      const hit = (tasksByWidget[ids[i]] || []).filter(function (x) { return x.id === rawId; })[0];
+      if (hit) return { task: hit, owner: ids[i] };
+    }
+    return null;
+  }
+
+  function withTaskWidget(widgetId, fn) {
+    const savedId = activeTaskWidgetId, savedTasks = tasks;
+    const w = widgetId || PRIMARY_TASKS_ID;
+    /* The array matters as much as the id. Every write handler looks its task
+       up in `tasks` and then mutates it, and after a scoped render that
+       variable is back to the primary's rows -- so an edit to a second
+       widget's task found nothing and was silently discarded by
+       saveTaskRowEdit's `if (!t) cancel` guard. */
+    const own = w !== PRIMARY_TASKS_ID ? tasksByWidget[w] : null;
+    activeTaskWidgetId = w;
+    if (own) tasks = own;
+    try { return fn(); }
+    finally {
+      // completeTask and deleteGoogleItem REPLACE the array rather than
+      // mutating it, so the new one has to be filed back under its widget.
+      if (own && tasks !== savedTasks) tasksByWidget[w] = tasks;
+      activeTaskWidgetId = savedId;
+      tasks = savedTasks;
+    }
+  }
+  function persistTaskLists() {
+    storageSet(TASK_LIST_KEY, JSON.stringify(taskListById));
+  }
+  async function restoreTaskLists() {
+    try {
+      const raw = await storageGet(TASK_LIST_KEY);
+      if (raw) { taskListById = JSON.parse(raw) || {}; return; }
+    } catch (e) { taskListById = {}; }
+    /* Migration from the single-board-wide selection this replaced. Without
+       it, everyone who had already chosen a list silently goes back to the
+       account default on the upgrade, which looks exactly like the bug this
+       change exists to fix. */
+    try {
+      const old = await storageGet(TASK_LIST_KEY_V0);
+      if (old) { taskListById[PRIMARY_TASKS_ID] = old; persistTaskLists(); }
+    } catch (e) {}
+  }
+
+  /* Diagnostic surface, in the same spirit as __mpsGoogleTokenProblem next
+     door. Which list is selected lives in a closure, so when a task turns up
+     in the wrong list there is nothing to inspect and no way to tell a wrong
+     selection from a wrong request -- the two have completely different
+     causes and looked identical from outside. `lastWrite` is the URL the last
+     create/edit/delete actually went to, which is the fact that settles it. */
+  let lastTaskWrite = null;
+  window.__mpsTaskListState = function () {
+    const title = function (lid) {
+      return (taskLists.filter(function (l) { return l.id === lid; })[0] || {}).title || lid;
+    };
+    const per = {};
+    Object.keys(taskListById).forEach(function (w) { per[w] = title(taskListById[w]); });
+    return {
+      active_widget: activeTaskWidgetId,
+      per_widget: per,
+      lists: taskLists.map(function (l) { return l.title + "  [" + l.id + "]"; }),
+      last_write: lastTaskWrite
+    };
+  };
+
   const el = (id) => document.getElementById(id);
 
   const signedOutEl = el("calSignedOut");
@@ -20068,6 +20216,13 @@
     if (gtOut) gtOut.hidden = !!on;
     const gtBtn = el("addGTaskBtn");
     if (gtBtn) gtBtn.hidden = !on;
+    /* The list picker is only meaningful while connected, and its options
+       have to be fetched. Put here rather than in boot() so it covers all
+       three ways this widget reaches the signed-in state: a cached token at
+       boot, the Connect button, and an account switch from settings. Not
+       awaited -- nothing on screen waits for it, and it hides itself if the
+       account turns out to have only one list. */
+    if (on) { try { loadTaskLists(); } catch (e) {} }
   }
 
   // The board's own Google account: the one that owns the refresh token, and
@@ -20508,7 +20663,7 @@
   }
 
   async function fetchTasks() {
-    const data = await authFor("unschedTasks").api(TASKS_API + "/lists/@default/tasks?showCompleted=false&maxResults=100");
+    const data = await authFor("unschedTasks").api(tasksUrl("?showCompleted=false&maxResults=100"));
     tasks = ((data && data.items) || []).filter(function (t) { return t.title; });
   }
 
@@ -20846,18 +21001,30 @@
     // sitting up here regardless of what time it's actually due.
     const allDayRow = document.createElement("div");
     allDayRow.className = "cal-allday-row";
-    allDayRow.style.gridColumn = "1 / -1";
+    // The same track sizes as the hour grid, including the 46px hour-label
+    // gutter, so column N up here lines up with column N down there.
+    allDayRow.style.gridTemplateColumns = wrap.style.gridTemplateColumns;
+    allDayRow.appendChild(document.createElement("div"));   // gutter spacer
+    /* Counted rather than checked with :empty, because the row is no longer
+       empty when there is nothing in it -- it always holds the gutter and one
+       cell per day. */
+    let allDayCount = 0;
     days.forEach(function (day) {
-      const prefix = days.length > 1 ? DOW[day.getDay()].slice(0, 2) + " " : "";
+      const cell = document.createElement("div");
+      cell.className = "cal-allday-cell";
       events.filter(function (e) {
         return e.allDay && day >= startOfDay(e.start) && day < startOfDay(e.end);
       }).forEach(function (e) {
-        allDayRow.appendChild(makeChip(nsEvent(e.id), prefix + e.title, "event", eventColor(e)));
+        cell.appendChild(makeChip(nsEvent(e.id), e.title, "event", eventColor(e)));
+        allDayCount++;
       });
       tasksOnDay(ymd(day)).forEach(function (t) {
         if (taskDueTime(t, tagMeta(nsTask(t.id)))) return;
-        allDayRow.appendChild(makeChip(nsTask(t.id), prefix + t.title, "task"));
+        // No day prefix any more: the column it sits in says which day it is.
+        cell.appendChild(makeChip(nsTask(t.id), t.title, "task"));
+        allDayCount++;
       });
+      allDayRow.appendChild(cell);
     });
 
     const corner = document.createElement("div");
@@ -20890,7 +21057,7 @@
     }
 
     viewport.innerHTML = "";
-    if (allDayRow.children.length) viewport.appendChild(allDayRow);
+    if (allDayCount) viewport.appendChild(allDayRow);
     viewport.appendChild(wrap);
 
     // Position timed events absolutely inside their day's 00:00 slot, so an
@@ -21090,14 +21257,18 @@
      same warning as renderCalendarInto: synchronous only. renderTasks touches
      exactly one piece of module state that matters here -- taskListEl -- so
      this swap is even narrower than the calendar's. */
-  function renderTasksInto(listEl, list) {
-    const savedEl = taskListEl, savedTasks = tasks;
+  function renderTasksInto(listEl, list, widgetId) {
+    const savedEl = taskListEl, savedTasks = tasks, savedOwner = activeTaskWidgetId;
     taskListEl = listEl;
-    // A widget on another account brings its own list; one on the signed-in
-    // account shares the main widget's, which is the same list anyway.
+    /* The third piece of the swap, and the one that makes two Tasks widgets
+       on two different lists possible: every handler renderTasks binds reads
+       this to decide which list its row belongs to. Restored with the rest. */
+    if (widgetId) activeTaskWidgetId = widgetId;
+    // A widget with its own list (or its own account) brings its own array;
+    // one that has neither shares the primary's, which is the same list.
     if (list) tasks = list;
     try { renderTasks(); }
-    finally { taskListEl = savedEl; tasks = savedTasks; }
+    finally { taskListEl = savedEl; tasks = savedTasks; activeTaskWidgetId = savedOwner; }
   }
 
   function renderCalendarInto(ctx) {
@@ -21614,7 +21785,7 @@
   // to move it to the very top of the whole tasklist (dated tasks included —
   // harmless here since they're not shown in this list anyway).
   function moveTaskGoogleOrder(taskId, previousId) {
-    let url = TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(taskId) + "/move";
+    let url = tasksUrl("/" + encodeURIComponent(taskId) + "/move");
     if (previousId) url += "?previous=" + encodeURIComponent(previousId);
     api(url, { method: "POST" }).catch(function (e) { console.warn("Reorder failed:", e); });
   }
@@ -21793,28 +21964,34 @@
     '</svg>';
 
   function completeTask(rawId) {
-    api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(rawId), {
+    const owner = activeTaskWidgetId;
+    api(tasksUrl("/" + encodeURIComponent(rawId)), {
       method: "PATCH",
       body: JSON.stringify({ id: rawId, status: "completed" })
     }).then(function (saved) {
-      tasks = tasks.filter(function (x) { return x.id !== rawId; });
-      // Keep an already-loaded Completed list in step rather than going
-      // stale until it's next reopened.
-      if (completedTasks && saved) completedTasks.unshift(saved);
+      withTaskWidget(owner, function () {
+        tasks = tasks.filter(function (x) { return x.id !== rawId; });
+        // Keep an already-loaded Completed list in step rather than going
+        // stale until it's next reopened.
+        const c = completedNow(); if (c && saved) c.unshift(saved);
+      });
       renderGrid();
-      renderTasks();
+      refreshTaskWidget(owner);
     }).catch(function (e) {
       window.alert("Complete failed: " + (e.message || e));
     });
   }
 
   function uncompleteTask(rawId) {
-    api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(rawId), {
+    const owner = activeTaskWidgetId;
+    api(tasksUrl("/" + encodeURIComponent(rawId)), {
       method: "PATCH",
       body: JSON.stringify({ id: rawId, status: "needsAction" })
     }).then(function () {
-      if (completedTasks) completedTasks = completedTasks.filter(function (x) { return x.id !== rawId; });
-      return refreshAll();
+      withTaskWidget(owner, function () {
+        const c = completedNow(); if (c) setCompletedNow(c.filter(function (x) { return x.id !== rawId; }));
+      });
+      return refreshAll().then(function () { refreshTaskWidget(owner); });
     }).catch(function (e) {
       window.alert("Restore failed: " + (e.message || e));
     });
@@ -21829,8 +22006,21 @@
   }
 
   let completedOpen = false;
-  let completedTasks = null; // null = never loaded yet
-  let completedLoading = false;
+  /* Completed tasks are per LIST, not per board: two Tasks widgets on two
+     different lists have two different completed histories, and one cache
+     shared between them showed whichever was fetched first under both.
+     Keyed by list id rather than by widget id so two widgets that happen to
+     be on the same list still share one fetch, which is the right answer. */
+  const completedByList = {};    // list id -> array, or absent = never loaded
+  const completedLoadingByList = {};
+  function completedKey() { return listIdFor(activeTaskWidgetId); }
+  function completedNow() {
+    const k = completedKey();
+    return (k in completedByList) ? completedByList[k] : null;
+  }
+  function setCompletedNow(v) { completedByList[completedKey()] = v; }
+  function completedLoadingNow() { return !!completedLoadingByList[completedKey()]; }
+  function setCompletedLoadingNow(v) { completedLoadingByList[completedKey()] = !!v; }
 
   /* The task currently being edited in place, plus its not-yet-saved values.
      Held here as module state — the same pattern notepadOpenIds/completedOpen
@@ -21839,15 +22029,24 @@
      editor with the user's half-typed text intact instead of resetting it. */
   let editingTaskId = null;
   let editingDraft = null;   // { title, notes, due, dueTime, repeat }
+  /* Which Tasks widget the open editor belongs to. One editor is open at a
+     time whichever widget started it, exactly like the composer, so the
+     widget has to be recorded rather than inferred -- renderTasks draws
+     through whatever taskListEl currently points at, which is the primary
+     unless something says otherwise. */
+  let editingOwnerId = PRIMARY_TASKS_ID;
 
   function cancelTaskRowEdit() {
+    const owner = editingOwnerId;
     editingTaskId = null;
     editingDraft = null;
-    renderTasks();
+    editingOwnerId = PRIMARY_TASKS_ID;
+    refreshTaskWidget(owner);
   }
 
   function openTaskRowEditor(t) {
     const meta = tagMeta(nsTask(t.id)) || {};
+    editingOwnerId = activeTaskWidgetId;
     editingTaskId = t.id;
     editingDraft = {
       title: t.title || "",
@@ -21856,7 +22055,11 @@
       dueTime: meta.dueTime || "",
       repeat: meta.repeat || ""
     };
-    renderTasks();
+    refreshTaskWidget(editingOwnerId);
+    /* Queried after the redraw, and only on the primary: an extra widget's
+       refresh is async, so its input does not exist yet. It gets focus from
+       the click that opened it instead, which is good enough and avoids
+       stealing focus from a row in a different widget. */
     const input = taskListEl.querySelector(".cal-taskrow-editing .gt-title-input");
     if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
   }
@@ -21866,8 +22069,17 @@
   // sending due:null to actually clear a date — since both are editing the
   // same resource and any divergence would be a bug, not a feature.
   async function saveTaskRowEdit() {
+    /* editingOwnerId, not activeTaskWidgetId. The commonest way this runs is
+       the document-level pointerdown click-away handler, which fires with no
+       widget context whatsoever -- so reading the active widget there gives
+       the primary and loses the edit. The editor recorded its own widget when
+       it opened; that is the authority. */
+    const owner = editingOwnerId;
     if (!editingTaskId || !editingDraft) return;
-    const t = tasks.filter(function (x) { return x.id === editingTaskId; })[0];
+    // Searches every widget's rows, so this works whether or not the caller
+    // established a swap first.
+    const foundEdit = findTaskOwner(editingTaskId);
+    const t = foundEdit ? foundEdit.task : null;
     const draft = editingDraft;
     const title = draft.title.trim();
     if (!t || !title) { cancelTaskRowEdit(); return; }
@@ -21877,20 +22089,23 @@
     // rather than waiting on the round trip — same bargain as creating a task.
     editingTaskId = null;
     editingDraft = null;
+    editingOwnerId = PRIMARY_TASKS_ID;
 
     t.title = title;
     t.notes = draft.notes;
     t.due = draft.due ? draft.due + "T00:00:00.000Z" : null;
     setTagMeta(nsId, "dueTime", draft.dueTime, title);
     setTagMeta(nsId, "repeat", draft.repeat, title);
-    renderTasks();
+    refreshTaskWidget(owner);
 
     try {
       const body = { id: t.id, title: title, notes: draft.notes };
       body.due = draft.due ? draft.due + "T00:00:00.000Z" : null;
-      await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(t.id), {
-        method: "PATCH",
-        body: JSON.stringify(body)
+      await withTaskWidget(owner, function () {
+        return api(tasksUrl("/" + encodeURIComponent(t.id)), {
+          method: "PATCH",
+          body: JSON.stringify(body)
+        });
       });
       // A due-date change moves the task on the calendar grid above, so both
       // surfaces repaint — but from the local array, without a refetch.
@@ -21906,6 +22121,10 @@
      grows. Reuses the very same composer and live tag row the modal used, so
      the two editing surfaces can't drift apart. */
   function buildTaskEditRow(t) {
+    // Bound during a render, fired long after it. Same reason renderTasks
+    // captures its owner: the global will have moved on by the time a click
+    // lands, and this row's task lives in one particular list.
+    const owner = activeTaskWidgetId;
     const nsId = nsTask(t.id);
     const row = document.createElement("div");
     row.className = "cal-taskrow cal-taskrow-editing";
@@ -21924,7 +22143,7 @@
       onDelete: function () {
         editingTaskId = null;
         editingDraft = null;
-        deleteGoogleItem(nsId, t.title);
+        withTaskWidget(owner, function () { deleteGoogleItem(nsId, t.title); });
       }
     });
     function syncDraft() {
@@ -21941,7 +22160,7 @@
     // sit on <body> and their clicks never reach this element at all.
     composer.el.addEventListener("click", function () { setTimeout(syncDraft, 0); });
 
-    function commit() { syncDraft(); saveTaskRowEdit(); }
+    function commit() { syncDraft(); withTaskWidget(owner, function () { saveTaskRowEdit(); }); }
 
     composer.titleInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); commit(); }
@@ -21972,31 +22191,48 @@
   // heading with no number beside it reads as though there is nothing behind
   // it, and the number cannot be known without asking. One page, once.
   function ensureCompletedCount() {
-    if (completedTasks === null && !completedLoading) loadCompletedTasks();
+    if (completedNow() === null && !completedLoadingNow()) loadCompletedTasks();
   }
 
   function loadCompletedTasks() {
-    if (completedLoading) return;
-    completedLoading = true;
+    if (completedLoadingNow()) return;
+    /* Captured, not re-read. Everything below resolves a network round trip
+       later, by which time the render swap that made this widget active has
+       long been restored -- writing the result into whatever happens to be
+       active THEN is how one widget's completed list lands in another. */
+    const owner = activeTaskWidgetId;
+    setCompletedLoadingNow(true);
     renderTasks();
-    api(TASKS_API + "/lists/@default/tasks?showCompleted=true&showHidden=true&maxResults=100")
+    api(tasksUrl("?showCompleted=true&showHidden=true&maxResults=100"))
       .then(function (data) {
-        completedTasks = (data.items || []).filter(function (x) { return x.status === "completed"; });
+        withTaskWidget(owner, function () {
+          setCompletedNow((data.items || []).filter(function (x) { return x.status === "completed"; }));
+        });
       })
       .catch(function (e) {
-        completedTasks = [];
+        withTaskWidget(owner, function () { setCompletedNow([]); });
         console.warn("Load completed tasks failed:", e);
       })
       .then(function () {
-        completedLoading = false;
-        renderTasks();
+        withTaskWidget(owner, function () { setCompletedLoadingNow(false); });
+        refreshTaskWidget(owner);
       });
+  }
+
+  /* Redraw one Tasks widget by name. The primary draws through renderTasks
+     directly; an extra one has to go back through its own refresh, which is
+     what re-establishes its element and its list before rendering. */
+  function refreshTaskWidget(id) {
+    if (!id || id === PRIMARY_TASKS_ID) { renderTasks(); return; }
+    const r = extraRefreshById[id];
+    if (r) { try { r(); } catch (e) {} }
   }
 
   // A completed row: same shape as an active one (checked circle, title,
   // tags) minus the due-date pill — a finished task's due date isn't
   // meaningful information anymore — plus the completion date in its place.
   function buildCompletedRow(t) {
+    const owner = activeTaskWidgetId;
     const nsId = nsTask(t.id);
     const row = document.createElement("div");
     row.className = "cal-taskrow cal-taskrow-done";
@@ -22011,7 +22247,7 @@
     check.innerHTML = TASK_CHECK_ICON;
     check.addEventListener("click", function (e) {
       e.stopPropagation();
-      uncompleteTask(t.id);
+      withTaskWidget(owner, function () { uncompleteTask(t.id); });
     });
     top.appendChild(check);
 
@@ -22056,10 +22292,10 @@
       // The number is always shown once it is known, including "(0)" -- an
       // absent count reads as "unknown", which is a different claim from
       // "none", and only one of the two is ever true here.
-      '<span>Completed' + (completedTasks ? " (" + completedTasks.length + ")" : "") + '</span>';
+      '<span>Completed' + (completedNow() ? " (" + completedNow().length + ")" : "") + '</span>';
     header.addEventListener("click", function () {
       completedOpen = !completedOpen;
-      if (completedOpen && completedTasks === null) loadCompletedTasks();
+      if (completedOpen && completedNow() === null) loadCompletedTasks();
       else renderTasks();
     });
     wrap.appendChild(header);
@@ -22072,9 +22308,9 @@
         loading.className = "cal-empty";
         loading.textContent = "Loading…";
         list.appendChild(loading);
-      } else if (completedTasks && completedTasks.length) {
-        completedTasks.forEach(function (t) { list.appendChild(buildCompletedRow(t)); });
-      } else if (completedTasks) {
+      } else if (completedNow() && completedNow().length) {
+        completedNow().forEach(function (t) { list.appendChild(buildCompletedRow(t)); });
+      } else if (completedNow()) {
         const empty = document.createElement("div");
         empty.className = "cal-empty";
         empty.textContent = "No completed tasks yet.";
@@ -22109,6 +22345,11 @@
   }
 
   function renderTasks() {
+    /* Which widget these rows belong to, captured while the render swap is
+       still in force. Every handler bound below fires long after it has been
+       restored, so each one carries the owner rather than reading a global
+       that will by then mean "whichever widget rendered last". */
+    const owner = activeTaskWidgetId;
     taskListEl.innerHTML = "";
     // Every task, dated or not. This list used to be the *un*scheduled ones
     // only, on the theory that anything with a due date already showed on the
@@ -22162,7 +22403,7 @@
       completeBtn.disabled = !!t.__pending;
       completeBtn.addEventListener("click", function (e) {
         e.stopPropagation();
-        completeTask(t.id);
+        withTaskWidget(owner, function () { completeTask(t.id); });
       });
       top.appendChild(completeBtn);
 
@@ -22232,7 +22473,9 @@
             dueTime: taskDueTime(t, meta),
             repeat: (meta && meta.repeat) || ""
           }, function (draft) {
-            window.__unbleepSetDueDate(nsId, draft.due, draft.dueTime, draft.repeat);
+            withTaskWidget(owner, function () {
+              window.__unbleepSetDueDate(nsId, draft.due, draft.dueTime, draft.repeat);
+            });
           });
         });
         row.appendChild(dueEl);
@@ -22301,7 +22544,7 @@
         for (let i = newIdx - 1; i >= 0; i--) {
           if (!unscheduled[i].__pending) { prevId = unscheduled[i].id; break; }
         }
-        if (!moved.__pending) moveTaskGoogleOrder(moved.id, prevId);
+        if (!moved.__pending) withTaskWidget(owner, function () { moveTaskGoogleOrder(moved.id, prevId); });
         renderTasks();
       });
 
@@ -22312,7 +22555,7 @@
         // expanding the row. A pending row has no id to edit against yet.
         if (t.__pending) return;
         if (e.target.closest && e.target.closest("button, select, input, textarea, a")) return;
-        openTaskRowEditor(t);
+        withTaskWidget(owner, function () { openTaskRowEditor(t); });
       });
       taskListEl.appendChild(row);
     });
@@ -22441,8 +22684,8 @@
     // subpage was ever opened still shows it correctly the first time.
     if (nsId.indexOf("task:") === 0) {
       const rawId = nsId.slice(5);
-      const t = tasks.filter(function (x) { return x.id === rawId; })[0];
-      setTagMeta(nsId, "due", (t && t.due) || "", title);
+      const found = findTaskOwner(rawId);
+      setTagMeta(nsId, "due", (found && found.task.due) || "", title);
     }
     const w = frameWin();
     if (w && w.__unbleepOpenGTask) {
@@ -22471,7 +22714,7 @@
     const rawId = nsId.replace(/^(task|event):/, "");
     const url = isEvent
       ? CAL_API + "/calendars/primary/events/" + encodeURIComponent(rawId)
-      : TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(rawId);
+      : tasksUrl("/" + encodeURIComponent(rawId));
     const body = isEvent
       ? JSON.stringify({ summary: newTitle })
       : JSON.stringify({ id: rawId, title: newTitle });
@@ -22498,14 +22741,17 @@
     const rawId = nsId.replace(/^(task|event):/, "");
     const url = isEvent
       ? CAL_API + "/calendars/primary/events/" + encodeURIComponent(rawId)
-      : TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(rawId);
+      : tasksUrl("/" + encodeURIComponent(rawId));
+    const owner = activeTaskWidgetId;
     api(url, { method: "DELETE" }).then(function () {
       if (isEvent) events = events.filter(function (e) { return e.id !== rawId; });
-      else tasks = tasks.filter(function (t) { return t.id !== rawId; });
+      else withTaskWidget(owner, function () {
+        tasks = tasks.filter(function (t) { return t.id !== rawId; });
+      });
       const w = frameWin();
       if (w && w.__unbleepRemoveGoogleRoot) w.__unbleepRemoveGoogleRoot(nsId);
       renderGrid();
-      renderTasks();
+      refreshTaskWidget(owner);
     }).catch(function (e) {
       window.alert("Delete failed: " + (e.message || e));
     });
@@ -22524,18 +22770,22 @@
   window.__unbleepSetDueDate = function (nsId, due, dueTime, repeat) {
     if (!nsId || nsId.indexOf("task:") !== 0) return;
     const rawId = nsId.slice(5);
-    const t = tasks.filter(function (x) { return x.id === rawId; })[0];
-    if (!t) return;
+    const found = findTaskOwner(rawId);
+    if (!found) return;
+    const t = found.task, owner = found.owner;
     const isoDue = due ? due + "T00:00:00.000Z" : null;
     t.due = isoDue;
     setTagMeta(nsId, "due", due || "", t.title);
     setTagMeta(nsId, "dueTime", dueTime || "", t.title);
     if (repeat != null) setTagMeta(nsId, "repeat", repeat || "", t.title);
-    renderTasks();
+    refreshTaskWidget(owner);
     renderGrid();
-    api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(rawId), {
-      method: "PATCH",
-      body: JSON.stringify({ id: rawId, title: t.title, due: isoDue })
+    // The PATCH has to name the owner's list, not whichever was last active.
+    withTaskWidget(owner, function () {
+      return api(tasksUrl("/" + encodeURIComponent(rawId)), {
+        method: "PATCH",
+        body: JSON.stringify({ id: rawId, title: t.title, due: isoDue })
+      });
     }).catch(function (e) {
       window.alert("Couldn't save the due date: " + (e.message || e));
       refreshAll();
@@ -25052,7 +25302,8 @@
         if (due.input.value) body.due = due.input.value + "T00:00:00.000Z";
         else if (existing) body.due = null;
         await runFormSaves(formHooks, body);
-        let url = TASKS_API + "/lists/@default/tasks";
+        let url = tasksUrl("");
+        lastTaskWrite = { via: "task form", url: url, at: new Date().toISOString() };
         if (existing) {
           url += "/" + encodeURIComponent(existing.id);
           body.id = existing.id;
@@ -25096,8 +25347,10 @@
       const ev = findEventById(rawId);
       if (ev) return openEventForm(ev);
     } else {
-      const t = tasks.filter(function (x) { return x.id === rawId; })[0];
-      if (t) return openTaskForm(t);
+      // Every Tasks widget's rows, not just the primary's -- same reason the
+      // event branch above searches every calendar.
+      const found = findTaskOwner(rawId);
+      if (found) return withTaskWidget(found.owner, function () { return openTaskForm(found.task); });
     }
     // Nothing in the current range matches (e.g. the view moved on under a
     // stale chip) — fall back to the old behaviour rather than doing nothing.
@@ -25134,6 +25387,11 @@
      screens away. */
   let inlineComposerEl = el("gtaskInlineComposer");
   const primaryComposerEl = inlineComposerEl;
+  /* One composer, moved between widgets, so the widget it currently belongs
+     to has to be recorded rather than inferred. Without this a task typed in
+     the second Tasks widget was created in whichever list was last rendered,
+     which is exactly the "added it to My Tasks" report. */
+  let composerOwnerId = PRIMARY_TASKS_ID;
   let inlineComposer = null;
   // Tags picked before the task exists — same staging pattern as the New
   // task modal's own pendingTags (see buildTagsSection/buildStagingTagRow).
@@ -25164,7 +25422,12 @@
     // Enter that would create the task twice.
     closeInlineComposer();
 
-    const r = await createTaskFromDraft({ title: t, notes: notes, due: due, dueTime: dueTime, repeat: repeat }, pendingTags);
+    /* Run as the widget the composer was opened from. createTaskFromDraft
+       builds its URL synchronously, so the swap only has to survive the call
+       and not the round trip -- see withTaskWidget. */
+    const r = await withTaskWidget(composerOwnerId, function () {
+      return createTaskFromDraft({ title: t, notes: notes, due: due, dueTime: dueTime, repeat: repeat }, pendingTags);
+    });
     // NOT showError(): that writes into the modal panel, which isn't open on
     // this path, so the message would land somewhere nobody can see. An
     // inline failure has to report itself inline.
@@ -25198,11 +25461,13 @@
     // Read by taskDueTime() until the real id exists and the staged tags are
     // written, so the due pill never flashes a date without its time.
     if (dueTime) optimistic.__dueTime = dueTime;
+    const owner = activeTaskWidgetId;
     tasks.unshift(optimistic);
-    renderTasks();
+    refreshTaskWidget(owner);
 
     try {
-      const saved = await api(TASKS_API + "/lists/@default/tasks", {
+      lastTaskWrite = { via: "inline composer", url: tasksUrl(""), at: new Date().toISOString() };
+      const saved = await api(tasksUrl(""), {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -25271,7 +25536,12 @@
       guests: (raw.attendees || []).map(function (a) { return a.email; })
     };
   }
-  function findTask(id) { return tasks.filter(function (x) { return x.id === id; })[0] || null; }
+  /* Searches every Tasks widget, not only the primary. Without this the AI
+     reported "No open task with id ..." for anything in a second widget's
+     list, which reads as the task not existing rather than as the lookup
+     being too narrow. Returns the task; ownerOfTask() gives the widget. */
+  function findTask(id) { const f = findTaskOwner(id); return f ? f.task : null; }
+  function ownerOfTask(id) { const f = findTaskOwner(id); return f ? f.owner : PRIMARY_TASKS_ID; }
   function tagPresetsForAi() {
     const d = tagDefs() || {};
     return {
@@ -25436,10 +25706,13 @@
         if (o.repeat !== undefined) setTagMeta(nsId, "repeat", o.repeat || "", title);
         const bad = applyTaskTags(nsId, title, o.tags);
         if (bad) return bad;
-        renderTasks();
+        const owner = ownerOfTask(t.id);
+        refreshTaskWidget(owner);
         const body = { id: t.id, title: title, notes: t.notes || "" };
         body.due = t.due || null;
-        await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(t.id), { method: "PATCH", body: JSON.stringify(body) });
+        await withTaskWidget(owner, function () {
+          return api(tasksUrl("/" + encodeURIComponent(t.id)), { method: "PATCH", body: JSON.stringify(body) });
+        });
         refreshTagSurfaces();
         return { ok: true, task: publicTask(t) };
       });
@@ -25448,12 +25721,17 @@
       return guarded(async function () {
         const t = findTask(id);
         if (!t) return { error: "No open task with id '" + id + "'." };
-        const saved = await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(id), {
-          method: "PATCH", body: JSON.stringify({ id: id, status: "completed" })
+        const owner = ownerOfTask(id);
+        const saved = await withTaskWidget(owner, function () {
+          return api(tasksUrl("/" + encodeURIComponent(id)), {
+            method: "PATCH", body: JSON.stringify({ id: id, status: "completed" })
+          });
         });
-        tasks = tasks.filter(function (x) { return x.id !== id; });
-        if (completedTasks && saved) completedTasks.unshift(saved);
-        renderGrid(); renderTasks();
+        withTaskWidget(owner, function () {
+          tasks = tasks.filter(function (x) { return x.id !== id; });
+          const c = completedNow(); if (c && saved) c.unshift(saved);
+        });
+        renderGrid(); refreshTaskWidget(owner);
         return { ok: true, completed: { id: id, title: t.title } };
       });
     },
@@ -25461,11 +25739,16 @@
       return guarded(async function () {
         const t = findTask(id);
         if (!t) return { error: "No open task with id '" + id + "'." };
-        await api(TASKS_API + "/lists/@default/tasks/" + encodeURIComponent(id), { method: "DELETE" });
-        tasks = tasks.filter(function (x) { return x.id !== id; });
+        const owner = ownerOfTask(id);
+        await withTaskWidget(owner, function () {
+          return api(tasksUrl("/" + encodeURIComponent(id)), { method: "DELETE" });
+        });
+        withTaskWidget(owner, function () {
+          tasks = tasks.filter(function (x) { return x.id !== id; });
+        });
         const w = frameWin();
         if (w && w.__unbleepRemoveGoogleRoot) w.__unbleepRemoveGoogleRoot(nsTask(id));
-        renderGrid(); renderTasks();
+        renderGrid(); refreshTaskWidget(owner);
         return { ok: true, deleted: { id: id, title: t.title } };
       });
     },
@@ -25583,6 +25866,7 @@
   if (addGTaskBtn) {
     addGTaskBtn.addEventListener("click", function () {
       if (inlineComposer) { inlineComposer.titleInput.focus(); return; }
+      composerOwnerId = PRIMARY_TASKS_ID;
       openInlineComposer();
     });
   }
@@ -25591,12 +25875,16 @@
      one task is being typed at a time, whichever widget it was started from
      -- so rather than a second one, the existing composer is pointed at that
      widget's own slot for as long as it is open. Closing puts it back. */
-  window.__gtaskComposeInto = function (host) {
+  window.__gtaskComposeInto = function (host, ownerId) {
     if (inlineComposer) { closeInlineComposer(); }
     inlineComposerEl = host || primaryComposerEl;
+    composerOwnerId = ownerId || PRIMARY_TASKS_ID;
     openInlineComposer();
   };
-  window.__gtaskComposerHome = function () { inlineComposerEl = primaryComposerEl; };
+  window.__gtaskComposerHome = function () {
+    inlineComposerEl = primaryComposerEl;
+    composerOwnerId = PRIMARY_TASKS_ID;
+  };
 
   // Click-away and Escape both dismiss. The backdrop covers the whole viewport,
   // so a click anywhere outside the panel lands on it.
@@ -25656,6 +25944,7 @@
     if (btn) setView(btn.dataset.view);
   });
 
+
   function step(dir) {
     if (view === "day") anchor = addDays(anchor, dir);
     else if (view === "week") anchor = addDays(anchor, 7 * dir);
@@ -25713,9 +26002,14 @@
   }
 
   /* The account row, shown in both the calendar's settings and the task
-     list's. They are two views of one connection -- Google gives an account
-     one calendar and one task list -- so switching from either switches both,
-     and saying so plainly beats letting someone discover it. */
+     list's. They are two views of one CONNECTION, so switching the account
+     from either switches both, and saying so plainly beats letting someone
+     discover it.
+
+     This used to say Google gives an account one calendar and one task list.
+     That was wrong about tasks -- an account has as many lists as it likes --
+     and the claim was read straight back out of this file and repeated to the
+     user as fact. Which list the board shows is now a choice; see tasksUrl(). */
   function buildAccountField(body, widgetId) {
     const current = function () { return widgetAccountEmail[widgetId] || ""; };
     const wrap = document.createElement("div");
@@ -25820,12 +26114,157 @@
     title: "Calendar settings",
     build: function (body) { buildCalSettings(body, "cal"); }
   });
+  /* ---------- which Google Tasks list this widget shows ----------
+
+     A Google account has several task lists ("My Tasks" plus any you make),
+     and every call in this file used to name "@default", so the rest were
+     unreachable from here. tasksUrl() is now the one place that decision is
+     spent; this is the one place it is made.
+
+     It lives in settings rather than in the widget header on purpose: it is
+     the same KIND of decision as the Google Account row directly below --
+     which source am I looking at -- and those belong together. The cost is
+     that the current list is not visible at a glance, which is a real one,
+     because switching it changes every row the widget draws. */
+  async function loadTaskLists() {
+    try {
+      const data = await authFor("unschedTasks").api(TASKS_API + "/users/@me/lists?maxResults=100");
+      taskLists = ((data && data.items) || [])
+        .filter(function (l) { return l && l.id && l.title; })
+        .map(function (l) { return { id: l.id, title: l.title }; });
+    } catch (e) {
+      /* Logged, not swallowed. Emptying the list silently made a failed fetch
+         and an account with a single list produce the identical result, with
+         nothing anywhere to tell them apart. The board still works either
+         way: every task call stays pointed at the selected list. */
+      console.warn("[mps] Google task list fetch failed:", e);
+      taskLists = [];
+    }
+    /* "@default" is an alias, not an id, so it matches nothing Google returns
+       and would leave the settings dropdown selecting no row at all. Google
+       lists the default first, so resolve it to that. Deliberately NOT
+       persisted: until a choice is actually made, the board should keep
+       following the account's default rather than pinning itself to whatever
+       that happened to be today. */
+    /* A widget with no entry stays on "@default", which Google resolves to
+       the account's default list -- so an unconfigured widget needs no entry
+       and gets the sensible thing. Only stored ids need checking.
+
+       A list deleted from Google's own UI would otherwise leave every fetch,
+       edit and delete on that widget returning 404, with nothing in the
+       interface able to get back to a list that exists. */
+    let healed = false;
+    if (taskLists.length) {
+      Object.keys(taskListById).forEach(function (w) {
+        if (!taskLists.some(function (l) { return l.id === taskListById[w]; })) {
+          taskListById[w] = taskLists[0].id;
+          healed = true;
+        }
+      });
+    }
+    if (healed) { persistTaskLists(); refreshAll(); }
+    return taskLists;
+  }
+
+  async function setTaskList(widgetId, id) {
+    const w = widgetId || PRIMARY_TASKS_ID;
+    if (!id || id === listIdFor(w)) return;
+    taskListById[w] = id;
+    persistTaskLists();
+    if (w === PRIMARY_TASKS_ID) {
+      /* Task ids are per-list, so every cached row from the old list is one
+         whose complete, rename and delete calls would 404 against the new
+         one. Dropping the completed cache forces it to be asked for again. */
+      setCompletedNow(null);
+      await refreshAll();
+      /* Extra widgets that never chose a list of their own were showing the
+         primary's, so they have to redraw too. The ones that DID choose are
+         unaffected, which is the entire point of this change. */
+      extraTasksViews.forEach(function (v) { try { v.refresh(); } catch (e) {} });
+    } else {
+      const r = extraRefreshById[w];
+      if (r) await r();
+    }
+  }
+
+  /* One of these per Tasks widget, each controlling only its own widget --
+     which is what makes two Tasks widgets side by side able to show two
+     different lists. It sits directly above the Google Account row because
+     they are the same kind of decision (which source am I looking at) and,
+     now, the same scope. */
+  function buildTaskListField(body, widgetId) {
+    const w = widgetId || PRIMARY_TASKS_ID;
+    const wrap = document.createElement("div");
+    wrap.className = "cal-field";
+    const lab = document.createElement("label");
+    lab.textContent = "Task list";
+    wrap.appendChild(lab);
+    // Bare <select>: .cal-field select is already styled, so this matches the
+    // rest of the panel without inventing a class for it.
+    const sel = document.createElement("select");
+    wrap.appendChild(sel);
+    const note = document.createElement("div");
+    note.className = "cal-hint";
+    wrap.appendChild(note);
+    body.appendChild(wrap);
+
+    function fill() {
+      sel.innerHTML = "";
+      if (!taskLists.length) {
+        const o = document.createElement("option");
+        o.textContent = "Connect Google to choose a list";
+        sel.appendChild(o);
+        sel.disabled = true;
+        return;
+      }
+      sel.disabled = false;
+      /* "@default" is an alias rather than an id, so it matches nothing Google
+         returns and would leave the dropdown selecting no row at all. Google
+         lists the default first, so a widget that has never chosen shows that
+         one selected -- which is also the list it is actually reading. */
+      const cur = listIdFor(w);
+      const sel_id = cur === "@default" ? taskLists[0].id : cur;
+      taskLists.forEach(function (l) {
+        const o = document.createElement("option");
+        o.value = l.id;
+        o.textContent = l.title;
+        if (l.id === sel_id) o.selected = true;
+        sel.appendChild(o);
+      });
+      note.textContent = taskLists.length === 1
+        ? "This account has one list. Any you add in Google Tasks show up here."
+        : "Only this widget. Other Google Tasks widgets keep their own list.";
+    }
+    fill();
+    /* The panel can be opened before the lists have been fetched, or after a
+       fetch that failed. Asking again on open is what stops that becoming a
+       dead control that never recovers without a reload. */
+    if (!taskLists.length) loadTaskLists().then(fill).catch(function () {});
+
+    sel.addEventListener("change", function () {
+      const chosen = sel.value;
+      sel.disabled = true;
+      note.textContent = "Loading\u2026";
+      setTaskList(w, chosen).then(function () {
+        sel.disabled = false;
+        note.textContent = "";
+      }).catch(function (e) {
+        sel.disabled = false;
+        note.textContent = String((e && e.message) || e);
+      });
+    });
+  }
+
   // The task list gets the account control too. It is the same connection,
   // but somebody in the task list wanting to change accounts should not have
-  // to know that the setting lives in the calendar.
+  // to know that the setting lives in the calendar. The list picker sits
+  // above it: which list, then which account, narrowest choice first.
   window.__registerWidgetSettings("unschedTasks", {
     title: "Tasks settings",
-    build: function (body) { buildAccountField(body, "unschedTasks"); }
+    build: function (body) {
+      buildTaskListField(body, "unschedTasks");
+      buildAccountField(body, "unschedTasks");
+    }
   });
 
   (async function boot() {
@@ -25837,6 +26276,9 @@
     } catch (e) {}
     const savedView = await storageGet("cal-view");
     if (savedView === "day" || savedView === "week" || savedView === "month") view = savedView;
+    /* Read before the first fetchTasks(), or the widget draws the default
+       list once and then visibly swaps to the chosen one. */
+    await restoreTaskLists();
     Array.prototype.forEach.call(viewToggle.querySelectorAll("button"), function (b) {
       b.classList.toggle("active", b.dataset.view === view);
     });
@@ -26198,12 +26640,16 @@
   window.__wireExtraCalendarSection = wireExtraCalendarWidget;
 
   /* ---------- extra Google Tasks views ----------
-     Google gives an account exactly ONE task list, so a second Tasks widget
-     can't be a second list — it's another window onto the same one. It reads
-     the `tasks` array the main widget already maintains rather than fetching
-     again, and is deliberately read-only: editing, reordering, tags and the
-     composer all live in the original, which stays the one place a task is
-     changed. That keeps two views of one list from disagreeing about it. */
+     A second Tasks widget is another window onto whichever list the main one
+     is showing, not a second list. That is a decision, not a limit: an account
+     has several lists (the header picker chooses between them), and this used
+     to claim otherwise in as many words.
+
+     It reads the `tasks` array the main widget already maintains rather than
+     fetching again, and is deliberately read-only: editing, reordering, tags
+     and the composer all live in the original, which stays the one place a
+     task is changed. That keeps two views of one list from disagreeing about
+     it, and it is why switching lists refreshes these too. */
   const extraTasksViews = [];
 
   function buildExtraTasksWidgetEl(id) {
@@ -26264,7 +26710,7 @@
         e.stopPropagation();
         // The composer comes HERE rather than the user being sent to the main
         // widget for it -- a task typed in this list should appear in it.
-        if (window.__gtaskComposeInto) window.__gtaskComposeInto(composerHost);
+        if (window.__gtaskComposeInto) window.__gtaskComposeInto(composerHost, id);
       });
     }
 
@@ -26287,22 +26733,42 @@
       }
       if (addBtn) addBtn.hidden = false;
       const auth = widgetAuth[id];
-      if (!auth) {
-        // Not switched: share the main widget's already-fetched list.
+      /* Share the primary's already-fetched array only when this widget is
+         genuinely looking at the same thing: same account AND same list. The
+         list half is new. Without it, a widget pointed at Deadlines rendered
+         the primary's My Tasks rows -- which then completed, renamed and
+         deleted against Deadlines, because the handlers carry this widget's
+         id. Two widgets on one list still share one fetch, which is right. */
+      const sameList = listIdFor(id) === listIdFor(PRIMARY_TASKS_ID);
+      if (!auth && sameList) {
         ownTasks = null;
-        renderTasksInto(viewport);
+        // Sharing the primary's array, so it must NOT be registered as its
+        // own -- withTaskWidget would then swap in a stale copy.
+        delete tasksByWidget[id];
+        renderTasksInto(viewport, null, id);
         return;
       }
       try {
-        const data = await auth.api(TASKS_API + "/lists/@default/tasks?showCompleted=false&maxResults=100");
+        const data = await withTaskWidget(id, function () {
+          return (auth || primaryAuth).api(tasksUrl("?showCompleted=false&maxResults=100"));
+        });
         ownTasks = ((data && data.items) || []).filter(function (t) { return t.title; });
       } catch (e) { ownTasks = []; }
-      renderTasksInto(viewport, ownTasks);
+      /* Registered before the render, because every handler renderTasks binds
+         reaches back through withTaskWidget for exactly this array. */
+      tasksByWidget[id] = ownTasks;
+      renderTasksInto(viewport, ownTasks, id);
     }
 
+    /* Same two fields, same order, as the primary widget's panel above. A
+       widget added with "+" is the same widget; it should not quietly lack a
+       control the identical one beside it has. */
     window.__registerWidgetSettings(id, {
       title: "Tasks settings",
-      build: function (body) { buildAccountField(body, id); }
+      build: function (body) {
+        buildTaskListField(body, id);
+        buildAccountField(body, id);
+      }
     });
 
     extraTasksViews.push({ id: id, refresh: refresh });
