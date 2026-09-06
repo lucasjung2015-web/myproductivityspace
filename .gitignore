@@ -15,8 +15,3 @@ index.html
 # ("No url found for submodule path") and broke the Netlify build. They are
 # local working copies, not dependencies -- nothing should track them.
 .claude/worktrees/
-
-# Local one-shot installer generated to create the routine-fed widgets
-# through the board own custom-widget API. Publish root is ".", so committing
-# it would serve it from the live site for no reason.
-install-widgets.js

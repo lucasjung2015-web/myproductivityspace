@@ -4115,6 +4115,23 @@
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg></span>
       <span class="add-widget-label">Bookmarks</span>
     </button>
+    <!-- The three routine-fed tiles. Each displays what a scheduled Claude
+         Code routine last posted to its topic; none of them fetches anything
+         itself. Listed individually rather than behind one "Routine feed"
+         chooser because they are three different things you add, not three
+         settings of one thing. -->
+    <button type="button" class="add-widget-card" data-add-type="feed-news">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1Z"/><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M7 9h7"/><path d="M7 13h7"/><path d="M7 17h4"/></svg></span>
+      <span class="add-widget-label">Morning News</span>
+    </button>
+    <button type="button" class="add-widget-card" data-add-type="feed-stocks">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20V9"/><path d="M11 20V4"/><path d="M16 20v-7"/><path d="M21 20v-11"/></svg></span>
+      <span class="add-widget-label">Portfolio</span>
+    </button>
+    <button type="button" class="add-widget-card" data-add-type="feed-email">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 7.6 5.4a1.5 1.5 0 0 0 1.8 0L20.5 7"/></svg></span>
+      <span class="add-widget-label">Email</span>
+    </button>
   </div>
 </div>
 
@@ -17177,6 +17194,56 @@
       addWidgetOverlay.hidden = false;
     }
 
+    /* ---------- routine-fed widgets, as first-class "+" entries ----------
+
+       These three read a topic that a scheduled Claude Code routine writes
+       into (see supabase/functions/feed). They are ordinary custom widgets,
+       so they are minted through __customWidgets.create rather than through
+       createDynamicWidgetInstance like the built-in types above.
+
+       Their code lives here rather than being fetched, because a widget that
+       only exists while some local file is being served is not a widget you
+       can add from your phone. Each asks for nothing at all except one topic
+       to read: no network, no data scopes, nothing published. */
+    const ROUTINE_FEEDS = {
+        "feed-news": {
+            "name": "Morning News",
+            "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
+            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n/* Faded whole-body treatment for a digest that is more than a day old: you\n   can still read it, and you cannot mistake it for this morning's. */\n.body.stale { opacity: 0.55; }\n.item { padding: 7px 0; border-bottom: 1px solid var(--hair, #ececec); }\n.item:last-child { border-bottom: none; }\n.hl { font-size: 12.5px; line-height: 1.35; font-weight: 600; }\n.hl a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(0,0,0,0.22); }\n.hl a:hover { border-bottom-color: currentColor; }\n.em { margin-right: 5px; }\n.sm { font-size: 11.5px; line-height: 1.4; color: var(--ink-soft, #565656); margin-top: 3px; }\n/* Inline at the end of the summary rather than a line of its own. As a\n   separate uppercase row it read as a section heading and took a third of\n   each item's height to say one word. */\n.src { color: var(--ink-soft, #8a8a8a); }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }\n.raw a { color: inherit; }",
+            "js": "var TOPIC = \"morning-news\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\n/* Everything below renders text that arrived from a scheduled routine, which\n   composed it from web sources. It is not trusted markup: escape first,\n   then re-introduce only the two things a digest needs, links and bold. */\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\")\n    .replace(/\"/g, \"&quot;\");\n}\nfunction safeUrl(u) {\n  var s = String(u || \"\").trim();\n  return /^https?:\\/\\//i.test(s) ? s : \"\";\n}\nfunction mdLite(s) {\n  var out = esc(s);\n  // [label](url) -> anchor, but only for http(s); anything else stays as text.\n  out = out.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g, function (m, label, url) {\n    var u = safeUrl(url);\n    return u ? '<a href=\"' + esc(u) + '\" target=\"_blank\" rel=\"noopener noreferrer\">' + label + \"</a>\" : label;\n  });\n  out = out.replace(/\\*\\*([^*]+)\\*\\*/g, \"<b>$1</b>\").replace(/\\*([^*\\n]+)\\*/g, \"<b>$1</b>\");\n  return out.replace(/\\n/g, \"<br>\");\n}\n\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\n/* The citation belongs inside the sentence, so the summary's own full stop\n   comes off and a new one goes after the closing bracket: \"... began\n   (Bloomberg).\" rather than \"... began. (Bloomberg)\". Only a period is\n   stripped; a summary ending in ? or ! keeps its mark. */\nfunction withSource(summary, source) {\n  var t = String(summary == null ? \"\" : summary).replace(/\\s+$/, \"\");\n  if (!source) return esc(t);\n  t = t.replace(/\\.$/, \"\");\n  // The full stop sits outside the span so it reads as body text rather than\n  // as part of the greyed-out source.\n  return (t ? esc(t) + \" \" : \"\") + '<span class=\"src\">(' + esc(source) + \")</span>.\";\n}\n\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No briefing yet. The 8:30am routine posts here once it has run.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  // A digest older than ~26 hours means the routine did not run this morning.\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 26 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var items = payload.data && payload.data.items;\n  if (Array.isArray(items) && items.length) {\n    bodyEl.innerHTML = items.map(function (it) {\n      var u = safeUrl(it.url);\n      var head = esc(it.headline || \"\");\n      return '<div class=\"item\">' +\n        '<div class=\"hl\"><span class=\"em\">' + esc(it.emoji || \"\") + \"</span>\" +\n        (u ? '<a href=\"' + esc(u) + '\" target=\"_blank\" rel=\"noopener noreferrer\">' + head + \"</a>\" : head) +\n        \"</div>\" +\n        (it.summary || it.source ? '<div class=\"sm\">' + withSource(it.summary, it.source) + \"</div>\" : \"\") +\n        \"</div>\";\n    }).join(\"\");\n    return;\n  }\n  // No structured items: fall back to whatever text the routine sent.\n  bodyEl.innerHTML = payload.text\n    ? '<div class=\"raw\">' + mdLite(payload.text) + \"</div>\"\n    : '<div class=\"msg\">The last run posted nothing readable.</div>';\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\n// Fires only if something republishes while this widget is open. The routine\n// writes server-side, so in practice the digest arrives on the next reload.\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
+            "net": false,
+            "data": [],
+            "publishes": [],
+            "reads": [
+                "morning-news"
+            ]
+        },
+        "feed-stocks": {
+            "name": "Portfolio",
+            "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
+            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* The number you actually came for, sized so it reads at a glance from\n   across the desk. Everything else on this widget is support for it. */\n.total { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }\n.delta { font-size: 12.5px; font-weight: 600; margin-top: 3px; }\n.up { color: #1a7f4b; }\n.down { color: #b4553f; }\n.flat { color: var(--ink-soft, #6b6b6b); }\n.subs { display: flex; gap: 12px; margin-top: 7px; flex-wrap: wrap; }\n.sub { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.sub b { display: block; font-size: 12px; color: var(--ink, #1a1a1a); font-weight: 600; margin-top: 1px; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 5px; }\n.mv { display: flex; align-items: baseline; gap: 6px; padding: 4px 0;\n      border-bottom: 1px solid var(--hair, #ececec); }\n.mv:last-child { border-bottom: none; }\n.sym { font-size: 12px; font-weight: 600; min-width: 46px; }\n.pct { font-size: 11.5px; font-weight: 600; min-width: 52px; }\n.why { font-size: 11px; line-height: 1.35; color: var(--ink-soft, #565656); flex: 1; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
+            "js": "var TOPIC = \"stock-summary\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n}\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\n// Percentages arrive as numbers. Sign drives both the colour and the glyph,\n// so a red minus never reads as a gain on a screenshot or in greyscale.\nfunction pct(n) {\n  if (n == null || isNaN(Number(n))) return { cls: \"flat\", txt: \"—\" };\n  var v = Number(n);\n  return { cls: v > 0 ? \"up\" : v < 0 ? \"down\" : \"flat\",\n           txt: (v > 0 ? \"+\" : \"\") + v.toFixed(2) + \"%\" };\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No summary yet. The 4pm ET routine posts here after market close.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  /* 3 days, not 26 hours like the daily widgets: this routine deliberately\n     does not run on weekends or market holidays, so a Sunday reading of\n     Friday's close is current rather than stale. */\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 3 * 24 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var d = payload.data;\n  if (!d) {\n    bodyEl.innerHTML = payload.text\n      ? '<div class=\"raw\">' + esc(payload.text) + \"</div>\"\n      : '<div class=\"msg\">The last run posted nothing readable.</div>';\n    return;\n  }\n  if (d.closed) {\n    bodyEl.innerHTML = '<div class=\"msg\">Markets were closed ' + esc(d.as_of || \"\") + \".</div>\";\n    return;\n  }\n\n  var day = pct(d.day_pct), ytd = pct(d.ytd_pct);\n  var html =\n    '<div class=\"total\">' + esc(d.total || \"—\") + \"</div>\" +\n    '<div class=\"delta ' + day.cls + '\">' + day.txt +\n      (d.day_usd ? \"  \" + esc(d.day_usd) : \"\") + \" today</div>\" +\n    '<div class=\"subs\">' +\n      '<div class=\"sub\">YTD<b class=\"' + ytd.cls + '\">' + ytd.txt + \"</b></div>\" +\n      (d.cash_pct != null ? '<div class=\"sub\">Cash<b>' + esc(String(d.cash_pct)) + \"%</b></div>\" : \"\") +\n      (d.as_of ? '<div class=\"sub\">As of<b>' + esc(d.as_of) + \"</b></div>\" : \"\") +\n    \"</div>\";\n\n  if (Array.isArray(d.movers) && d.movers.length) {\n    html += '<div class=\"sect\">Movers</div>' + d.movers.map(function (m) {\n      var p = pct(m.pct);\n      return '<div class=\"mv\"><span class=\"sym\">' + esc(m.symbol || \"\") + \"</span>\" +\n        '<span class=\"pct ' + p.cls + '\">' + p.txt + \"</span>\" +\n        '<span class=\"why\">' + esc(m.why || \"\") + \"</span></div>\";\n    }).join(\"\");\n  }\n  bodyEl.innerHTML = html;\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
+            "net": false,
+            "data": [],
+            "publishes": [],
+            "reads": [
+                "stock-summary"
+            ]
+        },
+        "feed-email": {
+            "name": "Email",
+            "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
+            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* Counts first. The routine's Telegram message is six sections of prose;\n   at this size the useful version is three numbers and the detail below. */\n.counts { display: flex; gap: 14px; }\n.ct { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.ct b { display: block; font-size: 19px; font-weight: 600; color: var(--ink, #1a1a1a); line-height: 1.1; }\n.ct.act b { color: #b4553f; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 4px; }\n.row { font-size: 11.5px; line-height: 1.35; padding: 3px 0;\n       border-bottom: 1px solid var(--hair, #ececec); }\n.row:last-child { border-bottom: none; }\n.who { color: var(--ink-soft, #6b6b6b); }\n.move { font-size: 10.5px; color: var(--ink-soft, #8a8a8a); }\n.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }\n.tag { font-size: 10px; padding: 1px 6px; border-radius: 999px;\n       background: rgba(0,0,0,0.055); color: var(--ink-soft, #565656); }\n.note { font-size: 11px; line-height: 1.4; margin-top: 10px; padding: 6px 8px;\n        border-radius: 8px; background: rgba(180,85,63,0.09); color: #8c4331; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
+            "js": "var TOPIC = \"email-digest\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n}\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\nfunction list(rows, fmt) {\n  return (rows || []).slice(0, 8).map(fmt).join(\"\");\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No digest yet. The 8:30am routine posts here once it has run.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 26 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var d = payload.data;\n  if (!d) {\n    bodyEl.innerHTML = payload.text\n      ? '<div class=\"raw\">' + esc(payload.text) + \"</div>\"\n      : '<div class=\"msg\">The last run posted nothing readable.</div>';\n    return;\n  }\n\n  var drafted = d.drafted || [], awaiting = d.awaiting || [], reconciled = d.reconciled || [];\n  var html =\n    '<div class=\"counts\">' +\n      '<div class=\"ct act\">Needs you<b>' + drafted.length + \"</b></div>\" +\n      '<div class=\"ct\">Awaiting<b>' + awaiting.length + \"</b></div>\" +\n      '<div class=\"ct\">Activity<b>' + (d.activity == null ? \"—\" : d.activity) + \"</b></div>\" +\n    \"</div>\";\n\n  if (drafted.length) {\n    html += '<div class=\"sect\">Drafted, waiting on you</div>' + list(drafted, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") +\n        (r.from ? ' <span class=\"who\">— ' + esc(r.from) + \"</span>\" : \"\") + \"</div>\";\n    });\n  }\n  if (awaiting.length) {\n    html += '<div class=\"sect\">Awaiting their reply</div>' + list(awaiting, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") + \"</div>\";\n    });\n  }\n  if (reconciled.length) {\n    html += '<div class=\"sect\">Moved</div>' + list(reconciled, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") +\n        '<div class=\"move\">' + esc(r.move || \"\") + \"</div></div>\";\n    });\n  }\n  if (Array.isArray(d.labeled) && d.labeled.length) {\n    html += '<div class=\"sect\">Filed</div><div class=\"tags\">' + d.labeled.map(function (l) {\n      return '<span class=\"tag\">' + esc(l.label || \"\") + (l.count ? \" \" + l.count : \"\") + \"</span>\";\n    }).join(\"\") + \"</div>\";\n  }\n  if (d.suggested_label) {\n    html += '<div class=\"note\">Suggested new label: <b>' + esc(d.suggested_label) + \"</b></div>\";\n  }\n  if (!drafted.length && !awaiting.length && !reconciled.length && !d.activity) {\n    html += '<div class=\"msg\">Nothing new in Important, Action Needed or Awaiting Reply.</div>';\n  }\n  bodyEl.innerHTML = html;\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
+            "net": false,
+            "data": [],
+            "publishes": [],
+            "reads": [
+                "email-digest"
+            ]
+        }
+    };
+
     function flashWidget(id) {
       const el = widgetEl(id);
       if (!el) return;
@@ -17195,6 +17262,21 @@
       if (!btn) return;
       const type = btn.getAttribute("data-add-type");
       closeAddWidgetPopup();
+
+      /* Custom widgets rather than a built-in type, so they go through the
+         custom-widget API instead of createDynamicWidgetInstance. Adding a
+         second one is allowed and harmless: two tiles reading one topic show
+         the same thing, the same way two Lists are two lists. */
+      if (ROUTINE_FEEDS[type]) {
+        const CW = window.__customWidgets;
+        if (!CW) { window.alert("The widget engine isn't ready yet. Try again in a second."); return; }
+        const r = CW.create(ROUTINE_FEEDS[type]);
+        if (r && r.ok) flashWidget(r.widget_id);
+        // A create can fail on the 200KB code cap or a not-ready board, and
+        // failing silently here would look exactly like a dead menu entry.
+        else window.alert("Couldn't add that widget: " + ((r && r.error) || "unknown error"));
+        return;
+      }
 
       if (type === "page") {
         /* With Notion connected there are two intentions behind this button --
@@ -22202,7 +22284,7 @@
        active THEN is how one widget's completed list lands in another. */
     const owner = activeTaskWidgetId;
     setCompletedLoadingNow(true);
-    renderTasks();
+    refreshTaskWidget(owner);
     api(tasksUrl("?showCompleted=true&showHidden=true&maxResults=100"))
       .then(function (data) {
         withTaskWidget(owner, function () {
@@ -22280,6 +22362,9 @@
   }
 
   function buildCompletedSection() {
+    // Bound during a render, fired on a click long after it. Same capture as
+    // every other handler here.
+    const owner = activeTaskWidgetId;
     const wrap = document.createElement("div");
     wrap.className = "cal-completed-section";
 
@@ -22294,9 +22379,11 @@
       // "none", and only one of the two is ever true here.
       '<span>Completed' + (completedNow() ? " (" + completedNow().length + ")" : "") + '</span>';
     header.addEventListener("click", function () {
-      completedOpen = !completedOpen;
-      if (completedOpen && completedNow() === null) loadCompletedTasks();
-      else renderTasks();
+      withTaskWidget(owner, function () {
+        completedOpen = !completedOpen;
+        if (completedOpen && completedNow() === null) loadCompletedTasks();
+        else refreshTaskWidget(owner);
+      });
     });
     wrap.appendChild(header);
 
@@ -22529,11 +22616,20 @@
         // relative order the user just set among the undated ones.
         const order = {};
         unscheduled.forEach(function (x, i) { order[x.id] = i; });
-        tasks.sort(function (a, b) {
-          const ai = order.hasOwnProperty(a.id) ? order[a.id] : -1;
-          const bi = order.hasOwnProperty(b.id) ? order[b.id] : -1;
-          if (ai === -1 || bi === -1) return 0;
-          return ai - bi;
+        /* Sorted inside the owner's swap. `unscheduled` was copied from the
+           right array during the render, but this handler fires on a drop,
+           long after the swap was restored -- so a bare `tasks.sort` here
+           reordered the PRIMARY widget's array while the drag happened in a
+           different one. The Google call below was already correct, which is
+           what made this look like "reordering does nothing": the order moved
+           in Google and never in the list you dragged. */
+        withTaskWidget(owner, function () {
+          tasks.sort(function (a, b) {
+            const ai = order.hasOwnProperty(a.id) ? order[a.id] : -1;
+            const bi = order.hasOwnProperty(b.id) ? order[b.id] : -1;
+            if (ai === -1 || bi === -1) return 0;
+            return ai - bi;
+          });
         });
         const newIdx = unscheduled.indexOf(moved);
         // Walk back past any still-pending rows: Google's move endpoint takes
@@ -22545,7 +22641,8 @@
           if (!unscheduled[i].__pending) { prevId = unscheduled[i].id; break; }
         }
         if (!moved.__pending) withTaskWidget(owner, function () { moveTaskGoogleOrder(moved.id, prevId); });
-        renderTasks();
+        // The widget you dragged in, not whichever rendered last.
+        refreshTaskWidget(owner);
       });
 
       row.addEventListener("click", function (e) {
@@ -25495,9 +25592,12 @@
       return { ok: true, task: saved && saved.id ? publicTask(saved) : null };
     } catch (e) {
       // Roll the placeholder back out so a failed create can't leave a ghost
-      // row that looks real but has no id behind it.
-      tasks = tasks.filter(function (x) { return x.id !== tempId; });
-      renderTasks();
+      // row that looks real but has no id behind it. Inside the owner's swap:
+      // this runs after the await, when `tasks` is the primary's again.
+      withTaskWidget(owner, function () {
+        tasks = tasks.filter(function (x) { return x.id !== tempId; });
+      });
+      refreshTaskWidget(owner);
       return { error: String(e.message || e) };
     }
   }
