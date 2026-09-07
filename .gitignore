@@ -19,3 +19,9 @@ index.html
 # Local one-shot updater for the routine-fed widgets. Publish root is ".",
 # so committing it would serve it from the live site for no reason.
 update-widgets.js
+
+# Supabase CLI scratch. cli-latest just caches the newest CLI version string
+# and re-churns whenever the CLI runs, so it arrives as a diff in every
+# unrelated commit. linked-project.json stays tracked: it is what points the
+# repo at the right Supabase project for a deploy.
+supabase/.temp/cli-latest

@@ -4065,26 +4065,34 @@
     html:not(.force-desktop) #aiPanelBtn { right: calc(52px + env(safe-area-inset-right)); }
     html:not(.force-desktop) #profileBtn { right: calc(6px + env(safe-area-inset-right)); }
 
-    /* ---------- 2. the bottom bar ---------- */
-    html:not(.force-desktop) .mob-bar {
-      display: flex; align-items: center; gap: 6px;
-      flex: 0 0 auto; overflow-x: auto; scrollbar-width: none;
-      padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
-      border-top: 1px solid var(--hair); background: var(--bg);
+    /* ---------- 2. the bottom chrome ----------
+       The section-name bar is gone. It labelled each page with the first
+       widget's name, which is only the page's name when a section happens to
+       hold one widget; on a stacked section it named one of the two and
+       silently dropped the other. A wrong label is worse than none, and the
+       dots plus a swipe already answer "where am I". */
+    .mob-dots {
+      display: flex; gap: 5px; justify-content: center; flex: 0 0 auto;
+      padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+      background: var(--bg);
     }
-    html:not(.force-desktop) .mob-bar::-webkit-scrollbar { display: none; }
-    .mob-bar { display: none; }
-    .mob-tab {
-      flex: 0 0 auto; min-height: 44px; padding: 6px 14px; border-radius: 999px;
-      border: 1px solid transparent; background: transparent; color: #6b6b6b;
-      font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap;
-      cursor: pointer;
-    }
-    .mob-tab.is-current { background: var(--ink); color: var(--bg); }
-    .mob-dots { display: flex; gap: 5px; justify-content: center; padding: 6px 0 2px; flex: 0 0 auto; }
     .mob-dot { width: 6px; height: 6px; border-radius: 50%; background: #d4d4d4; }
     .mob-dot.is-current { background: var(--ink); }
-    html.force-desktop .mob-bar, html.force-desktop .mob-dots { display: none !important; }
+    html.force-desktop .mob-dots { display: none !important; }
+
+    /* The hidden-widget tabs, sitting directly above the dots. Restyled for a
+       phone rather than inherited from the desktop board: one scrolling row
+       instead of wrapping to three on a narrow screen, and the hairline
+       instead of the board's hard black rule, which stacked against the dots
+       would read as two unrelated lines. It still shows only when something
+       is hidden, so an untouched board pays nothing for it. */
+    html:not(.force-desktop) .collapsed-tabs-bar.has-tabs {
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+      gap: 6px; padding: 6px 10px;
+      border-top: 1px solid var(--hair); background: var(--bg);
+    }
+    html:not(.force-desktop) .collapsed-tabs-bar::-webkit-scrollbar { display: none; }
+    html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip { flex: 0 0 auto; min-height: 44px; }
 
     /* ---------- 3. touch targets ----------
        The box grows to 44pt around the glyph; the glyph itself is untouched,
@@ -4222,7 +4230,12 @@
     html:not(.force-desktop) #gtaskSubpageHost {
       padding: calc(8px + env(safe-area-inset-top)) 14px env(safe-area-inset-bottom);
     }
-    html:not(.force-desktop) .collapsed-tabs-bar { display: none !important; }
+    /* The collapsed-tabs bar used to be display:none here, swept in with the
+       hover-only chrome above it. The consequence was different in kind: the
+       other rules drop an affordance you cannot use on a touch screen, while
+       this one dropped the only surface that shows hidden widgets exist. A
+       widget hidden on the desktop was then unreachable on a phone, with no
+       indication it was still there. It stays visible now. */
   }
 
   /* Hover states must not LATCH. There are 131 unconditional :hover rules in
@@ -4732,9 +4745,12 @@
   </div>
 </div>
 
-<div class="mob-dots" id="mobDots" hidden></div>
-<div class="mob-bar" id="mobBar" hidden></div>
+<!-- Bottom chrome, in the order it is read from the content upward: the
+     hidden-widget tabs (only present when something is hidden), then the
+     page dots. The dots sit lowest because position is glanced at
+     constantly and recovery is touched rarely. -->
 <div class="collapsed-tabs-bar" id="collapsedTabsBar"></div>
+<div class="mob-dots" id="mobDots" hidden></div>
 
 <!-- Deleted built-in sections are parked here (not actually destroyed) so
      their fetch/wiring logic stays alive and "+" can bring them straight
@@ -13090,7 +13106,23 @@
     function wireTab(id) {
       const tab = tabFor(id);
       if (!tab) return;
-      tab.addEventListener("click", function () { setHidden(id, false); });
+      tab.addEventListener("click", function () {
+        setHidden(id, false);
+        /* On a phone each slot is a whole page, and the tabs bar lists every
+           hidden widget on the board rather than the ones belonging to the
+           page you are on. Without this, tapping a tab for a widget two
+           sections away unhides it somewhere off screen and reads as nothing
+           having happened. Scroll to it after applyHiddenState has run, since
+           a slot whose every widget was hidden is display:none until then and
+           cannot be scrolled to. */
+        const el = widgetEl(id);
+        const slot = el && el.closest ? el.closest(".col-slot") : null;
+        if (slot && slot.scrollIntoView) {
+          requestAnimationFrame(function () {
+            slot.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+          });
+        }
+      });
     }
 
     async function loadHiddenState(id) {
@@ -34619,9 +34651,16 @@
    Mobile shell
    ---------------------------------------------------------------------
    The board becomes one widget per screen: the grid is a scroll-snap
-   pager, and this supplies the two things CSS cannot -- a bar that says
-   where you are and takes you somewhere, and the plumbing to keep it in
-   step as the board changes underneath it.
+   pager, and this supplies the one thing CSS cannot -- a position
+   indicator, plus the plumbing to keep it in step as the board changes
+   underneath it.
+
+   There used to be a bar of section names above the dots. It labelled each
+   page with the first widget's name, which is the page's name only when a
+   section holds exactly one widget; on a stacked section it named one and
+   silently dropped the other. It has been removed rather than fixed,
+   because there is no correct label to fall back to and the dots plus a
+   swipe already answer where you are.
 
    Everything here is inert unless the pointer is a finger. The same
    question the stylesheet asks, asked once in JS, so the two can never
@@ -34633,10 +34672,9 @@
 
   const TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)");
   const FORCE_KEY = "force-desktop-layout";
-  const bar = document.getElementById("mobBar");
   const dots = document.getElementById("mobDots");
   const grid = document.getElementById("widgetGrid");
-  if (!bar || !dots || !grid) return;
+  if (!dots || !grid) return;
 
   let observer = null;
   let current = 0;
@@ -34647,70 +34685,35 @@
 
   /* A page is a SLOT, not a widget: a section stacking two widgets is one
      screen, because the section is the unit the user arranged on the
-     desktop and splitting it here would invent a layout they never chose.
-     The label is the first widget's name, which is how they refer to it. */
+     desktop and splitting it here would invent a layout they never chose. */
   function slots() {
     return Array.prototype.filter.call(grid.children, function (n) {
       return n.classList && n.classList.contains("col-slot") && n.style.display !== "none";
     });
   }
-  function labelFor(slot) {
-    const el = slot.querySelector(".col.collapsible-col-wrap[data-col-id]");
-    const id = el && el.getAttribute("data-col-id");
-    let title = "";
-    try {
-      const all = window.__listWidgetTitles ? window.__listWidgetTitles() : [];
-      const hit = all.filter(function (w) { return w.id === id; })[0];
-      if (hit) title = hit.title;
-    } catch (e) {}
-    if (!title) {
-      const h = slot.querySelector(".section-header-title");
-      title = (h && h.textContent.trim()) || "Widget";
-    }
-    // Long widget names would push every other tab off the bar.
-    return title.length > 18 ? title.slice(0, 17) + "…" : title;
-  }
 
   function setCurrent(i) {
     current = i;
-    Array.prototype.forEach.call(bar.children, function (b, n) {
-      b.classList.toggle("is-current", n === i);
-      b.setAttribute("aria-current", n === i ? "true" : "false");
-    });
     Array.prototype.forEach.call(dots.children, function (d, n) {
       d.classList.toggle("is-current", n === i);
     });
-    const btn = bar.children[i];
-    // Keep the live tab in view when there are more tabs than fit.
-    if (btn && btn.scrollIntoView) btn.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
   }
 
   function build() {
     if (observer) { observer.disconnect(); observer = null; }
-    bar.innerHTML = "";
     dots.innerHTML = "";
     const list = slots();
     if (!isMobile() || list.length < 1) {
-      bar.hidden = true; dots.hidden = true;
+      dots.hidden = true;
       return;
     }
-    list.forEach(function (slot, i) {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "mob-tab";
-      b.textContent = labelFor(slot);
-      b.addEventListener("click", function () {
-        slot.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-        setCurrent(i);
-      });
-      bar.appendChild(b);
+    list.forEach(function () {
       const d = document.createElement("span");
       d.className = "mob-dot";
       dots.appendChild(d);
     });
-    // Dots are a position indicator, and with one page there is no position
-    // to indicate. The bar stays: it still names what you are looking at.
-    bar.hidden = false;
+    // A position indicator, and with one page there is no position to
+    // indicate.
     dots.hidden = list.length < 2;
 
     /* Which page you are on is whichever is most on screen. An observer
