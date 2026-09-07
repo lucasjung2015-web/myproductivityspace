@@ -582,9 +582,12 @@
     padding: 22px 28px 18px 28px; flex: 0 0 auto; color: var(--ink);
     display: flex; align-items: baseline; line-height: 0.92;
   }
+  /* No gap after "my": the wordmark is one word, myProductivitySpace, and
+     the 7px that used to sit here read as two. Size and weight are unchanged
+     -- the prefix is still the small light half of the mark, just joined. */
   .page-title .pt-prefix, .ag-wordmark .pt-prefix {
     font-size: 19px; font-weight: 400; color: var(--ink-soft);
-    margin-right: 7px;
+    margin-right: 0;
   }
   .page-title .pt-main, .ag-wordmark .pt-main {
     font-size: 46px; font-weight: 700; color: var(--ink);
@@ -2563,10 +2566,9 @@
   body.subpage-fullscreen-mode .links-row,
   body.subpage-fullscreen-mode .widget,
   body.subpage-fullscreen-mode .collapsed-tabs-bar,
-  /* Both of these are position:fixed at z-index 3000 — above the subpage host
-     (2000) — so unlike everything else on the dashboard they don't get covered
-     by the overlay and have to be hidden explicitly. */
-  body.subpage-fullscreen-mode #alwaysOnTopBtn,
+  /* These are position:fixed at z-index 3000 — above the subpage host (2000) —
+     so unlike everything else on the dashboard they don't get covered by the
+     overlay and have to be hidden explicitly. */
   body.subpage-fullscreen-mode #connectionsBtn,
   body.subpage-fullscreen-mode #addWidgetBtn,
   body.subpage-fullscreen-mode #aiPanelBtn,
@@ -2574,6 +2576,16 @@
   body.subpage-fullscreen-mode #aiPanel {
     display: none !important;
   }
+  /* The one corner button that survives Branch AI, deliberately left out of
+     the list above. Popping out is a window-level action rather than a board
+     tool, so it means the same thing from a task's subpage as from the board,
+     and hiding it here left no way into floating mode without first backing
+     out to the board. With its four neighbours gone it takes the corner they
+     used to end at — 12px, #profileBtn's normal offset — instead of floating
+     148px in with an empty gap to its right. --ai-panel-w is already zeroed in
+     this mode (see the html:has() rule near the top), so the calc resolves to
+     a flat 12px; it stays wrapped only so the two offsets read as one idiom. */
+  body.subpage-fullscreen-mode #alwaysOnTopBtn { right: calc(12px + var(--ai-panel-w)); }
 
   /* ---------- one widget maximized over the whole page ----------
      A CSS class toggle rather than the real Fullscreen API, exactly like
@@ -3098,11 +3110,18 @@
   }
   .ai-side-item:hover .ai-side-item-x, .ai-side-item-x:focus { opacity: 1; }
   .ai-side-item-x:hover { background: #dedede; color: var(--ink); }
-  /* Transparent, full-viewport: one click anywhere outside dismisses, and it
-     sits under the menu so the menu's own clicks still land. */
-  .ai-side-menu-backdrop { position: fixed; inset: 0; z-index: 1400; background: transparent; }
+  /* 2600/2601, and the number is not arbitrary. The menu is appended to
+     <body>, so it is a SIBLING of #aiPanel rather than a child of it, and
+     #aiPanel is z-index 2500 -- at 1401 the panel simply covered it. It has
+     to clear 2500 and stay below 3000, where the board's own floating buttons
+     start: a chat menu should be over the panel it belongs to and under a
+     modal or a maximised widget, both of which live at 4000 and above.
+
+     Transparent, full-viewport backdrop: one click anywhere outside dismisses,
+     and it sits just under the menu so the menu's own clicks still land. */
+  .ai-side-menu-backdrop { position: fixed; inset: 0; z-index: 2600; background: transparent; }
   .ai-side-menu {
-    position: fixed; z-index: 1401; min-width: 158px;
+    position: fixed; z-index: 2601; min-width: 158px;
     background: #ffffff; border-radius: 12px; padding: 5px;
     box-shadow: 0 10px 28px rgba(10,10,10,0.20), 0 0 0 1px rgba(10,10,10,0.07);
   }
@@ -3179,8 +3198,61 @@
   .ai-composer {
     position: relative;
     flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px;
-    padding: 12px 14px; border-top: 1px solid var(--hair);
+    /* Bottom padding moved to .ai-modebar, which now sits under this row. */
+    padding: 12px 14px 6px; border-top: 1px solid var(--hair);
   }
+  /* ---------- mode strip ----------
+     Sits directly below the message box and is indented to line up with the
+     box's own left edge, not the panel's: 14px of composer padding + the
+     34px round + button + the 8px gap = 56px. Hard-coded rather than derived
+     because all three of those are hard-coded a few rules above. */
+  .ai-modebar {
+    position: relative;
+    flex: 0 0 auto; display: flex; align-items: center;
+    padding: 0 14px 10px 56px;
+  }
+  .ai-mode-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 7px; margin-left: -7px;
+    border: none; border-radius: 7px; background: transparent;
+    color: var(--ink-soft); cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.2;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .ai-mode-btn:hover { background: #f3f3f4; color: var(--ink); }
+  .ai-mode-btn[aria-expanded="true"] { background: #f3f3f4; color: var(--ink); }
+  .ai-mode-btn svg { opacity: 0.6; }
+  /* The two non-default modes are states you can forget you are in, so the
+     strip stops being quiet grey text once you leave Auto. */
+  .ai-mode-btn.is-set { color: var(--ink); font-weight: 600; }
+  /* Opens upward for the same reason .ai-plus-menu does: the composer is
+     pinned to the bottom of the panel. */
+  .ai-mode-menu {
+    position: absolute; left: 49px; bottom: 34px; right: 14px; z-index: 20;
+    min-width: 240px; padding: 6px;
+    background: var(--bg); border: 1px solid var(--hair); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .ai-mode-menu[hidden] { display: none; }
+  .ai-mode-head {
+    padding: 5px 10px 7px; font-size: 11.5px; font-weight: 600;
+    letter-spacing: 0.02em; color: #9a9a9a;
+  }
+  .ai-mode-item {
+    width: 100%; display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 10px; border: none; border-radius: 8px;
+    background: transparent; color: var(--ink); cursor: pointer;
+    font-family: inherit; text-align: left;
+  }
+  .ai-mode-item:hover { background: #f3f3f4; }
+  /* Both are <span>, so they need display:block to stack -- the name is a
+     line and the description is the line under it, not a run-on. */
+  .ai-mode-item-text { flex: 1 1 auto; min-width: 0; }
+  .ai-mode-item-name { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+  .ai-mode-item-desc { display: block; font-size: 12px; color: var(--ink-soft); line-height: 1.3; margin-top: 2px; }
+  .ai-mode-tick { flex: 0 0 auto; width: 13px; margin-top: 3px; color: var(--ink); opacity: 0; }
+  .ai-mode-item.is-current .ai-mode-tick { opacity: 1; }
+  .ai-mode-key { flex: 0 0 auto; margin-top: 2px; font-size: 11.5px; color: #9a9a9a; }
   .ai-plus {
     flex: 0 0 auto; width: 34px; height: 34px; padding: 0;
     display: flex; align-items: center; justify-content: center;
@@ -3283,6 +3355,12 @@
   }
   @keyframes ai-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
   .ai-msg.is-error { padding: 9px 13px; border: 1px solid #d8b4b4; color: #7a2020; background: #fdf6f6; }
+  /* A tool that was held back by the mode rather than one that failed. Grey,
+     dashed, quiet: it is a receipt, not a problem. */
+  .ai-msg.is-note {
+    padding: 8px 12px; border: 1px dashed var(--hair); border-radius: 10px;
+    color: var(--ink-soft); background: #fafafa; font-size: 12.5px;
+  }
   /* A rendered reply. pre-wrap comes off: the Markdown parser owns line
      structure now, and leaving it on would double every list's spacing.
      Everything is scaled to the bubble's 13.5px rather than the page's
@@ -3462,31 +3540,42 @@
      "something is working in here" -- dimming and activity look the same in
      grey and only one of them is true. inset box-shadow rather than a border,
      so nothing shifts by a pixel when it appears. */
+  /* position:fixed, parented to <body>, sized every frame from the widget's
+     own bounding rect -- NOT absolute inside the widget. Two reasons, and
+     both of them were the bug where the effect could not be seen at all:
+     .collapsible-col-wrap sets overflow:hidden, which clipped the outer
+     bloom away entirely, and a widget whose body paints an opaque background
+     (a note's sticky pad, a custom widget's iframe) sat above a z-index:5
+     child. A fixed overlay is outside both problems. z-index 2400 keeps it
+     BELOW #aiPanel's 2500, so the panel is never fogged over. */
   .ai-fog {
-    position: absolute; inset: 0; border-radius: inherit;
-    pointer-events: none; z-index: 5;
+    position: fixed; left: 0; top: 0; width: 0; height: 0;
+    border-radius: 8px;
+    pointer-events: none; z-index: 2400;
     background: radial-gradient(122% 122% at 50% 50%,
-                rgba(217,119,87,0) 52%, rgba(217,119,87,0.10) 80%, rgba(217,119,87,0.26) 100%);
-    box-shadow: inset 0 0 0 2px rgba(217,119,87,0.55),
-                inset 0 0 30px rgba(217,119,87,0.28);
-    animation: ai-fog-breathe 2.6s ease-in-out infinite;
+                rgba(0,0,0,0) 46%, rgba(0,0,0,0.12) 76%, rgba(0,0,0,0.34) 100%);
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,0.7),
+                inset 0 0 34px rgba(0,0,0,0.3);
+    animation: ai-fog-breathe 2.2s ease-in-out infinite;
   }
   /* The frame itself, and the reason the static rule above cannot set it: an
-     animated box-shadow wins over the declared one at every frame. Recoloured
-     to Claude's orange. A soft outer bloom as well as the inner ring, so the
-     widget reads as lit rather than outlined. */
+     animated box-shadow wins over the declared one at every frame. Black, to
+     stay inside this board's monochrome palette, and heavier than the warm
+     version it replaces -- black at low alpha over a white board reads as
+     grey haze and was easy to miss entirely. A soft outer bloom as well as
+     the inner ring, so the widget reads as lit rather than outlined. */
   @keyframes ai-fog-breathe {
     0%, 100% {
       box-shadow:
-        inset 0 0 0 1.5px rgba(217,119,87,0.55),
-        inset 0 0 30px 6px rgba(217,119,87,0.20),
-        0 0 20px 1px rgba(217,119,87,0.22);
+        inset 0 0 0 2px rgba(0,0,0,0.62),
+        inset 0 0 34px 8px rgba(0,0,0,0.26),
+        0 0 26px 3px rgba(0,0,0,0.32);
     }
     50% {
       box-shadow:
-        inset 0 0 0 2.5px rgba(217,119,87,0.95),
-        inset 0 0 58px 14px rgba(217,119,87,0.36),
-        0 0 40px 8px rgba(217,119,87,0.42);
+        inset 0 0 0 3.5px rgba(0,0,0,1),
+        inset 0 0 66px 18px rgba(0,0,0,0.46),
+        0 0 48px 10px rgba(0,0,0,0.55);
     }
   }
 
@@ -3499,18 +3588,20 @@
      as an annotation on the page, which is what it is. The glow ties it to
      the fog around it. */
   .ai-cursor {
-    position: absolute; top: 0; left: 0; z-index: 6; pointer-events: none;
+    position: fixed; top: 0; left: 0; z-index: 2401; pointer-events: none;
     display: flex; align-items: flex-start; gap: 5px;
     transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
     will-change: transform;
   }
   .ai-cursor svg {
     flex: 0 0 auto;
-    /* The orange lives here rather than in the shape, so the pointer keeps a
-       real cursor's silhouette and still belongs to the frame around it. */
-    filter: drop-shadow(0 0 11px rgba(217,119,87,0.80))
-            drop-shadow(0 0 4px rgba(217,119,87,0.95))
-            drop-shadow(0 1px 2px rgba(0,0,0,0.35));
+    /* The halo lives here rather than in the shape, so the pointer keeps a
+       real cursor's silhouette and still belongs to the frame around it. A
+       black pointer needs a WHITE inner ring to survive a dark widget, then
+       the black bloom outside it to tie it to the fog. */
+    filter: drop-shadow(0 0 3px rgba(255,255,255,0.95))
+            drop-shadow(0 0 12px rgba(0,0,0,0.75))
+            drop-shadow(0 1px 2px rgba(0,0,0,0.45));
     animation: ai-cursor-pulse 2.6s ease-in-out infinite;
   }
   @keyframes ai-cursor-pulse {
@@ -3521,7 +3612,7 @@
   /* Motion here is decorative status, not information — the label and the
      ring still say "working" without any of it. */
   @media (prefers-reduced-motion: reduce) {
-    .ai-fog { animation: none; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.85), inset 0 0 30px 6px rgba(0,0,0,0.18); }
+    .ai-fog { animation: none; box-shadow: inset 0 0 0 3px rgba(0,0,0,0.9), inset 0 0 40px 10px rgba(0,0,0,0.3), 0 0 30px 4px rgba(0,0,0,0.4); }
     .ai-cursor { transition: none; }
     .ai-cursor svg { animation: none; }
     .ai-msg.is-streaming::after, .ai-thinking i, .ai-tool.is-running svg { animation: none; }
@@ -3938,7 +4029,7 @@
     html:not(.force-desktop) .ag-wordmark .pt-main,
     html:not(.force-desktop) .ag-wordmark .pt-accent { font-size: 21px; }
     html:not(.force-desktop) .page-title .pt-prefix,
-    html:not(.force-desktop) .ag-wordmark .pt-prefix { font-size: 11px; margin-right: 4px; }
+    html:not(.force-desktop) .ag-wordmark .pt-prefix { font-size: 11px; margin-right: 0; }
 
     /* Five 28px buttons 6px apart spanned 176px of a 375px screen, below both
        the size and the spacing minimum, and sat at z-index 3000 -- ON TOP of
@@ -4325,7 +4416,7 @@
   <div class="ai-head">
     <button type="button" class="ai-side-btn ai-head-side-btn" id="aiHeadSideToggle" title="Show sidebar" aria-label="Show sidebar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
     <span class="ai-head-mark"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></span>
-    <span class="ai-head-title">myProductivitySpace AI</span>
+    <span class="ai-head-title">myProductivitySpace</span>
     <button type="button" class="mps-x-btn" id="aiCloseBtn" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="ai-log" id="aiLog"></div>
@@ -4347,6 +4438,16 @@
     <input type="file" id="aiFileInput" multiple accept="image/*,application/pdf,text/*,.md,.csv,.json,.log" hidden>
     <textarea id="aiInput" rows="1" placeholder="Write a message..."></textarea>
     <button type="button" class="ai-send" id="aiSendBtn" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button>
+  </div>
+  <!-- The mode strip: below the message box, aligned to its left edge, the
+       way the same control sits in Claude Code. Its own row rather than a
+       control inside the composer, because it describes the NEXT message
+       rather than being part of writing one. -->
+  <div class="ai-modebar">
+    <button type="button" class="ai-mode-btn" id="aiModeBtn" aria-haspopup="true" aria-expanded="false" title="Change how much this assistant does on its own (Shift+Tab)"><span id="aiModeLabel">Auto</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="ai-mode-menu" id="aiModeMenu" hidden role="menu" aria-label="Mode">
+      <div class="ai-mode-head">Mode</div>
+    </div>
   </div>
   </div>
 </aside>
@@ -19820,6 +19921,67 @@
   // window, so everything (resizing panels, tasks, vocab, etc.) keeps
   // working exactly as it does in the normal tab, fully independently.
 
+  /* ---------- carrying an open Branch AI subpage across windows ----------
+
+     Which task's Branch AI subpage is open lives ONLY in the tree engine's
+     history state -- history.pushState({parentId}, "") inside the iframe,
+     with no URL of its own. So a fresh copy of this file loaded at
+     location.href always boots on the board, and popping out from inside
+     Branch AI used to dump you back on the dashboard.
+
+     A #task=<namespaced id> fragment is the seam. popoutHref() writes it on
+     the way out; the reader just below is the other half, running in the copy
+     that opens. Both halves are here rather than next to the subpage bridge
+     because the fragment exists purely to serve this button. */
+
+  function popoutHref() {
+    const base = location.href.split("#")[0];
+    try {
+      const frame = document.getElementById("unbleepTasksFrame");
+      const w = frame && frame.contentWindow;
+      const id = w && w.__unbleepGetCurrentParentId && w.__unbleepGetCurrentParentId();
+      if (id) return base + "#task=" + encodeURIComponent(id);
+    } catch (e) {}
+    return base;
+  }
+
+  (function consumeTaskFragment() {
+    const m = /^#task=(.+)$/.exec(location.hash || "");
+    if (!m) return;
+    let nsId = "";
+    try { nsId = decodeURIComponent(m[1]); } catch (e) { nsId = m[1]; }
+    // Drop the fragment immediately. It describes how this window was opened,
+    // not where it currently is, and left in place it would drag the user
+    // back into the subpage on every later reload of this window.
+    try {
+      history.replaceState(history.state, "", location.pathname + location.search);
+    } catch (e) {}
+    if (!nsId) return;
+    // The engine frame is fed by srcdoc after this script parses and only
+    // publishes __unbleepOpenGTask once it has booted, so poll rather than
+    // assume -- same shape as openSubpage()'s own retry, with a longer budget
+    // because this one is racing a cold load and a sign-in, not a click.
+    //
+    // The dashboard's openSubpage() is deliberately NOT reused: its
+    // setTagMeta(nsId, "due", ...) call reads the Google Tasks list, which on
+    // a cold boot has not loaded yet, so it would write an empty due date
+    // over a real one. Passing no title is safe for the same class of reason
+    // -- ensureGTaskRoot() leaves the root's stored text alone when the title
+    // it is handed is falsy, and the engine only resolves after storage has
+    // actually been read.
+    let tries = 0;
+    const t = setInterval(function () {
+      const frame = document.getElementById("unbleepTasksFrame");
+      const w = frame && frame.contentWindow;
+      if (w && w.__unbleepOpenGTask) {
+        clearInterval(t);
+        w.__unbleepOpenGTask(nsId, "");
+      } else if (++tries > 80) {
+        clearInterval(t);
+      }
+    }, 120);
+  })();
+
   const btn = document.getElementById("alwaysOnTopBtn");
   if (!btn) return;
 
@@ -19853,7 +20015,7 @@
         "width=" + sw,
         "height=" + sh
       ].join(",");
-      const fullWindow = window.open(location.href, "unbleepLifeOSFullWindow", features);
+      const fullWindow = window.open(popoutHref(), "unbleepLifeOSFullWindow", features);
       if (fullWindow) {
         try { fullWindow.moveTo(0, 0); } catch (e2) {}
         try { fullWindow.resizeTo(sw, sh); } catch (e2) {}
@@ -19911,7 +20073,7 @@
       pipWindow.document.head.appendChild(style);
 
       const iframe = pipWindow.document.createElement("iframe");
-      iframe.src = location.href;
+      iframe.src = popoutHref();
       pipWindow.document.body.appendChild(iframe);
 
       // No separate "maximize" chrome floated over the iframe any more --
@@ -20571,7 +20733,35 @@
   /* The default account, used by everything that is not speaking for a
      particular widget: creating an event from the shared modal, completing a
      task, the Connect button. Unqualified api() means this. */
+  /* Every Google call in this file goes through here, which is what makes
+     before-write one hook rather than fifteen. Reads are left alone: a hook
+     on every GET would fire constantly and has nothing useful to change. */
   function api(url, options) {
+    const method = String((options && options.method) || "GET").toUpperCase();
+    if (method !== "GET" && window.__mpsRunHook) {
+      let parsed = null;
+      const raw = options && options.body;
+      if (typeof raw === "string") { try { parsed = JSON.parse(raw); } catch (e) { parsed = null; } }
+      const ctx = { method: method, url: String(url), body: parsed, cancel: false };
+      try {
+        window.__mpsRunHook("before-write", ctx);
+        if (ctx.cancel) {
+          /* Rejected, not silently dropped. Every caller here has a catch
+             that surfaces a failure; returning a quiet success would leave
+             the optimistic row on screen forever with nothing behind it. */
+          console.warn("[mps] before-write cancelled:", method, String(url));
+          return Promise.reject(new Error("A patch cancelled this change (before-write)."));
+        }
+        // Only re-serialise if a handler actually touched it, so a request
+        // whose body was never JSON is passed through byte for byte.
+        if (parsed && ctx.body && ctx.body !== parsed) {
+          options = Object.assign({}, options, { body: JSON.stringify(ctx.body) });
+        } else if (parsed && ctx.body) {
+          const next = JSON.stringify(ctx.body);
+          if (next !== raw) options = Object.assign({}, options, { body: next });
+        }
+      } catch (e) { console.warn("[mps] before-write hook failed:", e); }
+    }
     return authFor(String(url).indexOf(TASKS_API) === 0 ? "unschedTasks" : "cal").api(url, options);
   }
 
@@ -20939,8 +21129,31 @@
      tasks are not fetched instead, because every task interaction on the grid
      (open the subtask tree, retag, reschedule, complete) writes back through
      the board's own account and would be editing the wrong list. */
+  /* EVERY Tasks widget's rows, not just the primary's.
+
+     A due date is a due date whichever list it is filed under, and the
+     calendar is the one surface where that is obviously true: you do not
+     think of Thursday as having "My Tasks deadlines" and "Deadlines list
+     deadlines". Returning only `tasks` meant the moment a second widget got
+     its own list, everything in it vanished from the grid -- the tasks were
+     right there in the widget beside it, with due dates, and the calendar
+     drew none of them.
+
+     Deduped by id, because two widgets pointed at the same list hold two
+     copies of the same rows. Task ids are per-list and opaque, so a hit in
+     one list is never the same task as a hit in another. */
   function tasksFor(id) {
-    return sameAccount(id, "unschedTasks") ? tasks : [];
+    if (!sameAccount(id, "unschedTasks")) return [];
+    const seen = Object.create(null);
+    const out = [];
+    function take(arr) {
+      (arr || []).forEach(function (t) {
+        if (t && t.id && !seen[t.id]) { seen[t.id] = 1; out.push(t); }
+      });
+    }
+    take(tasks);
+    Object.keys(tasksByWidget).forEach(function (w) { take(tasksByWidget[w]); });
+    return out;
   }
 
   function tasksOnDay(dayStr) {
@@ -21011,6 +21224,10 @@
       e.stopPropagation();
       openItemEditor(nsId, title);
     });
+    if (window.__mpsRunHook) {
+      try { window.__mpsRunHook("event-chip", { nsId: nsId, kind: kind, title: title, chip: chip }); }
+      catch (e) { console.warn("[mps] event-chip hook failed:", e); }
+    }
     return chip;
   }
 
@@ -22870,6 +23087,10 @@
         if (e.target.closest && e.target.closest("button, select, input, textarea, a")) return;
         withTaskWidget(owner, function () { openTaskRowEditor(t); });
       });
+      if (window.__mpsRunHook) {
+        try { window.__mpsRunHook("task-row", { widgetId: owner, task: t, nsId: nsId, row: row, done: false }); }
+        catch (e) { console.warn("[mps] task-row hook failed:", e); }
+      }
       taskListEl.appendChild(row);
     });
 
@@ -30376,6 +30597,49 @@
   const aiPanelBtn = $("aiPanelBtn");
   const AI_OPEN_KEY = "ai-panel-open";
 
+  /* ---------------- modes ----------------
+     How much the assistant is allowed to do without stopping to ask. Three
+     of them, the same three Claude Code offers, because the decision behind
+     them is the same one: a confirm you always click through is worse than
+     no confirm, and a confirm you actually want is worth the interruption.
+
+       auto    the default, and what the panel has always done -- the
+               DESTRUCTIVE table decides which tools stop for a Yes/No.
+       accept  every one of those is answered Yes automatically. Nothing else
+               changes; the tools available are identical.
+       plan    no tool that CHANGES anything runs at all. Reads are allowed,
+               so it can look at the board, the source and the console, and
+               it answers with a plan instead of an edit.
+
+     Plan mode is enforced in TWO places on purpose. The system prompt tells
+     the model the rule so it writes a plan rather than narrating edits it is
+     about to be refused; the gate in the tool loop is what makes the rule
+     true, because a prompt is a request and this one has to hold even when
+     the model forgets it 40 turns in. */
+  const AI_MODE_KEY = "ai-mode";
+  const AI_MODES = [
+    { id: "auto",   name: "Auto",         desc: "myProductivitySpace handles permission decisions" },
+    { id: "accept", name: "Accept edits", desc: "Automatically accept every change" },
+    { id: "plan",   name: "Plan",         desc: "Create a plan before making changes" }
+  ];
+  let aiMode = "auto";
+  function modeDef(id) {
+    for (let i = 0; i < AI_MODES.length; i++) if (AI_MODES[i].id === id) return AI_MODES[i];
+    return AI_MODES[0];
+  }
+
+  /* The tools plan mode lets through: everything that only looks. Kept as an
+     allow-list rather than a block-list of the mutating ones, so a tool
+     added later is read-only only if someone says so here -- the failure
+     mode of a forgotten entry is then "plan mode refused something it could
+     have run", not "plan mode silently edited the board". */
+  const AI_READ_ONLY_TOOLS = {
+    list_widgets: 1, read_widget: 1, inspect_widget: 1, inspect_custom_widget: 1,
+    list_tasks: 1, list_events: 1, list_notion_pages: 1,
+    read_dom: 1, read_source: 1, read_console: 1,
+    list_patches: 1, read_patch: 1, repo_status: 1, list_connectors: 1
+  };
+
   /* ---------------- saved chats ----------------
      Every conversation is kept, under its own key, with an index of titles
      for the sidebar. The panel always opens on a fresh chat -- a chat only
@@ -30445,8 +30709,14 @@
      strictly to execution would flash it for one tick and read as a glitch.
      FOG_MIN_MS holds it on screen long enough to be legible as "it is doing
      this, here" -- which is the entire point of the effect. */
-  const FOG_MIN_MS = 950;
+  /* Raised from 950ms. Most tools finish in a frame, and 950ms was long
+     enough for the effect to EXIST but not long enough to notice it if you
+     happened to be looking at the chat rather than the board. */
+  const FOG_MIN_MS = 1500;
   let fogNode = null, fogCursor = null, fogHost = null, fogDrift = null;
+  // The rAF handle that keeps the fixed overlay glued to the widget's rect,
+  // and the cursor's current spot as an offset INSIDE that rect.
+  let fogTrack = null, fogCursorX = 0, fogCursorY = 0;
 
   function widgetNode(id) {
     if (!id) return null;
@@ -30473,37 +30743,74 @@
     stopFog();
     const host = widgetNode(id);
     if (!host) return;
+    /* A widget the user has hidden, or one the board has folded away, has no
+       box to draw on -- an overlay at 0x0 is a rendering artefact, not a
+       signal. Nothing is drawn, and the work still runs. */
+    const first = host.getBoundingClientRect();
+    if (first.width < 4 || first.height < 4) return;
     fogHost = host;
     host.classList.add("ai-editing");
 
+    /* The effect is worthless on a widget that is off-screen, and the board
+       scrolls: the panel is usually open, the transcript has the eye, and
+       the widget being edited is as likely as not below the fold. Bring it
+       to the middle of the canvas first. Smooth rather than instant so it
+       reads as "look here", and the tracker below keeps the overlay glued to
+       the widget for the whole scroll. */
+    try { host.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" }); }
+    catch (e) { try { host.scrollIntoView(); } catch (e2) {} }
+
     fogNode = document.createElement("div");
     fogNode.className = "ai-fog";
-    host.appendChild(fogNode);
+    document.body.appendChild(fogNode);
 
     fogCursor = document.createElement("div");
     fogCursor.className = "ai-cursor";
     // No caption. The frame plus the pointer already say "working, here",
     // and a word like "Inspecting" was noise on top of that.
     fogCursor.innerHTML = CURSOR_SVG;
-    host.appendChild(fogCursor);
+    document.body.appendChild(fogCursor);
 
-    // Kept inside the widget's own box, and off the edges, so the label never
-    // hangs outside the surface it is annotating.
-    function drift() {
-      if (!fogCursor || !fogHost) return;
+    /* Both overlays are position:fixed, so their coordinates are viewport
+       coordinates and go stale the moment anything scrolls. Re-read every
+       frame rather than on scroll events: the widget also moves when a
+       column is resized, when the panel is dragged wider, and when a
+       neighbouring widget grows, and none of those fire a scroll. */
+    function place() {
+      fogTrack = requestAnimationFrame(place);
+      if (!fogHost || !fogNode) return;
       const r = fogHost.getBoundingClientRect();
-      // Inset by the cursor's own size now that it is 34px, so an oversized
+      fogNode.style.left = Math.round(r.left) + "px";
+      fogNode.style.top = Math.round(r.top) + "px";
+      fogNode.style.width = Math.round(r.width) + "px";
+      fogNode.style.height = Math.round(r.height) + "px";
+      if (fogCursor) {
+        fogCursor.style.transform = "translate3d(" +
+          Math.round(r.left + fogCursorX) + "px," +
+          Math.round(r.top + fogCursorY) + "px,0)";
+      }
+    }
+
+    // Kept inside the widget's own box, and off the edges, so the pointer
+    // never hangs outside the surface it is annotating. Only the offset is
+    // set here; place() turns it into a viewport position each frame, which
+    // is what lets the CSS transition ease between two drift spots.
+    function drift() {
+      if (!fogHost) return;
+      const r = fogHost.getBoundingClientRect();
+      // Inset by the cursor's own size now that it is 42px, so an oversized
       // pointer still lands wholly inside the widget it is annotating.
-      const x = 18 + Math.random() * Math.max(10, r.width - 80);
-      const y = 16 + Math.random() * Math.max(10, r.height - 80);
-      fogCursor.style.transform = "translate3d(" + Math.round(x) + "px," + Math.round(y) + "px,0)";
+      fogCursorX = 18 + Math.random() * Math.max(10, r.width - 80);
+      fogCursorY = 16 + Math.random() * Math.max(10, r.height - 80);
     }
     drift();
+    place();
     fogDrift = setInterval(drift, 700);
   }
 
   function stopFog() {
     if (fogDrift) { clearInterval(fogDrift); fogDrift = null; }
+    if (fogTrack) { cancelAnimationFrame(fogTrack); fogTrack = null; }
     if (fogNode && fogNode.parentNode) fogNode.parentNode.removeChild(fogNode);
     if (fogCursor && fogCursor.parentNode) fogCursor.parentNode.removeChild(fogCursor);
     if (fogHost) fogHost.classList.remove("ai-editing");
@@ -32319,6 +32626,15 @@
       "SAY WHAT YOU ACTUALLY CHECKED. There is a real difference between 'I changed the code and it should work' and 'I exercised it and here is what happened', and only the second is worth anything to the user. Where you can check -- a custom widget with inspect_custom_widget, page behaviour with click_element then read_console using `since` -- do it, and quote what you saw. Where you cannot, say so plainly and say what would settle it. Be especially careful with anything INTERMITTENT: a bug that happens sometimes cannot be confirmed fixed by reading code, and claiming otherwise is worse than admitting the limit, because the user stops looking. commit_source is checked for file size and tag balance only; it never runs your code.",
 
       "Destructive tools show the user a confirm button automatically \u2014 call them directly rather than asking in prose first.",
+
+      /* One paragraph, swapped by mode. The gate in the tool loop is what
+         actually enforces plan mode; this is what stops the model from
+         spending a turn writing "done" about an edit that was refused. */
+      aiMode === "plan"
+        ? "YOU ARE IN PLAN MODE. Every tool that would change anything \u2014 the board, a widget, a task, an event, a patch, the source file \u2014 is switched off and will come back refused if you call it. The reading tools all still work, and you are expected to use them: read the widget, read the source, read the console, then say what you would do. Answer with a short plan \u2014 what you would change, where, and what could go wrong \u2014 and finish by telling the user to switch the mode picker under the message box to Auto or Accept edits if they want you to carry it out. Do not pretend a change was made, and do not ask for permission to run a tool: the mode, not the user's next sentence, is what unlocks it."
+        : aiMode === "accept"
+        ? "The user has turned on Accept edits, so the confirm buttons are answered Yes for you and nothing pauses. That makes you the only check left on this turn: re-read a destructive call before you make it, and say plainly in your reply what you changed, since the user no longer sees a confirm naming it."
+        : "The user is in Auto mode: you decide which tools to call, and the few consequential ones (patches, commits, connector calls, deletes) stop for a Yes/No from them.",
       "",
       "Style: you are a narrow sidebar, so keep replies short \u2014 usually one or two sentences. Replies render as Markdown: use **bold** for the key term, bullet lists for anything with more than two parts, `code` for ids/keys/formats, and an emoji or two where they help the eye (\ud83d\udcda \u2705 \ud83d\udcc5 \u2728) \u2014 never as decoration on every line.",
       "Confirm what you changed in plain language rather than restating the tool call."
@@ -32886,9 +33202,27 @@
              stream for this turn has already closed, so waiting here costs
              nothing and the model simply sees the answer in its result. */
           let out = null;
-          const ask = DESTRUCTIVE[use.name];
+
+          /* The plan-mode gate. Deliberately here, in the loop, rather than
+             by shortening the tool list on the way out: the model keeps the
+             full set in view and gets told in words why the call did not
+             run, which is what makes it write the plan instead of quietly
+             working around a tool it thinks does not exist. */
+          if (aiMode === "plan" && !AI_READ_ONLY_TOOLS[use.name]) {
+            out = { planBlocked: true,
+                    error: "Plan mode is on, so " + use.name + " did not run and nothing was changed. " +
+                           "Reading tools still work. Finish looking, then reply with the plan and tell the user to " +
+                           "switch the mode picker under the message box to Auto or Accept edits to have it carried out." };
+          }
+
+          const ask = out === null ? DESTRUCTIVE[use.name] : null;
           let question = null;
           if (ask) { try { question = ask(use.input || {}); } catch (e) { question = null; } }
+          /* Accept edits answers every one of these Yes without drawing the
+             card. Not "draw it and auto-click": a confirm that resolves
+             itself is a worse thing to have watched than no confirm, and the
+             model's own reply is what reports the change in this mode. */
+          if (question && aiMode === "accept") question = null;
           if (question) {
             if (placeholder && placeholder.parentNode) placeholder.remove();
             placeholder = null;
@@ -32910,8 +33244,20 @@
             catch (e) { out = { error: String((e && e.message) || e) }; }
           }
 
+          /* A tool that CREATES a widget has no target to fog before it
+             runs -- the widget does not exist yet -- so it used to be the one
+             kind of work that happened entirely invisibly. Now the id comes
+             back in the result and the new widget gets the same beat of fog
+             the edited ones get, which doubles as "here is the thing I just
+             made". */
+          let fogId = targetId;
+          if (!fogId && out && !out.error && (out.widget_id || out.id)) {
+            fogId = out.widget_id || out.id;
+            startFog(fogId, ui.label);
+          }
+
           // Instant work still gets a visible beat of fog. See FOG_MIN_MS.
-          if (targetId) {
+          if (fogId) {
             const left = FOG_MIN_MS - (Date.now() - started);
             if (left > 0) await wait(left);
             stopFog();
@@ -32924,7 +33270,13 @@
              skip, so that stays on screen as the plain fact. */
           // A failure is the one thing that earns a line of its own, because
           // it is the one thing the model might soften.
-          if (out && out.error) { sawToolError = true; appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error"); }
+          if (out && out.planBlocked) {
+            /* Not an error, and not styled as one: nothing broke, the mode
+               did exactly what it says on the strip. The line is still worth
+               drawing, because the alternative is a tool call that leaves no
+               trace at all and a user wondering whether anything happened. */
+            appendMessage("ai", "Plan mode \u2014 didn't run " + use.name + ". Nothing was changed.").classList.add("is-note");
+          } else if (out && out.error) { sawToolError = true; appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error"); }
 
           /* The loop-breaker. The same tool, the same input, the same answer
              as earlier in this very request means the model is going in a
@@ -33401,6 +33753,98 @@
   }
   const aiCloseBtn = $("aiCloseBtn");
   if (aiCloseBtn) aiCloseBtn.addEventListener("click", function () { setAiPanelOpen(false, true); });
+
+  /* ---------------- the mode picker ----------------
+     Reads and writes the `aiMode` the tool loop and the system prompt above
+     both consult. The menu is built once from AI_MODES rather than written
+     out in the markup, so adding a fourth mode is one line in that array. */
+  const aiModeBtn = $("aiModeBtn");
+  const aiModeMenu = $("aiModeMenu");
+  const aiModeLabel = $("aiModeLabel");
+  const TICK_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" ' +
+                   'stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                   '<path d="M4 12.5l5 5L20 6.5"/></svg>';
+
+  function renderModeMenu() {
+    if (!aiModeMenu) return;
+    aiModeMenu.innerHTML = "";
+    aiModeMenu.appendChild(el("div", "ai-mode-head", "Mode"));
+    AI_MODES.forEach(function (m, i) {
+      const b = el("button", "ai-mode-item" + (m.id === aiMode ? " is-current" : ""));
+      b.type = "button";
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(m.id === aiMode));
+      const txt = el("span", "ai-mode-item-text");
+      txt.appendChild(el("span", "ai-mode-item-name", m.name));
+      txt.appendChild(el("span", "ai-mode-item-desc", m.desc));
+      b.appendChild(txt);
+      const tick = el("span", "ai-mode-tick");
+      tick.innerHTML = TICK_SVG;
+      b.appendChild(tick);
+      // The number that picks it from the keyboard while the menu is open.
+      b.appendChild(el("span", "ai-mode-key", String(i + 1)));
+      b.addEventListener("click", function () { setAiMode(m.id, true); setModeMenuOpen(false); });
+      aiModeMenu.appendChild(b);
+    });
+  }
+
+  function setAiMode(id, persist) {
+    aiMode = modeDef(id).id;
+    if (aiModeLabel) aiModeLabel.textContent = modeDef(aiMode).name;
+    if (aiModeBtn) aiModeBtn.classList.toggle("is-set", aiMode !== "auto");
+    renderModeMenu();
+    if (persist) window.storageSet(AI_MODE_KEY, aiMode);
+  }
+
+  function setModeMenuOpen(open) {
+    if (!aiModeMenu || !aiModeBtn) return;
+    aiModeMenu.hidden = !open;
+    aiModeBtn.setAttribute("aria-expanded", String(!!open));
+    if (open) { renderModeMenu(); const f = aiModeMenu.querySelector(".ai-mode-item"); if (f) f.focus(); }
+  }
+
+  if (aiModeBtn) {
+    aiModeBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      setModeMenuOpen(aiModeMenu.hidden);
+    });
+  }
+  // Clicking anywhere else closes it, the same way the + menu behaves.
+  document.addEventListener("click", function (e) {
+    if (!aiModeMenu || aiModeMenu.hidden) return;
+    const t = e.target;
+    if (t && (t.closest(".ai-mode-menu") || t.closest(".ai-mode-btn"))) return;
+    setModeMenuOpen(false);
+  });
+  document.addEventListener("keydown", function (e) {
+    /* Shift+Tab cycles modes, but ONLY from the message box. It is the
+       gesture Claude Code uses and the reason the picker has a keyboard
+       route at all -- you change the mode mid-sentence -- but Shift+Tab is
+       also how a keyboard user walks backwards through the panel's controls,
+       so it is claimed on the one element where nobody is doing that. */
+    if (e.key === "Tab" && e.shiftKey && !aiPanel.hidden &&
+        document.activeElement === aiInput) {
+      e.preventDefault();
+      let i = 0;
+      for (let k = 0; k < AI_MODES.length; k++) if (AI_MODES[k].id === aiMode) i = k;
+      setAiMode(AI_MODES[(i + 1) % AI_MODES.length].id, true);
+      return;
+    }
+    if (!aiModeMenu || aiModeMenu.hidden) return;
+    if (e.key === "Escape") { e.preventDefault(); setModeMenuOpen(false); aiModeBtn.focus(); return; }
+    // The digits pick a mode only while the menu has the keyboard. Typing a
+    // "1" into the message box with the menu still open must stay a "1".
+    const ae = document.activeElement;
+    if (ae && (ae === aiInput || ae.tagName === "INPUT" || ae.isContentEditable)) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && n <= AI_MODES.length) {
+      e.preventDefault();
+      setAiMode(AI_MODES[n - 1].id, true);
+      setModeMenuOpen(false);
+      aiModeBtn.focus();
+    }
+  });
+  setAiMode(aiMode, false);
   /* ---------------- attachments ----------------
      Files staged for the NEXT message. Images become image blocks, PDFs
      document blocks, anything text-shaped is inlined as text -- which is the
@@ -33576,6 +34020,9 @@
     } catch (e) { chats = []; }
     chats.sort(function (a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
     renderSidebar();
+    let savedMode = null;
+    try { savedMode = await window.storageGet(AI_MODE_KEY); } catch (e) {}
+    if (savedMode) setAiMode(savedMode, false);
     let savedWidth = null;
     try { savedWidth = await window.storageGet(AI_WIDTH_KEY); } catch (e) {}
     if (savedWidth) {
@@ -33777,14 +34224,75 @@
     else controls.appendChild(btn);
   }
 
+  /* ---- the widget-body hook ----
+
+     Fired here rather than from each widget's own code because this module
+     already walks every widget on the board, and because the hook has to fire
+     for widgets that ALREADY EXIST. A patch registers at boot, which is after
+     every built-in widget has drawn, so a hook fired once during startup would
+     never reach a patch -- the patch would install into an empty room.
+
+     So it fires late and repeatedly: after startup, when a widget is created,
+     and again whenever a patch is installed or removed. Which means a handler
+     runs many times for the same body, and ctx.once() is how a handler stops
+     adding its button five times. The marker lives on the element, so a body
+     that is rebuilt correctly gets the work done again. */
+  /* Built once per scan rather than once per widget: __aiBoard.list() walks
+     the whole board, and calling it inside the loop would walk it once for
+     every widget on it. */
+  function typeMap() {
+    var out = {};
+    try {
+      ((window.__aiBoard && window.__aiBoard.list()) || []).forEach(function (w) {
+        if (w && w.id) out[w.id] = w.type || null;
+      });
+    } catch (e) {}
+    return out;
+  }
+
+  function fireBodyHook(colWrap, types) {
+    if (!window.__mpsRunHook || !colWrap || colWrap.nodeType !== 1) return;
+    var id = colWrap.getAttribute("data-col-id");
+    if (!id) return;
+    var body = colWrap.querySelector(".widget-body");
+    if (!body) return;
+    var ctx = {
+      widgetId: id,
+      type: (types && types[id]) || null,
+      body: body,
+      /* Do this once for this body, whatever else happens. The key is
+         namespaced by the patch that is asking, so two patches using the
+         same key do not silently cancel each other out. */
+      once: function (key, fn) {
+        var owner = (window.__mpsBlameNow && window.__mpsBlameNow()) || "anon";
+        var mark = "mpsOnce_" + String(owner).replace(/\W/g, "_") + "_" + String(key).replace(/\W/g, "_");
+        if (body.dataset[mark]) return false;
+        body.dataset[mark] = "1";
+        try { fn(body); } catch (e) { console.warn("[mps] widget-body once() failed:", e); }
+        return true;
+      }
+    };
+    try { window.__mpsRunHook("widget-body", ctx); }
+    catch (e) { console.warn("[mps] widget-body hook failed:", e); }
+  }
+
   function scan(root) {
     var scope = root || document;
-    if (scope.nodeType === 1 && scope.matches && scope.matches(".col.collapsible-col-wrap")) ensureGear(scope);
+    var types = typeMap();
+    if (scope.nodeType === 1 && scope.matches && scope.matches(".col.collapsible-col-wrap")) {
+      ensureGear(scope); fireBodyHook(scope, types);
+    }
     if (!scope.querySelectorAll) return;
-    Array.prototype.forEach.call(scope.querySelectorAll(".col.collapsible-col-wrap"), ensureGear);
+    Array.prototype.forEach.call(scope.querySelectorAll(".col.collapsible-col-wrap"), function (el) {
+      ensureGear(el); fireBodyHook(el, types);
+    });
   }
 
   scan(document);
+
+  /* A patch was just installed or removed, so re-offer every body to it. The
+     board dispatches this from the patch runtime; see repaintLivePage. */
+  window.addEventListener("mps:repaint", function () { scan(document); });
 
   // Widgets arrive well after load: dynamic ones are built (and retried) on a
   // timer, and render() moves them between the grid, the hidden pool and the
@@ -34108,7 +34616,22 @@
        isolated and switched off by the patch runtime, and the widget draws
        what it would have drawn anyway. */
     "tasks-list": "The Google Tasks rows a widget is about to draw. ctx: {widgetId, listId, items}. Mutate or replace ctx.items to sort, filter or hide. Fires on every render of every Tasks widget, so keep it cheap.",
-    "calendar-events": "The events a calendar widget is about to draw, before the grid is laid out. ctx: {widgetId, view, items}. Same contract as tasks-list: mutate or replace ctx.items to filter, hide or recolour. Fires on every render of every calendar widget, in day, week and month, so keep it cheap."
+    "calendar-events": "The events a calendar widget is about to draw, before the grid is laid out. ctx: {widgetId, view, items}. Same contract as tasks-list: mutate or replace ctx.items to filter, hide or recolour. Fires on every render of every calendar widget, in day, week and month, so keep it cheap.",
+
+    /* The three below exist so a built-in widget can be extended as freely as
+       a custom one. The distinction that made that impossible was reach, not
+       permission: a patch could already change a widget's DATA, its settings
+       panel and the two forms, and could not touch its body, its rows, or
+       what it sends to Google. Every one of those was a source commit, which
+       means a deploy, every device, and no isolation if it is wrong. */
+
+    "widget-body": "A built-in widget's body, so a patch can put something in it -- a button, a filter bar, a summary line. ctx: {widgetId, type, body, once}. Fires after boot, whenever a widget is created, and again whenever a patch is installed or removed, so it WILL run more than once for the same widget. Use ctx.once('my-key', function () { ... }) to do the work only the first time; anything you add outside that will be added twice.",
+
+    "task-row": "One task row, after it is built and before it goes on screen. ctx: {widgetId, task, nsId, row, done}. Add a badge, a button, a class; row is the live element. `done` is true for a completed row. Fires once per row per render of every Tasks widget, so keep it very cheap -- this is the hottest hook here.",
+
+    "event-chip": "One event or task chip on the calendar grid. ctx: {nsId, kind, title, chip}. kind is 'task' or 'event'. Same contract as task-row.",
+
+    "before-write": "Every create, edit, complete, delete and reorder heading for Google, just before it is sent. ctx: {method, url, body, cancel}. Amend by mutating ctx.body (a parsed object when the request carries JSON), or set ctx.cancel = true to stop it. THINK BEFORE CANCELLING: the surrounding code has usually already updated the screen optimistically, so a silent veto leaves the board showing something that never happened. If you cancel, tell the user why."
   };
 
   function noteError(name, e) {
