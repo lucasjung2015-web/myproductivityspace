@@ -17,7 +17,24 @@
    the alternative is parsing 2 MB of HTML, CSS and JS in an edge function to
    decide what a line means, and a blunt rule that always fires beats a
    clever one that sometimes does not. */
-export const PROTECTED: { rule: string; why: string; tokens: string[] }[] = [
+/* `sealed` changes what a rule means.
+ *
+ * By default a rule guards against CHANGING a protected line: quoting one
+ * identically on both sides is an anchor and passes, which is what makes
+ * "add a control next to the emoji button" possible and is the whole reason
+ * changedLines() does a two-way difference.
+ *
+ * That is right for chrome and wrong for security. Anchoring on
+ * `function systemPrompt() {` and inserting one line after it replaces the
+ * entire system prompt without changing a single protected character. Same
+ * trick on serveData bypasses the permission gate, and on AI_TOOLS grants a
+ * new tool. Four of these were live until the tests below caught them.
+ *
+ * A sealed rule refuses if its tokens appear ANYWHERE in the edit, anchor or
+ * not. You cannot edit near them either. That is a real cost and the right
+ * one: these are small, self-contained, and nothing legitimate needs to be
+ * written next to them. */
+export const PROTECTED: { rule: string; why: string; tokens: string[]; sealed?: boolean }[] = [
   {
     rule: "widget-chrome",
     why: "the emoji button, hover controls and title in every widget header",
@@ -30,6 +47,10 @@ export const PROTECTED: { rule: string; why: string; tokens: string[] }[] = [
       "col-delete-btn", "section-hide-btn", "section-drag-handle", "collapsible-unhide",
       // The title itself.
       "section-header-title", "data-widget-title-id", "__applyWidgetTitle",
+      // The gear. A hover control like the five above; it was missed. Note
+      // this locks the BUTTON, not the panel it opens -- widget settings are
+      // meant to be extended, and __extendWidgetSettings stays open.
+      "widget-settings-btn",
     ],
   },
   {
@@ -48,6 +69,54 @@ export const PROTECTED: { rule: string; why: string; tokens: string[] }[] = [
     rule: "google-auth",
     why: "the OAuth client and scopes; changing them silently breaks sign-in for everyone",
     tokens: ["CLIENT_ID", "SUPABASE_ANON_KEY", "SUPABASE_URL", "googleapis.com/auth/"],
+  },
+  {
+    rule: "widget-sandbox",
+    sealed: true,
+    why: "the isolation and permission gate that make custom widgets safe to run",
+    /* The load-bearing rule, and the one whose absence was least obvious.
+     * Everything else here protects something the owner picked. This protects
+     * the machinery that makes every OTHER promise true: a widget frame has
+     * an opaque origin and holds no credentials, and a widget may read only
+     * what was approved for it. Deleting one attribute makes the frame
+     * same-origin with the page, at which point any widget can read the
+     * Google access token out of memory -- and the tool descriptions that
+     * promise otherwise become false without a word changing in them.
+     *
+     * The realistic failure is not sabotage. It is that widening a scope is
+     * the shortest path to "make this widget able to X", and the widening
+     * outlives the request. */
+    tokens: [
+      "allow-scripts", "connect-src",
+      "serveData", "DATA_SCOPES", "SCOPE_FOR",
+      "normalizeScopes", "normalizeConnectorGrants",
+    ],
+  },
+  {
+    rule: "cloud-sync",
+    sealed: true,
+    why: "the code that saves the board and pulls it back; a mistake here loses data rather than looks",
+    /* Every other rule protects behaviour. This protects the only thing that
+     * cannot be restored by fixing the code afterwards. */
+    tokens: ["WRITER_ID", "repull", "readCursor"],
+  },
+  {
+    rule: "agent-self",
+    sealed: true,
+    why: "the assistant's own instructions, tools and limits",
+    /* Rules an agent can rewrite are suggestions.
+     *
+     * The system prompt is where the untrusted-content warnings live, where
+     * the locked rules are explained, and where the debugging habits were
+     * added. AI_TOOLS is what it is allowed to do; AI_MAX_TURNS is how long
+     * it may run; __mpsConsole is how it checks its own work. All of it was
+     * editable by the thing it governs, which makes it documentation rather
+     * than enforcement.
+     *
+     * This does mean the assistant can no longer improve its own prompt. That
+     * is the trade, and it is the right way round: an instruction the owner
+     * did not write is not an instruction. */
+    tokens: ["AI_MAX_TURNS", "AI_TOOLS", "AI_API_URL", "systemPrompt", "__mpsConsole"],
   },
   {
     rule: "patch-runtime",
@@ -96,8 +165,23 @@ export function changedLines(oldStr: string, newStr: string): string[] {
 export type Refusal = { rule: string; why: string; token: string; line: string };
 
 export function fenceCheck(oldStr: string, newStr: string): Refusal | null {
+  /* Sealed rules first, against the raw edit rather than its changed lines:
+     an anchor is not a defence when inserting one line beside it is the
+     attack. Checked on both sides so neither removing nor introducing one
+     of these gets through. */
+  for (const group of PROTECTED) {
+    if (!group.sealed) continue;
+    for (const token of group.tokens) {
+      if (oldStr.includes(token) || newStr.includes(token)) {
+        const hit = (oldStr.includes(token) ? oldStr : newStr)
+          .split("\n").find((l) => l.includes(token)) || token;
+        return { rule: group.rule, why: group.why, token, line: hit.trim().slice(0, 160) };
+      }
+    }
+  }
   for (const line of changedLines(oldStr, newStr)) {
     for (const group of PROTECTED) {
+      if (group.sealed) continue;
       for (const token of group.tokens) {
         if (line.includes(token)) {
           return { rule: group.rule, why: group.why, token, line: line.trim().slice(0, 160) };

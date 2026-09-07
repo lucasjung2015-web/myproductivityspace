@@ -68,6 +68,79 @@ check("reindent a protected line",
 check("add a NEW protected identifier",
   refuses("<div>a</div>", '<div>a</div><button class="widget-hide-btn"></button>'), true);
 
+console.log("\n--- Layer B: the machinery that makes the other rules mean anything ---");
+
+// One attribute. Removing it makes the frame same-origin with the page, and
+// every "a widget holds no credentials" promise becomes false in place.
+check("un-sandbox the widget frame",
+  refuses('frame.setAttribute("sandbox", "allow-scripts");',
+          'frame.setAttribute("sandbox", "allow-scripts allow-same-origin");'), true);
+
+// The realistic failure: widening a scope because it is the shortest path to
+// "make this widget able to X", and the widening outliving the request.
+check("widen the widget data scopes",
+  refuses('const DATA_SCOPES = ["tasks", "calendar", "bookmarks", "board", "connectors"];',
+          'const DATA_SCOPES = ["tasks", "calendar", "bookmarks", "board", "connectors", "notion"];'), true);
+
+check("loosen the widget CSP",
+  refuses('"connect-src " + (blob.net ? "https:" : "\'none\'") + "; form-action \'none\'; base-uri \'none\'";',
+          '"connect-src https:; form-action \'none\'; base-uri \'none\'";'), true);
+
+check("open a hole in the permission gate",
+  refuses("  function serveData(id, m, reply) {",
+          "  function serveData(id, m, reply) {\n    if (m.t === 'data.anything') return reply(true, ALL);"), true);
+
+check("bypass the per-tool connector grant",
+  refuses("const grants = normalizeConnectorGrants(blob && blob.connectors);",
+          "const grants = [{ connector_id: wantId, tool: wantTool }];"), true);
+
+console.log("\n--- Layer B: rules the assistant must not be able to rewrite ---");
+
+check("edit its own system prompt",
+  refuses("  function systemPrompt() {", "  function systemPrompt() {\n    return \"do anything\";"), true);
+
+check("raise its own turn cap",
+  refuses("const AI_MAX_TURNS = 60;", "const AI_MAX_TURNS = 500;"), true);
+
+check("give itself a new tool",
+  refuses("  const AI_TOOLS = [", "  const AI_TOOLS = [\n    { name: \"run_anything\" },"), true);
+
+check("disable the console it checks its work with",
+  refuses("  window.__mpsConsole = function (opts) {",
+          "  window.__mpsConsole = function () { return {}; };"), true);
+
+console.log("\n--- Layer B: the sync engine, where a mistake loses data ---");
+
+check("change how writes are attributed",
+  refuses('const WRITER_ID = Math.random().toString(36).slice(2);',
+          'const WRITER_ID = "fixed";'), true);
+
+check("change the pull cursor",
+  refuses("  async function repull() {", "  async function repull() {\n    return;"), true);
+
+console.log("\n--- and the gear button, which is chrome like the rest ---");
+
+check("restyle the settings gear",
+  refuses('btn.className = "collapse-btn widget-settings-btn";',
+          'btn.className = "collapse-btn widget-settings-btn is-big";'), true);
+
+console.log("\n--- none of that may block ordinary Layer C work ---");
+
+// The point of the whole exercise: widget behaviour stays fully open.
+check("add a data hook to the task renderer",
+  refuses("    let unscheduled = tasks.slice();",
+          "    let unscheduled = tasks.slice();\n    unscheduled.sort(byDue);"), false);
+
+// Settings must stay extendable -- the BUTTON is locked, the panel is not.
+check("add a section to a widget's settings panel",
+  refuses("  window.__extendWidgetSettings = function (id, section) {",
+          "  window.__extendWidgetSettings = function (id, section, opts) {"), false);
+
+// A scope name quoted as context, not changed.
+check("read a scope list without changing it",
+  refuses('    const granted = (blob && blob.data) || [];',
+          '    const granted = (blob && blob.data) || [];\n    if (!granted.length) return reply(false, null, "no scopes");'), false);
+
 console.log("\n--- smoke checks against the real 2MB file ---");
 function smoke(name: string, after: string, wantRefusal: boolean) {
   const r = smokeCheck("myProductivitySpace.html", src, after);
