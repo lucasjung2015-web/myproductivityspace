@@ -219,6 +219,98 @@ Deno.serve(async (req) => {
     }
   }
 
+  /* ---- revert: the undo that did not exist ----
+
+     Until now a source commit was permanent. If it broke the board, the board
+     was where you would have gone to fix it, and the fix was to hand-edit a
+     2MB file under pressure. That asymmetry -- straight-to-live with no way
+     back -- is what made every other guard here have to be so strict.
+
+     A forward revert, never a history rewrite: the previous content is
+     committed as a NEW commit, so nothing is erased and the broken version
+     stays readable. And it will only undo the assistant's own work: HEAD has
+     to carry the marker the commit path stamps, so a revert can never eat a
+     commit the owner made by hand. */
+  if (action === "revert") {
+    if (!mayWrite) return json({ error: "This account may not commit to the repository." }, 403, cors);
+
+    const path = String(body.path ?? "");
+    if (!path) return json({ error: "No path." }, 400, cors);
+    if (PROTECTED_PATHS.some((p) => path === p || path.startsWith(p))) {
+      return json({ error: 'Refused: "' + path + '" is a locked path.', rule: "locked-path" }, 403, cors);
+    }
+
+    try {
+      const h = await headOf(token!, repo!, branch);
+      const headMsg = String((h.commit as Record<string, unknown>).message ?? "");
+      if (!headMsg.includes("Committed by the myProductivitySpace assistant.")) {
+        return json({
+          error: "The newest commit was not made by the assistant, so there is nothing here it may undo.",
+          head_message: headMsg.split("\n")[0],
+          note: "Revert only ever undoes the assistant's own last commit. Anything else is yours, " +
+                "and undoing it is a git command you run yourself.",
+        }, 409, cors);
+      }
+
+      const parents = (h.commit as Record<string, unknown>).parents as { sha: string }[] | undefined;
+      if (!parents || !parents.length) return json({ error: "That commit has no parent to go back to." }, 409, cors);
+      const parentSha = String(parents[0].sha);
+
+      const parentCommit = await gh(token!, `/repos/${repo}/git/commits/${parentSha}`);
+      const parentTree = String((parentCommit.tree as Record<string, unknown>).sha);
+      const wasFile = await readFileAt(token!, repo!, parentTree, path);
+      if (!wasFile) return json({ error: 'The file did not exist at "' + parentSha.slice(0, 8) + '".' }, 409, cors);
+
+      const nowFile = await readFileAt(token!, repo!, h.treeSha, path);
+      if (nowFile && nowFile.content === wasFile.content) {
+        return json({ error: "That file is already identical to the previous commit; nothing to undo." }, 409, cors);
+      }
+
+      // Belt and braces. The old content passed on the way in, but a revert
+      // that shipped something unparseable would be the worst possible bug in
+      // the one tool you reach for when things are already broken.
+      const smoke = smokeCheck(path, nowFile ? nowFile.content : "", wasFile.content);
+      if (smoke) return json({ error: "The previous version does not pass the smoke check.", note: smoke }, 422, cors);
+
+      const blob = await gh(token!, `/repos/${repo}/git/blobs`, {
+        method: "POST",
+        body: JSON.stringify({ content: wasFile.content, encoding: "utf-8" }),
+      });
+      const tree = await gh(token!, `/repos/${repo}/git/trees`, {
+        method: "POST",
+        body: JSON.stringify({
+          base_tree: h.treeSha,
+          tree: [{ path, mode: "100644", type: "blob", sha: String(blob.sha) }],
+        }),
+      });
+      const msg = "revert: put " + path + " back to " + parentSha.slice(0, 8) +
+        "\n\nUndoes " + h.commitSha.slice(0, 12) + ' ("' + headMsg.split("\n")[0].slice(0, 72) + '").' +
+        "\nA forward revert: that commit is still in the history and still readable." +
+        "\nCommitted by the myProductivitySpace assistant.";
+      const commit = await gh(token!, `/repos/${repo}/git/commits`, {
+        method: "POST",
+        body: JSON.stringify({ message: msg, tree: String(tree.sha), parents: [h.commitSha] }),
+      });
+      await gh(token!, `/repos/${repo}/git/refs/heads/${branch}`, {
+        method: "PATCH",
+        body: JSON.stringify({ sha: String(commit.sha), force: false }),
+      });
+
+      return json({
+        ok: true,
+        commit: String(commit.sha),
+        short: String(commit.sha).slice(0, 8),
+        reverted: h.commitSha.slice(0, 8),
+        path,
+        user_must_reload: true,
+        note: "Put back. The site rebuilds from this commit, which takes about a minute, and " +
+              "only then does a reload show it. Tell the user in those words.",
+      }, 200, cors);
+    } catch (e) {
+      return json({ error: String((e as Error).message || e) }, 502, cors);
+    }
+  }
+
   if (action === "commit") {
     if (!mayWrite) return json({ error: "This account may not commit to the repository." }, 403, cors);
 

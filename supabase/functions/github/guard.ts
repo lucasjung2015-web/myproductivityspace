@@ -233,6 +233,55 @@ export function smokeCheck(path: string, before: string, after: string): string 
       }
     }
     if (!/<html[\s>]/i.test(after)) return "The result no longer contains an <html> tag.";
+
+    /* And then actually read it.
+     *
+     * Everything above weighs the envelope: is it the right size, is it
+     * sealed, is there paper inside. None of it opens the envelope, so a
+     * stray brace or an unterminated string sailed through and took the whole
+     * board down -- and the board is where you would have gone to fix it.
+     *
+     * This is not a correctness check and cannot be one. A bug that parses
+     * fine and does the wrong thing still ships; only running the app catches
+     * that, and nothing here runs the app. What it removes is the entire
+     * class of failure where the page does not load at all.
+     *
+     * new Function parses without executing. Deno is V8, so this is the same
+     * parser the browser will use. type="text/plain" is skipped because
+     * #tasksSubappSrc holds a whole HTML document for an iframe srcdoc and is
+     * not JavaScript -- a checker that missed that would refuse every commit,
+     * which is exactly how the <script>-balance rule above went wrong first
+     * time round. */
+    /* Both tags anchored to the start of a line, and that anchoring is
+     * load-bearing rather than tidiness. This file contains the string
+     * "<script>" inside JavaScript -- the custom-widget runtime builds an
+     * HTML document that way -- so it holds far more "<script" than
+     * "</script>". A regex that treats those as tags pairs a real opening tag
+     * with a string-embedded closing one, hands the parser a slab of markup,
+     * and refuses a perfectly good commit. It happens to work out on the
+     * current file, which is the worst kind of working: adding one more
+     * script tag anywhere re-pairs everything and it starts refusing.
+     *
+     * Every real top-level block in this document begins a line; every
+     * embedded mention is mid-line inside quotes. */
+    const re = /^[ \t]*<script([^>]*)>([\s\S]*?)^[ \t]*<\/script>/gm;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(after)) !== null) {
+      const attrs = m[1] || "", body = m[2];
+      if (/\bsrc\s*=/.test(attrs) || !body.trim()) continue;
+      const type = (attrs.match(/type\s*=\s*["']([^"']+)["']/) || [])[1];
+      if (type && !/^(text|application)\/(java|ecma)script$|^module$/i.test(type)) continue;
+      try {
+        new Function(body);
+      } catch (e) {
+        const line = after.slice(0, m.index).split("\n").length;
+        return "The JavaScript in the <script> block starting at line " + line +
+          " no longer parses: " + String((e as Error).message) + ". The commit was " +
+          "refused, because a file that does not parse takes the whole board down " +
+          "and the board is where you would go to fix it. Re-read that region with " +
+          "read_source and check the edit's brackets, quotes and template literals.";
+      }
+    }
   }
   return null;
 }

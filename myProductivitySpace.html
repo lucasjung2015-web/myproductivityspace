@@ -21476,8 +21476,26 @@
 
   function renderGrid() {
     rangeLabel.textContent = rangeText();
-    if (view === "month") renderMonth();
-    else renderTimeGrid();
+    /* The calendar's half of the tasks-list hook. Fired here rather than in
+       renderMonth and renderTimeGrid separately, so day, week and month all
+       get it from one place and cannot drift apart.
+
+       `events` is swapped and restored around this call by renderCalendarInto,
+       so a handler always sees the rows belonging to the widget being drawn.
+       Restored in a finally: a filter must never outlive the render it was
+       for, or the next widget draws someone else's filtered list. */
+    const savedEvents = events;
+    if (window.__mpsRunHook) {
+      const ctx = { widgetId: gridWidgetId || "cal", view: view, items: events.slice() };
+      try {
+        window.__mpsRunHook("calendar-events", ctx);
+        if (Array.isArray(ctx.items)) events = ctx.items;
+      } catch (e) { console.warn("[mps] calendar-events hook failed:", e); }
+    }
+    try {
+      if (view === "month") renderMonth();
+      else renderTimeGrid();
+    } finally { events = savedEvents; }
   }
 
   /* Draw the calendar as some OTHER widget, then put everything back.
@@ -31169,6 +31187,20 @@
       }
     },
     {
+      name: "revert_source",
+      description: "Undo YOUR OWN last source commit, by committing the previous version of the file back.\n" +
+        "Reach for this the moment a commit turns out to be wrong -- a feature that does not work, a mistake you spotted on re-reading, or the user saying the board is broken. Do NOT attempt a second commit to fix a broken first one: the file you would be editing IS the broken one, and a repair written against it is a guess stacked on a guess, shipped to every device. Put it back, then diagnose from a board that loads.\n" +
+        "It is a FORWARD revert, not a history rewrite: the bad commit stays in the history and stays readable, so nothing is lost by using it. It refuses if the newest commit was not made by you, so it can never undo something the user wrote by hand.\n" +
+        "Like any source change it reaches the live site about a minute later, and only then does a reload show it. Say so.",
+      input_schema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "Which file to put back. Defaults to the app file." }
+        },
+        required: []
+      }
+    },
+    {
       name: "repo_status",
       description: "Whether you can edit the app's own source, and the state of the repository it lives in.\n" +
         "Returns: whether source editing is configured at all, whether THIS account may commit, the repo and branch, the current head commit, and -- the part that matters most -- the list of things the board's owner has LOCKED. Read that list before planning any source change, so you find out something is off limits before you write it rather than after.",
@@ -31238,7 +31270,7 @@
        it. The whole patch feature had never once run. */
     list_patches: 1, read_patch: 1, write_patch: 1, delete_patch: 1,
     // And these address the app's own source file, not a widget.
-    read_source: 1, read_console: 1, repo_status: 1, commit_source: 1,
+    read_source: 1, read_console: 1, repo_status: 1, commit_source: 1, revert_source: 1,
     // And these address a connector, which is not a widget either.
     list_connectors: 1, call_connector: 1
   };
@@ -31468,6 +31500,7 @@
     delete_patch:          { label: "Removing\u2026",    target: null },
     repo_status:           { label: "Checking the repo\u2026", target: null },
     commit_source:         { label: "Editing the app\u2026",  target: null },
+    revert_source:         { label: "Putting it back\u2026",  target: null },
     list_connectors:       { label: "Checking connectors\u2026", target: null },
     call_connector:        { label: "Asking\u2026",       target: null }
   };
@@ -31870,6 +31903,15 @@
       }
 
       /* ---- the source file itself: the writable half of read_source ---- */
+      case "revert_source": {
+        const r = await githubCall({ action: "revert", path: String(input.path || APP_FILE) });
+        if (!r || !r.body) return { error: "Could not reach the source proxy." };
+        // Both caches go either way: a refused revert usually means the read
+        // was stale, and retrying against the same stale text fails the same.
+        forgetSourceCaches();
+        return r.body;
+      }
+
       case "repo_status": {
         const r = await githubCall({ action: "status" });
         if (!r || !r.body) return { error: "Could not reach the source proxy." };
@@ -32248,6 +32290,8 @@
          account one task list. Both halves of that failure are addressed
          here: it can now edit the file, and it is told in as many words not
          to promote "this app does not" into "this cannot be done". */
+      "A COMMIT IS NOW UNDOABLE, and that should change what you do when one goes wrong. revert_source puts the file back to the previous commit. If a change turns out to be broken -- the user says the board is wrong, or you re-read the edit and see the mistake -- revert FIRST and diagnose after. Never write a second commit to repair a broken first one: you would be editing the broken file, and a repair written against it is a guess stacked on a guess, shipped to every device at once. The revert is forward-only, so nothing is erased and the bad commit stays readable for working out what happened.",
+
       "AND YOU CAN NOW EDIT THE APP'S SOURCE OUTRIGHT. commit_source rewrites the real file and redeploys it, so a change made that way is permanent, applies on every device, and needs no hook to attach to. This changes what a correct answer looks like. When a request cannot be met by a patch \u2014 because the code lives in a closure, because no hook reaches it, because a value is hard-coded that should be configurable \u2014 the answer is NOT to explain the limitation and stop. It is to read the source with read_source from:'repo', write the edit, and commit it. Patches remain right for the small, the personal and the switchable; the source is right when the app itself is incomplete or wrong. If you find yourself composing a sentence like 'the real fix is on the app's own integration, which is outside what I can reach', delete it and make the fix.",
 
       "CONNECTORS ARE THE BOARD'S REACH OUTSIDE ITSELF. The user can point the board at any server speaking MCP, and list_connectors tells you which ones exist and what each can do. Check it before you tell anyone you have no way to reach something: a request that looks impossible (\u201cwhat's in my backlog\u201d, \u201chow did that ticker close\u201d) is often one connector call away. You cannot add a connector yourself \u2014 that is Connectors \u2192 Add \u2192 Add custom connector, and it needs the server's URL and usually a token, which only the user has. You can say plainly that adding one would answer the question.\n" +
@@ -34063,7 +34107,8 @@
        corrupt the real one or reach Google. A handler that throws is
        isolated and switched off by the patch runtime, and the widget draws
        what it would have drawn anyway. */
-    "tasks-list": "The Google Tasks rows a widget is about to draw. ctx: {widgetId, listId, items}. Mutate or replace ctx.items to sort, filter or hide. Fires on every render of every Tasks widget, so keep it cheap."
+    "tasks-list": "The Google Tasks rows a widget is about to draw. ctx: {widgetId, listId, items}. Mutate or replace ctx.items to sort, filter or hide. Fires on every render of every Tasks widget, so keep it cheap.",
+    "calendar-events": "The events a calendar widget is about to draw, before the grid is laid out. ctx: {widgetId, view, items}. Same contract as tasks-list: mutate or replace ctx.items to filter, hide or recolour. Fires on every render of every calendar widget, in day, week and month, so keep it cheap."
   };
 
   function noteError(name, e) {

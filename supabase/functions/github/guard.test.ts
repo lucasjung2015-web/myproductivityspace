@@ -147,10 +147,39 @@ function smoke(name: string, after: string, wantRefusal: boolean) {
   check(name, r !== null, wantRefusal, r ? "-> " + r.slice(0, 90) : "");
 }
 smoke("a small honest edit passes", src.replace("Add a task", "Add a to-do"), false);
-smoke("an unbalanced <script> is refused", src.replace("</head>", "<script>x=1;</head>"), true);
-smoke("a balanced <script> pair passes", src.replace("</head>", "<script>window.x=1;</script></head>"), false);
+/* NOT src.replace("</head>", ...). The first </head> in the file is inside
+ * #tasksSubappSrc, which holds an entire HTML document for an iframe srcdoc,
+ * so that insertion landed in the sub-app -- closing that block early and
+ * leaving the rest of its markup to be parsed as JavaScript. The browser
+ * would do the same thing, so refusing it is correct. These tests want the
+ * real document, which is what the LAST </html> reliably identifies. */
+const endOfDoc = src.lastIndexOf("</html>");
+const insertAtEnd = (frag: string) => src.slice(0, endOfDoc) + frag + src.slice(endOfDoc);
+smoke("an unbalanced <script> is refused", insertAtEnd("<script>x=1;"), true);
+smoke("a balanced <script> pair passes", insertAtEnd("<script>window.x=1;</script>"), false);
 smoke("losing half the file is refused", src.slice(0, Math.floor(src.length / 2)), true);
 smoke("emptying the file is refused", "", true);
+
+console.log("\n--- and it now opens the envelope, not just weighs it ---");
+
+// The class of failure this exists for: valid-looking, correctly sized, and
+// the page does not load.
+const brace = src.replace("  function renderTasks() {", "  function renderTasks() { {");
+smoke("a stray brace is refused", brace, true);
+
+const quote = src.replace('const TASKS_API = "https://www.googleapis.com/tasks/v1";',
+                          'const TASKS_API = "https://www.googleapis.com/tasks/v1;');
+smoke("an unterminated string is refused", quote, true);
+
+// text/plain is not JavaScript. A checker that missed this would refuse every
+// commit ever made -- the same way the <script>-balance rule did first time.
+check("the text/plain sub-app is not parsed as JS",
+  smokeCheck("myProductivitySpace.html", src, src) !== null, false);
+
+// And it must not become a correctness check by accident.
+const stillValid = src.replace("  function renderTasks() {",
+                               "  function renderTasks() {\n    const unusedButValid = 1;");
+smoke("valid code that does nothing useful still passes", stillValid, false);
 
 console.log("\n--- the real file is not already tripping anything ---");
 const noop = smokeCheck("myProductivitySpace.html", src, src);
