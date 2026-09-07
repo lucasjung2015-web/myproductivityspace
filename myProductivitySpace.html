@@ -30709,12 +30709,15 @@
      instead of an answer. A cap exists to stop a runaway loop, and the
      repeat-detector below is what actually catches those; this only needs to
      be past the length of honest work. */
-  /* 20 while the app is out with testers on subsidised credits. Each turn is
-     a billed API call carrying everything before it, so the cap is also the
-     ceiling on what one message can cost: at 60 a single runaway request ran
-     into the several-dollar range. Raise it back once usage is metered per
-     account rather than paid for centrally. */
-  const AI_MAX_TURNS = 20;
+  /* Past the length of honest work, which is the only thing this number is
+     for. It was briefly 20, to bound what one message could cost. That was a
+     mistake in both directions: real source-editing work runs past 20 turns,
+     so the loop kept hitting the cap and handing back a plan instead of a
+     result, and finishing the job then took a second request that re-paid for
+     the whole conversation. A cap that turns one run into two costs more than
+     the run it was meant to bound. The repeat-detector below is what actually
+     catches a model going in circles; this is only the backstop. */
+  const AI_MAX_TURNS = 60;
 
   function board() { return window.__aiBoard || null; }
 
@@ -33514,6 +33517,15 @@
         // the same silence this whole branch exists to prevent.
         if (!wrapText) {
           appendMessage("ai", "I ran out of tool calls on this one before I got to an answer. Ask again, or narrow it to a single widget and I'll go straight there.").classList.add("is-error");
+        } else {
+          /* Say the cap was hit even when the wrap-up wrote something. It
+             writes a summary ending in what is still left to do, which reads
+             exactly like the model deciding to stop there -- so without this
+             line, running out of turns is indistinguishable from finishing,
+             and the only symptom is that everything quietly takes two
+             prompts. Not an error: the run did real work and saved it. */
+          appendMessage("ai", "That hit the tool-call limit for one request, so it stopped partway. Say “carry on” and I'll pick up from here.")
+            .classList.add("is-note");
         }
       }
     } catch (err) {
