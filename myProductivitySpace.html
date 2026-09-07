@@ -3354,7 +3354,16 @@
     animation: ai-caret-blink 1s steps(1, end) infinite;
   }
   @keyframes ai-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
-  .ai-msg.is-error { padding: 9px 13px; border: 1px solid #d8b4b4; color: #7a2020; background: #fdf6f6; }
+  /* An issue the run hit, in the same quiet grey as the model's trace rather
+     than in a red box. Most of what lands here is a tool that returned an
+     error the model then read and worked around, so the run continued and
+     often succeeded; boxing every one of those in red made a working request
+     look like a failed one. Matches .ai-trace deliberately: same voice, same
+     weight, sitting in the log as commentary rather than as an alert. */
+  .ai-msg.is-error {
+    padding: 4px 2px; border: none; background: transparent;
+    color: #9a9a9a; font-size: 12px; line-height: 1.45;
+  }
   /* A tool that was held back by the mode rather than one that failed. Grey,
      dashed, quiet: it is a receipt, not a problem. */
   .ai-msg.is-note {
