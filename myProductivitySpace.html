@@ -12747,6 +12747,11 @@
 
     function updateTabsBarVisibility() {
       collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
+      /* On a phone the bar is filtered down to the section on screen, which
+         can leave it holding tabs but showing none of them. The mobile shell
+         owns that decision and corrects has-tabs itself; it is absent on a
+         desktop, where child count is the whole answer. */
+      if (window.__mpsFilterHiddenTabs) { try { window.__mpsFilterHiddenTabs(); } catch (e) {} }
     }
 
     // The tab shows the widget's own emoji to the left of its label; a widget
@@ -33633,18 +33638,44 @@
     });
   }
 
-  // History can only be cut at the start of a user turn: a tool_use with its
-  // tool_result sliced away is a request the API rejects.
+  /* History can only be cut at the start of a user turn: a tool_use with its
+     tool_result sliced away is a request the API rejects.
+
+     This used to shift one message and then keep shifting until the front was
+     a user turn, which is fine right up until there is no later user turn to
+     find. One long agentic run is exactly that shape: a single user turn
+     followed by sixty pairs of assistant tool_use and user tool_result. Past
+     CHAT_MAX_MESSAGES the inner loop then walked off the end and emptied the
+     array outright, and the next tool_result pushed became messages[0] with
+     nothing to pair against:
+
+       messages.0.content.0: unexpected `tool_use_id` found in `tool_result`
+       blocks ... must have a corresponding `tool_use` block
+
+     So: find a real cut point first and splice to it, and when there isn't
+     one, leave the history alone. An over-long request is recoverable; a
+     malformed one is not. */
   function trimMessages() {
     while (messages.length > CHAT_MAX_MESSAGES) {
-      messages.shift();
-      while (messages.length && !isUserTurn(messages[0])) messages.shift();
+      let cut = -1;
+      for (let i = 1; i < messages.length; i++) {
+        if (isUserTurn(messages[i])) { cut = i; break; }
+      }
+      if (cut === -1) return;
+      messages.splice(0, cut);
     }
   }
 
   function saveCurrentChat() {
     if (!currentChatId) return;
-    trimMessages();
+    /* Never mid-run. This is called once per turn from inside the tool loop,
+       at the one moment the array is legitimately a single user turn followed
+       by a long chain of tool_use/tool_result pairs, which is the exact shape
+       that has no safe cut point. Trimming belongs between requests, where
+       aiBusy is false: at send (before setBusy(true)) and in the finally
+       (after setBusy(false)). Saving still happens every turn either way, so
+       an interrupted run loses nothing. */
+    if (!aiBusy) trimMessages();
     const entry = chatIndexEntry(currentChatId);
     if (entry) entry.updatedAt = Date.now();
     chats.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
@@ -34697,7 +34728,56 @@
     Array.prototype.forEach.call(dots.children, function (d, n) {
       d.classList.toggle("is-current", n === i);
     });
+    filterTabs();
   }
+
+  /* The collapsed-tabs bar is one global list of everything hidden on the
+     board. That reads correctly on a desktop, where the whole board is one
+     page, and wrongly on a phone, where it would offer you widgets belonging
+     to sections three swipes away. Filtered to the section on screen, the bar
+     answers "what is hidden HERE", which is the question you are asking while
+     looking at it.
+
+     The exception is a widget whose entire section is hidden. Such a section
+     is display:none'd wholesale and stops being a page at all, so there is no
+     section to swipe to and no screen on which its tabs would ever qualify.
+     Those stay visible everywhere rather than becoming unreachable, which was
+     the original bug this bar was un-hidden to fix. */
+  function filterTabs() {
+    const bar = document.getElementById("collapsedTabsBar");
+    if (!bar) return;
+    const mobile = isMobile();
+    const slot = mobile ? slots()[current] : null;
+
+    let here = null;
+    if (slot) {
+      here = Object.create(null);
+      Array.prototype.forEach.call(slot.querySelectorAll("[data-col-id]"), function (el) {
+        here[el.getAttribute("data-col-id")] = true;
+      });
+    }
+
+    let shown = 0;
+    Array.prototype.forEach.call(bar.children, function (tab) {
+      const id = String(tab.id || "").replace(/Strip$/, "");
+      let visible = true;
+      if (here && id) {
+        // Fails open: a custom widget id that will not survive a CSS selector
+        // should leave its tab reachable, not swallow it.
+        let own = null;
+        try {
+          const el = grid.querySelector('[data-col-id="' + id + '"]');
+          own = el && el.closest ? el.closest(".col-slot") : null;
+        } catch (e) { own = null; }
+        const orphaned = !own || own.style.display === "none";
+        visible = !!here[id] || orphaned;
+      }
+      tab.hidden = !visible;
+      if (visible) shown++;
+    });
+    bar.classList.toggle("has-tabs", shown > 0);
+  }
+  window.__mpsFilterHiddenTabs = filterTabs;
 
   function build() {
     if (observer) { observer.disconnect(); observer = null; }
@@ -34705,6 +34785,9 @@
     const list = slots();
     if (!isMobile() || list.length < 1) {
       dots.hidden = true;
+      // Also the path taken when force-desktop is switched on mid-session, so
+      // any per-section filtering left over from the phone layout is undone.
+      filterTabs();
       return;
     }
     list.forEach(function () {
