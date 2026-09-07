@@ -22,7 +22,7 @@ const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
      supabase secrets set AI_MODEL=claude-sonnet-5
    The page sends the same values; these are what make it binding. */
 const MODEL = Deno.env.get("AI_MODEL") ?? "claude-sonnet-5";
-const MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") ?? "8192");
+const MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") ?? "32000");
 
 // The board is served from one origin; echo it back rather than using "*",
 // since these requests carry an Authorization header.
