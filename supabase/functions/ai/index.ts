@@ -17,6 +17,13 @@
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
+/* Pinned here rather than trusted from the request body. Overridable by env
+   so the model can be changed without a code edit:
+     supabase secrets set AI_MODEL=claude-sonnet-5
+   The page sends the same values; these are what make it binding. */
+const MODEL = Deno.env.get("AI_MODEL") ?? "claude-sonnet-5";
+const MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") ?? "8192");
+
 // The board is served from one origin; echo it back rather than using "*",
 // since these requests carry an Authorization header.
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
@@ -56,7 +63,19 @@ Deno.serve(async (req) => {
 
   let body: string;
   try {
-    body = JSON.stringify(await req.json());
+    const payload = await req.json();
+
+    /* The model and the output ceiling are decided HERE, not in the page.
+       Everything this function forwards arrives from a browser, so until now
+       a tester with devtools open could set `model` to a five-times-pricier
+       one and `max_tokens` to 128000 and spend against the account at will.
+       The invite gate stops strangers; it does not stop a curious friend.
+       While the credits are subsidised these two are pinned server-side and
+       whatever the client asked for is discarded. */
+    payload.model = MODEL;
+    payload.max_tokens = Math.min(Number(payload.max_tokens) || MAX_TOKENS, MAX_TOKENS);
+
+    body = JSON.stringify(payload);
   } catch {
     return new Response(JSON.stringify({ error: { message: "Invalid JSON body." } }), {
       status: 400,

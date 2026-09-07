@@ -30699,7 +30699,12 @@
      instead of an answer. A cap exists to stop a runaway loop, and the
      repeat-detector below is what actually catches those; this only needs to
      be past the length of honest work. */
-  const AI_MAX_TURNS = 60;
+  /* 20 while the app is out with testers on subsidised credits. Each turn is
+     a billed API call carrying everything before it, so the cap is also the
+     ceiling on what one message can cost: at 60 a single runaway request ran
+     into the several-dollar range. Raise it back once usage is metered per
+     account rather than paid for centrally. */
+  const AI_MAX_TURNS = 20;
 
   function board() { return window.__aiBoard || null; }
 
@@ -32541,7 +32546,23 @@
     }
   }
 
-  function systemPrompt() {
+  /* The volatile half of what the model needs: the clock, the connectors, and
+     the board as it stands. Deliberately NOT part of the system prompt any
+     more. Prompt caching is a prefix match, and this text changes every
+     minute; with it sitting near the top of `system`, the ~20K of tool
+     definitions and rules behind it could never be cached, so every turn of
+     every agentic loop paid full input price to re-process all of it. It
+     rides on the user's message instead, which leaves the whole system prefix
+     byte-identical from one request to the next and lets the growing
+     conversation cache as well.
+
+     Snapshotted once per user message rather than rebuilt per turn: the model
+     learns about anything it changes mid-loop from the tool results it gets
+     back, and list_widgets re-reads the board whenever it needs certainty. */
+  const BOARD_STATE_OPEN = "<board-state>";
+  const BOARD_STATE_CLOSE = "</board-state>";
+
+  function boardStateBlock() {
     const b = board();
     const widgets = b ? b.list() : [];
     const presets = b ? b.colorPresets().map(function (p) { return p.name; }).join(", ") : "";
@@ -32558,9 +32579,7 @@
     const notion = window.__mpsNotionLibrary ? "available" : "not connected";
 
     return [
-      "You are myProductivitySpace AI, the assistant built into a single-page personal dashboard.",
-      "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
-      "RULE: nothing about any widget is fixed. Its contents, its settings, and its appearance \u2014 fonts, weights, colours, spacing, what is shown or hidden \u2014 can all be changed with your tools, built-in widgets included. Never reply that a widget's rendering or styling cannot be changed. When asked to change how something looks: call read_widget (its dom_outline lists the elements and class names), then inspect_widget with a selector to see the rules applied, then set_widget_style with the override. Do this before you say anything else.",
+      BOARD_STATE_OPEN,
       "Today is " + today + " (local time " + now.toTimeString().slice(0, 5) + "). Google Calendar/Tasks: " + google + ". Notion: " + notion + ".",
       "",
       "Current widgets on the board (id \u2014 title, type, size):",
@@ -32575,6 +32594,22 @@
       "",
       "Colour presets: " + presets + ".",
       focus,
+      BOARD_STATE_CLOSE
+    ].join("\n");
+  }
+
+  /* Byte-stable for the life of the page: no clock, no board, nothing that
+     varies per request except the mode paragraph near the bottom (three
+     possible values, so three cache entries, each staying warm for as long as
+     the user stays in that mode). This is what carries the cache breakpoint,
+     and every edit to it should keep that in mind: interpolate anything
+     time- or board-dependent in here and the cache silently stops paying. */
+  function systemPrompt() {
+    return [
+      "You are myProductivitySpace AI, the assistant built into a single-page personal dashboard.",
+      "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
+      "RULE: nothing about any widget is fixed. Its contents, its settings, and its appearance \u2014 fonts, weights, colours, spacing, what is shown or hidden \u2014 can all be changed with your tools, built-in widgets included. Never reply that a widget's rendering or styling cannot be changed. When asked to change how something looks: call read_widget (its dom_outline lists the elements and class names), then inspect_widget with a selector to see the rules applied, then set_widget_style with the override. Do this before you say anything else.",
+      "The date, the local time, the connector status and the current contents of the board are given to you in a " + BOARD_STATE_OPEN + " block attached to the user's message. Read it there rather than asking for it. It is a snapshot taken when they hit send, so once you have changed the board yourself, trust your own tool results over it, and call list_widgets when you need to be certain.",
       "",
       "How to work: read before you edit \u2014 read_widget, list_tasks or list_events give you the ids that edit tools need. " +
       "A widget's `instructions` line is the user's standing preference for it: follow it on every edit to that widget, and when the user describes how a widget should behave from now on, record it with set_widget_instructions. " +
@@ -32687,11 +32722,27 @@
         // cut off mid-JSON arrives as input {} and fails silently.
         max_tokens: 8192,
         stream: true,
-        system: systemPrompt(),
-        // Omitted entirely on the wrap-up turn: with no tools on the table
-        // the model has nothing to do but write the answer, which is the
-        // whole point of that last call. JSON.stringify drops the key.
-        tools: opts && opts.noTools ? undefined : AI_TOOLS,
+        /* Top-level cache_control is automatic caching: the breakpoint lands
+           on the last cacheable block and walks forward as the conversation
+           grows, which is what makes the history of a long agentic loop cheap
+           to resend. It costs one of the four breakpoint slots. */
+        cache_control: { type: "ephemeral" },
+        /* The explicit one. Render order is tools -> system -> messages, so a
+           breakpoint on the last system block covers the ~15K of tool
+           definitions as well as the rules text, and it is a guaranteed read
+           point that survives whatever happens later in `messages`. Cache
+           reads bill at a tenth of the input rate; a 5-minute entry is
+           refreshed by every read, so an active session keeps it warm. */
+        system: [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }],
+        /* The wrap-up turn used to omit `tools` entirely. Same intent, wrong
+           mechanism now: tools render AHEAD of `system` in the prompt, so
+           dropping them changes the cached prefix and the last turn of every
+           request would re-process the entire conversation at full price.
+           tool_choice "none" takes them off the table while leaving the
+           bytes byte-identical, so the wrap-up reads the cache like any
+           other turn. Both values cost the same tool-use system prompt. */
+        tools: AI_TOOLS,
+        tool_choice: opts && opts.noTools ? { type: "none" } : { type: "auto" },
         messages: apiMessages
       })
     });
@@ -32723,6 +32774,20 @@
 
     function onEvent(ev) {
       if (!ev || !ev.type) return;
+      /* The only way to know whether caching is actually working. A cache
+         that has been silently invalidated looks exactly like a cache that
+         is working -- same replies, same speed, just a bigger bill -- so the
+         numbers go to the console every turn. `read` at zero on turn two or
+         later means something time- or board-dependent has crept back into
+         the system prompt or the tool list and the prefix no longer matches.
+         The AI panel can read this itself with read_console. */
+      if (ev.type === "message_start") {
+        const u = (ev.message && ev.message.usage) || {};
+        console.log("[mps ai] tokens in=" + (u.input_tokens || 0) +
+                    " cache_write=" + (u.cache_creation_input_tokens || 0) +
+                    " cache_read=" + (u.cache_read_input_tokens || 0));
+        return;
+      }
       if (ev.type === "content_block_start") {
         const cb = ev.content_block || {};
         blocks[ev.index] = cb.type === "tool_use"
@@ -33077,13 +33142,15 @@
       } catch (e) {}
     }
 
-    /* A plain string while there is nothing attached: that is the shape the
-       rest of this file (trimMessages, maybeTitleChat) already keys off, and
-       there is no reason to make every text-only turn pay for the block form. */
-    let content = clean;
+    /* Always the block form now, because every user turn carries the
+       <board-state> snapshot ahead of what the user actually typed. The
+       string shape used to be the signal for "a real user turn" in
+       trimMessages, openChat and userTextOf; isUserTurn() is that signal
+       now, and it still recognises the string form so chats saved before
+       this change keep working. */
+    let content = [{ type: "text", text: boardStateBlock() }];
+    if (clean) content.push({ type: "text", text: clean });
     if (files.length) {
-      content = [];
-      if (clean) content.push({ type: "text", text: clean });
       files.forEach(function (a) {
         if (a.kind === "image") {
           content.push({ type: "image", source: { type: "base64", media_type: a.mediaType, data: a.data } });
@@ -33397,12 +33464,27 @@
     renderSidebar();
   }
 
-  // History can only be cut at a user message that is plain text: a
-  // tool_use with its tool_result sliced away is a request the API rejects.
+  /* A real user turn, as against the block-shaped user messages the loop
+     itself pushes: tool_result batches, and the out-of-turns nudge. This used
+     to be `typeof m.content === "string"` at every call site, which stopped
+     being true the moment user turns started carrying a <board-state> block.
+     The marker is the signal now; the string form is still accepted so chats
+     saved before that change still trim, reopen and title correctly. */
+  function isUserTurn(m) {
+    if (!m || m.role !== "user") return false;
+    if (typeof m.content === "string") return true;
+    if (!Array.isArray(m.content)) return false;
+    return m.content.some(function (b) {
+      return b.type === "text" && typeof b.text === "string" && b.text.indexOf(BOARD_STATE_OPEN) === 0;
+    });
+  }
+
+  // History can only be cut at the start of a user turn: a tool_use with its
+  // tool_result sliced away is a request the API rejects.
   function trimMessages() {
     while (messages.length > CHAT_MAX_MESSAGES) {
       messages.shift();
-      while (messages.length && !(messages[0].role === "user" && typeof messages[0].content === "string")) messages.shift();
+      while (messages.length && !isUserTurn(messages[0])) messages.shift();
     }
   }
 
@@ -33430,18 +33512,29 @@
       return { role: m.role, content: m.content.map(function (b) {
         if (b.type === "image") return { type: "text", text: "[an image was attached here; it is no longer in context]" };
         if (b.type === "document") return { type: "text", text: "[a PDF was attached here; it is no longer in context]" };
+        /* Keep the marker, drop the body. isUserTurn still recognises the
+           turn on reopen, but a stored chat does not carry one copy of the
+           whole widget list per message -- which on a busy board is most of
+           what the chat would weigh in storage. */
+        if (b.type === "text" && b.text && b.text.indexOf(BOARD_STATE_OPEN) === 0) {
+          return { type: "text", text: BOARD_STATE_OPEN + "\n(snapshot from that turn, not kept in history)\n" + BOARD_STATE_CLOSE };
+        }
         return b;
       }) };
     });
   }
 
-  // The first user message as plain text, whichever shape it took.
+  /* A user message as plain text, whichever shape it took, with the
+     <board-state> snapshot left out: it is context for the model, not
+     something the user said, and letting it through would put the widget
+     list into the chat title and into the reopened transcript. */
   function userTextOf(m) {
     if (!m) return "";
     if (typeof m.content === "string") return m.content;
     if (!Array.isArray(m.content)) return "";
-    return m.content.filter(function (b) { return b.type === "text" && b.text; })
-                    .map(function (b) { return b.text; }).join(" ");
+    return m.content.filter(function (b) {
+      return b.type === "text" && b.text && b.text.indexOf(BOARD_STATE_OPEN) !== 0;
+    }).map(function (b) { return b.text; }).join(" ");
   }
 
   /* One tiny non-streaming call names the chat after its first exchange --
@@ -33508,7 +33601,9 @@
     // model's prose. Tool calls and their results are what the model said
     // to the board, not to the user, and were never shown live either.
     messages.forEach(function (m) {
-      if (m.role === "user" && typeof m.content === "string") { appendMessage("user", m.content); return; }
+      // userTextOf strips the <board-state> block, so the bubble shows what
+      // the user typed and not the snapshot that rode along with it.
+      if (isUserTurn(m)) { const t = userTextOf(m); if (t) appendMessage("user", t); return; }
       if (m.role === "assistant" && Array.isArray(m.content)) {
         m.content.forEach(function (b) {
           if (b.type === "text" && b.text && b.text !== "(no response)") setBubbleMarkdown(appendMessage("ai", ""), b.text);
