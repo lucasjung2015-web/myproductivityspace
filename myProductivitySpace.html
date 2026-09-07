@@ -3512,6 +3512,16 @@
   }
   .ai-thinking i:nth-child(2) { animation-delay: 0.14s; }
   .ai-thinking i:nth-child(3) { animation-delay: 0.28s; }
+  /* The model's reasoning while it works, and the tool labels between.
+     Deliberately quiet: it is a progress signal, not part of the reply, and
+     it is replaced by the reply the instant real text arrives. Clamped to
+     three lines so a long stretch of reasoning cannot push the composer off
+     screen; it scrolls itself as new text lands. */
+  .ai-trace {
+    display: block; color: #9a9a9a; font-size: 12px; line-height: 1.45;
+    white-space: pre-wrap; overflow: hidden; max-height: 3.9em;
+  }
+  .ai-trace.is-tool { color: #8a8a8a; font-style: italic; }
   @keyframes ai-bounce {
     0%, 70%, 100% { transform: translateY(0); opacity: 0.45; }
     35%           { transform: translateY(-4px); opacity: 1; }
@@ -32689,7 +32699,7 @@
      blocks are accumulated (their input arrives as a stream of JSON fragments
      and is only parseable once the block closes) and returned for the caller
      to execute. */
-  async function streamTurn(apiMessages, onText, onToolStart, opts) {
+  async function streamTurn(apiMessages, onText, onToolStart, opts, onThinking) {
     // The proxy authenticates the CALLER, not Anthropic — it holds the real
     // key itself. getSession() (behind token()) refreshes an access token
     // that is near expiry, which is what keeps a long-lived tab authorised.
@@ -32734,6 +32744,18 @@
            so a high ceiling carries no timeout risk and bills nothing unless
            it is actually used. */
         max_tokens: 32000,
+        /* Sonnet 5 runs adaptive thinking whether or not you ask for it, and
+           since Sonnet 4.6 the display default flipped to "omitted", so the
+           panel was generating reasoning, being billed for it, and receiving
+           empty strings. "summarized" returns readable text for the same
+           money: display controls visibility only, the thinking happens and
+           bills identically either way. It is what fills the status line
+           while the model is working instead of leaving three dots.
+           (`display: "updates"`, the short between-tool progress notes, is
+           Fable-only and not available on this model.)
+           Note that thinking counts against max_tokens, which is part of why
+           8192 was too tight above. */
+        thinking: { type: "adaptive", display: "summarized" },
         stream: true,
         /* Top-level cache_control is automatic caching: the breakpoint lands
            on the last cacheable block and walks forward as the conversation
@@ -32803,8 +32825,14 @@
       }
       if (ev.type === "content_block_start") {
         const cb = ev.content_block || {};
+        /* A thinking block carries a `signature` alongside its text. Keep it:
+           the block goes back into history on the next turn, and the pair is
+           what the API verifies. Renaming or dropping either half is what
+           breaks a replayed turn. */
         blocks[ev.index] = cb.type === "tool_use"
           ? { type: "tool_use", id: cb.id, name: cb.name, _json: "", input: {} }
+          : cb.type === "thinking"
+          ? { type: "thinking", thinking: cb.thinking || "", signature: cb.signature || "" }
           : { type: "text", text: "" };
         if (cb.type === "tool_use" && onToolStart) { try { onToolStart(cb.name); } catch (e) {} }
       } else if (ev.type === "content_block_delta") {
@@ -32813,6 +32841,11 @@
         if (!blk) return;
         if (d.type === "text_delta") { blk.text += d.text; onText(d.text); }
         else if (d.type === "input_json_delta") { blk._json += d.partial_json || ""; }
+        else if (d.type === "thinking_delta") {
+          blk.thinking += d.thinking || "";
+          if (onThinking) { try { onThinking(blk.thinking); } catch (e) {} }
+        }
+        else if (d.type === "signature_delta") { blk.signature += d.signature || ""; }
       } else if (ev.type === "content_block_stop") {
         const blk = blocks[ev.index];
         if (blk && blk.type === "tool_use") {
@@ -33034,6 +33067,47 @@
     return b;
   }
 
+  /* Show what the model is doing inside the waiting bubble, so a long turn
+     reads as progress rather than as a hang. Two sources feed the same line:
+     the summarized reasoning as it streams, and the tool labels between
+     those stretches. The dots stay until there is something to say, and the
+     whole line is discarded the moment the reply itself starts arriving.
+
+     This is also what makes the stop button usable. A tester who can see the
+     model heading somewhere wrong can stop it, and on subsidised credits a
+     turn not taken is the cheapest turn there is. */
+  /* Back to bare dots. Called when a placeholder is reused for the next turn,
+     so last turn's tool label does not sit there looking like this turn's. */
+  function resetTrace(bubble) {
+    if (!bubble) return;
+    const line = bubble.querySelector(".ai-trace");
+    if (!line) return;
+    line.remove();
+    if (!bubble.querySelector(".ai-thinking")) {
+      const dots = el("span", "ai-thinking");
+      dots.innerHTML = "<i></i><i></i><i></i>";
+      bubble.appendChild(dots);
+    }
+  }
+
+  function setTrace(bubble, text, isTool) {
+    if (!bubble) return;
+    const t = String(text || "").trim();
+    if (!t) return;
+    let line = bubble.querySelector(".ai-trace");
+    if (!line) {
+      const dots = bubble.querySelector(".ai-thinking");
+      if (dots) dots.remove();
+      line = el("span", "ai-trace");
+      bubble.appendChild(line);
+    }
+    line.classList.toggle("is-tool", !!isTool);
+    line.textContent = t;
+    // Keep the newest words visible rather than the start of a long thought.
+    line.scrollTop = line.scrollHeight;
+    scrollLog();
+  }
+
   // A plain-language receipt for the log. The model narrates in its own words
   // too; this line is the part that says an edit definitely landed.
   function describeTool(name, input, result) {
@@ -33220,14 +33294,19 @@
           scrollLog();
         }, function (toolName) {
           /* The model has started writing a tool call. Its input may be
-             seconds away -- a whole word bank, a widget's code -- and until
-             it lands the log shows only dots. The fog can start now for the
-             tools whose target is known without the input (the Google
-             widgets); it is the "working, here" signal, on the widget
-             rather than as a step in the chat. */
+             seconds away -- a whole word bank, a widget's code -- so the
+             label goes up now. The fog can start now too for the tools whose
+             target is known without the input (the Google widgets); it is
+             the "working, here" signal on the widget, while the trace line
+             is the same signal in the chat. */
           const ui = TOOL_UI[toolName] || {};
+          if (ui.label) setTrace(placeholder, ui.label, true);
           const early = resolveTarget(ui, {});
           if (early) startFog(early, ui.label);
+        }, null, function (thought) {
+          // Summarized reasoning, streaming. Only while the bubble is still
+          // a placeholder: once the reply starts, the reply owns the bubble.
+          if (!bubble) setTrace(placeholder, thought, false);
         });
         stopFog();
 
@@ -33247,11 +33326,20 @@
         // keeps the live render (which does want the block, empty or not,
         // as the anchor the first delta attaches to) unaffected.
         let assistantContent = result.blocks
-          .filter(function (b) { return b.type === "tool_use" || b.text; })
+          .filter(function (b) {
+            if (b.type === "tool_use") return true;
+            /* A thinking block goes back into history with its signature
+               intact. The two halves are verified as a pair when the turn is
+               replayed alongside its tool_result, so dropping either one, or
+               flattening the block into text, breaks the next request rather
+               than merely losing the reasoning. */
+            if (b.type === "thinking") return !!(b.thinking || b.signature);
+            return !!b.text;
+          })
           .map(function (b) {
-            return b.type === "tool_use"
-              ? { type: "tool_use", id: b.id, name: b.name, input: b.input }
-              : { type: "text", text: b.text };
+            if (b.type === "tool_use") return { type: "tool_use", id: b.id, name: b.name, input: b.input };
+            if (b.type === "thinking") return { type: "thinking", thinking: b.thinking, signature: b.signature };
+            return { type: "text", text: b.text };
           });
         // The API rejects an empty content array outright, same as it
         // rejects an empty text block -- a turn that came back as neither
@@ -33390,7 +33478,7 @@
         // original dots never became a bubble and are still in the log --
         // MOVE them to the bottom rather than adding a second set, or a
         // tool-only turn leaves a spinner stranded above the reply forever.
-        if (placeholder && placeholder.parentNode) { aiLog.appendChild(placeholder); scrollLog(); }
+        if (placeholder && placeholder.parentNode) { resetTrace(placeholder); aiLog.appendChild(placeholder); scrollLog(); }
         else placeholder = appendThinking();
       }
 
@@ -33522,7 +33610,13 @@
   function persistableMessages() {
     return messages.map(function (m) {
       if (typeof m.content === "string" || !Array.isArray(m.content)) return m;
-      return { role: m.role, content: m.content.map(function (b) {
+      return { role: m.role, content: m.content.filter(function (b) {
+        /* Thinking blocks are dropped on save rather than stubbed. They are
+           bulky, they are of no use to a reopened transcript, and a stub
+           would carry a signature that no longer verifies, which is worse
+           than not sending one at all. */
+        return b.type !== "thinking";
+      }).map(function (b) {
         if (b.type === "image") return { type: "text", text: "[an image was attached here; it is no longer in context]" };
         if (b.type === "document") return { type: "text", text: "[a PDF was attached here; it is no longer in context]" };
         /* Keep the marker, drop the body. isUserTurn still recognises the
