@@ -4082,10 +4082,18 @@
 
     /* Five 28px buttons 6px apart spanned 176px of a 375px screen, below both
        the size and the spacing minimum, and sat at z-index 3000 -- ON TOP of
-       the full-screen AI panel. They collapse into one 44pt control. */
+       the full-screen AI panel. Two of them stay gone: always-on-top is a
+       desktop window mode a phone has no equivalent of, and Connections is a
+       setup screen you do once, from a laptop.
+
+       The "+" came back. It is not a convenience like those two -- it is the
+       only way to put a widget on the board at all, so hiding it here meant a
+       phone could rearrange, rename, hide and delete widgets but never add
+       one. It sits left of the view toggle, the same slot it occupies on the
+       desktop row, so the two layouts order the chrome the same way. */
     html:not(.force-desktop) #alwaysOnTopBtn,
-    html:not(.force-desktop) #connectionsBtn,
-    html:not(.force-desktop) #addWidgetBtn { display: none; }
+    html:not(.force-desktop) #connectionsBtn { display: none; }
+    html:not(.force-desktop) #addWidgetBtn,
     html:not(.force-desktop) #aiPanelBtn,
     html:not(.force-desktop) #profileBtn {
       top: calc(6px + env(safe-area-inset-top));
@@ -4094,6 +4102,66 @@
     }
     html:not(.force-desktop) #aiPanelBtn { right: calc(52px + env(safe-area-inset-right)); }
     html:not(.force-desktop) #profileBtn { right: calc(6px + env(safe-area-inset-right)); }
+    /* The view toggle's right edge is 104px and it is 86px wide, so its LEFT
+       edge is at 190px. 194px clears it by 4. The desktop `right` on this
+       button is wrapped in var(--ai-panel-w) for the docked sidebar, which
+       does not exist on a phone -- the panel is full screen here -- so the
+       offset is a plain number and the !important is what beats it. */
+    html:not(.force-desktop) #addWidgetBtn {
+      right: calc(194px + env(safe-area-inset-right)) !important;
+      opacity: 1;
+    }
+    /* The wordmark is the only thing to the left of the row, and at 21px it
+       measures 206px -- more than the ~140px a 390px portrait screen has left
+       once four controls have taken the right side. It already overran the
+       view toggle before the "+" existed; the "+" moves the wall 50px further
+       in. So it is bounded here and allowed to truncate, because text sliding
+       underneath a button is a state nothing recovers from, while a clipped
+       name is still the name.
+
+       The 250px is the controls plus their gaps: 6 + 44 + 2 + 44 + 8 + 86 +
+       5 + 44 = 239, plus a 11px breathing gap before the text.
+
+       The ellipsis has to live on .pt-accent, not here. .page-title is a flex
+       row of three spans, and text-overflow on a flex CONTAINER does nothing
+       -- the container has no text of its own, so it would clip mid-glyph
+       with no mark. Pinning the first two spans and letting the last one be
+       the only shrinkable item puts the ellipsis at the end of the word,
+       which is where a reader expects it: "myProductivity…". In landscape
+       there is 624px of room and none of this engages. */
+    html:not(.force-desktop) .page-title,
+    html:not(.force-desktop) .ag-wordmark {
+      max-width: calc(100% - 250px - env(safe-area-inset-right));
+      overflow: hidden; white-space: nowrap;
+    }
+    html:not(.force-desktop) .page-title .pt-prefix,
+    html:not(.force-desktop) .page-title .pt-main,
+    html:not(.force-desktop) .ag-wordmark .pt-prefix,
+    html:not(.force-desktop) .ag-wordmark .pt-main { flex: 0 0 auto; }
+    html:not(.force-desktop) .page-title .pt-accent,
+    html:not(.force-desktop) .ag-wordmark .pt-accent {
+      flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* On the narrowest phones the 21px mark is 206px against a 112px budget,
+       so the clip lands inside "Productivity" and the mark reads
+       "myProductiv". Board view already drops the wordmark to 15px for its
+       own reasons; widget view borrows that size below 460px, where 15px puts
+       the clip in the last word instead -- "myProductivitySpa…", which still
+       reads as the name. Above 460px, and in every landscape orientation,
+       there is room for the mark at full size and none of this applies. */
+    @media (max-width: 460px) {
+      html:not(.force-desktop) .page-title .pt-main,
+      html:not(.force-desktop) .page-title .pt-accent,
+      html:not(.force-desktop) .ag-wordmark .pt-main,
+      html:not(.force-desktop) .ag-wordmark .pt-accent { font-size: 15px; }
+      html:not(.force-desktop) .page-title .pt-prefix,
+      html:not(.force-desktop) .ag-wordmark .pt-prefix { font-size: 9px; }
+    }
+    /* Same three states that already retire the view toggle. A "+" over a
+       full-screen AI panel, or during a move, adds a widget to a board you
+       cannot see. */
+    html.mob-moving:not(.force-desktop) #addWidgetBtn,
+    html.ai-panel-open:not(.force-desktop) #addWidgetBtn { display: none !important; }
 
     /* ---------- 2. the bottom chrome ----------
        The section-name bar is gone. It labelled each page with the first
@@ -4198,6 +4266,7 @@
     html:not(.force-desktop) .icon-popover,
     html:not(.force-desktop) .color-popover,
     html:not(.force-desktop) .list-config-popover,
+    html:not(.force-desktop) .add-widget-popup,
     html:not(.force-desktop) .cal-createpanel.as-menu,
     html:not(.force-desktop) .cal-viewtoggle-menu,
     html:not(.force-desktop) .mps-menu,
@@ -4217,6 +4286,7 @@
     html:not(.force-desktop) .icon-popover::before,
     html:not(.force-desktop) .color-popover::before,
     html:not(.force-desktop) .list-config-popover::before,
+    html:not(.force-desktop) .add-widget-popup::before,
     html:not(.force-desktop) #profileMenu::before {
       content: ""; display: block; width: 38px; height: 5px; border-radius: 999px;
       background: #d0d0d0; margin: 8px auto 10px;
@@ -4230,6 +4300,34 @@
       border-radius: 18px 18px 0 0;
       padding-bottom: calc(14px + env(safe-area-inset-bottom));
     }
+
+    /* Left and right only, deliberately not the `padding` shorthand: the
+       sheet rule above sets a padding-bottom carrying env(safe-area-inset-
+       bottom), and a shorthand here would quietly reset it, putting the
+       bottom row of cards under the home indicator on every phone that has
+       one. */
+    html:not(.force-desktop) .add-widget-popup { padding-left: 14px; padding-right: 14px; }
+    /* The picker's grid carries a hard 208px width, which is what made it a
+       neat two-up popup hanging off a desktop corner. Inside a full-width
+       sheet that same 208px is a narrow column down one side with the rest of
+       the sheet empty, so the width comes off and the columns get counted
+       from the space instead.
+
+       Capped at 520px and centred rather than filling the sheet: left to
+       stretch, an 874px landscape screen fits eight columns and puts the
+       ninth card alone on a second row. 520px is five across, so nine cards
+       read as 5 + 4, and a 390px phone never reaches the cap and lays out as
+       a 3 x 3. Neither number is named -- auto-fit with a 92px floor derives
+       both from the width it is given. */
+    html:not(.force-desktop) .add-widget-grid {
+      width: auto; max-width: 520px; margin: 0 auto;
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+      gap: 10px;
+    }
+    /* Taller than the desktop card for the same reason every other target
+       here is: 90px of card is comfortable, and the label gets two lines
+       before it truncates so "Google Calendar" stays readable. */
+    html:not(.force-desktop) .add-widget-card { padding: 14px 8px; min-height: 92px; }
 
     /* ---------- 7. the calendar ----------
        At 26px an hour, a 30-minute event is 12px tall -- and wireEventDrag's
