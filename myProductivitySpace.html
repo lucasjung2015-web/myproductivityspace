@@ -616,6 +616,19 @@
      remembers instead of the column's own. Each column's width lives
      directly on its own element (see applyWidth() in the column-layout
      script), so it travels with the column wherever it's dragged. */
+  /* ---------- phone-only chrome, hidden everywhere by default ----------
+     Every one of these elements is in the DOM unconditionally, and their base
+     `display: none` rules used to live INSIDE the touch media query. A desktop
+     never evaluates that block, so it had no rule hiding any of them: the
+     scrim covered the whole page at z-index 3150, and the rotate hint's SVG,
+     which carries a viewBox and no size, expanded to fill the viewport.
+
+     A default-off rule has to sit where every device reads it. These are
+     deliberately un-!important so the touch query's higher-specificity rules
+     (html:not(.force-desktop) ...) still turn on what applies there. */
+  .mob-seg, .mob-chrome, .mob-menu, .mob-scrim,
+  .mob-rotate, .mob-ctl, .mob-size { display: none; }
+
   .widget {
     display: flex; flex-direction: row; align-items: stretch;
     justify-content: center;
