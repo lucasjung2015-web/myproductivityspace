@@ -4383,8 +4383,6 @@
     }
     .mob-ctl button:active { background: rgba(0,0,0,.07); color: var(--ink); }
     .mob-ctl svg { width: 18px; height: 18px; display: block; }
-    .mob-ctl .mc-grip { display: none; touch-action: none; cursor: grab; }
-    html.mob-board:not(.force-desktop) .mob-ctl .mc-grip { display: grid; }
     /* `zoom` on the grid scales EVERYTHING inside it, these controls
        included, so at a 0.2 board they render at a fifth of their size and
        become unhittable. Counter-scaled back to their real size with a
@@ -4398,9 +4396,6 @@
     html.mob-board:not(.force-desktop) .mob-size {
       transform: scale(calc(1 / var(--mob-zoom, 1)));
       transform-origin: bottom right;
-    }
-    .col.collapsible-col-wrap.mob-dragging {
-      opacity: .97; box-shadow: 0 16px 34px -10px rgba(0,0,0,.3);
     }
     .col.collapsible-col-wrap.mob-drop-target { outline: 2px solid var(--ink); outline-offset: -2px; }
 
@@ -4417,6 +4412,60 @@
     /* Everything else keeps its header, and the buttons now sit under it --
        so the body starts clear of them too. */
     html:not(.force-desktop) .col.collapsible-col-wrap .widget-body { padding-top: 36px; }
+
+    /* --- move mode ---
+       The iOS home-screen answer to a problem the six-dot grip could not
+       solve: at board-view scale a 36px handle sits on a 140px tile, so it
+       competes with the name and the ••• for a gesture you make rarely. In
+       move mode there is no handle at all and the WHOLE widget is the target,
+       which is the size the gesture actually needs. */
+    .mob-movebar { display: none; }
+    html.mob-moving:not(.force-desktop) .mob-movebar {
+      display: flex; align-items: center; gap: 10px;
+      position: fixed; left: 0; right: 0; z-index: 3300;
+      top: calc(6px + env(safe-area-inset-top));
+      margin: 0 12px; padding: 9px 10px 9px 14px; border-radius: 14px;
+      border: 1px solid var(--hair);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 0 14px 34px -12px rgba(0,0,0,.3);
+      font-size: 13.5px; color: var(--ink);
+    }
+    .mob-movebar .mm-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mob-movebar .mm-done {
+      margin-left: auto; flex: 0 0 auto; min-height: 34px; padding: 0 15px;
+      border: 0; border-radius: 999px; background: var(--ink); color: var(--bg);
+      font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    }
+    /* Everything that is not the thing you are placing gets out of the way:
+       no menus, no grips, no resize corners while a move is in progress. */
+    html.mob-moving:not(.force-desktop) .mob-ctl,
+    html.mob-moving:not(.force-desktop) .mob-size,
+    html.mob-moving:not(.force-desktop) .mob-seg { display: none !important; }
+    html.mob-moving:not(.force-desktop) .col.collapsible-col-wrap {
+      cursor: grab; touch-action: none;
+    }
+    /* The thing being moved, and the thing it would land beside. */
+    html.mob-moving .col.collapsible-col-wrap.mob-picked {
+      outline: 2px solid var(--ink); outline-offset: -2px;
+      box-shadow: 0 16px 34px -10px rgba(0,0,0,.3);
+    }
+    html.mob-moving .col.collapsible-col-wrap.mob-drop-target {
+      outline: 2px dashed var(--ink); outline-offset: -2px;
+    }
+    /* The Home-screen wobble, at a quarter of the amplitude: enough to say
+       "these are loose" without becoming the loudest thing on the board. */
+    @keyframes mob-jiggle {
+      0%, 100% { transform: rotate(-0.35deg); }
+      50%      { transform: rotate(0.35deg); }
+    }
+    html.mob-moving:not(.force-desktop) .col.collapsible-col-wrap {
+      animation: mob-jiggle 0.34s ease-in-out infinite;
+    }
+    html.mob-moving:not(.force-desktop) .col.collapsible-col-wrap.mob-picked { animation: none; }
+    @media (prefers-reduced-motion: reduce) {
+      html.mob-moving:not(.force-desktop) .col.collapsible-col-wrap { animation: none; }
+    }
 
     /* --- the anchored menu --- */
     .mob-menu { display: none; }
@@ -5067,6 +5116,10 @@
   </button>
 </div>
 
+<div class="mob-movebar" id="mobMoveBar">
+  <span class="mm-what" id="mobMoveWhat"></span>
+  <button type="button" class="mm-done" id="mobMoveDone">Done</button>
+</div>
 <div class="mob-scrim" id="mobScrim"></div>
 <div class="mob-menu" id="mobMenu" role="menu" aria-label="Widget options"></div>
 
@@ -35546,6 +35599,14 @@
 
     add("Open fullscreen", ICO.expand, function () { B.setMaximized(id); });
 
+    /* Two scopes, two menu items, so what you are about to drag is decided
+       before the drag rather than by which of two adjacent handles your thumb
+       found. Move section only when there is a section to move. */
+    add("Move widget", ICO.grip, function () { enterMove(id, "widget"); });
+    if (matesOf(id).length > 1) {
+      add("Move section", ICO.grip, function () { enterMove(id, "section"); });
+    }
+
     /* Hide is in BOTH views now. It was board-only while a hidden widget had
        no representation in widget view, which made hiding one there a door
        that locked behind you. The tab bar carries hidden widgets at its end
@@ -35559,16 +35620,7 @@
        only meant the command was missing exactly where you were most likely
        to reach for it. Shown only when the widget actually shares a slot: on
        a section of one it is Hide widget under a second name. */
-    let mates = [];
-    try {
-      const el = grid.querySelector('[data-col-id="' + id + '"]');
-      const own = el && el.closest ? el.closest(".col-slot") : null;
-      if (own) {
-        mates = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
-          return n.getAttribute("data-col-id");
-        }).filter(Boolean);
-      }
-    } catch (e) { mates = []; }
+    const mates = matesOf(id);
     if (mates.length > 1) {
       add("Hide section (" + mates.length + ")", ICO.eyeOff, function () {
         mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
@@ -35608,13 +35660,6 @@
       if (!id) return;
       const wrap = document.createElement("div");
       wrap.className = "mob-ctl";
-
-      const grip = document.createElement("button");
-      grip.type = "button";
-      grip.className = "mc-grip";
-      grip.setAttribute("aria-label", "Drag to reorder");
-      grip.innerHTML = svgIcon(ICO.grip, true);
-      wrap.appendChild(grip);
 
       const more = document.createElement("button");
       more.type = "button";
@@ -35697,56 +35742,140 @@
   grid.addEventListener("pointerup", endSize);
   grid.addEventListener("pointercancel", endSize);
 
-  /* Drag a grip to reorder the board. The move itself goes through
-     __aiLayout.arrange, so it persists and re-renders on the same path the
-     desktop drag uses -- this only decides WHICH move to ask for. */
-  let dragState = null;
-  grid.addEventListener("pointerdown", function (e) {
-    if (!isMobile() || currentView() !== "board") return;
-    const grip = e.target.closest(".mc-grip");
-    if (!grip) return;
-    e.preventDefault();
-    const el = grip.closest(".col.collapsible-col-wrap");
-    if (!el) return;
-    grid.setPointerCapture(e.pointerId);
-    dragState = { pid: e.pointerId, id: idOf(el), el: el, sx: e.clientX, sy: e.clientY, moved: false, over: null };
-  });
-  grid.addEventListener("pointermove", function (e) {
-    if (!dragState || e.pointerId !== dragState.pid) return;
-    const dx = e.clientX - dragState.sx, dy = e.clientY - dragState.sy;
-    if (!dragState.moved) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      dragState.moved = true;
-      dragState.el.classList.add("mob-dragging");
+  /* Everything sharing a slot with `id`, itself included. One widget means a
+     section of one, where "move section" and "move widget" are the same act. */
+  function matesOf(id) {
+    try {
+      const el = grid.querySelector('[data-col-id="' + id + '"]');
+      const own = el && el.closest ? el.closest(".col-slot") : null;
+      if (!own) return [id];
+      const out = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
+        return n.getAttribute("data-col-id");
+      }).filter(Boolean);
+      return out.length ? out : [id];
+    } catch (e) { return [id]; }
+  }
+
+  /* ---------- move mode ----------
+     A state, not a handle. While it is on there is nothing to aim at: the
+     whole widget is the drag target, which at board scale is a 140px object
+     instead of a 36px one. Scope is chosen from the menu beforehand, so a
+     drag never has to guess whether you meant this widget or its column. */
+  let moveState = null;
+  const moveBar = document.getElementById("mobMoveBar");
+  const moveWhat = document.getElementById("mobMoveWhat");
+  const moveDone = document.getElementById("mobMoveDone");
+
+  function enterMove(id, scope) {
+    closeMenu();
+    // You cannot place a thing you cannot see the board for, so widget view
+    // hands over to board view rather than offering a move with one widget
+    // on screen and nowhere to drop it.
+    if (currentView() !== "board") setView("board", true);
+    moveState = { id: id, scope: scope, drag: null };
+    document.documentElement.classList.add("mob-moving");
+    const n = nameFor(id);
+    if (moveWhat) {
+      moveWhat.textContent = scope === "section"
+        ? "Moving this section — drag it where you want it"
+        : "Moving " + (n.title || id) + " — drag it where you want it";
     }
-    let over = null;
+    const el = grid.querySelector('[data-col-id="' + id + '"]');
+    if (el) el.classList.add("mob-picked");
+  }
+  function exitMove() {
+    moveState = null;
+    document.documentElement.classList.remove("mob-moving");
+    Array.prototype.forEach.call(
+      grid.querySelectorAll(".mob-picked, .mob-drop-target"),
+      function (n) { n.classList.remove("mob-picked", "mob-drop-target"); }
+    );
+  }
+  if (moveDone) moveDone.addEventListener("click", exitMove);
+
+  function dropTargetAt(x, y, selfId) {
+    let hit = null;
     Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (t) {
-      if (t === dragState.el) return;
+      if (t.getAttribute("data-col-id") === selfId) return;
       const r = t.getBoundingClientRect();
-      if (e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom) over = t;
+      if (x > r.left && x < r.right && y > r.top && y < r.bottom) hit = t;
     });
-    if (dragState.over && dragState.over !== over) dragState.over.classList.remove("mob-drop-target");
-    dragState.over = over;
+    return hit;
+  }
+
+  grid.addEventListener("pointerdown", function (e) {
+    if (!moveState || !isMobile()) return;
+    const el = e.target.closest(".col.collapsible-col-wrap");
+    if (!el) return;
+    e.preventDefault();
+    grid.setPointerCapture(e.pointerId);
+    moveState.drag = { pid: e.pointerId, from: el, sx: e.clientX, sy: e.clientY, over: null, moved: false };
+    // Whatever you grab becomes the thing being moved, so you can change your
+    // mind about which widget without leaving the mode and coming back.
+    const grabbed = el.getAttribute("data-col-id");
+    if (grabbed && grabbed !== moveState.id) {
+      const prev = grid.querySelector(".mob-picked");
+      if (prev) prev.classList.remove("mob-picked");
+      moveState.id = grabbed;
+      el.classList.add("mob-picked");
+      const n = nameFor(grabbed);
+      if (moveWhat && moveState.scope !== "section") {
+        moveWhat.textContent = "Moving " + (n.title || grabbed) + " — drag it where you want it";
+      }
+    }
+  }, true);
+
+  grid.addEventListener("pointermove", function (e) {
+    if (!moveState || !moveState.drag || e.pointerId !== moveState.drag.pid) return;
+    const d = moveState.drag;
+    if (!d.moved) {
+      if (Math.abs(e.clientX - d.sx) < 8 && Math.abs(e.clientY - d.sy) < 8) return;
+      d.moved = true;
+    }
+    const over = dropTargetAt(e.clientX, e.clientY, moveState.id);
+    if (d.over && d.over !== over) d.over.classList.remove("mob-drop-target");
+    d.over = over;
     if (over) over.classList.add("mob-drop-target");
   });
-  function endDrag(e) {
-    if (!dragState || e.pointerId !== dragState.pid) return;
-    const st = dragState; dragState = null;
-    st.el.classList.remove("mob-dragging");
-    if (st.over) st.over.classList.remove("mob-drop-target");
-    if (!st.moved || !st.over || !window.__aiLayout) return;
-    const targetId = idOf(st.over);
-    if (!targetId || targetId === st.id) return;
-    // Which side depends on which way you dragged, so the widget lands where
-    // you dropped it rather than always to one side of the target.
-    const a = st.el.getBoundingClientRect(), b = st.over.getBoundingClientRect();
-    const side = (b.top > a.top || (Math.abs(b.top - a.top) < 4 && b.left > a.left))
-      ? "move_right_of" : "move_left_of";
-    try { window.__aiLayout.arrange(st.id, side, targetId); } catch (err) {}
-    rebuild();
+
+  function endMoveDrag(e) {
+    if (!moveState || !moveState.drag || e.pointerId !== moveState.drag.pid) return;
+    const d = moveState.drag;
+    moveState.drag = null;
+    if (d.over) d.over.classList.remove("mob-drop-target");
+    if (!d.moved || !d.over || !window.__aiLayout) return;
+    const targetId = d.over.getAttribute("data-col-id");
+    if (!targetId || targetId === moveState.id) return;
+    /* Which side follows the direction you dragged, so it lands where you
+       dropped it rather than always to one side of the target. */
+    const a = d.from.getBoundingClientRect(), b = d.over.getBoundingClientRect();
+    const after = b.top > a.top || (Math.abs(b.top - a.top) < 4 && b.left > a.left);
+    const verb = moveState.scope === "section"
+      ? (after ? "move_section_right_of" : "move_section_left_of")
+      : (after ? "move_right_of" : "move_left_of");
+    try { window.__aiLayout.arrange(moveState.id, verb, targetId); } catch (err) {}
+    // render() rebuilt the slots, so the picked element is gone; re-mark the
+    // widget by id and stay in the mode for the next move.
+    setTimeout(function () {
+      build();
+      const again = grid.querySelector('[data-col-id="' + moveState.id + '"]');
+      if (again) again.classList.add("mob-picked");
+    }, 60);
   }
-  grid.addEventListener("pointerup", endDrag);
-  grid.addEventListener("pointercancel", endDrag);
+  grid.addEventListener("pointerup", endMoveDrag);
+  grid.addEventListener("pointercancel", endMoveDrag);
+
+  window.__mpsMoveMode = function (id, scope) {
+    if (!id) { exitMove(); return null; }
+    enterMove(id, scope === "section" ? "section" : "widget");
+    return scope || "widget";
+  };
+
+  /* The six-dot grip and the drag handler that went with it are gone. Move
+     mode above replaced both: a 36px handle on a 140px tile competed with the
+     widget's name and the ••• for a gesture made rarely, and the two handles
+     it would have needed -- one for the widget, one for its section -- are
+     indistinguishable at board scale. The header keeps the space. */
 
   /* ---------- the two views ----------
      One class on <html> and the stylesheet does the rest: nothing is
