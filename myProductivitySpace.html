@@ -4482,6 +4482,43 @@
     html.mob-board:not(.force-desktop) .collapsed-tabs-bar .collapsible-tab-icon { font-size: 12px; }
     html.mob-board:not(.force-desktop) .collapsed-tabs-bar .collapsible-unhide svg { width: 11px; height: 11px; }
 
+    /* --- board view is landscape-first ---
+       The board is wider than it is tall, so the phone's long edge is the one
+       that matters: your board fits at roughly 0.22 in portrait and 0.47 in
+       landscape, which is the difference between seeing its shape and reading
+       it. Orientation cannot be set from code -- iOS Safari has no
+       screen.orientation.lock at all -- so the honest move is to say so once,
+       in board view, in portrait, and get out of the way. */
+    .mob-rotate { display: none; }
+    html.mob-board:not(.force-desktop) .mob-rotate {
+      display: flex; align-items: center; gap: 9px;
+      position: fixed; z-index: 3250; left: 50%; transform: translateX(-50%);
+      bottom: calc(58px + env(safe-area-inset-bottom));
+      padding: 9px 15px; border-radius: 999px;
+      border: 1px solid var(--hair);
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(18px) saturate(180%);
+      box-shadow: 0 12px 28px -10px rgba(0,0,0,.3);
+      font-size: 12.5px; color: var(--ink); white-space: nowrap;
+      animation: mob-rotate-in .32s cubic-bezier(.22,1,.36,1);
+    }
+    /* Landscape is the state it is asking for, so in landscape it is not a
+       hint, it is clutter. */
+    @media (orientation: landscape) { html.mob-board .mob-rotate { display: none !important; } }
+    html.mob-moving .mob-rotate { display: none !important; }
+    .mob-rotate svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-soft); }
+    .mob-rotate button {
+      margin-left: 2px; width: 26px; height: 26px; padding: 0; border: 0;
+      border-radius: 50%; background: transparent; color: var(--ink-soft);
+      display: grid; place-items: center; cursor: pointer; font: inherit; font-size: 15px;
+    }
+    @keyframes mob-rotate-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) { .mob-rotate { animation: none; } }
+    html.mob-rotate-dismissed .mob-rotate { display: none !important; }
+
     /* --- move mode ---
        The iOS home-screen answer to a problem the six-dot grip could not
        solve: at board-view scale a 36px handle sits on a 140px tile, so it
@@ -5190,6 +5227,13 @@
   </button>
 </div>
 
+<div class="mob-rotate" id="mobRotate">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="7" width="18" height="10" rx="2.2"/><path d="M8 3.5 12 7 8 10.5"/>
+  </svg>
+  <span>Turn your phone for the full board</span>
+  <button type="button" id="mobRotateX" aria-label="Dismiss">&#215;</button>
+</div>
 <div class="mob-scrim" id="mobScrim"></div>
 <div class="mob-menu" id="mobMenu" role="menu" aria-label="Widget options"></div>
 
@@ -36097,6 +36141,18 @@
   }
   grid.addEventListener("pointerup", endMoveDrag);
   grid.addEventListener("pointercancel", endMoveDrag);
+
+  /* Dismissed for the session, not forever: the reason it exists is that
+     board view in portrait looks broken rather than small, and someone who
+     comes back on a new day deserves the same one-line explanation. Kept out
+     of synced storage for the same reason -- it is about the device in your
+     hand, not about the board. */
+  const rotateX = document.getElementById("mobRotateX");
+  if (rotateX) {
+    rotateX.addEventListener("click", function () {
+      document.documentElement.classList.add("mob-rotate-dismissed");
+    });
+  }
 
   window.__mpsMoveMode = function (id, scope) {
     if (!id) { exitMove(); return null; }
