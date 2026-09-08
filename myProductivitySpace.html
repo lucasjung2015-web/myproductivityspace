@@ -19033,6 +19033,14 @@
         rowMain.appendChild(star);
         rowMain.appendChild(title);
         row.appendChild(rowMain);
+        // The description, as a single muted line right under the title —
+        // same treatment the Google Tasks list gives its own notes.
+        if (t.notes) {
+          const notesEl = document.createElement("div");
+          notesEl.className = "cal-taskrow-notes";
+          notesEl.textContent = t.notes.split("\n")[0];
+          row.appendChild(notesEl);
+        }
         const rlTags = buildReadingTagbar(t, { hideEmpty: true });
         // gap:6px on .task-row means an empty bar is still 6px of dead space.
         if (rlTags.children.length) row.appendChild(rlTags);
@@ -19103,7 +19111,7 @@
 
     function openReadingRowEditor(t) {
       editingId = t.id;
-      editingDraft = { text: t.text || "" };
+      editingDraft = { text: t.text || "", notes: t.notes || "" };
       renderReadingList();
       const input = readingList.querySelector(".task-row-editing .gt-title-input");
       if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
@@ -19117,6 +19125,7 @@
       // bargain the Google Tasks composer and editor both make.
       if (!t || !text) { cancelReadingRowEdit(); return; }
       t.text = text;
+      t.notes = editingDraft.notes.trim();
       editingId = null;
       editingDraft = null;
       persist();
@@ -19169,6 +19178,27 @@
       });
       titleRow.appendChild(input);
       row.appendChild(titleRow);
+
+      // Description — same row/input classes and placeholder styling as the
+      // Google Tasks composer's own notes field, right under the title and
+      // above the tags, so the two lists' editors read as one component.
+      const notesRow = document.createElement("div");
+      notesRow.className = "gt-notes-row";
+      notesRow.innerHTML = GT_ICON.notes;
+      const notesInput = document.createElement("input");
+      notesInput.type = "text";
+      notesInput.className = "gt-notes-input";
+      notesInput.placeholder = "Description";
+      notesInput.value = editingDraft.notes || "";
+      notesInput.addEventListener("input", function () {
+        if (editingDraft) editingDraft.notes = notesInput.value;
+      });
+      notesInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); saveReadingRowEdit(); }
+        else if (e.key === "Escape") { e.preventDefault(); cancelReadingRowEdit(); }
+      });
+      notesRow.appendChild(notesInput);
+      row.appendChild(notesRow);
 
       // Full tagbar: this is the "edit view" the collapsed row's hideEmpty
       // defers to, so the unset Status/Media Type selects belong here.
