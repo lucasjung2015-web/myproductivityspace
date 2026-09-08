@@ -4356,19 +4356,33 @@
     html:not(.force-desktop) .col.collapsible-col-wrap { position: relative; }
     .mob-ctl { display: none; }
     html:not(.force-desktop) .mob-ctl {
-      display: flex; gap: 2px; position: absolute; top: 34px; right: 6px; z-index: 6;
+      display: flex; gap: 2px; position: absolute; top: 36px; right: 6px; z-index: 6;
       border-radius: 9px;
       background: color-mix(in srgb, var(--bg) 74%, transparent);
       backdrop-filter: blur(12px) saturate(160%);
     }
     .mob-ctl button {
-      width: 30px; height: 30px; border: 0; background: transparent; border-radius: 8px;
+      width: 36px; height: 36px; border: 0; background: transparent; border-radius: 9px;
       color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; padding: 0;
     }
     .mob-ctl button:active { background: rgba(0,0,0,.07); color: var(--ink); }
-    .mob-ctl svg { width: 15px; height: 15px; display: block; }
+    .mob-ctl svg { width: 18px; height: 18px; display: block; }
     .mob-ctl .mc-grip { display: none; touch-action: none; cursor: grab; }
     html.mob-board:not(.force-desktop) .mob-ctl .mc-grip { display: grid; }
+    /* `zoom` on the grid scales EVERYTHING inside it, these controls
+       included, so at a 0.2 board they render at a fifth of their size and
+       become unhittable. Counter-scaled back to their real size with a
+       transform, which does not affect layout, anchored to the corner each
+       control already sits in so it grows away from the widget's content
+       rather than off its edge. */
+    html.mob-board:not(.force-desktop) .mob-ctl {
+      transform: scale(calc(1 / var(--mob-zoom, 1)));
+      transform-origin: top right;
+    }
+    html.mob-board:not(.force-desktop) .mob-size {
+      transform: scale(calc(1 / var(--mob-zoom, 1)));
+      transform-origin: bottom right;
+    }
     .col.collapsible-col-wrap.mob-dragging {
       opacity: .97; box-shadow: 0 16px 34px -10px rgba(0,0,0,.3);
     }
@@ -4382,11 +4396,11 @@
        placeholder moves with the real text. */
     html:not(.force-desktop) .col.collapsible-col-wrap.note-widget .note-editor,
     html:not(.force-desktop) .col.collapsible-col-wrap.note-widget .sticky-note {
-      padding-top: 34px;
+      padding-top: 40px;
     }
     /* Everything else keeps its header, and the buttons now sit under it --
        so the body starts clear of them too. */
-    html:not(.force-desktop) .col.collapsible-col-wrap .widget-body { padding-top: 30px; }
+    html:not(.force-desktop) .col.collapsible-col-wrap .widget-body { padding-top: 36px; }
 
     /* --- the anchored menu --- */
     .mob-menu { display: none; }
@@ -35342,6 +35356,26 @@
          land here or a phone loses the ability entirely. Confirmed, because it
          is the one command in this menu that does not come back: hide is a
          toggle, delete is not. */
+      /* Only when the widget actually shares a slot. On a section of one,
+         "hide section" and "hide widget" are the same command with two names,
+         and offering both invites the reader to hunt for a difference that is
+         not there. */
+      let mates = [];
+      try {
+        const slot = document.getElementById(id + "ColWrap") || grid.querySelector('[data-col-id="' + id + '"]');
+        const own = slot && slot.closest ? slot.closest(".col-slot") : null;
+        if (own) {
+          mates = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
+            return n.getAttribute("data-col-id");
+          }).filter(Boolean);
+        }
+      } catch (e) { mates = []; }
+      if (mates.length > 1) {
+        add("Hide section (" + mates.length + ")", ICO.eye, function () {
+          mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
+          rebuild();
+        });
+      }
       add("Delete widget", ICO.trash, function () {
         if (window.confirm("Delete \u201c" + cur.title + "\u201d? This cannot be undone.")) {
           B.remove(id); rebuild();
