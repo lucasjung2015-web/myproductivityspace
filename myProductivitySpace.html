@@ -13922,7 +13922,7 @@
       },
       arrange: function (id, action, targetId, value) {
         if (WIDGET_IDS.indexOf(id) === -1) return { error: "No widget with id '" + id + "'." };
-        const needsTarget = /^(move_left_of|move_right_of|stack_above|stack_below)$/.test(action);
+        const needsTarget = /^(move_left_of|move_right_of|stack_above|stack_below|move_section_left_of|move_section_right_of)$/.test(action);
         if (needsTarget) {
           if (!targetId || WIDGET_IDS.indexOf(targetId) === -1) return { error: "target_id must name another widget on the board." };
           if (targetId === id) return { error: "A widget cannot be placed relative to itself." };
@@ -13948,6 +13948,33 @@
           storageSet(HEIGHT_STORAGE_KEY[id], String(heights[id]));
           applyHeightInSlot(id);
           return { ok: true, widget_id: id, height: heights[id] };
+        }
+        /* Section moves relocate the WHOLE slot, so they run before
+           removeFromLayout and never call it. Every other action here moves a
+           single widget, and removeFromLayout is what pulls it out of the slot
+           it shares -- exactly the thing a section move must not do. Trying to
+           express "move this section" as a series of widget moves dismantles
+           the section into separate columns on the first one.
+
+           The target index is recomputed after the splice: removing the source
+           slot shifts every index after it by one, so a target to the right of
+           the source would otherwise land one place off. */
+        if (action === "move_section_left_of" || action === "move_section_right_of") {
+          const from = layout.findIndex(function (sl) { return sl.indexOf(id) !== -1; });
+          if (from === -1) return { error: "'" + id + "' is not on the board." };
+          const toBefore = layout.findIndex(function (sl) { return sl.indexOf(targetId) !== -1; });
+          if (toBefore === -1) return { error: "'" + targetId + "' is not on the board." };
+          if (from === toBefore) {
+            return { error: "'" + id + "' and '" + targetId + "' are already in the same section." };
+          }
+          const moved = layout.splice(from, 1)[0];
+          let at = layout.findIndex(function (sl) { return sl.indexOf(targetId) !== -1; });
+          if (at === -1) at = layout.length;
+          else if (action === "move_section_right_of") at = at + 1;
+          layout.splice(at, 0, moved);
+          persistLayout();
+          render();
+          return { ok: true, moved_section: moved.slice(), layout: window.__aiLayout.describe() };
         }
         removeFromLayout(id);
         if (action === "move_to_end") {
@@ -31739,12 +31766,12 @@
     /* ---- layout ---- */
     {
       name: "arrange_widget",
-      description: "Move or resize a widget. move_left_of / move_right_of put it in its own column beside target_id; stack_above / stack_below put it in the same column as target_id; move_to_end makes it the last column. set_width (pixels; only for the top widget of a column) and set_height (pixels; only when stacked) take value.",
+      description: "Move or resize a widget. move_left_of / move_right_of put it in its own column beside target_id; stack_above / stack_below put it in the same column as target_id; move_to_end makes it the last column. move_section_left_of / move_section_right_of move the WHOLE column this widget belongs to, keeping anything stacked with it together, and put it beside target_id's column -- use these when the user says \"move this section\" rather than \"move this widget\", since the widget forms take it out of the column it shares. set_width (pixels; only for the top widget of a column) and set_height (pixels; only when stacked) take value.",
       input_schema: {
         type: "object",
         properties: {
           widget_id: { type: "string" },
-          action: { type: "string", enum: ["move_left_of", "move_right_of", "stack_above", "stack_below", "move_to_end", "set_width", "set_height"] },
+          action: { type: "string", enum: ["move_left_of", "move_right_of", "stack_above", "stack_below", "move_section_left_of", "move_section_right_of", "move_to_end", "set_width", "set_height"] },
           target_id: { type: "string" },
           value: { type: "integer" }
         },
