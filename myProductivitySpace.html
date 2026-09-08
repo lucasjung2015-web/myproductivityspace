@@ -290,8 +290,10 @@
      display:none'd alongside the corner buttons further down). Those modes are
      flagged by a class on <body>, so the root reads them back through :has(). */
   html:has(body.widget-fullscreen-mode),
-  html:has(body.subpage-fullscreen-mode),
-  html:has(body.pip-active) { --ai-panel-w: 0px; }
+  html:has(body.subpage-fullscreen-mode) { --ai-panel-w: 0px; }
+  /* pip-active is deliberately not in that list. The gutter exists because the
+     AI panel is open beside the board, and floating a widget does not close
+     it -- zeroing the gutter here slid the board under the panel. */
 
   /* position:relative anchors the drag insertion bar (.links-drop-bar). */
   .links-row {
@@ -2713,12 +2715,13 @@
   }
   #aiPanelBtn:hover { background: #222222; }
 
-  body.pip-active #alwaysOnTopBtn,
-  body.pip-active #connectionsBtn,
-  body.pip-active #addWidgetBtn,
-  body.pip-active #aiPanelBtn,
-  body.pip-active #profileBtn,
-  body.pip-active #aiPanel { display: none; }
+  /* pip-active used to hide all of this, swept in with the two fullscreen
+     modes. It does not belong with them: a fullscreen mode takes the page
+     over, so chrome floating above one widget would overlap it, while
+     floating a widget opens a SECOND window and leaves this page exactly as
+     it was. Hiding the corner buttons there stranded the board -- no AI, no
+     account, no add-widget -- for as long as the float was open, and the
+     float is a thing you keep open precisely so you can carry on here. */
 
   /* ---------- account menu ----------
      The account chooser pattern: a tinted tray holding separate white cards
@@ -20423,7 +20426,15 @@
         "width=" + sw,
         "height=" + sh
       ].join(",");
-      const fullWindow = window.open(popoutHref(), "unbleepLifeOSFullWindow", features);
+      /* A fixed window name meant the second popout replaced the first
+         instead of opening beside it: window.open reuses any window already
+         carrying that name. Naming per target lets several stand open at
+         once, and still reuses the right one when you re-open the same
+         thing rather than piling up duplicates. */
+      const href = popoutHref();
+      const tag = (/#task=(.+)$/.exec(href) || [])[1] || "board";
+      const winName = "mpsPopout_" + String(tag).replace(/[^A-Za-z0-9_]/g, "_");
+      const fullWindow = window.open(href, winName, features);
       if (fullWindow) {
         try { fullWindow.moveTo(0, 0); } catch (e2) {}
         try { fullWindow.resizeTo(sw, sh); } catch (e2) {}
