@@ -4297,11 +4297,10 @@
       overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
       scroll-snap-type: none;
       gap: 0; padding: 6px 10px calc(20px + env(safe-area-inset-bottom));
-      /* The factor is set on the element from fitBoard, not declared here.
-         WebKit's `zoom` is a legacy property that does not reliably accept a
-         custom property, so `zoom: var(--mob-zoom)` silently did nothing on
-         iOS: the desktop row laid out at full width, overflowed, and got
-         clipped to the first slot. */
+      /* Scaled by fitBoard with a transform, not declared here and not `zoom`.
+         iOS Safari exposes style.zoom and then ignores it on the element, so
+         both the CSS-variable form and the scripted form silently did nothing
+         and the desktop row stayed full width, clipped to the first slot. */
       transform-origin: top left;
     }
     html.mob-board:not(.force-desktop) .col-slot {
@@ -35404,39 +35403,57 @@
      and the page scrolls to the real bottom. Where zoom is unsupported the
      transform fallback needs its own width compensation, since a transform
      leaves the element reporting its full unscaled box. */
-  const CAN_ZOOM = (function () {
-    try { return typeof document.createElement("div").style.zoom === "string"; }
-    catch (e) { return false; }
-  })();
-  function applyZoom(k) {
-    if (CAN_ZOOM) {
-      grid.style.zoom = k === 1 ? "" : String(k);
-      grid.style.transform = "";
-      grid.style.width = "";
-    } else {
-      grid.style.transform = k === 1 ? "" : "scale(" + k + ")";
-      grid.style.width = k === 1 ? "" : (100 / k) + "%";
-    }
+  function clearZoom() {
+    grid.style.zoom = "";
+    grid.style.transform = "";
+    grid.style.transformOrigin = "";
+    grid.style.width = "";
+    grid.style.height = "";
+    grid.style.flex = "";
+  }
+  /* Scale by transform, with the layout box corrected by hand.
+
+     `zoom` was the first choice because it affects layout for free, and asking
+     whether it exists is useless: iOS Safari exposes style.zoom, so the
+     feature-detect passed, and then ignored the value on the element. The
+     board stayed full width and nothing errored. A detect that can lie is
+     worse than no detect, so this measures the result instead.
+
+     transform never affects layout, so the element keeps reporting its full
+     unscaled box. Width is pinned to the board's natural width so the row
+     lays out as it does on a desktop, and height is set to the SCALED height
+     so the space it occupies matches the space it paints. */
+  function applyZoom(k, naturalW, naturalH) {
+    if (k === 1 || !naturalW) { clearZoom(); return; }
+    grid.style.zoom = "";
+    grid.style.flex = "0 0 auto";
+    grid.style.width = naturalW + "px";
+    grid.style.transformOrigin = "top left";
+    grid.style.transform = "scale(" + k + ")";
+    grid.style.height = Math.max(1, Math.round(naturalH * k)) + "px";
   }
   function fitBoard() {
     const root = document.documentElement;
     if (!isMobile() || currentView() !== "board") {
       root.style.removeProperty("--mob-zoom");
-      applyZoom(1);
+      clearZoom();
       return;
     }
+    // Measure unscaled. Both dimensions: the height is needed to correct the
+    // layout box that a transform leaves behind.
     root.style.setProperty("--mob-zoom", "1");
-    applyZoom(1);
-    const natural = Math.max(grid.scrollWidth, grid.clientWidth, 1);
+    clearZoom();
+    const naturalW = Math.max(grid.scrollWidth, grid.clientWidth, 1);
+    const naturalH = Math.max(grid.scrollHeight, grid.clientHeight, 1);
     const avail = Math.max(root.clientWidth - 20, 1);
-    let k = avail / natural;
+    let k = avail / naturalW;
     if (!isFinite(k) || k <= 0) k = ZOOM_MIN;
     k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k));
     k = Math.round(k * 1000) / 1000;
     // Published for the counter-scale on the injected controls, which have to
     // undo exactly this factor to stay finger-sized.
     root.style.setProperty("--mob-zoom", String(k));
-    applyZoom(k);
+    applyZoom(k, naturalW, naturalH);
   }
   window.addEventListener("orientationchange", function () { setTimeout(fitBoard, 250); });
   window.addEventListener("resize", function () { setTimeout(fitBoard, 120); });
