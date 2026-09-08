@@ -35524,6 +35524,7 @@
     grid.style.width = "";
     grid.style.height = "";
     grid.style.flex = "";
+    grid.style.marginBottom = "";
   }
   /* Scale by transform, with the layout box corrected by hand.
 
@@ -35537,14 +35538,31 @@
      unscaled box. Width is pinned to the board's natural width so the row
      lays out as it does on a desktop, and height is set to the SCALED height
      so the space it occupies matches the space it paints. */
-  function applyZoom(k, naturalW, naturalH) {
+  /* availH is the height the grid ALREADY has from the flex layout, and it is
+     the height the scaled board should end up filling.
+
+     The first version scaled that height down along with the width, which is
+     what produced a thin strip of board above a screen of white: the board's
+     height is assigned by its container, not by its content, so shrinking it
+     shrinks the thing that was already exactly the right size.
+
+     Going the other way instead: give the grid availH / k of height BEFORE
+     scaling, so that k brings it back to exactly availH. The widgets inside
+     stretch to that taller box and land at full height once scaled.
+
+     A transform leaves the layout box at its pre-scale size, so the element
+     still reserves availH / k. The negative margin gives that difference
+     back, which is what stops the page scrolling into empty space below. */
+  function applyZoom(k, naturalW, availH) {
     if (k === 1 || !naturalW) { clearZoom(); return; }
+    const boxH = Math.max(1, Math.round(availH / k));
     grid.style.zoom = "";
     grid.style.flex = "0 0 auto";
     grid.style.width = naturalW + "px";
+    grid.style.height = boxH + "px";
     grid.style.transformOrigin = "top left";
     grid.style.transform = "scale(" + k + ")";
-    grid.style.height = Math.max(1, Math.round(naturalH * k)) + "px";
+    grid.style.marginBottom = -(boxH - Math.round(availH)) + "px";
   }
   function fitBoard() {
     const root = document.documentElement;
@@ -35553,12 +35571,14 @@
       clearZoom();
       return;
     }
-    // Measure unscaled. Both dimensions: the height is needed to correct the
-    // layout box that a transform leaves behind.
+    /* Measure unscaled. Width is the board's own content width, which is what
+       decides the factor. Height is the space the grid HAS, not the space its
+       content wants -- the board stretches to its container, so its content
+       height is meaningless here and its assigned height is the target. */
     root.style.setProperty("--mob-zoom", "1");
     clearZoom();
     const naturalW = Math.max(grid.scrollWidth, grid.clientWidth, 1);
-    const naturalH = Math.max(grid.scrollHeight, grid.clientHeight, 1);
+    const availH = Math.max(grid.getBoundingClientRect().height, grid.clientHeight, 1);
     const avail = Math.max(root.clientWidth - 20, 1);
     let k = avail / naturalW;
     if (!isFinite(k) || k <= 0) k = ZOOM_MIN;
@@ -35567,7 +35587,7 @@
     // Published for the counter-scale on the injected controls, which have to
     // undo exactly this factor to stay finger-sized.
     root.style.setProperty("--mob-zoom", String(k));
-    applyZoom(k, naturalW, naturalH);
+    applyZoom(k, naturalW, availH);
   }
   window.addEventListener("orientationchange", function () { setTimeout(fitBoard, 250); });
   window.addEventListener("resize", function () { setTimeout(fitBoard, 120); });
