@@ -20477,20 +20477,34 @@
      them, which the floating kind cannot: browsers allow exactly one document
      Picture-in-Picture window per tab, so asking for a second only re-uses the
      first. Every call gets its own name so every click is its own window. */
+  let popoutCount = 0;
   function openPlainPopout() {
     const sw = Math.max(320, (window.screen && window.screen.availWidth) || window.innerWidth);
     const sh = Math.max(240, (window.screen && window.screen.availHeight) || window.innerHeight);
     const name = "mpsPopout_" + Date.now().toString(36) + "_"
       + Math.random().toString(36).slice(2, 7);
+    /* left and top are not decoration. Chrome only treats a window.open call
+       as a real popup window when the feature string positions AND sizes it;
+       give it size alone and it quietly opens a tab instead, which is exactly
+       what happened here. The existing popout call further up this file has
+       always carried left/top for the same reason.
+
+       The offset also cascades each new window down and across instead of
+       stacking them all at the same coordinates, so a third window is
+       visibly a third window rather than looking like the second one. */
+    const step = (popoutCount++ % 6) * 34;
     const w = window.open(
       popoutHref(), name,
       ["popup=yes", "resizable=yes", "scrollbars=yes",
+       "left=" + (40 + step), "top=" + (40 + step),
        "width=" + Math.round(sw * 0.6), "height=" + Math.round(sh * 0.7)].join(",")
     );
     if (!w) {
       alert("Your browser blocked the pop-up. Allow pop-ups for this site to open more than one window.");
       return null;
     }
+    try { w.moveTo(40 + step, 40 + step); } catch (e) {}
+    try { w.resizeTo(Math.round(sw * 0.6), Math.round(sh * 0.7)); } catch (e) {}
     try { w.focus(); } catch (e) {}
     return w;
   }
