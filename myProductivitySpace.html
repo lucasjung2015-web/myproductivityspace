@@ -4289,7 +4289,12 @@
       overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
       scroll-snap-type: none;
       gap: 0; padding: 6px 10px calc(20px + env(safe-area-inset-bottom));
-      zoom: var(--mob-zoom, 0.35);
+      /* The factor is set on the element from fitBoard, not declared here.
+         WebKit's `zoom` is a legacy property that does not reliably accept a
+         custom property, so `zoom: var(--mob-zoom)` silently did nothing on
+         iOS: the desktop row laid out at full width, overflowed, and got
+         clipped to the first slot. */
+      transform-origin: top left;
     }
     html.mob-board:not(.force-desktop) .col-slot { display: flex; flex-direction: column; }
     html.mob-board:not(.force-desktop) .col.collapsible-col-wrap {
@@ -4429,8 +4434,24 @@
     .mob-scrim { position: fixed; inset: 0; z-index: 3150; display: none; }
     .mob-scrim.is-open { display: block; }
 
-    /* A tab for a widget that is not currently in rotation. */
-    .mob-tab.is-hidden { opacity: .55; border-style: dashed; border-color: var(--hair); }
+    /* A tab for a widget that is not in rotation. Diagonal hatching plus an
+       eye-off badge: the hatch reads instantly as "put away" across a row of
+       pills, and the icon says which state that is for anyone the texture
+       does not reach. Not merely faded, which reads as disabled rather than
+       as something you can take back off the shelf. */
+    .mob-tab.is-hidden {
+      color: var(--ink-soft);
+      border: 1px solid var(--hair);
+      background-color: transparent;
+      background-image: repeating-linear-gradient(
+        -45deg,
+        color-mix(in srgb, var(--ink) 9%, transparent) 0 1.5px,
+        transparent 1.5px 7px
+      );
+    }
+    .mob-tab.is-hidden .mt-em { opacity: .75; }
+    .mob-tab .mt-off { display: inline-flex; margin-left: 2px; }
+    .mob-tab .mt-off svg { width: 13px; height: 13px; display: block; }
 
     /* --- the segmented control --- */
     html:not(.force-desktop) .mob-seg {
@@ -35159,6 +35180,12 @@
         return { id: idOf(el), title: n.title, icon: n.icon, hidden: false };
       });
     }
+    /* Hidden widgets go to the END of the bar rather than sitting in place.
+       In place they read as part of the rotation you swipe through, which
+       they are not; at the end they read as a shelf you can take things off. */
+    all = all.slice().sort(function (x, y) {
+      return (x.hidden ? 1 : 0) - (y.hidden ? 1 : 0);
+    });
     all.forEach(function (w) {
       const b = document.createElement("button");
       b.type = "button";
@@ -35173,6 +35200,17 @@
       // textContent, not innerHTML: a widget title is user text and a custom
       // widget's title is model-authored, so neither is safe to parse as markup.
       b.appendChild(document.createTextNode(w.title || w.id));
+      if (w.hidden) {
+        // Hatch AND icon, not the hatch alone: a texture is not readable to
+        // everyone, and a faded pill on its own reads as disabled rather than
+        // as put away.
+        const off = document.createElement("span");
+        off.className = "mt-off";
+        off.setAttribute("aria-hidden", "true");
+        off.innerHTML = svgIcon(ICO.eyeOff);
+        b.appendChild(off);
+        b.setAttribute("aria-label", (w.title || w.id) + ", hidden. Tap to restore.");
+      }
       b.addEventListener("click", function () {
         if (w.hidden) {
           try { board().setHidden(w.id, false); } catch (e) {}
@@ -35247,16 +35285,45 @@
      one and converge on nothing. Landscape needs no special case: a wider
      viewport simply divides into a bigger factor. */
   const ZOOM_MIN = 0.16, ZOOM_MAX = 1;
+  /* Applied as a plain number rather than through a custom property: WebKit
+     ignores `zoom: var(...)`. `zoom` is preferred over a transform because it
+     affects layout, so the shrunken board occupies the space it visually takes
+     and the page scrolls to the real bottom. Where zoom is unsupported the
+     transform fallback needs its own width compensation, since a transform
+     leaves the element reporting its full unscaled box. */
+  const CAN_ZOOM = (function () {
+    try { return typeof document.createElement("div").style.zoom === "string"; }
+    catch (e) { return false; }
+  })();
+  function applyZoom(k) {
+    if (CAN_ZOOM) {
+      grid.style.zoom = k === 1 ? "" : String(k);
+      grid.style.transform = "";
+      grid.style.width = "";
+    } else {
+      grid.style.transform = k === 1 ? "" : "scale(" + k + ")";
+      grid.style.width = k === 1 ? "" : (100 / k) + "%";
+    }
+  }
   function fitBoard() {
     const root = document.documentElement;
-    if (!isMobile() || currentView() !== "board") { root.style.removeProperty("--mob-zoom"); return; }
+    if (!isMobile() || currentView() !== "board") {
+      root.style.removeProperty("--mob-zoom");
+      applyZoom(1);
+      return;
+    }
     root.style.setProperty("--mob-zoom", "1");
+    applyZoom(1);
     const natural = Math.max(grid.scrollWidth, grid.clientWidth, 1);
     const avail = Math.max(root.clientWidth - 20, 1);
     let k = avail / natural;
     if (!isFinite(k) || k <= 0) k = ZOOM_MIN;
     k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k));
-    root.style.setProperty("--mob-zoom", String(Math.round(k * 1000) / 1000));
+    k = Math.round(k * 1000) / 1000;
+    // Published for the counter-scale on the injected controls, which have to
+    // undo exactly this factor to stay finger-sized.
+    root.style.setProperty("--mob-zoom", String(k));
+    applyZoom(k);
   }
   window.addEventListener("orientationchange", function () { setTimeout(fitBoard, 250); });
   window.addEventListener("resize", function () { setTimeout(fitBoard, 120); });
@@ -35276,6 +35343,8 @@
     drop: '<path d="M12 3s6 6.4 6 10a6 6 0 0 1-12 0c0-3.6 6-10 6-10Z"/>',
     expand: '<path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/>',
     eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    eyeOff: '<path d="M3 3l18 18"/><path d="M10.6 5.2A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4"/>'
+          + '<path d="M6.5 6.7A17 17 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1"/>',
     trash: '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/>'
          + '<path d="M18.5 6l-1 13.2A1.8 1.8 0 0 1 15.7 21H8.3a1.8 1.8 0 0 1-1.8-1.8L5.5 6"/>'
   };
@@ -35346,12 +35415,13 @@
 
     add("Open fullscreen", ICO.expand, function () { B.setMaximized(id); });
 
-    /* Hide is board-view only, and fenced off below a divider. In widget view
-       it would remove the screen you are standing on and leave you somewhere
-       else, with the only way back in the other mode. */
+    /* Hide is in BOTH views now. It was board-only while a hidden widget had
+       no representation in widget view, which made hiding one there a door
+       that locked behind you. The tab bar carries hidden widgets at its end
+       now, so the way back is on screen the moment you hide something. */
+    menuEl.appendChild(document.createElement("hr"));
+    add("Hide widget", ICO.eyeOff, function () { B.setHidden(id, true); rebuild(); });
     if (boardView) {
-      menuEl.appendChild(document.createElement("hr"));
-      add("Hide widget", ICO.eye, function () { B.setHidden(id, true); rebuild(); });
       /* Delete lived only in the hover array this view now hides, so it has to
          land here or a phone loses the ability entirely. Confirmed, because it
          is the one command in this menu that does not come back: hide is a
