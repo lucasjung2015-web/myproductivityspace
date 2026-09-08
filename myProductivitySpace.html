@@ -4488,24 +4488,10 @@
        competes with the name and the ••• for a gesture you make rarely. In
        move mode there is no handle at all and the WHOLE widget is the target,
        which is the size the gesture actually needs. */
-    .mob-movebar { display: none; }
-    html.mob-moving:not(.force-desktop) .mob-movebar {
-      display: flex; align-items: center; gap: 10px;
-      position: fixed; left: 0; right: 0; z-index: 3300;
-      top: calc(6px + env(safe-area-inset-top));
-      margin: 0 12px; padding: 9px 10px 9px 14px; border-radius: 14px;
-      border: 1px solid var(--hair);
-      background: color-mix(in srgb, var(--bg) 88%, transparent);
-      backdrop-filter: blur(20px) saturate(180%);
-      box-shadow: 0 14px 34px -12px rgba(0,0,0,.3);
-      font-size: 13.5px; color: var(--ink);
-    }
-    .mob-movebar .mm-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .mob-movebar .mm-done {
-      margin-left: auto; flex: 0 0 auto; min-height: 34px; padding: 0 15px;
-      border: 0; border-radius: 999px; background: var(--ink); color: var(--bg);
-      font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
-    }
+    /* No bar and no Done button. The wobble already says the board is in a
+       state, and a banner naming the widget was describing something you can
+       see. Tapping any part of the screen that is not a widget leaves the
+       mode, which is the same way out the Home screen gives you. */
     /* Everything that is not the thing you are placing gets out of the way:
        no menus, no grips, no resize corners while a move is in progress. */
     html.mob-moving:not(.force-desktop) .mob-ctl,
@@ -4521,6 +4507,13 @@
     }
     html.mob-moving .col.collapsible-col-wrap.mob-drop-target {
       outline: 2px dashed var(--ink); outline-offset: -2px;
+    }
+    /* Two outcomes, two marks: an edge for "beside this", a filled body for
+       "into this column". You should be able to tell which one a release will
+       do before you release. */
+    html.mob-moving .col.collapsible-col-wrap.mob-drop-stack {
+      outline-style: solid;
+      background-color: color-mix(in srgb, var(--ink) 10%, transparent);
     }
     /* The Home-screen wobble, at a quarter of the amplitude: enough to say
        "these are loose" without becoming the loudest thing on the board. */
@@ -5185,10 +5178,6 @@
   </button>
 </div>
 
-<div class="mob-movebar" id="mobMoveBar">
-  <span class="mm-what" id="mobMoveWhat"></span>
-  <button type="button" class="mm-done" id="mobMoveDone">Done</button>
-</div>
 <div class="mob-scrim" id="mobScrim"></div>
 <div class="mob-menu" id="mobMenu" role="menu" aria-label="Widget options"></div>
 
@@ -35946,9 +35935,6 @@
   }
 
   let moveState = null;
-  const moveBar = document.getElementById("mobMoveBar");
-  const moveWhat = document.getElementById("mobMoveWhat");
-  const moveDone = document.getElementById("mobMoveDone");
 
   function enterMove(id, scope) {
     closeMenu();
@@ -35958,12 +35944,6 @@
     if (currentView() !== "board") setView("board", true);
     moveState = { id: id, scope: scope, drag: null };
     document.documentElement.classList.add("mob-moving");
-    const n = nameFor(id);
-    if (moveWhat) {
-      moveWhat.textContent = scope === "section"
-        ? "Moving this section — drag it where you want it"
-        : "Moving " + (n.title || id) + " — drag it where you want it";
-    }
     const el = elFor(id);
     if (el) el.classList.add("mob-picked");
   }
@@ -35971,12 +35951,28 @@
     moveState = null;
     document.documentElement.classList.remove("mob-moving");
     Array.prototype.forEach.call(
-      grid.querySelectorAll(".mob-picked, .mob-drop-target"),
-      function (n) { n.classList.remove("mob-picked", "mob-drop-target"); }
+      grid.querySelectorAll(".mob-picked, .mob-drop-target, .mob-drop-stack"),
+      function (n) { n.classList.remove("mob-picked", "mob-drop-target", "mob-drop-stack"); }
     );
   }
-  if (moveDone) moveDone.addEventListener("click", exitMove);
+  /* Out of the mode by tapping anywhere that is not a widget. Capture phase
+     and pointerdown rather than click, so it lands before the grid's own
+     handlers and before a tap on a widget can be mistaken for one on the
+     board. A tap that starts a drag is not a tap: the drag branch returns
+     first. */
+  document.addEventListener("pointerdown", function (e) {
+    if (!moveState) return;
+    if (e.target.closest && e.target.closest(".col.collapsible-col-wrap")) return;
+    if (e.target.closest && e.target.closest(".mob-menu, .mob-tab, .mob-seg")) return;
+    exitMove();
+  }, true);
 
+  /* Where on the target you let go decides what happens, using the same
+     thresholds the desktop drag uses: the outer quarters put the widget in its
+     own column beside this one, the middle half stacks it into this column
+     above or below. Without the middle case there was no way to stack at all
+     from a phone -- dragging one Page onto another only ever parked it
+     alongside, which is what "it's not stacking" was. */
   function dropTargetAt(x, y, selfId) {
     let hit = null;
     Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (t) {
@@ -35984,7 +35980,15 @@
       const r = t.getBoundingClientRect();
       if (x > r.left && x < r.right && y > r.top && y < r.bottom) hit = t;
     });
-    return hit;
+    if (!hit) return null;
+    const r = hit.getBoundingClientRect();
+    const relX = (x - r.left) / r.width;
+    const edge = 0.25;
+    let zone;
+    if (relX < edge) zone = "left";
+    else if (relX > 1 - edge) zone = "right";
+    else zone = (y - r.top) / r.height < 0.5 ? "top" : "bottom";
+    return { el: hit, zone: zone };
   }
 
   grid.addEventListener("pointerdown", function (e) {
@@ -36002,10 +36006,6 @@
       if (prev) prev.classList.remove("mob-picked");
       moveState.id = grabbed;
       el.classList.add("mob-picked");
-      const n = nameFor(grabbed);
-      if (moveWhat && moveState.scope !== "section") {
-        moveWhat.textContent = "Moving " + (n.title || grabbed) + " — drag it where you want it";
-      }
     }
   }, true);
 
@@ -36016,27 +36016,44 @@
       if (Math.abs(e.clientX - d.sx) < 8 && Math.abs(e.clientY - d.sy) < 8) return;
       d.moved = true;
     }
-    const over = dropTargetAt(e.clientX, e.clientY, moveState.id);
-    if (d.over && d.over !== over) d.over.classList.remove("mob-drop-target");
+    const found = dropTargetAt(e.clientX, e.clientY, moveState.id);
+    const over = found && found.el;
+    if (d.over && d.over !== over) {
+      d.over.classList.remove("mob-drop-target", "mob-drop-stack");
+    }
     d.over = over;
-    if (over) over.classList.add("mob-drop-target");
+    d.zone = found && found.zone;
+    if (over) {
+      over.classList.add("mob-drop-target");
+      // Two different outcomes deserve two different marks: a solid edge for
+      // "beside", a filled body for "into this column".
+      over.classList.toggle("mob-drop-stack", d.zone === "top" || d.zone === "bottom");
+    }
   });
 
   function endMoveDrag(e) {
     if (!moveState || !moveState.drag || e.pointerId !== moveState.drag.pid) return;
     const d = moveState.drag;
     moveState.drag = null;
-    if (d.over) d.over.classList.remove("mob-drop-target");
+    if (d.over) d.over.classList.remove("mob-drop-target", "mob-drop-stack");
     if (!d.moved || !d.over || !window.__aiLayout) return;
     const targetId = d.over.getAttribute("data-col-id");
     if (!targetId || targetId === moveState.id) return;
-    /* Which side follows the direction you dragged, so it lands where you
-       dropped it rather than always to one side of the target. */
-    const a = d.from.getBoundingClientRect(), b = d.over.getBoundingClientRect();
-    const after = b.top > a.top || (Math.abs(b.top - a.top) < 4 && b.left > a.left);
-    const verb = moveState.scope === "section"
-      ? (after ? "move_section_right_of" : "move_section_left_of")
-      : (after ? "move_right_of" : "move_left_of");
+    const zone = d.zone || "right";
+    let verb;
+    if (zone === "top" || zone === "bottom") {
+      /* Stacking is a widget-level act: a whole section cannot be folded into
+         another column without deciding what happens to the widths and the
+         order of both, so a section dropped into the middle moves beside
+         instead of silently doing something else. */
+      verb = moveState.scope === "section"
+        ? "move_section_right_of"
+        : (zone === "top" ? "stack_above" : "stack_below");
+    } else {
+      verb = moveState.scope === "section"
+        ? (zone === "right" ? "move_section_right_of" : "move_section_left_of")
+        : (zone === "right" ? "move_right_of" : "move_left_of");
+    }
     try { window.__aiLayout.arrange(moveState.id, verb, targetId); } catch (err) {}
     // render() rebuilt the slots, so the picked element is gone; re-mark the
     // widget by id and stay in the mode for the next move.
