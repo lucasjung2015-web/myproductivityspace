@@ -4079,15 +4079,10 @@
        widget's name, which is only the page's name when a section happens to
        hold one widget; on a stacked section it named one of the two and
        silently dropped the other. A wrong label is worse than none, and the
-       dots plus a swipe already answer "where am I". */
-    .mob-dots {
-      display: flex; gap: 5px; justify-content: center; flex: 0 0 auto;
-      padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
-      background: var(--bg);
-    }
-    .mob-dot { width: 6px; height: 6px; border-radius: 50%; background: #d4d4d4; }
-    .mob-dot.is-current { background: var(--ink); }
-    html.force-desktop .mob-dots { display: none !important; }
+       dots plus a swipe already answer "where am I".
+
+       The dots themselves now live with the tab bar in section 10 below, as
+       one piece of bottom chrome rather than a lone strip. */
 
     /* The hidden-widget tabs, sitting directly above the dots. Restyled for a
        phone rather than inherited from the desktop board: one scrolling row
@@ -4245,6 +4240,124 @@
        this one dropped the only surface that shows hidden widgets exist. A
        widget hidden on the desktop was then unreachable on a phone, with no
        indication it was still there. It stays visible now. */
+
+    /* ---------- 10. two views ----------
+       The phone gets two ways to read the same board, chosen from the
+       segmented control top right. They are one space at two distances, not
+       two layouts: board view is the whole board with each widget rendering
+       its real content small, widget view is one widget filling the screen.
+
+       Both are the SAME DOM. `.col-slot` goes display:contents on a phone so
+       its widgets become direct children of the grid, which is what makes
+       "one widget per screen" possible at all -- a slot stacking two widgets
+       is one desktop section but two phone screens. Nothing is re-rendered
+       to switch views; only the flex rules change. */
+
+    /* --- widget view: one widget per screen, no sections --- */
+    html:not(.force-desktop) .col-slot { display: contents; }
+    html:not(.force-desktop) .col-resizer,
+    html:not(.force-desktop) .row-resizer { display: none; }
+    html:not(.force-desktop):not(.mob-board) .col.collapsible-col-wrap {
+      flex: 0 0 100% !important; width: 100% !important;
+      min-width: 100%; max-width: 100%; min-height: 0;
+      scroll-snap-align: start; scroll-snap-stop: always;
+      padding: 4px 14px 8px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    /* Room for the dots and the tab bar, which float over the content. */
+    html:not(.force-desktop):not(.mob-board) .widget { padding-bottom: 0; }
+    html:not(.force-desktop):not(.mob-board) .col.collapsible-col-wrap:last-child {
+      padding-bottom: 96px;
+    }
+
+    /* --- board view: the real board, two columns, real content --- */
+    html.mob-board:not(.force-desktop) .widget {
+      flex-direction: row; flex-wrap: wrap; align-content: flex-start;
+      overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      scroll-snap-type: none;
+      gap: 10px; padding: 4px 12px calc(20px + env(safe-area-inset-bottom));
+    }
+    html.mob-board:not(.force-desktop) .col.collapsible-col-wrap {
+      flex: 0 0 calc(50% - 5px) !important; width: auto !important;
+      min-width: 0; max-width: none;
+      min-height: 128px; max-height: 210px; overflow: hidden;
+      scroll-snap-align: none;
+      padding: 0;
+    }
+    /* Board view is for reading the board, not scrolling inside one widget,
+       so the wrapper clips and nothing inside it scrolls the page out from
+       under you. Deliberately on the wrapper alone: an `* { overflow: hidden }`
+       here also clips every popover and absolutely-positioned child a widget
+       owns, which breaks things that have nothing to do with scrolling.
+
+       Carrying a widget's desktop width through to the phone board is a real
+       idea and is NOT implemented -- the column widths live in the layout
+       closure and are not published. Every tile is half-width for now. */
+    html.mob-board:not(.force-desktop) .mob-chrome { display: none; }
+
+    /* --- the segmented control --- */
+    html:not(.force-desktop) .mob-seg {
+      position: fixed; z-index: 2450;
+      top: calc(8px + env(safe-area-inset-top));
+      right: calc(104px + env(safe-area-inset-right));
+      display: flex; padding: 3px; gap: 2px; border-radius: 12px;
+      border: 1px solid var(--hair);
+      background: color-mix(in srgb, var(--bg) 72%, transparent);
+      backdrop-filter: blur(16px) saturate(170%);
+    }
+    html.force-desktop .mob-seg, .mob-seg { display: none; }
+    html:not(.force-desktop) .mob-seg { display: flex; }
+    .mob-seg button {
+      width: 38px; height: 34px; border: 0; background: transparent; border-radius: 9px;
+      color: var(--ink-soft); display: grid; place-items: center; cursor: pointer;
+      padding: 0; position: relative; z-index: 2;
+    }
+    .mob-seg button.is-on { color: var(--bg); }
+    .mob-seg button svg { width: 16px; height: 16px; display: block; }
+    .mob-seg .mob-thumb {
+      position: absolute; top: 3px; left: 3px; width: 38px; height: 34px;
+      border-radius: 9px; background: var(--ink); z-index: 1;
+      transition: transform 240ms cubic-bezier(.22,1,.36,1);
+    }
+    body.widget-fullscreen-mode .mob-seg,
+    body.subpage-fullscreen-mode .mob-seg,
+    body.pip-active .mob-seg { display: none !important; }
+
+    /* --- bottom chrome: dots for position, tabs for destinations --- */
+    html:not(.force-desktop) .mob-chrome {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 2400;
+      padding-bottom: calc(6px + env(safe-area-inset-bottom));
+      background: color-mix(in srgb, var(--bg) 68%, transparent);
+      backdrop-filter: blur(20px) saturate(175%);
+      -webkit-mask-image: linear-gradient(to top, #000 78%, transparent);
+      mask-image: linear-gradient(to top, #000 78%, transparent);
+    }
+    .mob-chrome { display: none; }
+    html:not(.force-desktop):not(.mob-board) .mob-chrome { display: block; }
+    .mob-pdots { display: flex; justify-content: center; gap: 6px; padding: 8px 0 6px; }
+    .mob-pdots span {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--hair);
+      transition: background .18s, transform .18s;
+    }
+    .mob-pdots span.is-on { background: var(--ink); transform: scale(1.22); }
+    .mob-tabs {
+      display: flex; gap: 7px; overflow-x: auto; padding: 0 12px 4px;
+      scrollbar-width: none;
+    }
+    .mob-tabs::-webkit-scrollbar { display: none; }
+    .mob-tab {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
+      min-height: 38px; padding: 0 13px; border-radius: 999px;
+      border: 1px solid transparent; background: var(--fill, #f2f2f0);
+      color: var(--ink-soft); font: inherit; font-size: 12.5px; font-weight: 500;
+      white-space: nowrap; cursor: pointer;
+    }
+    .mob-tab .mt-em { font-size: 14px; }
+    .mob-tab.is-on { background: var(--ink); color: var(--bg); }
+    body.widget-fullscreen-mode .mob-chrome,
+    body.subpage-fullscreen-mode .mob-chrome,
+    body.pip-active .mob-chrome,
+    html.ai-panel-open .mob-chrome,
+    html.ai-panel-open .mob-seg { display: none !important; }
   }
 
   /* Hover states must not LATCH. There are 131 unconditional :hover rules in
@@ -4759,7 +4872,30 @@
      page dots. The dots sit lowest because position is glanced at
      constantly and recovery is touched rarely. -->
 <div class="collapsed-tabs-bar" id="collapsedTabsBar"></div>
-<div class="mob-dots" id="mobDots" hidden></div>
+
+<!-- Phone chrome. Both are inert on a desktop: the stylesheet only shows them
+     inside the touch media query, and the script only wires them there. The
+     dots give absolute position, which a scrolling tab bar cannot; the tabs
+     name the destinations, which dots cannot. -->
+<div class="mob-seg" id="mobSeg" role="tablist" aria-label="View">
+  <div class="mob-thumb" id="mobThumb"></div>
+  <button type="button" id="mobBoardBtn" role="tab" aria-selected="false" aria-label="Board view" title="Board view">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/>
+      <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.8"/>
+    </svg>
+  </button>
+  <button type="button" id="mobWidgetBtn" role="tab" aria-selected="true" aria-label="Widget view" title="Widget view">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="6" y="3" width="12" height="18" rx="2.4"/>
+    </svg>
+  </button>
+</div>
+
+<div class="mob-chrome" id="mobChrome">
+  <div class="mob-pdots" id="mobDots"></div>
+  <div class="mob-tabs" id="mobTabs"></div>
+</div>
 
 <!-- Deleted built-in sections are parked here (not actually destroyed) so
      their fetch/wiring logic stays alive and "+" can bring them straight
@@ -34776,9 +34912,13 @@
 
   const TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)");
   const FORCE_KEY = "force-desktop-layout";
+  const VIEW_KEY = "mobile-view";
   const dots = document.getElementById("mobDots");
+  const tabsEl = document.getElementById("mobTabs");
   const grid = document.getElementById("widgetGrid");
-  if (!dots || !grid) return;
+  const seg = document.getElementById("mobSeg");
+  const thumb = document.getElementById("mobThumb");
+  if (!dots || !tabsEl || !grid) return;
 
   let observer = null;
   let current = 0;
@@ -34787,90 +34927,102 @@
     return TOUCH.matches && !document.documentElement.classList.contains("force-desktop");
   }
 
-  /* A page is a SLOT, not a widget: a section stacking two widgets is one
-     screen, because the section is the unit the user arranged on the
-     desktop and splitting it here would invent a layout they never chose. */
-  function slots() {
-    return Array.prototype.filter.call(grid.children, function (n) {
-      return n.classList && n.classList.contains("col-slot") && n.style.display !== "none";
-    });
+  /* A page is a WIDGET now, not a section. `.col-slot` is display:contents on
+     a phone, so a slot that stacks two widgets on the desktop is two screens
+     here. The section was the right unit while the desktop arrangement was
+     the only arrangement; on a phone it meant a "page" could hold two things
+     and the dots undercounted what you had to swipe through. */
+  function pages() {
+    return Array.prototype.filter.call(
+      grid.querySelectorAll(".col.collapsible-col-wrap"),
+      function (n) { return n.style.display !== "none" && n.offsetParent !== null; }
+    );
+  }
+  function idOf(el) { return el && el.getAttribute ? el.getAttribute("data-col-id") : null; }
+
+  /* Titles and emoji for the tab bar. __aiBoard is the board's published
+     surface and already carries both, so the bar cannot drift from what the
+     widget actually calls itself. */
+  function nameFor(id) {
+    try {
+      const hit = (window.__aiBoard.list() || []).filter(function (w) { return w.id === id; })[0];
+      if (hit) return { title: hit.title || id, icon: hit.icon || "" };
+    } catch (e) {}
+    return { title: id, icon: "" };
   }
 
   function setCurrent(i) {
     current = i;
     Array.prototype.forEach.call(dots.children, function (d, n) {
-      d.classList.toggle("is-current", n === i);
+      d.classList.toggle("is-on", n === i);
     });
-    filterTabs();
+    Array.prototype.forEach.call(tabsEl.children, function (b, n) {
+      b.classList.toggle("is-on", n === i);
+      b.setAttribute("aria-current", n === i ? "true" : "false");
+    });
+    const cur = tabsEl.children[i];
+    if (cur && cur.scrollIntoView) {
+      cur.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+    }
   }
 
-  /* The collapsed-tabs bar is one global list of everything hidden on the
-     board. That reads correctly on a desktop, where the whole board is one
-     page, and wrongly on a phone, where it would offer you widgets belonging
-     to sections three swipes away. Filtered to the section on screen, the bar
-     answers "what is hidden HERE", which is the question you are asking while
-     looking at it.
-
-     The exception is a widget whose entire section is hidden. Such a section
-     is display:none'd wholesale and stops being a page at all, so there is no
-     section to swipe to and no screen on which its tabs would ever qualify.
-     Those stay visible everywhere rather than becoming unreachable, which was
-     the original bug this bar was un-hidden to fix. */
+  /* Hidden widgets belong to the board, not to a page. With sections gone
+     there is no "this section's hidden widgets" left to filter to, so the bar
+     shows all of them -- and only in board view, where composition lives and
+     where it does not fight the tab bar for the bottom of the screen. */
   function filterTabs() {
     const bar = document.getElementById("collapsedTabsBar");
     if (!bar) return;
-    const mobile = isMobile();
-    const slot = mobile ? slots()[current] : null;
-
-    let here = null;
-    if (slot) {
-      here = Object.create(null);
-      Array.prototype.forEach.call(slot.querySelectorAll("[data-col-id]"), function (el) {
-        here[el.getAttribute("data-col-id")] = true;
-      });
-    }
-
     let shown = 0;
     Array.prototype.forEach.call(bar.children, function (tab) {
-      const id = String(tab.id || "").replace(/Strip$/, "");
-      let visible = true;
-      if (here && id) {
-        // Fails open: a custom widget id that will not survive a CSS selector
-        // should leave its tab reachable, not swallow it.
-        let own = null;
-        try {
-          const el = grid.querySelector('[data-col-id="' + id + '"]');
-          own = el && el.closest ? el.closest(".col-slot") : null;
-        } catch (e) { own = null; }
-        const orphaned = !own || own.style.display === "none";
-        visible = !!here[id] || orphaned;
-      }
-      tab.hidden = !visible;
-      if (visible) shown++;
+      tab.hidden = false; shown++;
     });
-    bar.classList.toggle("has-tabs", shown > 0);
+    const boardView = document.documentElement.classList.contains("mob-board");
+    bar.classList.toggle("has-tabs", shown > 0 && (!isMobile() || boardView));
   }
   window.__mpsFilterHiddenTabs = filterTabs;
+
+  function goTo(i) {
+    const list = pages();
+    const el = list[i];
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+    setCurrent(i);
+  }
 
   function build() {
     if (observer) { observer.disconnect(); observer = null; }
     dots.innerHTML = "";
-    const list = slots();
-    if (!isMobile() || list.length < 1) {
-      dots.hidden = true;
-      // Also the path taken when force-desktop is switched on mid-session, so
-      // any per-section filtering left over from the phone layout is undone.
-      filterTabs();
-      return;
-    }
-    list.forEach(function () {
+    tabsEl.innerHTML = "";
+    const list = pages();
+    if (!isMobile() || list.length < 1) { filterTabs(); return; }
+
+    list.forEach(function (el, i) {
+      const id = idOf(el);
+      const n = nameFor(id);
+
       const d = document.createElement("span");
-      d.className = "mob-dot";
       dots.appendChild(d);
+
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mob-tab";
+      b.setAttribute("data-tab-for", id || "");
+      if (n.icon) {
+        const em = document.createElement("span");
+        em.className = "mt-em";
+        em.textContent = n.icon;
+        b.appendChild(em);
+      }
+      // textContent, not innerHTML: a widget title is user text and a custom
+      // widget's title is model-authored, so neither is safe to parse as markup.
+      b.appendChild(document.createTextNode(n.title));
+      b.addEventListener("click", function () { goTo(i); });
+      tabsEl.appendChild(b);
     });
-    // A position indicator, and with one page there is no position to
-    // indicate.
-    dots.hidden = list.length < 2;
+
+    // One page has no position to indicate, but the tab bar still names it.
+    dots.style.display = list.length < 2 ? "none" : "";
 
     /* Which page you are on is whichever is most on screen. An observer
        rather than a scroll handler: it fires only when the answer actually
@@ -34884,8 +35036,9 @@
       const i = list.indexOf(best.target);
       if (i !== -1 && i !== current) setCurrent(i);
     }, { root: grid, threshold: [0.5, 0.75] });
-    list.forEach(function (slot) { observer.observe(slot); });
+    list.forEach(function (el) { observer.observe(el); });
     setCurrent(Math.min(current, list.length - 1));
+    filterTabs();
   }
 
   /* render() rebuilds the grid's children wholesale whenever a widget is
@@ -34907,6 +35060,55 @@
   });
   document.documentElement.classList.toggle("is-touch", TOUCH.matches);
 
+  /* ---------- the two views ----------
+     One class on <html> and the stylesheet does the rest: nothing is
+     re-rendered, no widget moves in the DOM, only the flex rules change.
+     That is what keeps the two modes honestly the same board -- a rebuild
+     would let them drift apart, and a widget scrolled halfway would lose its
+     place every time you switched. */
+  function setView(v, persist) {
+    const board = v === "board";
+    document.documentElement.classList.toggle("mob-board", board);
+    const bb = document.getElementById("mobBoardBtn");
+    const wb = document.getElementById("mobWidgetBtn");
+    if (bb) { bb.classList.toggle("is-on", board); bb.setAttribute("aria-selected", String(board)); }
+    if (wb) { wb.classList.toggle("is-on", !board); wb.setAttribute("aria-selected", String(!board)); }
+    if (thumb) thumb.style.transform = "translateX(" + (board ? 0 : 40) + "px)";
+    if (persist) { try { window.storageSet(VIEW_KEY, v); } catch (e) {} }
+    filterTabs();
+    /* Coming back to widget view, land on the widget you were reading rather
+       than at the start of the board. The scroll position survives the class
+       change, but scroll-snap can leave it between two pages. */
+    if (!board) requestAnimationFrame(function () { goTo(current); });
+  }
+  function currentView() {
+    return document.documentElement.classList.contains("mob-board") ? "board" : "widget";
+  }
+  const boardBtn = document.getElementById("mobBoardBtn");
+  const widgetBtn = document.getElementById("mobWidgetBtn");
+  if (boardBtn) boardBtn.addEventListener("click", function () { setView("board", true); });
+  if (widgetBtn) widgetBtn.addEventListener("click", function () { setView("widget", true); });
+
+  /* In board view a tap on a widget takes you into it, which is the same
+     journey the segmented control makes, just started from the thing you
+     want rather than from the corner. Ignored on anything interactive, so
+     tapping a checkbox in a tile still ticks it. */
+  grid.addEventListener("click", function (e) {
+    if (!isMobile() || currentView() !== "board") return;
+    if (e.target.closest("button, a, input, textarea, select, [contenteditable]")) return;
+    const el = e.target.closest(".col.collapsible-col-wrap");
+    if (!el) return;
+    const i = pages().indexOf(el);
+    if (i === -1) return;
+    current = i;
+    setView("widget", true);
+  });
+
+  window.__mpsMobileView = function (v) {
+    if (v === "board" || v === "widget") setView(v, true);
+    return currentView();
+  };
+
   /* The escape hatch. Detection is right almost always; this removes the
      "almost" for anyone whose device answers the question oddly. */
   window.__mpsForceDesktop = function (on) {
@@ -34918,6 +35120,11 @@
     let saved = null;
     try { saved = await window.storageGet(FORCE_KEY); } catch (e) {}
     if (saved === "true") document.documentElement.classList.add("force-desktop");
+    let savedView = null;
+    try { savedView = await window.storageGet(VIEW_KEY); } catch (e) {}
+    // Widget view is the default: it is what works with no arrangement
+    // decisions made, and board view is a deliberate choice.
+    setView(savedView === "board" ? "board" : "widget", false);
     build();
   })();
 })();
