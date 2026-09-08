@@ -4446,41 +4446,25 @@
     .mob-scrim { position: fixed; inset: 0; z-index: 3150; display: none; }
     .mob-scrim.is-open { display: block; }
 
-    /* A tab for a widget that is not in rotation: a translucent pill with ONE
-       diagonal stroke through it and the eye-off centred on that stroke. The
-       single line reads as "struck out" at a glance, where hatching read as a
-       texture; the material keeps it a real surface rather than a greyed-out
-       one, because it is something you can take back rather than something
-       switched off. The name stays legible underneath -- you have to be able
-       to find the widget you are looking for. */
+    /* A tab for a widget that is not in rotation: a translucent pill carrying
+       the eye-off badge, and nothing else. The material keeps it a real
+       surface rather than a greyed-out one, because a hidden widget is
+       something you can take back rather than something switched off, and the
+       name stays fully legible because finding the one you want is the whole
+       job of this bar. */
     .mob-tab.is-hidden {
-      position: relative;
       color: var(--ink-soft);
       border: 1px solid var(--hair);
       background: color-mix(in srgb, var(--bg) 52%, transparent);
       backdrop-filter: blur(14px) saturate(160%);
       -webkit-backdrop-filter: blur(14px) saturate(160%);
     }
-    /* Corner to corner, one hairline, drawn over the label rather than behind
-       it so it reads as struck through. */
-    .mob-tab.is-hidden::before {
-      content: ""; position: absolute; inset: 0; border-radius: inherit;
-      pointer-events: none;
-      background: linear-gradient(to top right,
-        transparent calc(50% - 0.7px),
-        color-mix(in srgb, var(--ink) 42%, transparent) calc(50% - 0.7px),
-        color-mix(in srgb, var(--ink) 42%, transparent) calc(50% + 0.7px),
-        transparent calc(50% + 0.7px));
-    }
     .mob-tab.is-hidden .mt-em { opacity: .7; }
-    /* Centred on the pill, sitting on the stroke, with a small knocked-out
-       ground so the line does not run through the glyph itself. */
-    .mob-tab .mt-off {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-      display: grid; place-items: center; width: 20px; height: 20px;
-      border-radius: 50%; color: var(--ink);
-      background: color-mix(in srgb, var(--bg) 88%, transparent);
-    }
+    /* The eye-off alone now, inline after the name. The diagonal stroke it used
+       to sit on is gone: struck-through reads as cancelled, and a hidden widget
+       is parked rather than cancelled. Inline rather than centred, because with
+       no line to sit on a centred badge only covers the name you are reading. */
+    .mob-tab .mt-off { display: inline-flex; margin-left: 3px; color: var(--ink); }
     .mob-tab .mt-off svg { width: 13px; height: 13px; display: block; }
     @media (prefers-reduced-transparency: reduce) {
       .mob-tab.is-hidden { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
