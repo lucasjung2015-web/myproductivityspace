@@ -23781,7 +23781,13 @@
       const w = frameWin();
       if (w && w.__unbleepRemoveGoogleRoot) w.__unbleepRemoveGoogleRoot(nsId);
       renderGrid();
-      refreshTaskWidget(owner);
+      /* redraw, not refresh. refreshTaskWidget refetches from Google for a
+         non-primary widget, and the Tasks API is eventually consistent: a LIST
+         issued straight after a DELETE still returns the task that was just
+         deleted, so the row came back and only a later reload showed it gone.
+         The local array has already had it removed, so drawing from memory is
+         both correct and immediate. */
+      redrawTaskWidget(owner);
     }).catch(function (e) {
       window.alert("Delete failed: " + (e.message || e));
     });
@@ -26789,7 +26795,9 @@
         });
         const w = frameWin();
         if (w && w.__unbleepRemoveGoogleRoot) w.__unbleepRemoveGoogleRoot(nsTask(id));
-        renderGrid(); refreshTaskWidget(owner);
+        // Same reason as deleteGoogleItem: refetching here re-reads a row
+        // Google has not finished deleting yet.
+        renderGrid(); redrawTaskWidget(owner);
         return { ok: true, deleted: { id: id, title: t.title } };
       });
     },
@@ -35500,31 +35508,34 @@
        now, so the way back is on screen the moment you hide something. */
     menuEl.appendChild(document.createElement("hr"));
     add("Hide widget", ICO.eyeOff, function () { B.setHidden(id, true); rebuild(); });
+
+    /* Sits beside Hide widget in BOTH views, not only board view. A section is
+       a grouping of widgets, and that grouping is just as real while you are
+       looking at one of its members full-screen -- gating it to board view
+       only meant the command was missing exactly where you were most likely
+       to reach for it. Shown only when the widget actually shares a slot: on
+       a section of one it is Hide widget under a second name. */
+    let mates = [];
+    try {
+      const el = grid.querySelector('[data-col-id="' + id + '"]');
+      const own = el && el.closest ? el.closest(".col-slot") : null;
+      if (own) {
+        mates = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
+          return n.getAttribute("data-col-id");
+        }).filter(Boolean);
+      }
+    } catch (e) { mates = []; }
+    if (mates.length > 1) {
+      add("Hide section (" + mates.length + ")", ICO.eyeOff, function () {
+        mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
+        rebuild();
+      });
+    }
     if (boardView) {
       /* Delete lived only in the hover array this view now hides, so it has to
          land here or a phone loses the ability entirely. Confirmed, because it
          is the one command in this menu that does not come back: hide is a
          toggle, delete is not. */
-      /* Only when the widget actually shares a slot. On a section of one,
-         "hide section" and "hide widget" are the same command with two names,
-         and offering both invites the reader to hunt for a difference that is
-         not there. */
-      let mates = [];
-      try {
-        const slot = document.getElementById(id + "ColWrap") || grid.querySelector('[data-col-id="' + id + '"]');
-        const own = slot && slot.closest ? slot.closest(".col-slot") : null;
-        if (own) {
-          mates = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
-            return n.getAttribute("data-col-id");
-          }).filter(Boolean);
-        }
-      } catch (e) { mates = []; }
-      if (mates.length > 1) {
-        add("Hide section (" + mates.length + ")", ICO.eye, function () {
-          mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
-          rebuild();
-        });
-      }
       add("Delete widget", ICO.trash, function () {
         if (window.confirm("Delete \u201c" + cur.title + "\u201d? This cannot be undone.")) {
           B.remove(id); rebuild();
