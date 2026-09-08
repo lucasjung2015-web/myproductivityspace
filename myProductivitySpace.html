@@ -4318,6 +4318,16 @@
     .col.collapsible-col-wrap.mob-sizing { outline: 2px solid var(--ink); outline-offset: -2px; }
     html.mob-board:not(.force-desktop) .mob-chrome { display: none; }
 
+    /* The desktop hover array goes. `.widget-header-controls` is the row of
+       drag / colour / fullscreen / hide / delete buttons that appears on
+       hover, and a phone has no hover to reveal it with, so it simply sat
+       there permanently: five 13px glyphs competing with the widget's own
+       title, none of them near a thumb-sized target. Everything it carried
+       now lives in the ••• and the grip below, at a size a finger can hit.
+       The title group's icon button was already hidden here; this finishes
+       the job for the other side of the header. */
+    html:not(.force-desktop) .widget-header-controls { display: none !important; }
+
     /* --- per-widget controls, on the surface because there is no hover ---
        The ••• carries every command that used to live in a hover control.
        The six-dot grip stays outside it and board-only: dragging is the
@@ -35196,7 +35206,9 @@
     smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/>',
     drop: '<path d="M12 3s6 6.4 6 10a6 6 0 0 1-12 0c0-3.6 6-10 6-10Z"/>',
     expand: '<path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/>',
-    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>'
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    trash: '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/>'
+         + '<path d="M18.5 6l-1 13.2A1.8 1.8 0 0 1 15.7 21H8.3a1.8 1.8 0 0 1-1.8-1.8L5.5 6"/>'
   };
   function svgIcon(d, filled) {
     return '<svg viewBox="0 0 24 24" fill="' + (filled ? 'currentColor' : 'none') + '" stroke="'
@@ -35271,6 +35283,15 @@
     if (boardView) {
       menuEl.appendChild(document.createElement("hr"));
       add("Hide widget", ICO.eye, function () { B.setHidden(id, true); rebuild(); });
+      /* Delete lived only in the hover array this view now hides, so it has to
+         land here or a phone loses the ability entirely. Confirmed, because it
+         is the one command in this menu that does not come back: hide is a
+         toggle, delete is not. */
+      add("Delete widget", ICO.trash, function () {
+        if (window.confirm("Delete \u201c" + cur.title + "\u201d? This cannot be undone.")) {
+          B.remove(id); rebuild();
+        }
+      });
     }
 
     const r = btn.getBoundingClientRect();
