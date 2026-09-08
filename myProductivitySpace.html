@@ -4388,6 +4388,14 @@
       background: color-mix(in srgb, var(--bg) 74%, transparent);
       backdrop-filter: blur(12px) saturate(160%);
     }
+    /* In board view the counter-scale renders these at exactly their base
+       size on screen, so the base size IS the on-screen size. 36px over a
+       widget drawn at a fifth of its width covered a real share of it; 24px
+       is still hittable and stops competing with the widget's own content. */
+    html.mob-board:not(.force-desktop) .mob-ctl button { width: 24px; height: 24px; border-radius: 7px; }
+    html.mob-board:not(.force-desktop) .mob-ctl svg { width: 13px; height: 13px; }
+    html.mob-board:not(.force-desktop) .mob-ctl { top: 4px; right: 4px; gap: 0; }
+    html.mob-board:not(.force-desktop) .mob-size { width: 26px; height: 26px; padding: 6px; }
     .mob-ctl button {
       width: 36px; height: 36px; border: 0; background: transparent; border-radius: 9px;
       color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; padding: 0;
@@ -35511,6 +35519,7 @@
      one and converge on nothing. Landscape needs no special case: a wider
      viewport simply divides into a bigger factor. */
   const ZOOM_MIN = 0.16, ZOOM_MAX = 1;
+  let fitting = false;
   /* Applied as a plain number rather than through a custom property: WebKit
      ignores `zoom: var(...)`. `zoom` is preferred over a transform because it
      affects layout, so the shrunken board occupies the space it visually takes
@@ -35588,9 +35597,23 @@
     // undo exactly this factor to stay finger-sized.
     root.style.setProperty("--mob-zoom", String(k));
     applyZoom(k, naturalW, availH);
+
+    /* Tell the widgets the box changed. The calendar sizes its hour grid from
+       the height it measures when it renders, and nothing about scaling the
+       board fires the event it listens for -- so it kept a layout computed for
+       the height the column had before, and showed two hours in a column with
+       room for the day. Anything that re-lays-out on resize fixes itself here.
+
+       Guarded, because this module also listens for resize: without the flag
+       the dispatch calls fitBoard, which dispatches again. */
+    if (!fitting) {
+      fitting = true;
+      try { window.dispatchEvent(new Event("resize")); } catch (e) {}
+      setTimeout(function () { fitting = false; }, 0);
+    }
   }
   window.addEventListener("orientationchange", function () { setTimeout(fitBoard, 250); });
-  window.addEventListener("resize", function () { setTimeout(fitBoard, 120); });
+  window.addEventListener("resize", function () { if (!fitting) setTimeout(fitBoard, 120); });
 
   /* ---------- per-widget controls ----------
      Every action here goes through __aiBoard, the board's own published
@@ -35798,9 +35821,28 @@
     applySpans();
   })();
 
-  /* Snapping to one or two columns rather than tracking the finger: a
-     continuous resize on a 390px two-column grid lands between meaningless
-     values, and every intermediate width would reflow the whole board. */
+  /* The corner handle resizes the real board.
+
+     It used to write a phone-only span of one or two columns, which made sense
+     while board view was its own two-column reflow. Board view renders the
+     actual desktop layout now, so that span is read by nothing and the handle
+     did nothing at all -- which is what "the resizers don't work" was.
+
+     Screen pixels are divided by the scale factor on the way in, so a finger
+     moving 40px across a board drawn at a fifth moves the widget 200 board
+     pixels and the edge tracks the finger rather than crawling. */
+  function boardWidthOf(id) {
+    try {
+      const L = window.__aiLayout && window.__aiLayout.describe();
+      if (L) for (let i = 0; i < L.length; i++) {
+        if (L[i].widgets && L[i].widgets.indexOf(id) !== -1 && L[i].width) return L[i].width;
+      }
+    } catch (e) {}
+    const el = elFor(id);
+    const k = parseFloat(document.documentElement.style.getPropertyValue("--mob-zoom")) || 1;
+    const own = el && el.closest ? el.closest(".col-slot") : null;
+    return own ? Math.round(own.getBoundingClientRect().width / k) : 320;
+  }
   let sizeState = null;
   grid.addEventListener("pointerdown", function (e) {
     if (!isMobile() || currentView() !== "board") return;
@@ -35810,19 +35852,36 @@
     const el = h.closest(".col.collapsible-col-wrap");
     if (!el) return;
     grid.setPointerCapture(e.pointerId);
-    const sp = spanOf(idOf(el));
-    sizeState = { pid: e.pointerId, id: idOf(el), el: el, sx: e.clientX, sy: e.clientY, w: sp.w, h: sp.h };
+    const id = idOf(el);
+    const k = parseFloat(document.documentElement.style.getPropertyValue("--mob-zoom")) || 1;
+    sizeState = {
+      pid: e.pointerId, id: id, el: el, sx: e.clientX, sy: e.clientY, k: k || 1,
+      w0: boardWidthOf(id),
+      h0: Math.round(el.getBoundingClientRect().height / (k || 1)),
+      last: 0
+    };
     el.classList.add("mob-sizing");
   }, true);
   grid.addEventListener("pointermove", function (e) {
     if (!sizeState || e.pointerId !== sizeState.pid) return;
-    const dx = e.clientX - sizeState.sx, dy = e.clientY - sizeState.sy;
-    const col = grid.clientWidth / 2;
-    const w = sizeState.w + (dx > col * 0.4 ? 1 : (dx < -col * 0.4 ? -1 : 0));
-    const h = sizeState.h + (dy > 60 ? 1 : (dy < -60 ? -1 : 0));
-    const cur = spanOf(sizeState.id);
-    const nw = Math.min(2, Math.max(1, w)), nh = Math.min(2, Math.max(1, h));
-    if (nw !== cur.w || nh !== cur.h) setSpan(sizeState.id, nw, nh);
+    if (!window.__aiLayout) return;
+    const k = sizeState.k || 1;
+    const dx = (e.clientX - sizeState.sx) / k;
+    const dy = (e.clientY - sizeState.sy) / k;
+    // Throttled to a frame: set_width re-renders the board, and asking for that
+    // on every pointermove rebuilds the whole grid dozens of times a second.
+    const now = Date.now();
+    if (now - sizeState.last < 60) return;
+    sizeState.last = now;
+    try {
+      window.__aiLayout.arrange(sizeState.id, "set_width", null, Math.round(sizeState.w0 + dx));
+      // Height only applies to a stacked widget; on a section of one the call
+      // is refused and the widget simply fills its column, which is correct.
+      window.__aiLayout.arrange(sizeState.id, "set_height", null, Math.round(sizeState.h0 + dy));
+    } catch (err) {}
+    const again = elFor(sizeState.id);
+    if (again) { sizeState.el = again; again.classList.add("mob-sizing"); }
+    fitBoard();
   });
   function endSize(e) {
     if (!sizeState || e.pointerId !== sizeState.pid) return;
