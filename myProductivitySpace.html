@@ -35743,10 +35743,33 @@
   grid.addEventListener("pointercancel", endSize);
 
   /* Everything sharing a slot with `id`, itself included. One widget means a
-     section of one, where "move section" and "move widget" are the same act. */
+     section of one, where "move section" and "move widget" are the same act.
+
+     Read from __aiLayout.describe(), which returns the layout array itself and
+     is the authority on what shares a section. The previous version built a
+     CSS selector out of the widget id and walked the DOM, so any id that did
+     not survive being spliced into a selector threw, the catch returned "just
+     this one", and both Hide section and Move section silently vanished from
+     the menu for exactly the widgets that had a section. Custom and Page
+     widgets carry generated ids, which is where that bites.
+
+     The DOM walk stays as a fallback, without the selector: comparing
+     attributes over a node list cannot be broken by the value of an id. */
   function matesOf(id) {
     try {
-      const el = grid.querySelector('[data-col-id="' + id + '"]');
+      const layout = window.__aiLayout && window.__aiLayout.describe();
+      if (layout && layout.length) {
+        for (let i = 0; i < layout.length; i++) {
+          const w = layout[i] && layout[i].widgets;
+          if (w && w.indexOf(id) !== -1) return w.slice();
+        }
+      }
+    } catch (e) {}
+    try {
+      let el = null;
+      Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (n) {
+        if (n.getAttribute("data-col-id") === id) el = n;
+      });
       const own = el && el.closest ? el.closest(".col-slot") : null;
       if (!own) return [id];
       const out = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
@@ -35761,6 +35784,18 @@
      whole widget is the drag target, which at board scale is a 140px object
      instead of a 36px one. Scope is chosen from the menu beforehand, so a
      drag never has to guess whether you meant this widget or its column. */
+  /* Look a widget up by attribute rather than by selector, for the same
+     reason matesOf does: an id is data, and splicing data into a selector
+     makes a widget unreachable the moment its id contains anything the
+     selector grammar cares about. */
+  function elFor(id) {
+    let hit = null;
+    Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (n) {
+      if (n.getAttribute("data-col-id") === id) hit = n;
+    });
+    return hit;
+  }
+
   let moveState = null;
   const moveBar = document.getElementById("mobMoveBar");
   const moveWhat = document.getElementById("mobMoveWhat");
@@ -35780,7 +35815,7 @@
         ? "Moving this section — drag it where you want it"
         : "Moving " + (n.title || id) + " — drag it where you want it";
     }
-    const el = grid.querySelector('[data-col-id="' + id + '"]');
+    const el = elFor(id);
     if (el) el.classList.add("mob-picked");
   }
   function exitMove() {
@@ -35858,7 +35893,7 @@
     // widget by id and stay in the mode for the next move.
     setTimeout(function () {
       build();
-      const again = grid.querySelector('[data-col-id="' + moveState.id + '"]');
+      const again = elFor(moveState.id);
       if (again) again.classList.add("mob-picked");
     }, 60);
   }
