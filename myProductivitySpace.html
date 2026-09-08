@@ -4351,6 +4351,17 @@
     .col.collapsible-col-wrap.mob-sizing { outline: 2px solid var(--ink); outline-offset: -2px; }
     html.mob-board:not(.force-desktop) .mob-chrome { display: none; }
 
+    /* The standalone section controls go too. `.section-controls` is already
+       hidden above, but the two buttons it builds are named individually and
+       can be reached through other paths, so they are struck out by name as
+       well rather than only through the container that happens to hold them
+       today. Hiding a section is in the ••• now, where it sits next to the
+       widget it belongs to instead of floating at the corner of a column you
+       cannot point at on a phone. */
+    html:not(.force-desktop) .section-hide-btn,
+    html:not(.force-desktop) .section-drag-handle,
+    html:not(.force-desktop) .section-controls { display: none !important; }
+
     /* The desktop hover array goes. `.widget-header-controls` is the row of
        drag / colour / fullscreen / hide / delete buttons that appears on
        hover, and a phone has no hover to reveal it with, so it simply sat
@@ -35603,15 +35614,19 @@
        before the drag rather than by which of two adjacent handles your thumb
        found. Move section only when there is a section to move. */
     add("Move widget", ICO.grip, function () { enterMove(id, "widget"); });
-    if (matesOf(id).length > 1) {
+    if (boardView && matesOf(id).length > 1) {
       add("Move section", ICO.grip, function () { enterMove(id, "section"); });
     }
 
-    /* Hide is in BOTH views now. It was board-only while a hidden widget had
-       no representation in widget view, which made hiding one there a door
-       that locked behind you. The tab bar carries hidden widgets at its end
-       now, so the way back is on screen the moment you hide something. */
-    menuEl.appendChild(document.createElement("hr"));
+    /* No divider. It was fencing the destructive items off from the rest, but
+       with the section commands landing beside them the menu ended up cut into
+       pieces that did not correspond to anything -- a rule that reads as
+       structure has to encode structure, and this one had stopped. Order does
+       the work instead: the reversible edits first, then hide, then delete.
+
+       Hide widget is in both views. It was board-only while a hidden widget
+       had no representation in widget view, which made hiding one there a door
+       that locked behind you; the tab bar carries hidden widgets now. */
     add("Hide widget", ICO.eyeOff, function () { B.setHidden(id, true); rebuild(); });
 
     /* Sits beside Hide widget in BOTH views, not only board view. A section is
@@ -35620,8 +35635,13 @@
        only meant the command was missing exactly where you were most likely
        to reach for it. Shown only when the widget actually shares a slot: on
        a section of one it is Hide widget under a second name. */
+    /* Section commands, board view only. A section is a column, and widget
+       view has no columns -- one widget fills the screen and its neighbours
+       are somewhere off to the side. Acting on a grouping you cannot see is
+       the kind of command that reads as working and quietly does something
+       to a part of the board you are not looking at. */
     const mates = matesOf(id);
-    if (mates.length > 1) {
+    if (boardView && mates.length > 1) {
       add("Hide section (" + mates.length + ")", ICO.eyeOff, function () {
         mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
         rebuild();
