@@ -22671,12 +22671,14 @@
     // to drag by, and a native drag would blur whatever input you're in.
     row.draggable = false;
 
-    // No notes field here (see buildTaskComposer's noNotes) and the open
-    // circle becomes the delete control: hover previews the checkmark exactly
-    // like the complete button does, but a click here deletes the task —
-    // there's no separate standing Delete button any more.
+    // The Description field (Google Tasks' own notes) lives here too, right
+    // under the title and above the due chips — same composer the New task
+    // modal uses, so editing it inline writes straight back to the same
+    // resource saveTaskRowEdit PATCHes below. The open circle becomes the
+    // delete control: hover previews the checkmark exactly like the complete
+    // button does, but a click here deletes the task — there's no separate
+    // standing Delete button any more.
     const composer = buildTaskComposer(editingDraft, {
-      noNotes: true,
       deleteButton: true,
       onChange: function () { syncDraft(); },
       onDelete: function () {
@@ -22688,11 +22690,17 @@
     function syncDraft() {
       if (!editingDraft) return;
       editingDraft.title = composer.titleInput.value;
+      editingDraft.notes = composer.notesInput.value;
       editingDraft.due = composer.dueInput.value;
       editingDraft.dueTime = composer.timeInput.value;
       editingDraft.repeat = composer.repeatInput.value;
     }
     composer.titleInput.addEventListener("input", syncDraft);
+    composer.notesInput.addEventListener("input", syncDraft);
+    composer.notesInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      else if (e.key === "Escape") { e.preventDefault(); cancelTaskRowEdit(); }
+    });
     // The date/repeat chips write straight into the hidden carrier inputs, so
     // a click anywhere in the composer is the cue to re-read all of them. The
     // popovers themselves report in through opts.onChange below, since they
@@ -25722,7 +25730,7 @@
     notesInput = document.createElement("input");
     notesInput.type = "text";
     notesInput.className = "gt-notes-input";
-    notesInput.placeholder = "Details";
+    notesInput.placeholder = "Description";
     notesInput.value = init.notes || "";
     notesRow.appendChild(notesInput);
     main.appendChild(notesRow);
