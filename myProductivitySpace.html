@@ -4500,6 +4500,16 @@
     html.mob-moving:not(.force-desktop) .col.collapsible-col-wrap {
       cursor: grab; touch-action: none;
     }
+    /* While moving, a widget is an object you are dragging, not a document you
+       are reading. Its inner scrollers would otherwise swallow the drag: start
+       the gesture over the calendar's hour grid or a long Page and the widget
+       scrolls instead of moving. Scoped to the mode, so the aggressive reach
+       of `*` lasts exactly as long as the drag does. */
+    html.mob-moving:not(.force-desktop) .col.collapsible-col-wrap * {
+      overflow: hidden !important;
+      touch-action: none !important;
+      -webkit-overflow-scrolling: auto !important;
+    }
     /* The thing being moved, and the thing it would land beside. */
     html.mob-moving .col.collapsible-col-wrap.mob-picked {
       outline: 2px solid var(--ink); outline-offset: -2px;
@@ -4539,6 +4549,8 @@
       backdrop-filter: blur(22px) saturate(180%);
       box-shadow: 0 18px 40px -12px rgba(0,0,0,.32);
       transform-origin: top right;
+      overflow-y: auto; overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .mob-menu button {
       display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px;
@@ -35741,9 +35753,29 @@
       });
     }
 
+    /* Fit it on the screen. The menu grew past the eight items it was built
+       for -- the section commands land at the bottom, so running off the
+       bottom edge hid exactly the ones added last and made them look removed.
+
+       Opens below the button when there is room, flips above when there is
+       more room there, and scrolls inside whichever side it picked rather
+       than being clipped by the viewport. */
     const r = btn.getBoundingClientRect();
-    menuEl.style.top = (r.bottom + 8) + "px";
+    const vh = window.innerHeight || 800;
+    const below = vh - r.bottom - 16;
+    const above = r.top - 16;
     menuEl.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+    if (below >= above) {
+      menuEl.style.top = (r.bottom + 8) + "px";
+      menuEl.style.bottom = "auto";
+      menuEl.style.maxHeight = Math.max(160, below) + "px";
+      menuEl.style.transformOrigin = "top right";
+    } else {
+      menuEl.style.top = "auto";
+      menuEl.style.bottom = (vh - r.top + 8) + "px";
+      menuEl.style.maxHeight = Math.max(160, above) + "px";
+      menuEl.style.transformOrigin = "bottom right";
+    }
     menuEl.classList.add("is-open");
     if (scrimEl) scrimEl.classList.add("is-open");
   }
