@@ -1987,10 +1987,19 @@
        column rather than wrapping inside it. */
     overflow-wrap: anywhere;
   }
-  .gt-notes-row { display: flex; align-items: center; gap: 11px; }
-  .gt-notes-row svg { flex: 0 0 auto; width: 17px; height: 17px; color: #5f6368; }
+  .gt-notes-row { display: flex; align-items: flex-start; gap: 11px; }
+  .gt-notes-row svg { flex: 0 0 auto; width: 17px; height: 17px; color: #5f6368; margin-top: 2px; }
   .gt-notes-input { font-size: 14px; }
   .gt-notes-input::placeholder { color: #70757a; }
+  /* Same reasoning as textarea.gt-title-input above: grown to content
+     height in JS (gtAutoGrow), so no scrollbar or resize handle should
+     ever be visible, and no line-height override so the first line lands
+     at the same baseline the old single-line <input> used to. */
+  textarea.gt-notes-input {
+    display: block; resize: none; overflow: hidden;
+    height: auto; min-height: 0; vertical-align: top;
+    overflow-wrap: anywhere;
+  }
 
   .gt-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .gt-chip {
@@ -18862,6 +18871,12 @@
       '<path class="tcb-check" d="M7.5 12.5l3 3 6-6.5"/>' +
       '</svg>';
 
+    // Same reasoning: the notes-row icon the Google Tasks composer uses
+    // (GT_ICON.notes there) lives in that other module's scope, so it's
+    // duplicated here rather than reached across the boundary.
+    const READING_NOTES_ICON =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16"/><path d="M4 12h12"/><path d="M4 17h8"/></svg>';
+
     function fmtReadingCompletedDate(iso) {
       const d = new Date(iso);
       if (isNaN(d.getTime())) return String(iso).slice(0, 10);
@@ -19182,21 +19197,30 @@
       // Description — same row/input classes and placeholder styling as the
       // Google Tasks composer's own notes field, right under the title and
       // above the tags, so the two lists' editors read as one component.
+      // A <textarea>, not an <input>: free text that can run to several
+      // lines, and Enter inserts one rather than committing the row (that's
+      // the title field's job, not this one's).
       const notesRow = document.createElement("div");
       notesRow.className = "gt-notes-row";
-      notesRow.innerHTML = GT_ICON.notes;
-      const notesInput = document.createElement("input");
-      notesInput.type = "text";
+      notesRow.innerHTML = READING_NOTES_ICON;
+      const notesInput = document.createElement("textarea");
       notesInput.className = "gt-notes-input";
       notesInput.placeholder = "Description";
+      notesInput.rows = 1;
       notesInput.value = editingDraft.notes || "";
+      function growReadingNotes() {
+        notesInput.style.height = "auto";
+        notesInput.style.height = notesInput.scrollHeight + "px";
+      }
       notesInput.addEventListener("input", function () {
         if (editingDraft) editingDraft.notes = notesInput.value;
+        growReadingNotes();
       });
       notesInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") { e.preventDefault(); saveReadingRowEdit(); }
-        else if (e.key === "Escape") { e.preventDefault(); cancelReadingRowEdit(); }
+        if (e.key === "Escape") { e.preventDefault(); cancelReadingRowEdit(); }
       });
+      requestAnimationFrame(growReadingNotes);
+      notesInput.addEventListener("focus", growReadingNotes);
       notesRow.appendChild(notesInput);
       row.appendChild(notesRow);
 
@@ -22726,10 +22750,12 @@
       editingDraft.repeat = composer.repeatInput.value;
     }
     composer.titleInput.addEventListener("input", syncDraft);
+    // No Enter handler here: the description is multi-line, so Enter has to
+    // do what it does in any textarea and insert a line break, not commit
+    // the row. Escape still abandons the edit, same as everywhere else.
     composer.notesInput.addEventListener("input", syncDraft);
     composer.notesInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); commit(); }
-      else if (e.key === "Escape") { e.preventDefault(); cancelTaskRowEdit(); }
+      if (e.key === "Escape") { e.preventDefault(); cancelTaskRowEdit(); }
     });
     // The date/repeat chips write straight into the hidden carrier inputs, so
     // a click anywhere in the composer is the cue to re-read all of them. The
@@ -22858,7 +22884,7 @@
     if (t.notes) {
       const notesEl = document.createElement("div");
       notesEl.className = "cal-taskrow-notes";
-      notesEl.textContent = "- " + t.notes.split("\n")[0];
+      notesEl.textContent = t.notes.split("\n")[0];
       row.appendChild(notesEl);
     }
 
@@ -23039,15 +23065,15 @@
       if (!t.__pending) top.appendChild(buildBranchAiButton(nsId, t.title));
       row.appendChild(top);
 
-      // The task's notes, as a single muted "- " line right under the
-      // title — same spot a short detail line sits in the reference this
-      // row is modeled on. Google Tasks notes are free text and can run to
-      // several lines; only the first is shown here, the rest lives in the
-      // full editor.
+      // The task's notes, as a single muted line right under the title —
+      // same spot a short detail line sits in the reference this row is
+      // modeled on. Google Tasks notes are free text and can run to several
+      // lines; only the first is shown here, the rest lives in the full
+      // editor.
       if (t.notes) {
         const notesEl = document.createElement("div");
         notesEl.className = "cal-taskrow-notes";
-        notesEl.textContent = "- " + t.notes.split("\n")[0];
+        notesEl.textContent = t.notes.split("\n")[0];
         row.appendChild(notesEl);
       }
 
@@ -25757,13 +25783,21 @@
     const notesRow = document.createElement("div");
     notesRow.className = "gt-notes-row";
     notesRow.innerHTML = GT_ICON.notes;
-    notesInput = document.createElement("input");
-    notesInput.type = "text";
+    // A <textarea>, not an <input>: the description is free text that can
+    // run to several lines, and Enter has to insert one rather than being
+    // swallowed by a single-line field or hijacked to commit the form (the
+    // title field's job, not this one's -- see the deliberate absence of an
+    // Enter handler below). Grows with gtAutoGrow exactly like the title.
+    notesInput = document.createElement("textarea");
     notesInput.className = "gt-notes-input";
     notesInput.placeholder = "Description";
+    notesInput.rows = 1;
     notesInput.value = init.notes || "";
     notesRow.appendChild(notesInput);
     main.appendChild(notesRow);
+    requestAnimationFrame(function () { gtAutoGrow(notesInput); });
+    notesInput.addEventListener("focus", function () { gtAutoGrow(notesInput); });
+    notesInput.addEventListener("input", function () { gtAutoGrow(notesInput); });
     }
 
     const chips = document.createElement("div");
@@ -26465,9 +26499,10 @@
       if (e.key === "Enter") { e.preventDefault(); commitInlineComposer(); }
       else if (e.key === "Escape") { e.preventDefault(); closeInlineComposer(); }
     });
+    // Multi-line field: Enter inserts a line break here rather than
+    // committing the task, same reasoning as the row editor above.
     inlineComposer.notesInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); commitInlineComposer(); }
-      else if (e.key === "Escape") { e.preventDefault(); closeInlineComposer(); }
+      if (e.key === "Escape") { e.preventDefault(); closeInlineComposer(); }
     });
     inlineComposer.titleInput.focus();
   }
