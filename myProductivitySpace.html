@@ -4269,20 +4269,37 @@
       padding-bottom: 96px;
     }
 
-    /* --- board view: the real board, two columns, real content --- */
+    /* --- board view: the desktop board, zoomed out ---
+       Not a phone-shaped reflow into two columns. This is the actual desktop
+       arrangement -- the same slots at the same relative widths, the same
+       stacking -- shrunk until it fits. That is what makes it a view of YOUR
+       board rather than a second layout that happens to hold the same widgets,
+       and it is why turning the phone to landscape genuinely helps: the board
+       does not re-wrap, it just gets a wider window and a bigger zoom factor.
+
+       `zoom` rather than `transform: scale()` deliberately: zoom affects
+       layout, so the board occupies the space it visually takes and the page
+       scrolls correctly. A transform would leave the element reserving its
+       full unscaled height, with a screen of blank space underneath. The
+       factor is measured in JS (fitBoard) because CSS cannot divide the
+       viewport by the board's natural width. */
     html.mob-board:not(.force-desktop) .widget {
-      flex-direction: row; flex-wrap: wrap; align-content: flex-start;
+      flex-direction: row; flex-wrap: nowrap; align-items: stretch;
+      justify-content: flex-start;
       overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch;
       scroll-snap-type: none;
-      gap: 10px; padding: 4px 12px calc(20px + env(safe-area-inset-bottom));
+      gap: 0; padding: 6px 10px calc(20px + env(safe-area-inset-bottom));
+      zoom: var(--mob-zoom, 0.35);
     }
+    html.mob-board:not(.force-desktop) .col-slot { display: flex; flex-direction: column; }
     html.mob-board:not(.force-desktop) .col.collapsible-col-wrap {
-      flex: 0 0 calc(50% - 5px) !important; width: auto !important;
-      min-width: 0; max-width: none;
-      min-height: 128px; max-height: 210px; overflow: hidden;
-      scroll-snap-align: none;
-      padding: 0;
+      flex: 1 1 auto !important; width: auto !important;
+      min-width: 0; max-width: none; max-height: none;
+      overflow: hidden; scroll-snap-align: none;
     }
+    /* The col-resizers come back so the slots keep their desktop proportions;
+       they are inert here, just spacing. */
+    html.mob-board:not(.force-desktop) .col-resizer { display: block; }
     /* Board view is for reading the board, not scrolling inside one widget,
        so the wrapper clips and nothing inside it scrolls the page out from
        under you. Deliberately on the wrapper alone: an `* { overflow: hidden }`
@@ -4339,7 +4356,7 @@
     html:not(.force-desktop) .col.collapsible-col-wrap { position: relative; }
     .mob-ctl { display: none; }
     html:not(.force-desktop) .mob-ctl {
-      display: flex; gap: 2px; position: absolute; top: 4px; right: 6px; z-index: 6;
+      display: flex; gap: 2px; position: absolute; top: 34px; right: 6px; z-index: 6;
       border-radius: 9px;
       background: color-mix(in srgb, var(--bg) 74%, transparent);
       backdrop-filter: blur(12px) saturate(160%);
@@ -4356,6 +4373,20 @@
       opacity: .97; box-shadow: 0 16px 34px -10px rgba(0,0,0,.3);
     }
     .col.collapsible-col-wrap.mob-drop-target { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+    /* A Page hides its header title group entirely: its FIRST LINE is the
+       title. So unlike every other widget there is nothing above the content
+       for the buttons to sit over, and at the top-right they landed straight
+       on the words. The first line starts below them instead. Padding on the
+       editor rather than a margin on the first block, so the empty-state
+       placeholder moves with the real text. */
+    html:not(.force-desktop) .col.collapsible-col-wrap.note-widget .note-editor,
+    html:not(.force-desktop) .col.collapsible-col-wrap.note-widget .sticky-note {
+      padding-top: 34px;
+    }
+    /* Everything else keeps its header, and the buttons now sit under it --
+       so the body starts clear of them too. */
+    html:not(.force-desktop) .col.collapsible-col-wrap .widget-body { padding-top: 30px; }
 
     /* --- the anchored menu --- */
     .mob-menu { display: none; }
@@ -35164,6 +35195,7 @@
     list.forEach(function (el) { observer.observe(el); });
     ensureControls();
     applySpans();
+    fitBoard();
     setCurrent(Math.min(current, list.length - 1));
     filterTabs();
   }
@@ -35191,6 +35223,29 @@
     build();
   });
   document.documentElement.classList.toggle("is-touch", TOUCH.matches);
+
+  /* Board view shows the desktop board shrunk to fit, so the shrink factor
+     is the viewport divided by the board's natural width. CSS cannot do that
+     division, so it is measured here and published as --mob-zoom.
+
+     Measured with zoom cleared, because scrollWidth reports post-zoom values
+     and reading it while zoomed would feed the last answer back into the next
+     one and converge on nothing. Landscape needs no special case: a wider
+     viewport simply divides into a bigger factor. */
+  const ZOOM_MIN = 0.16, ZOOM_MAX = 1;
+  function fitBoard() {
+    const root = document.documentElement;
+    if (!isMobile() || currentView() !== "board") { root.style.removeProperty("--mob-zoom"); return; }
+    root.style.setProperty("--mob-zoom", "1");
+    const natural = Math.max(grid.scrollWidth, grid.clientWidth, 1);
+    const avail = Math.max(root.clientWidth - 20, 1);
+    let k = avail / natural;
+    if (!isFinite(k) || k <= 0) k = ZOOM_MIN;
+    k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k));
+    root.style.setProperty("--mob-zoom", String(Math.round(k * 1000) / 1000));
+  }
+  window.addEventListener("orientationchange", function () { setTimeout(fitBoard, 250); });
+  window.addEventListener("resize", function () { setTimeout(fitBoard, 120); });
 
   /* ---------- per-widget controls ----------
      Every action here goes through __aiBoard, the board's own published
@@ -35471,6 +35526,8 @@
     if (thumb) thumb.style.transform = "translateX(" + (board ? 0 : 40) + "px)";
     if (persist) { try { window.storageSet(VIEW_KEY, v); } catch (e) {} }
     filterTabs();
+    // After the class lands, so the board is laid out the way it will be read.
+    requestAnimationFrame(fitBoard);
     /* Coming back to widget view, land on the widget you were reading rather
        than at the start of the board. The scroll position survives the class
        change, but scroll-snap can leave it between two pages. */
