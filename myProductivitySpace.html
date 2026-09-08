@@ -4289,10 +4289,93 @@
        here also clips every popover and absolutely-positioned child a widget
        owns, which breaks things that have nothing to do with scrolling.
 
-       Carrying a widget's desktop width through to the phone board is a real
-       idea and is NOT implemented -- the column widths live in the layout
-       closure and are not published. Every tile is half-width for now. */
+       Size here is the PHONE's, stored separately from the desktop column
+       widths. `set_width` on the layout surface stores desktop pixels, which
+       this view ignores because tiles are a fixed half-width -- so wiring the
+       grip to it would silently rearrange the desktop and do nothing visible
+       here. A widget instead gets a phone span of one or two columns, and one
+       or two rows, which is what "bigger" can actually mean on a 390px grid. */
+    html.mob-board:not(.force-desktop) .col.collapsible-col-wrap.mob-w2 {
+      flex: 0 0 100% !important;
+    }
+    html.mob-board:not(.force-desktop) .col.collapsible-col-wrap.mob-h2 {
+      max-height: 330px;
+    }
+    /* A 34px target around an 11px mark. A hover-era resize handle is a few
+       pixels wide, which no finger can land on. */
+    .mob-size { display: none; }
+    html.mob-board:not(.force-desktop) .mob-size {
+      display: grid; position: absolute; right: 0; bottom: 0;
+      width: 34px; height: 34px; padding: 8px; place-items: end;
+      z-index: 6; touch-action: none; cursor: nwse-resize;
+      border: 0; background: transparent;
+    }
+    .mob-size:after {
+      content: ""; width: 11px; height: 11px;
+      border-right: 2px solid var(--ink-soft); border-bottom: 2px solid var(--ink-soft);
+      border-radius: 0 0 3px 0; opacity: .8;
+    }
+    .col.collapsible-col-wrap.mob-sizing { outline: 2px solid var(--ink); outline-offset: -2px; }
     html.mob-board:not(.force-desktop) .mob-chrome { display: none; }
+
+    /* --- per-widget controls, on the surface because there is no hover ---
+       The ••• carries every command that used to live in a hover control.
+       The six-dot grip stays outside it and board-only: dragging is the
+       gesture it represents and a menu item cannot be dragged, and widget
+       view has nothing to rearrange. The grip sits INBOARD of the ••• so the
+       control a thumb catches on the trailing edge is the recoverable one --
+       a menu opened by mistake is dismissed, a drag by mistake silently
+       rearranges the board. */
+    html:not(.force-desktop) .col.collapsible-col-wrap { position: relative; }
+    .mob-ctl { display: none; }
+    html:not(.force-desktop) .mob-ctl {
+      display: flex; gap: 2px; position: absolute; top: 4px; right: 6px; z-index: 6;
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--bg) 74%, transparent);
+      backdrop-filter: blur(12px) saturate(160%);
+    }
+    .mob-ctl button {
+      width: 30px; height: 30px; border: 0; background: transparent; border-radius: 8px;
+      color: var(--ink-soft); display: grid; place-items: center; cursor: pointer; padding: 0;
+    }
+    .mob-ctl button:active { background: rgba(0,0,0,.07); color: var(--ink); }
+    .mob-ctl svg { width: 15px; height: 15px; display: block; }
+    .mob-ctl .mc-grip { display: none; touch-action: none; cursor: grab; }
+    html.mob-board:not(.force-desktop) .mob-ctl .mc-grip { display: grid; }
+    .col.collapsible-col-wrap.mob-dragging {
+      opacity: .97; box-shadow: 0 16px 34px -10px rgba(0,0,0,.3);
+    }
+    .col.collapsible-col-wrap.mob-drop-target { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+    /* --- the anchored menu --- */
+    .mob-menu { display: none; }
+    html:not(.force-desktop) .mob-menu.is-open { display: block; }
+    .mob-menu {
+      position: fixed; z-index: 3200; min-width: 208px; padding: 5px; border-radius: 14px;
+      border: 1px solid var(--hair);
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(22px) saturate(180%);
+      box-shadow: 0 18px 40px -12px rgba(0,0,0,.32);
+      transform-origin: top right;
+    }
+    .mob-menu button {
+      display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px;
+      padding: 0 11px; border: 0; background: transparent; border-radius: 10px;
+      color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; text-align: left;
+    }
+    .mob-menu button:active { background: rgba(0,0,0,.07); }
+    .mob-menu button svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-soft); }
+    .mob-menu hr { border: 0; border-top: 1px solid var(--hair); margin: 4px 6px; }
+    .mob-swatches { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 9px 5px; }
+    .mob-swatches button {
+      width: 30px; height: 30px; min-height: 0; padding: 0; border-radius: 50%;
+      border: 1px solid rgba(0,0,0,.14);
+    }
+    .mob-scrim { position: fixed; inset: 0; z-index: 3150; display: none; }
+    .mob-scrim.is-open { display: block; }
+
+    /* A tab for a widget that is not currently in rotation. */
+    .mob-tab.is-hidden { opacity: .55; border-style: dashed; border-color: var(--hair); }
 
     /* --- the segmented control --- */
     html:not(.force-desktop) .mob-seg {
@@ -4891,6 +4974,9 @@
     </svg>
   </button>
 </div>
+
+<div class="mob-scrim" id="mobScrim"></div>
+<div class="mob-menu" id="mobMenu" role="menu" aria-label="Widget options"></div>
 
 <div class="mob-chrome" id="mobChrome">
   <div class="mob-pdots" id="mobDots"></div>
@@ -34956,11 +35042,16 @@
     Array.prototype.forEach.call(dots.children, function (d, n) {
       d.classList.toggle("is-on", n === i);
     });
-    Array.prototype.forEach.call(tabsEl.children, function (b, n) {
-      b.classList.toggle("is-on", n === i);
-      b.setAttribute("aria-current", n === i ? "true" : "false");
+    // Tabs list every widget and pages list only the visible ones, so the two
+    // are matched by id rather than by index.
+    const here = idOf(pages()[i]);
+    let cur = null;
+    Array.prototype.forEach.call(tabsEl.children, function (b) {
+      const on = here && b.getAttribute("data-tab-for") === here;
+      b.classList.toggle("is-on", !!on);
+      b.setAttribute("aria-current", on ? "true" : "false");
+      if (on) cur = b;
     });
-    const cur = tabsEl.children[i];
     if (cur && cur.scrollIntoView) {
       cur.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
     }
@@ -34997,27 +35088,51 @@
     const list = pages();
     if (!isMobile() || list.length < 1) { filterTabs(); return; }
 
-    list.forEach(function (el, i) {
-      const id = idOf(el);
-      const n = nameFor(id);
+    // The dots count the pages you can swipe through.
+    list.forEach(function () { dots.appendChild(document.createElement("span")); });
 
-      const d = document.createElement("span");
-      dots.appendChild(d);
-
+    /* The tab bar lists EVERY widget on the board, hidden ones included, so it
+       answers "what have I got" and not only "what is in front of me". A tab
+       for a hidden widget is dashed and faded; tapping it brings the widget
+       back and takes you to it, which is the only way back to a hidden widget
+       from this view. */
+    let all = [];
+    try { all = (board() && board().list()) || []; } catch (e) { all = []; }
+    if (!all.length) {
+      all = list.map(function (el) {
+        const n = nameFor(idOf(el));
+        return { id: idOf(el), title: n.title, icon: n.icon, hidden: false };
+      });
+    }
+    all.forEach(function (w) {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "mob-tab";
-      b.setAttribute("data-tab-for", id || "");
-      if (n.icon) {
+      b.className = "mob-tab" + (w.hidden ? " is-hidden" : "");
+      b.setAttribute("data-tab-for", w.id || "");
+      if (w.icon) {
         const em = document.createElement("span");
         em.className = "mt-em";
-        em.textContent = n.icon;
+        em.textContent = w.icon;
         b.appendChild(em);
       }
       // textContent, not innerHTML: a widget title is user text and a custom
       // widget's title is model-authored, so neither is safe to parse as markup.
-      b.appendChild(document.createTextNode(n.title));
-      b.addEventListener("click", function () { goTo(i); });
+      b.appendChild(document.createTextNode(w.title || w.id));
+      b.addEventListener("click", function () {
+        if (w.hidden) {
+          try { board().setHidden(w.id, false); } catch (e) {}
+          // The board re-renders, so find the page again rather than trusting
+          // an index captured before the widget existed as a page.
+          requestAnimationFrame(function () {
+            rebuild();
+            const i = pages().map(idOf).indexOf(w.id);
+            if (i !== -1) goTo(i);
+          });
+          return;
+        }
+        const i = pages().map(idOf).indexOf(w.id);
+        if (i !== -1) goTo(i);
+      });
       tabsEl.appendChild(b);
     });
 
@@ -35037,9 +35152,16 @@
       if (i !== -1 && i !== current) setCurrent(i);
     }, { root: grid, threshold: [0.5, 0.75] });
     list.forEach(function (el) { observer.observe(el); });
+    ensureControls();
+    applySpans();
     setCurrent(Math.min(current, list.length - 1));
     filterTabs();
   }
+
+  /* A hide, an unhide or a reorder changes attributes rather than the grid's
+     child list, so the MutationObserver below does not see it. Anything that
+     changes the board through this module says so explicitly. */
+  function rebuild() { setTimeout(build, 60); }
 
   /* render() rebuilds the grid's children wholesale whenever a widget is
      added, deleted, hidden or moved, so the bar has to be rebuilt with it.
@@ -35059,6 +35181,258 @@
     build();
   });
   document.documentElement.classList.toggle("is-touch", TOUCH.matches);
+
+  /* ---------- per-widget controls ----------
+     Every action here goes through __aiBoard, the board's own published
+     surface, which funnels each verb through the same setWidgetX the desktop
+     button uses. So a phone edit persists, re-renders and syncs on exactly
+     the path a hand edit does, rather than being a second implementation that
+     drifts. Reordering goes through __aiLayout.arrange for the same reason. */
+  const ICO = {
+    dots: '<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>',
+    grip: '<circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/>'
+        + '<circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>',
+    pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/>',
+    drop: '<path d="M12 3s6 6.4 6 10a6 6 0 0 1-12 0c0-3.6 6-10 6-10Z"/>',
+    expand: '<path d="M4 9V4h5"/><path d="M20 15v5h-5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/>',
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>'
+  };
+  function svgIcon(d, filled) {
+    return '<svg viewBox="0 0 24 24" fill="' + (filled ? 'currentColor' : 'none') + '" stroke="'
+      + (filled ? 'none' : 'currentColor') + '" stroke-width="1.9" stroke-linecap="round" '
+      + 'stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  }
+  const menuEl = document.getElementById("mobMenu");
+  const scrimEl = document.getElementById("mobScrim");
+  function closeMenu() {
+    if (menuEl) menuEl.classList.remove("is-open");
+    if (scrimEl) scrimEl.classList.remove("is-open");
+  }
+  if (scrimEl) scrimEl.addEventListener("click", closeMenu);
+
+  function board() { return window.__aiBoard || null; }
+
+  function openMenu(btn, id) {
+    const B = board();
+    if (!menuEl || !B) return;
+    const boardView = currentView() === "board";
+    menuEl.innerHTML = "";
+    const add = function (label, icon, fn) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.innerHTML = svgIcon(icon);
+      b.appendChild(document.createTextNode(label));
+      b.addEventListener("click", function () { closeMenu(); try { fn(); } catch (e) {} });
+      menuEl.appendChild(b);
+    };
+    const cur = nameFor(id);
+
+    add("Rename", ICO.pencil, function () {
+      const v = window.prompt("Widget name", cur.title);
+      if (v != null && v.trim()) B.rename(id, v.trim());
+    });
+    add("Change icon", ICO.smile, function () {
+      const v = window.prompt("Emoji for this widget (leave blank to remove)", cur.icon || "");
+      if (v != null) B.setIcon(id, v.trim());
+    });
+
+    // Colour is a row of the board's own presets rather than a text field:
+    // the palette is a closed set, so a picker is both faster and unmissable.
+    const sw = document.createElement("div");
+    sw.className = "mob-swatches";
+    let presets = [];
+    try { presets = B.colorPresets() || []; } catch (e) {}
+    presets.forEach(function (p) {
+      const c = document.createElement("button");
+      c.type = "button";
+      c.title = p.name;
+      c.setAttribute("aria-label", p.name);
+      c.style.background = p.hex;
+      c.addEventListener("click", function () { closeMenu(); try { B.setColor(id, p.name); } catch (e) {} });
+      sw.appendChild(c);
+    });
+    if (presets.length) {
+      const lab = document.createElement("button");
+      lab.type = "button";
+      lab.innerHTML = svgIcon(ICO.drop);
+      lab.appendChild(document.createTextNode("Colour"));
+      lab.disabled = true;
+      lab.style.opacity = ".7";
+      menuEl.appendChild(lab);
+      menuEl.appendChild(sw);
+    }
+
+    add("Open fullscreen", ICO.expand, function () { B.setMaximized(id); });
+
+    /* Hide is board-view only, and fenced off below a divider. In widget view
+       it would remove the screen you are standing on and leave you somewhere
+       else, with the only way back in the other mode. */
+    if (boardView) {
+      menuEl.appendChild(document.createElement("hr"));
+      add("Hide widget", ICO.eye, function () { B.setHidden(id, true); rebuild(); });
+    }
+
+    const r = btn.getBoundingClientRect();
+    menuEl.style.top = (r.bottom + 8) + "px";
+    menuEl.style.right = Math.max(8, window.innerWidth - r.right) + "px";
+    menuEl.classList.add("is-open");
+    if (scrimEl) scrimEl.classList.add("is-open");
+  }
+
+  /* The controls are injected rather than authored into every widget, because
+     render() rebuilds the slots from `layout` and would drop anything the
+     markup carried. Idempotent, so a rebuild re-uses what is already there. */
+  function ensureControls() {
+    if (!isMobile()) {
+      Array.prototype.forEach.call(grid.querySelectorAll(".mob-ctl, .mob-size"), function (n) { n.remove(); });
+      return;
+    }
+    Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (el) {
+      if (el.querySelector(".mob-ctl")) return;
+      const id = idOf(el);
+      if (!id) return;
+      const wrap = document.createElement("div");
+      wrap.className = "mob-ctl";
+
+      const grip = document.createElement("button");
+      grip.type = "button";
+      grip.className = "mc-grip";
+      grip.setAttribute("aria-label", "Drag to reorder");
+      grip.innerHTML = svgIcon(ICO.grip, true);
+      wrap.appendChild(grip);
+
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "mc-more";
+      more.setAttribute("aria-label", "Widget options");
+      more.innerHTML = svgIcon(ICO.dots, true);
+      more.addEventListener("click", function (e) {
+        e.stopPropagation(); e.preventDefault();
+        openMenu(more, id);
+      });
+      wrap.appendChild(more);
+
+      el.appendChild(wrap);
+
+      const size = document.createElement("button");
+      size.type = "button";
+      size.className = "mob-size";
+      size.setAttribute("aria-label", "Resize widget");
+      el.appendChild(size);
+    });
+  }
+
+  /* Phone-local widget size. Deliberately not the desktop width: those are
+     pixel column widths for a layout this view does not use, and writing to
+     them would move furniture on a screen the user is not looking at. */
+  const SPAN_KEY = "mobile-span";
+  let spans = {};
+  function spanOf(id) { return spans[id] || { w: 1, h: 1 }; }
+  function applySpans() {
+    Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (el) {
+      const sp = spanOf(idOf(el));
+      el.classList.toggle("mob-w2", sp.w === 2);
+      el.classList.toggle("mob-h2", sp.h === 2);
+    });
+  }
+  function setSpan(id, w, h) {
+    spans[id] = { w: Math.min(2, Math.max(1, w)), h: Math.min(2, Math.max(1, h)) };
+    applySpans();
+    try { window.storageSet(SPAN_KEY, JSON.stringify(spans)); } catch (e) {}
+  }
+  (async function () {
+    let raw = null;
+    try { raw = await window.storageGet(SPAN_KEY); } catch (e) {}
+    try { spans = raw ? JSON.parse(raw) : {}; } catch (e) { spans = {}; }
+    if (!spans || typeof spans !== "object") spans = {};
+    applySpans();
+  })();
+
+  /* Snapping to one or two columns rather than tracking the finger: a
+     continuous resize on a 390px two-column grid lands between meaningless
+     values, and every intermediate width would reflow the whole board. */
+  let sizeState = null;
+  grid.addEventListener("pointerdown", function (e) {
+    if (!isMobile() || currentView() !== "board") return;
+    const h = e.target.closest(".mob-size");
+    if (!h) return;
+    e.preventDefault(); e.stopPropagation();
+    const el = h.closest(".col.collapsible-col-wrap");
+    if (!el) return;
+    grid.setPointerCapture(e.pointerId);
+    const sp = spanOf(idOf(el));
+    sizeState = { pid: e.pointerId, id: idOf(el), el: el, sx: e.clientX, sy: e.clientY, w: sp.w, h: sp.h };
+    el.classList.add("mob-sizing");
+  }, true);
+  grid.addEventListener("pointermove", function (e) {
+    if (!sizeState || e.pointerId !== sizeState.pid) return;
+    const dx = e.clientX - sizeState.sx, dy = e.clientY - sizeState.sy;
+    const col = grid.clientWidth / 2;
+    const w = sizeState.w + (dx > col * 0.4 ? 1 : (dx < -col * 0.4 ? -1 : 0));
+    const h = sizeState.h + (dy > 60 ? 1 : (dy < -60 ? -1 : 0));
+    const cur = spanOf(sizeState.id);
+    const nw = Math.min(2, Math.max(1, w)), nh = Math.min(2, Math.max(1, h));
+    if (nw !== cur.w || nh !== cur.h) setSpan(sizeState.id, nw, nh);
+  });
+  function endSize(e) {
+    if (!sizeState || e.pointerId !== sizeState.pid) return;
+    sizeState.el.classList.remove("mob-sizing");
+    sizeState = null;
+  }
+  grid.addEventListener("pointerup", endSize);
+  grid.addEventListener("pointercancel", endSize);
+
+  /* Drag a grip to reorder the board. The move itself goes through
+     __aiLayout.arrange, so it persists and re-renders on the same path the
+     desktop drag uses -- this only decides WHICH move to ask for. */
+  let dragState = null;
+  grid.addEventListener("pointerdown", function (e) {
+    if (!isMobile() || currentView() !== "board") return;
+    const grip = e.target.closest(".mc-grip");
+    if (!grip) return;
+    e.preventDefault();
+    const el = grip.closest(".col.collapsible-col-wrap");
+    if (!el) return;
+    grid.setPointerCapture(e.pointerId);
+    dragState = { pid: e.pointerId, id: idOf(el), el: el, sx: e.clientX, sy: e.clientY, moved: false, over: null };
+  });
+  grid.addEventListener("pointermove", function (e) {
+    if (!dragState || e.pointerId !== dragState.pid) return;
+    const dx = e.clientX - dragState.sx, dy = e.clientY - dragState.sy;
+    if (!dragState.moved) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      dragState.moved = true;
+      dragState.el.classList.add("mob-dragging");
+    }
+    let over = null;
+    Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (t) {
+      if (t === dragState.el) return;
+      const r = t.getBoundingClientRect();
+      if (e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom) over = t;
+    });
+    if (dragState.over && dragState.over !== over) dragState.over.classList.remove("mob-drop-target");
+    dragState.over = over;
+    if (over) over.classList.add("mob-drop-target");
+  });
+  function endDrag(e) {
+    if (!dragState || e.pointerId !== dragState.pid) return;
+    const st = dragState; dragState = null;
+    st.el.classList.remove("mob-dragging");
+    if (st.over) st.over.classList.remove("mob-drop-target");
+    if (!st.moved || !st.over || !window.__aiLayout) return;
+    const targetId = idOf(st.over);
+    if (!targetId || targetId === st.id) return;
+    // Which side depends on which way you dragged, so the widget lands where
+    // you dropped it rather than always to one side of the target.
+    const a = st.el.getBoundingClientRect(), b = st.over.getBoundingClientRect();
+    const side = (b.top > a.top || (Math.abs(b.top - a.top) < 4 && b.left > a.left))
+      ? "move_right_of" : "move_left_of";
+    try { window.__aiLayout.arrange(st.id, side, targetId); } catch (err) {}
+    rebuild();
+  }
+  grid.addEventListener("pointerup", endDrag);
+  grid.addEventListener("pointercancel", endDrag);
 
   /* ---------- the two views ----------
      One class on <html> and the stylesheet does the rest: nothing is
