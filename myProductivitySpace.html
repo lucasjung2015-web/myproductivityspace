@@ -4243,7 +4243,26 @@
        the rest. */
     html:not(.force-desktop) .cal-tg-event { touch-action: pan-y; }
     html:not(.force-desktop) .cal-daycell { min-height: 58px; }
-    html:not(.force-desktop) .cal-viewport { min-height: 340px; }
+    /* Widget view only. In widget view the widget owns the screen and the
+       wrapper scrolls, so asking for 340px of hour grid costs nothing: the
+       page just gets longer.
+
+       In board view it was the whole bug behind "the calendar will not scroll
+       to the end". A board tile is a fixed box with overflow:hidden, and the
+       viewport is a flex child of it -- so a 340px minimum on a 300px tile
+       does not shrink the tile, it pushes the viewport's bottom 40px past the
+       tile's edge, where the tile clips it away. The grid still scrolls, and
+       scrolling still ends where the browser says it ends: with the last hour
+       flush against the viewport's real bottom, which is now off the tile.
+       11 PM was being scrolled into a strip you cannot see. The blank band
+       under the last hour line was the rest of that strip showing through.
+
+       Nothing replaces it in board view, so the base min-height:120px would
+       do the same thing on a small tile -- hence the explicit 0. flex:1 1 0
+       then sizes the viewport to exactly the room the tile has, the grid
+       scrolls inside it, and the end of the scroll is the end of the day. */
+    html:not(.force-desktop):not(.mob-board) .cal-viewport { min-height: 340px; }
+    html.mob-board:not(.force-desktop) .cal-viewport { min-height: 0; }
     html:not(.force-desktop) .cal-chip { font-size: 11px; padding: 3px 5px; }
 
     /* ---------- 8. the AI panel ---------- */
