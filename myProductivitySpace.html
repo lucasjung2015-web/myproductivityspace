@@ -23637,7 +23637,7 @@
     if (completedOpen) {
       const list = document.createElement("div");
       list.className = "cal-completed-list";
-      if (completedLoading) {
+      if (completedLoadingNow()) {
         const loading = document.createElement("div");
         loading.className = "cal-empty";
         loading.textContent = "Loading…";
