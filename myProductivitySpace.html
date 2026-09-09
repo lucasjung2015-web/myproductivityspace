@@ -21023,9 +21023,19 @@
     finally {
       // completeTask and deleteGoogleItem REPLACE the array rather than
       // mutating it, so the new one has to be filed back under its widget.
-      if (own && tasks !== savedTasks) tasksByWidget[w] = tasks;
+      // Only undo the swap-in when we actually swapped: for the PRIMARY
+      // widget `tasks` IS the storage (there is no tasksByWidget entry to
+      // file it back to), so unconditionally restoring savedTasks here was
+      // silently reverting every reassignment (filter/replace) a primary-
+      // widget write made -- the row vanished from `tasks` for an instant
+      // and then reappeared, because the finally put the old array straight
+      // back. Google still got the request; only the local render lost it,
+      // which is why a reload (a fresh fetch) always showed it gone.
+      if (own) {
+        if (tasks !== savedTasks) tasksByWidget[w] = tasks;
+        tasks = savedTasks;
+      }
       activeTaskWidgetId = savedId;
-      tasks = savedTasks;
     }
   }
   function persistTaskLists() {
