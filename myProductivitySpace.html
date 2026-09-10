@@ -631,7 +631,19 @@
 
   .widget {
     display: flex; flex-direction: row; align-items: stretch;
+    /* `safe center`, not plain `center`. A centred flex row that is WIDER
+       than its container pushes the overflow out of both sides equally, and
+       no browser can scroll to a negative position -- so everything spilling
+       past the left edge was permanently unreachable while the right side
+       scrolled fine. It only appears once the board outgrows the window,
+       which is why it arrived quietly as widgets were added rather than as
+       an obvious break. `safe` falls back to flex-start exactly when the
+       content overflows, so a narrow board still centres and a wide one
+       starts at the left edge and scrolls the whole way.
+       The plain value stays first as the fallback for anything that does
+       not understand the keyword; it is overridden wherever `safe` parses. */
     justify-content: center;
+    justify-content: safe center;
     gap: 0; padding: 10px 28px 28px 28px; flex: 1 1 auto; min-height: 0;
   }
   /* A slot is the width-resizable unit placed in the row; it holds one
