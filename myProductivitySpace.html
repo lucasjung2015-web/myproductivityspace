@@ -3262,6 +3262,10 @@
   /* The two non-default modes are states you can forget you are in, so the
      strip stops being quiet grey text once you leave Auto. */
   .ai-mode-btn.is-set { color: var(--ink); font-weight: 600; }
+  .ai-pick-btn { margin-left: 4px; }
+  .ai-mode-btn:disabled { opacity: 0.45; cursor: default; }
+  /* The two extra menus open above their own button, like the mode menu. */
+  .ai-pick-menu { left: auto; }
   /* Opens upward for the same reason .ai-plus-menu does: the composer is
      pinned to the bottom of the panel. */
   .ai-mode-menu {
@@ -5079,6 +5083,10 @@
     <div class="ai-mode-menu" id="aiModeMenu" hidden role="menu" aria-label="Mode">
       <div class="ai-mode-head">Mode</div>
     </div>
+    <button type="button" class="ai-mode-btn ai-pick-btn" id="aiModelBtn" aria-haspopup="true" aria-expanded="false" title="Which model answers"><span id="aiModelLabel">Sonnet 5</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="ai-mode-menu ai-pick-menu" id="aiModelMenu" hidden role="menu" aria-label="Model"></div>
+    <button type="button" class="ai-mode-btn ai-pick-btn" id="aiEffortBtn" aria-haspopup="true" aria-expanded="false" title="How hard the model thinks"><span id="aiEffortLabel">High</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="ai-mode-menu ai-pick-menu" id="aiEffortMenu" hidden role="menu" aria-label="Effort"></div>
   </div>
   </div>
 </aside>
@@ -31475,6 +31483,64 @@
      true, because a prompt is a request and this one has to hold even when
      the model forgets it 40 turns in. */
   const AI_MODE_KEY = "ai-mode";
+  /* ---- model and effort ----
+     Two pickers beside the mode picker. The MODEL is which upstream answers:
+     the proxy holds a key per provider and an allow-list of model ids, and
+     refuses anything not on it, so the page choosing a model is not the page
+     choosing a price. The EFFORT is how hard that model thinks, and the
+     levels on offer are the model's own: Sonnet takes medium and high, plus
+     "auto" (medium, raised to high for the rest of the run and chat the
+     moment a run struggles; see escalateEffort in the loop). DeepSeek takes
+     none (thinking off), low, high and max; it maps medium to high itself,
+     so it is not offered.
+
+     One stored effort per model, so switching models brings back the level
+     last used with that model. Both pickers lock while a run is in progress:
+     a model switch mid-chat re-stores the whole history at the write rate,
+     because caches are per model, and effort changes invalidate the cached
+     messages, so both are meant to happen between messages. Thinking blocks
+     are pruned from history after every run (pruneFinishedRun), which is
+     what makes a between-message switch safe: nothing signed by one model
+     is ever replayed to the other. */
+  const AI_MODEL_KEY = "ai-model";
+  const AI_EFFORT_KEY = "ai-effort";   // suffixed with ":" + model id
+  const AI_MODELS = [
+    { id: "claude-sonnet-5", name: "Sonnet 5", defaultEffort: "high",
+      efforts: [
+        { id: "auto",   name: "Auto",   desc: "Medium, raised to high when a run struggles" },
+        { id: "medium", name: "Medium", desc: "Less thinking per turn" },
+        { id: "high",   name: "High",   desc: "The model's default" }
+      ] },
+    { id: "deepseek-flash", name: "DeepSeek Flash", defaultEffort: "high",
+      efforts: [
+        { id: "none", name: "Off",  desc: "No thinking" },
+        { id: "low",  name: "Low",  desc: "Brief thinking" },
+        { id: "high", name: "High", desc: "The model's default" },
+        { id: "max",  name: "Max",  desc: "Longest thinking" }
+      ] }
+  ];
+  let aiModel = AI_MODELS[0].id;
+  const aiEffortByModel = {};
+  function modelDefOf(id) {
+    for (let i = 0; i < AI_MODELS.length; i++) if (AI_MODELS[i].id === id) return AI_MODELS[i];
+    return AI_MODELS[0];
+  }
+  function currentEffort() {
+    const m = modelDefOf(aiModel);
+    const e = aiEffortByModel[m.id] || m.defaultEffort;
+    return m.efforts.some(function (x) { return x.id === e; }) ? e : m.defaultEffort;
+  }
+  /* Chats that a struggling run has already pushed to high stay there: a
+     chat that needed it once is that kind of chat. Kept on the chat's index
+     entry so it survives a reopen. */
+  function chatEscalated() {
+    const e = currentChatId ? chatIndexEntry(currentChatId) : null;
+    return !!(e && e.escalated);
+  }
+  /* Struggle signals, checked after every turn of an auto run. Turn count
+     past twelve is beyond the median task by a wide margin; two tool errors
+     or the repeat detector firing mean the model is not converging. */
+  const AI_ESCALATE_TURNS = 12;
   const AI_MODES = [
     { id: "auto",   name: "Auto",         desc: "myProductivitySpace handles permission decisions" },
     { id: "accept", name: "Accept edits", desc: "Automatically accept every change" },
@@ -31537,9 +31603,9 @@
      against the account. This is exactly the swap the old comment here
      described: point AI_API_URL elsewhere, drop the two key headers. */
   const AI_API_URL = (window.__mpsFnUrl || "") + "/ai";
-  // Sonnet is the deliberate pick for a sidebar: these are small, concrete
-  // board edits and latency is felt on every one of them. One-line swap.
-  const AI_MODEL = "claude-sonnet-5";
+  // The model is chosen in the panel (AI_MODELS below) and pinned to an
+  // allow-list by the proxy. Sonnet is the default: these are small,
+  // concrete board edits and latency is felt on every one of them.
   // A ceiling on tool round-trips, so a model that keeps calling tools can't
   // spin the panel forever.
   /* How many tool round-trips one request may take before the loop stops
@@ -31566,6 +31632,33 @@
      the run it was meant to bound. The repeat-detector below is what actually
      catches a model going in circles; this is only the backstop. */
   const AI_MAX_TURNS = 60;
+
+  /* A ceiling on one tool result, because a big one is not paid for once.
+     Every result is appended to the conversation and resent on every
+     remaining turn of the request, so a single fat read rides along a dozen
+     more times. read_console alone can legally return 200 entries x (2000
+     chars of text + 1200 of stack) = 640K characters, and read_dom on a full
+     board is the same shape. 100K is far past any honest result and still
+     bounds the worst case.
+
+     Truncation is not silent: the model is told it was cut and which
+     argument to narrow, because a model that does not know it got a partial
+     answer just asks the same way again -- the exact circle the repeat
+     detector below exists to catch. */
+  const AI_TOOL_RESULT_MAX = 100000;
+
+  /* Tools where a partial answer is worse than no answer. A truncated
+     console read costs you old noise; a truncated SOURCE read is a file the
+     model may then edit and commit against, having seen only part of it.
+     These refuse instead, which sends it back to ask properly. */
+  const AI_TRUNCATE_REFUSES = { read_source: 1, read_patch: 1 };
+
+  /* What to narrow, per tool. Generic advice produces a generic retry. */
+  const AI_TRUNCATE_HINTS = {
+    read_console: "Lower `limit`, pass `since` with the latest_seq from an earlier call, or filter with `contains`.",
+    read_dom: "Use a more specific selector so less of the tree comes back.",
+    list_widgets: "Ask for the one widget you need rather than the whole board."
+  };
 
   function board() { return window.__aiBoard || null; }
 
@@ -32212,13 +32305,14 @@
       name: "read_source",
       description: "Read the app's OWN source code. The whole dashboard is one self-contained HTML file \u2014 markup, CSS and JavaScript together \u2014 and this searches it.\n" +
         "Use it BEFORE answering any question about how a built-in feature behaves, and before saying a behaviour does not exist. The settings panel is not the source of truth: plenty of behaviour is wired in code with no toggle exposed for it, so 'there is no setting for X' is never evidence that X does not happen. Search for it and find out.\n" +
-        "Two modes. Pass `query` to grep: every matching line comes back with its line number and surrounding context. Pass `start_line` (and optionally `end_line`) instead to read a specific stretch, which is how you read a whole function after grep has found it.\n" +
+        "Two modes. Pass `query` to grep: every matching line comes back with its line number and surrounding context. Pass `queries` (a list) to run several greps in one call. Pass `start_line` (and optionally `end_line`) instead to read a specific stretch, which is how you read a whole function after grep has found it.\n" +
         "Good queries are the literal strings the code would contain: a storage key ('cal-view'), a function name ('function setView'), a CSS class ('.cal-taskrow-title'), an id ('calCreateBtn'), a label the user sees ('All day').\n" +
         "This tool is read-only \u2014 the file is served off a CDN and the page cannot write back to it \u2014 but you are NOT read-only on the app. write_patch runs your own CSS and JS in the page itself, which is how you change built-in UI: a field on the event popup, a restyle outside any widget, behaviour the app does not have. So the honest answer to \"can you change X\" is: read the source to find where X is built, check list_patches, then patch it. Never tell the user a change needs someone to edit the source file, and never offer to rebuild a built-in widget as a custom one to add behaviour it may already have: look first, then patch.",
       input_schema: {
         type: "object",
         properties: {
           query: { type: "string", description: "Text to search for. Case-insensitive substring by default; a regular expression when regex is true." },
+          queries: { type: "array", items: { type: "string" }, description: "Up to 6 searches run together in one call, each with the same options, sharing one result budget. Use this whenever you can name several things to look for at once, instead of one search per turn." },
           regex: { type: "boolean", description: "Treat query as a JavaScript regular expression. Default false." },
           context_lines: { type: "number", description: "Lines of context around each match. Default 4, max 30." },
           max_matches: { type: "number", description: "How many matches to return. Default 20, max 60. With list_only, default 200, max 600." },
@@ -32869,11 +32963,29 @@
     return n + "\t" + t;
   }
 
-  async function readSource(input) {
+  async function readSource(input, budget) {
     let lines;
     const fromRepo = String(input.from || "live") === "repo";
     try { lines = (fromRepo ? await repoSource(input.path) : await appSource()).split("\n"); }
     catch (e) { return { error: String((e && e.message) || e) }; }
+    const MAX = budget || SRC_TOTAL_MAX;
+
+    /* Several searches in one call. The stored chats showed the model
+       hunting through this file one grep per turn, 120 times in a row over
+       two weeks, and a turn is the expensive unit: each one resends the whole
+       conversation. Batching the searches it can name up front turns a chain
+       of turns into one. The total budget is shared, not multiplied, so the
+       result stays inside the tool-result ceiling. */
+    if (Array.isArray(input.queries) && input.queries.length) {
+      const qs = input.queries.map(String).filter(Boolean).slice(0, 6);
+      const each = Math.floor(MAX / qs.length);
+      const results = [];
+      for (const q of qs) {
+        const sub = Object.assign({}, input, { queries: undefined, query: q });
+        results.push(await readSource(sub, each));
+      }
+      return { read_from: fromRepo ? "repo" : "live", file_lines: lines.length, results: results };
+    }
 
     // Range mode: read a stretch outright, which is what you want once grep
     // has told you where the function starts.
@@ -32884,7 +32996,7 @@
       for (let i = start; i <= end; i++) out.push(srcLine(i, lines[i - 1]));
       let body = out.join("\n");
       let cut = false;
-      if (body.length > SRC_TOTAL_MAX) { body = body.slice(0, SRC_TOTAL_MAX); cut = true; }
+      if (body.length > MAX) { body = body.slice(0, MAX); cut = true; }
       return { read_from: fromRepo ? "repo" : "live",
                file_lines: lines.length, start_line: start, end_line: end, truncated: cut, source: body };
     }
@@ -32938,7 +33050,7 @@
       for (let i = from; i <= to; i++) body.push(srcLine(i, lines[i - 1]));
       const text = body.join("\n");
       // Stop cleanly at the budget rather than returning half a match.
-      if (total + text.length > SRC_TOTAL_MAX) { cut = true; break; }
+      if (total + text.length > MAX) { cut = true; break; }
       total += text.length;
       matches.push({ line: n, excerpt: text });
     }
@@ -33459,6 +33571,19 @@
     ].join("\n");
   }
 
+  /* Every user turn carries its own <board-state>, and every one of them is
+     left exactly as it was sent. An earlier version rewrote all but the
+     newest into a fixed "superseded" marker on the way to the API. That
+     looked like a saving and was the opposite: the rewrite changed bytes at
+     the previous user turn, and prompt caching is a prefix match, so every
+     turn after it (the whole tool chain of the previous message, tens of
+     thousands of tokens) missed the cache and was written again at the
+     write rate on every new message. A stale snapshot is ~2K tokens and
+     there are at most three or four in history before trimMessages drops
+     them, so reading them back at a tenth of the input rate costs far less
+     than the rewrite did. The system prompt tells the model the newest
+     snapshot is the current one. */
+
   /* Byte-stable for the life of the page: no clock, no board, nothing that
      varies per request except the mode paragraph near the bottom (three
      possible values, so three cache entries, each staying warm for as long as
@@ -33477,8 +33602,9 @@
       "You are myProductivitySpace AI, the assistant built into a single-page personal dashboard.",
       "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
       "Nothing about a widget is fixed. Its contents, its settings and its appearance (fonts, weights, colours, spacing, what is shown or hidden) can all be changed with your tools, built-in widgets included, so never reply that a widget's rendering or styling cannot be changed. To change how something looks: read_widget gives a dom_outline of the elements and class names, inspect_widget with a selector shows the rules currently applied to them, and set_widget_style writes CSS scoped to that widget.",
-      "The date, the local time, the connector status and the current contents of the board are given to you in a " + BOARD_STATE_OPEN + " block attached to the user's message. Read it there rather than asking for it. It is a snapshot taken when they hit send, so once you have changed the board yourself, trust your own tool results over it, and call list_widgets when you need to be certain.",
+      "The date, the local time, the connector status and the current contents of the board are given to you in a " + BOARD_STATE_OPEN + " block attached to the user's message. Read it there rather than asking for it. It is a snapshot taken when they hit send, so once you have changed the board yourself, trust your own tool results over it, and call list_widgets when you need to be certain. Earlier messages in the chat keep their own older snapshots; only the one on the latest message describes the board now.",
       "",
+      "Turns are the expensive unit, not tool calls: every turn resends the whole conversation. When reads are independent of each other (read_source searches for different strings, a read_widget and its inspect_widget, list_tasks alongside list_events), make them together in one turn rather than one per turn, and give read_source a list of `queries` instead of a search per turn. A read whose arguments depend on an earlier result still has to wait for it.",
       "Read before you edit: read_widget, list_tasks and list_events give you the ids that edit tools need. " +
       "A widget's `instructions` line is the user's standing preference for it: follow it on every edit to that widget, and when the user describes how a widget should behave from now on, record it with set_widget_instructions. " +
       "Every widget's composition is data you can change: a Page's blocks, a list's items and categories, a Bookmarks bar's links, Vocabulary's languages, counts, pick mode and the word banks themselves (you can author new banks), and a custom widget's whole code. Build a custom widget only for something genuinely new. " +
@@ -33524,6 +33650,7 @@
          went untouched; and a confident fix to an intermittent bug that
          could not have been confirmed either way. */
       "Debugging something that is misbehaving: read_source tells you what the code says, read_console tells you what the app actually did, including console output, uncaught exceptions and rejected promises captured from before boot. Read the console first. Bugs here announce themselves by name far more often than you would expect, and an uncaught exception names its own line. Going straight to the source means reconstructing from scratch something the app already wrote down.",
+      "When several reads do not depend on each other, ask for them in ONE turn rather than one after another. read_console and read_source, or two widgets you want to compare, do not need to be sequential -- nothing in the first answer changes what you would ask of the second. Every turn resends the whole conversation, so three reads spread across three turns cost three times what the same three reads cost together. Sequence only where you genuinely need the first answer to know what to ask next.",
 
       "One bug is usually four. Before you fix anything, name the class of mistake it is, not 'this line is wrong' but 'a handler read a variable that had been restored by the time it fired', then use read_source with list_only:true to find every other place with that shape. Report what you found even where you did not change it. A fix applied to the one site the user happened to hit, while its siblings sit untouched, costs the same as a real fix and teaches everyone the bug is gone.",
 
@@ -33586,7 +33713,7 @@
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: AI_MODEL,
+        model: aiModel,
         /* A backstop, not a tuning knob: the model never sees it, and hitting
            it truncates a tool_use block mid-JSON, which arrives as input {}
            and costs a wasted turn plus the retry that follows (the
@@ -33607,6 +33734,11 @@
            Note that thinking counts against max_tokens, which is part of why
            8192 was too tight above. */
         thinking: { type: "adaptive", display: "summarized" },
+        /* Effort: see AI_MODELS. Changing it mid-chat invalidates the cached
+           messages once, which is fine per chat and would not be per message;
+           escalation therefore sticks for the chat. The proxy translates
+           "none" into thinking-off for the models that spell it that way. */
+        output_config: { effort: (opts && opts.effort) || "high" },
         stream: true,
         /* Top-level cache_control is automatic caching: the breakpoint lands
            on the last cacheable block and walks forward as the conversation
@@ -33617,8 +33749,15 @@
            breakpoint on the last system block covers the ~15K of tool
            definitions as well as the rules text, and it is a guaranteed read
            point that survives whatever happens later in `messages`. Cache
-           reads bill at a tenth of the input rate; a 5-minute entry is
-           refreshed by every read, so an active session keeps it warm. */
+           reads bill at a tenth of the input rate.
+
+           Five-minute TTL, deliberately. A one-hour entry was tried: it
+           writes at 2x the input rate instead of 1.25x, and pays that back
+           only if the next message lands inside the hour. The Console's
+           logs put the real gaps between messages at one to three hours,
+           past where the hour entry expires, so it would have cost the
+           extra write and still missed. Within a message the 19-odd turns
+           are seconds apart and the five-minute entry never goes cold. */
         system: [{ type: "text", text: systemPrompt(), cache_control: { type: "ephemeral" } }],
         /* The wrap-up turn used to omit `tools` entirely. Same intent, wrong
            mechanism now: tools render AHEAD of `system` in the prompt, so
@@ -33666,11 +33805,23 @@
          numbers go to the console every turn. `read` at zero on turn two or
          later means something time- or board-dependent has crept back into
          the system prompt or the tool list and the prefix no longer matches.
-         The AI panel can read this itself with read_console. */
+         The AI panel can read this itself with read_console.
+
+         cache_creation is broken out by TTL because the aggregate cannot
+         answer the question that matters here: the system block asks for
+         ttl:"1h", and the billing data shows only 5-minute writes, which
+         would mean every gap over five minutes is a cold start paying to
+         re-store the whole prefix. 1h=0 on a cold turn says the one-hour
+         request is not landing; a non-zero 1h says it is and the Console is
+         merely collapsing the columns. The aggregate looks identical either
+         way, which is why this was invisible until the bill was read. */
       if (ev.type === "message_start") {
         const u = (ev.message && ev.message.usage) || {};
+        const cc = u.cache_creation || {};
         console.log("[mps ai] tokens in=" + (u.input_tokens || 0) +
                     " cache_write=" + (u.cache_creation_input_tokens || 0) +
+                    " (5m=" + (cc.ephemeral_5m_input_tokens || 0) +
+                    " 1h=" + (cc.ephemeral_1h_input_tokens || 0) + ")" +
                     " cache_read=" + (u.cache_read_input_tokens || 0));
         return;
       }
@@ -33714,6 +33865,13 @@
         }
       } else if (ev.type === "message_delta") {
         if (ev.delta && ev.delta.stop_reason) stopReason = ev.delta.stop_reason;
+        /* The other half of the meter. message_start carries the input side
+           only; output_tokens (visible text, tool-call JSON and thinking
+           together, all at the output rate) arrives here, cumulative, and the
+           delta that carries stop_reason is the final count for the turn. */
+        if (ev.delta && ev.delta.stop_reason && ev.usage && ev.usage.output_tokens != null) {
+          console.log("[mps ai] tokens out=" + ev.usage.output_tokens + " stop=" + ev.delta.stop_reason);
+        }
       } else if (ev.type === "error") {
         throw new Error((ev.error && ev.error.message) || "The model stream failed.");
       }
@@ -34059,6 +34217,7 @@
      long as there is something to stop. */
   function setBusy(on) {
     aiBusy = on;
+    setPickersLocked(on);
     aiSendBtn.disabled = false;
     aiSendBtn.classList.toggle("is-stop", !!on);
     aiSendBtn.innerHTML = on ? STOP_SVG : SEND_SVG;
@@ -34122,9 +34281,23 @@
     // Did the loop run out of turns rather than finishing? Cleared by the
     // break below, so only exhaustion leaves it true.
     let hitCap = true;
+    const chosenEffort = currentEffort();
+    let runEffort = chosenEffort === "auto" ? (chatEscalated() ? "high" : "medium") : chosenEffort;
+    let toolErrors = 0;
+    console.log("[mps ai] model=" + aiModel + " effort=" + runEffort + " (" + chosenEffort + ")");
+    /* Only the "auto" level escalates. A level the user chose by name is a
+       decision, not a starting point. */
+    function escalateEffort(reason) {
+      if (chosenEffort !== "auto" || runEffort === "high") return;
+      runEffort = "high";
+      const e = currentChatId ? chatIndexEntry(currentChatId) : null;
+      if (e) e.escalated = true;
+      console.log("[mps ai] effort escalated to high: " + reason);
+    }
 
     try {
       for (let turn = 0; turn < AI_MAX_TURNS; turn++) {
+        if (turn >= AI_ESCALATE_TURNS) escalateEffort("turn " + turn);
         // Checked before each turn as well as inside the tool loop: stopping
         // during a long tool run must not be followed by one more request.
         if (aiStopped) { hitCap = false; break; }
@@ -34154,7 +34327,7 @@
           if (ui.label) setTrace(placeholder, ui.label, true);
           const early = resolveTarget(ui, {});
           if (early) startFog(early, ui.label);
-        }, null, function (thought) {
+        }, { effort: runEffort }, function (thought) {
           // Summarized reasoning, streaming. Only while the bubble is still
           // a placeholder: once the reply starts, the reply owns the bubble.
           if (!bubble) setTrace(placeholder, thought, false);
@@ -34295,7 +34468,11 @@
                drawing, because the alternative is a tool call that leaves no
                trace at all and a user wondering whether anything happened. */
             appendMessage("ai", "Plan mode \u2014 didn't run " + use.name + ". Nothing was changed.").classList.add("is-note");
-          } else if (out && out.error) { sawToolError = true; appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error"); }
+          } else if (out && out.error) {
+            sawToolError = true;
+            if (++toolErrors >= 2) escalateEffort("second tool error");
+            appendMessage("ai", describeTool(use.name, use.input, out)).classList.add("is-error");
+          }
 
           /* The loop-breaker. The same tool, the same input, the same answer
              as earlier in this very request means the model is going in a
@@ -34308,11 +34485,34 @@
           const sig = use.name + "|" + JSON.stringify(use.input || {});
           const outStr = JSON.stringify(out);
           if (seenCalls.get(sig) === outStr && out && typeof out === "object" && !Array.isArray(out)) {
+            escalateEffort("repeated call");
             out = Object.assign({}, out, {
               _repeat: "You already made this exact call earlier in this request and got this exact result. Nothing has changed since. Do not call it again \u2014 answer the user with what you have."
             });
           }
           seenCalls.set(sig, outStr);
+
+          /* The size ceiling. `outStr` is already serialised above for the
+             repeat signature, so this costs nothing to check. Note it runs
+             AFTER the repeat detector on purpose: a truncated result and the
+             full one serialise differently, and comparing the truncated
+             forms would make two identical calls look like two different
+             answers, which is precisely the circle that detector catches. */
+          if (outStr.length > AI_TOOL_RESULT_MAX) {
+            console.warn("[mps] tool result over cap:", use.name, outStr.length);
+            out = AI_TRUNCATE_REFUSES[use.name]
+              ? { error: "That returned " + outStr.length + " characters, over the " +
+                         AI_TOOL_RESULT_MAX + " limit, and a partial answer here is worse " +
+                         "than none: you would be reading part of a file you may then edit. " +
+                         "Narrow the range and read again." }
+              : {
+                  _truncated: true,
+                  _original_chars: outStr.length,
+                  _hint: (AI_TRUNCATE_HINTS[use.name] || "Re-call with a narrower query.") +
+                         " Do not simply repeat this call: you will get the same cut result.",
+                  preview: outStr.slice(0, AI_TOOL_RESULT_MAX)
+                };
+          }
 
           results.push({
             type: "tool_result",
@@ -34357,7 +34557,7 @@
           }
           setBubbleMarkdown(wrapBubble, wrapped);
           scrollLog();
-        }, null, { noTools: true });
+        }, null, { noTools: true, effort: runEffort });
         const wrapText = (wrap.blocks || []).filter(function (b) { return b.type === "text" && b.text; })
           .map(function (b) { return b.text; }).join("");
         messages.push({ role: "assistant", content: [{ type: "text", text: wrapText || "(no response)" }] });
@@ -34457,6 +34657,58 @@
      So: find a real cut point first and splice to it, and when there isn't
      one, leave the history alone. An over-long request is recoverable; a
      malformed one is not. */
+  /* What a finished request leaves behind, and what it costs to keep.
+
+     One message is a chain of ~19 requests, and every tool result in that
+     chain is still in `messages` when the NEXT message goes out. Each of
+     those tokens is then written to the cache once (1.25x the input rate)
+     and read back on every turn of every later message (0.1x, times ~19
+     turns), which together comes to more per token than plain input. A
+     19-turn message leaves ~50K tokens of tool results behind, and that
+     carry was the largest single line in the bill: about 30 cents of a
+     50-cent message.
+
+     So once a request has finished, its bulky tool results collapse to a
+     short preview. The user's words, the model's replies and the tool calls
+     themselves all stay; only the payloads shrink. If the model needs one
+     again it re-runs the tool, one turn, which is cheaper than carrying the
+     result on every turn that follows. Thinking blocks go too: they are only
+     required while their own tool chain is still open, and they are dropped
+     on save already (see persistableMessages), so a reopened chat has run
+     without them all along.
+
+     Idempotent on purpose: a pruned result carries PRUNE_TAG and is skipped
+     next time, so a chain pruned once is byte-identical on every later
+     request and keeps caching. Only ever called with aiBusy false, for the
+     same reason trimMessages is: an open chain must not be touched. */
+  const PRUNE_KEEP_CHARS = 400;
+  const PRUNE_TAG = "[pruned after that request finished";
+  function pruneFinishedRun() {
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (!m || !Array.isArray(m.content)) continue;
+      if (m.role === "assistant") {
+        if (!m.content.some(function (b) { return b.type === "thinking"; })) continue;
+        const kept = m.content.filter(function (b) { return b.type !== "thinking"; });
+        m.content = kept.length ? kept : [{ type: "text", text: "(no response)" }];
+        continue;
+      }
+      for (let j = 0; j < m.content.length; j++) {
+        const b = m.content[j];
+        if (!b || b.type !== "tool_result" || typeof b.content !== "string") continue;
+        if (b.content.length <= PRUNE_KEEP_CHARS + 120 || b.content.indexOf(PRUNE_TAG) !== -1) continue;
+        m.content[j] = {
+          type: "tool_result",
+          tool_use_id: b.tool_use_id,
+          is_error: !!b.is_error,
+          content: b.content.slice(0, PRUNE_KEEP_CHARS) +
+                   "\n\u2026 " + PRUNE_TAG + "; " + (b.content.length - PRUNE_KEEP_CHARS) +
+                   " more characters were here. Call the tool again if you need the full result.]"
+        };
+      }
+    }
+  }
+
   function trimMessages() {
     while (messages.length > CHAT_MAX_MESSAGES) {
       let cut = -1;
@@ -34477,7 +34729,7 @@
        aiBusy is false: at send (before setBusy(true)) and in the finally
        (after setBusy(false)). Saving still happens every turn either way, so
        an interrupted run loses nothing. */
-    if (!aiBusy) trimMessages();
+    if (!aiBusy) { pruneFinishedRun(); trimMessages(); }
     const entry = chatIndexEntry(currentChatId);
     if (entry) entry.updatedAt = Date.now();
     chats.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
@@ -34551,7 +34803,9 @@
         method: "POST",
         headers: { "content-type": "application/json", "authorization": "Bearer " + jwt, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({
-          model: AI_MODEL, max_tokens: 24, stream: false,
+          // Titles always come from Sonnet: 15 tokens, and the proxy's
+          // default model needs no second provider to be configured.
+          model: AI_MODELS[0].id, max_tokens: 24, stream: false,
           system: "You title conversations for a sidebar. Reply with only the title: three to six words, Title Case, no quotes, no trailing punctuation.",
           messages: [{ role: "user", content: "First message:\n" + userTextOf(firstUser).slice(0, 600) + "\n\nReply:\n" + firstReply.slice(0, 600) }]
         })
@@ -34933,6 +35187,84 @@
     }
   });
   setAiMode(aiMode, false);
+
+  /* ---------------- the model and effort pickers ----------------
+     Same menu styling as the mode picker, built from AI_MODELS. */
+  const aiModelBtn = $("aiModelBtn"), aiModelMenu = $("aiModelMenu"), aiModelLabel = $("aiModelLabel");
+  const aiEffortBtn = $("aiEffortBtn"), aiEffortMenu = $("aiEffortMenu"), aiEffortLabel = $("aiEffortLabel");
+
+  function renderPickMenu(menu, head, items, currentId, onPick) {
+    if (!menu) return;
+    menu.innerHTML = "";
+    menu.appendChild(el("div", "ai-mode-head", head));
+    items.forEach(function (m) {
+      const b = el("button", "ai-mode-item" + (m.id === currentId ? " is-current" : ""));
+      b.type = "button";
+      b.setAttribute("role", "menuitemradio");
+      b.setAttribute("aria-checked", String(m.id === currentId));
+      const txt = el("span", "ai-mode-item-text");
+      txt.appendChild(el("span", "ai-mode-item-name", m.name));
+      if (m.desc) txt.appendChild(el("span", "ai-mode-item-desc", m.desc));
+      b.appendChild(txt);
+      const tick = el("span", "ai-mode-tick");
+      tick.innerHTML = TICK_SVG;
+      b.appendChild(tick);
+      b.addEventListener("click", function () { onPick(m.id); });
+      menu.appendChild(b);
+    });
+  }
+  function setPickOpen(btn, menu, open) {
+    if (!btn || !menu) return;
+    menu.hidden = !open;
+    btn.setAttribute("aria-expanded", String(!!open));
+    if (open) { const f = menu.querySelector(".ai-mode-item"); if (f) f.focus(); }
+  }
+  function refreshPickers() {
+    const m = modelDefOf(aiModel);
+    const e = currentEffort();
+    if (aiModelLabel) aiModelLabel.textContent = m.name;
+    if (aiModelBtn) aiModelBtn.classList.toggle("is-set", aiModel !== AI_MODELS[0].id);
+    const ed = m.efforts.filter(function (x) { return x.id === e; })[0];
+    if (aiEffortLabel) aiEffortLabel.textContent = ed ? ed.name : e;
+    if (aiEffortBtn) aiEffortBtn.classList.toggle("is-set", e !== m.defaultEffort);
+    renderPickMenu(aiModelMenu, "Model", AI_MODELS, aiModel, function (id) { setAiModel(id, true); setPickOpen(aiModelBtn, aiModelMenu, false); });
+    renderPickMenu(aiEffortMenu, "Effort", m.efforts, e, function (id) { setAiEffort(id, true); setPickOpen(aiEffortBtn, aiEffortMenu, false); });
+  }
+  function setAiModel(id, persist) {
+    aiModel = modelDefOf(id).id;
+    refreshPickers();
+    if (persist) window.storageSet(AI_MODEL_KEY, aiModel);
+  }
+  function setAiEffort(id, persist) {
+    const m = modelDefOf(aiModel);
+    aiEffortByModel[m.id] = m.efforts.some(function (x) { return x.id === id; }) ? id : m.defaultEffort;
+    refreshPickers();
+    if (persist) window.storageSet(AI_EFFORT_KEY + ":" + m.id, aiEffortByModel[m.id]);
+  }
+  /* Locked during a run: see the note on AI_MODELS. */
+  function setPickersLocked(on) {
+    if (aiModelBtn) aiModelBtn.disabled = !!on;
+    if (aiEffortBtn) aiEffortBtn.disabled = !!on;
+    if (on) { setPickOpen(aiModelBtn, aiModelMenu, false); setPickOpen(aiEffortBtn, aiEffortMenu, false); }
+  }
+  if (aiModelBtn) aiModelBtn.addEventListener("click", function (e) {
+    e.stopPropagation(); setPickOpen(aiEffortBtn, aiEffortMenu, false); setPickOpen(aiModelBtn, aiModelMenu, aiModelMenu.hidden);
+  });
+  if (aiEffortBtn) aiEffortBtn.addEventListener("click", function (e) {
+    e.stopPropagation(); setPickOpen(aiModelBtn, aiModelMenu, false); setPickOpen(aiEffortBtn, aiEffortMenu, aiEffortMenu.hidden);
+  });
+  document.addEventListener("click", function (e) {
+    const t = e.target;
+    if (t && (t.closest(".ai-pick-menu") || t.closest(".ai-pick-btn"))) return;
+    setPickOpen(aiModelBtn, aiModelMenu, false);
+    setPickOpen(aiEffortBtn, aiEffortMenu, false);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (aiModelMenu && !aiModelMenu.hidden) { setPickOpen(aiModelBtn, aiModelMenu, false); aiModelBtn.focus(); }
+    if (aiEffortMenu && !aiEffortMenu.hidden) { setPickOpen(aiEffortBtn, aiEffortMenu, false); aiEffortBtn.focus(); }
+  });
+  refreshPickers();
   /* ---------------- attachments ----------------
      Files staged for the NEXT message. Images become image blocks, PDFs
      document blocks, anything text-shaped is inlined as text -- which is the
@@ -35111,6 +35443,14 @@
     let savedMode = null;
     try { savedMode = await window.storageGet(AI_MODE_KEY); } catch (e) {}
     if (savedMode) setAiMode(savedMode, false);
+    let savedModel = null;
+    try { savedModel = await window.storageGet(AI_MODEL_KEY); } catch (e) {}
+    for (const m of AI_MODELS) {
+      let savedEffort = null;
+      try { savedEffort = await window.storageGet(AI_EFFORT_KEY + ":" + m.id); } catch (e) {}
+      if (savedEffort && m.efforts.some(function (x) { return x.id === savedEffort; })) aiEffortByModel[m.id] = savedEffort;
+    }
+    if (savedModel) setAiModel(savedModel, false); else refreshPickers();
     let savedWidth = null;
     try { savedWidth = await window.storageGet(AI_WIDTH_KEY); } catch (e) {}
     if (savedWidth) {

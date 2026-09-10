@@ -15,14 +15,55 @@
  * before this code runs. Do NOT deploy with --no-verify-jwt.
  */
 
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+/* Where each model id is sent, and which secret signs the request. Every
+   upstream here speaks Anthropic's Messages format, so the page builds one
+   request shape and this function only re-addresses it. Anything the page
+   asks for that is not on this list falls back to MODEL: a tester with
+   devtools open can pick between the models the owner has priced, and
+   nothing else.
 
-/* Pinned here rather than trusted from the request body. Overridable by env
-   so the model can be changed without a code edit:
-     supabase secrets set AI_MODEL=claude-sonnet-5
-   The page sends the same values; these are what make it binding. */
+   Deploy a second provider with its key, e.g.
+     supabase secrets set DEEPSEEK_API_KEY=sk-...
+   A provider whose key is not set is simply not offered: the request falls
+   back to MODEL rather than failing. */
+type Provider = { url: string; keyEnv: string; kind: "anthropic" | "deepseek" };
+const PROVIDERS: Record<string, Provider> = {
+  "claude-sonnet-5": { url: "https://api.anthropic.com/v1/messages", keyEnv: "ANTHROPIC_API_KEY", kind: "anthropic" },
+  "deepseek-flash":  { url: "https://api.deepseek.com/anthropic/v1/messages", keyEnv: "DEEPSEEK_API_KEY", kind: "deepseek" },
+};
+
+/* The fallback when the page names nothing, or names something off the list.
+   Overridable by env so the default can be changed without a code edit:
+     supabase secrets set AI_MODEL=claude-sonnet-5 */
 const MODEL = Deno.env.get("AI_MODEL") ?? "claude-sonnet-5";
 const MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") ?? "32000");
+
+/* DeepSeek's Anthropic-compatible endpoint takes the same request with four
+   differences, per its compatibility table: `cache_control` is ignored (its
+   caching is automatic), `thinking` is enabled/disabled rather than adaptive,
+   `display` is not a field it knows, and effort "none" is spelled as thinking
+   off. Stripping the ignored fields rather than forwarding them keeps a
+   future strictness change on their side from turning into a 400 here. */
+function stripCacheControl(x: unknown): void {
+  if (Array.isArray(x)) { for (const y of x) stripCacheControl(y); return; }
+  if (x && typeof x === "object") {
+    const o = x as Record<string, unknown>;
+    delete o.cache_control;
+    for (const k of Object.keys(o)) stripCacheControl(o[k]);
+  }
+}
+function adaptForDeepseek(payload: Record<string, unknown>): void {
+  stripCacheControl(payload);
+  const oc = (payload.output_config ?? {}) as Record<string, unknown>;
+  const effort = typeof oc.effort === "string" ? oc.effort : "high";
+  if (effort === "none") {
+    payload.thinking = { type: "disabled" };
+    delete payload.output_config;
+  } else {
+    payload.thinking = { type: "enabled" };
+    payload.output_config = { effort };
+  }
+}
 
 // The board is served from one origin; echo it back rather than using "*",
 // since these requests carry an Authorization header.
@@ -53,27 +94,27 @@ Deno.serve(async (req) => {
     });
   }
 
-  const key = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!key) {
-    return new Response(JSON.stringify({ error: { message: "Proxy is not configured." } }), {
-      status: 500,
-      headers: { ...cors, "content-type": "application/json" },
-    });
-  }
-
   let body: string;
+  let provider: Provider;
+  let key: string;
   try {
     const payload = await req.json();
 
     /* The model and the output ceiling are decided HERE, not in the page.
-       Everything this function forwards arrives from a browser, so until now
-       a tester with devtools open could set `model` to a five-times-pricier
+       Everything this function forwards arrives from a browser, so a tester
+       with devtools open could otherwise set `model` to a five-times-pricier
        one and `max_tokens` to 128000 and spend against the account at will.
        The invite gate stops strangers; it does not stop a curious friend.
-       While the credits are subsidised these two are pinned server-side and
-       whatever the client asked for is discarded. */
-    payload.model = MODEL;
+       The page's choice is honoured only when it names a model on the
+       PROVIDERS list whose key is configured; otherwise it is MODEL. */
+    const asked = typeof payload.model === "string" ? payload.model : "";
+    let model = PROVIDERS[asked] && Deno.env.get(PROVIDERS[asked].keyEnv) ? asked : MODEL;
+    if (!PROVIDERS[model]) model = "claude-sonnet-5";
+    provider = PROVIDERS[model];
+    key = Deno.env.get(provider.keyEnv) ?? "";
+    payload.model = model;
     payload.max_tokens = Math.min(Number(payload.max_tokens) || MAX_TOKENS, MAX_TOKENS);
+    if (provider.kind === "deepseek") adaptForDeepseek(payload);
 
     body = JSON.stringify(payload);
   } catch {
@@ -82,8 +123,14 @@ Deno.serve(async (req) => {
       headers: { ...cors, "content-type": "application/json" },
     });
   }
+  if (!key) {
+    return new Response(JSON.stringify({ error: { message: "Proxy is not configured." } }), {
+      status: 500,
+      headers: { ...cors, "content-type": "application/json" },
+    });
+  }
 
-  const upstream = await fetch(ANTHROPIC_URL, {
+  const upstream = await fetch(provider.url, {
     method: "POST",
     headers: {
       "content-type": "application/json",
