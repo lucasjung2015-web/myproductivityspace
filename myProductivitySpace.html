@@ -3262,10 +3262,45 @@
   /* The two non-default modes are states you can forget you are in, so the
      strip stops being quiet grey text once you leave Auto. */
   .ai-mode-btn.is-set { color: var(--ink); font-weight: 600; }
-  .ai-pick-btn { margin-left: 4px; }
   .ai-mode-btn:disabled { opacity: 0.45; cursor: default; }
-  /* The two extra menus open above their own button, like the mode menu. */
-  .ai-pick-menu { left: auto; }
+  /* The model/effort trigger: pushed to the strip's right edge, model name
+     in ink and effort in grey, no chevron, the way the same control reads
+     in Claude's own composer. */
+  .ai-pick-btn { margin-left: auto; margin-right: -7px; gap: 6px; color: var(--ink); font-weight: 500; }
+  .ai-pick-btn .ai-pick-effort { color: #9a9a9a; font-weight: 500; }
+  .ai-pick-menu { left: auto; right: 14px; min-width: 250px; max-width: 320px; }
+  .ai-pick-sep { height: 1px; margin: 6px 4px; background: var(--hair); }
+  /* The Effort row: label left, current level and a chevron right. */
+  .ai-pick-row {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border: none; border-radius: 8px;
+    background: transparent; color: var(--ink); cursor: pointer;
+    font-family: inherit; font-size: 13.5px; font-weight: 600; text-align: left;
+  }
+  .ai-pick-row:hover, .ai-pick-row.is-open { background: #f3f3f4; }
+  .ai-pick-row-val { margin-left: auto; font-weight: 400; color: #9a9a9a; }
+  .ai-pick-row svg { flex: 0 0 auto; opacity: 0.5; }
+  /* The flyout. The panel sits at the screen's right edge, so the levels
+     open to the LEFT of the menu, bottom-aligned with the Effort row. */
+  .ai-pick-sub {
+    position: absolute; right: calc(100% + 6px); bottom: 0; z-index: 21;
+    min-width: 230px; padding: 8px 6px 6px;
+    background: var(--bg); border: 1px solid var(--hair); border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .ai-pick-sub[hidden] { display: none; }
+  .ai-pick-sub-note { padding: 2px 10px 8px; font-size: 12px; line-height: 1.35; color: var(--ink-soft); }
+  .ai-pick-sub .ai-mode-item { align-items: center; padding: 7px 10px; }
+  .ai-pick-sub .ai-mode-item-name { font-weight: 500; font-size: 14px; }
+  .ai-pick-badge {
+    display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 6px;
+    font-size: 11px; font-weight: 500; color: var(--ink-soft); background: #f0f0f1; vertical-align: 1px; white-space: nowrap;
+  }
+  .ai-pick-badge.is-warn { color: #7a4b00; background: #fbe9c8; }
+  /* Narrow panels have no room to the left; stack the flyout above instead. */
+  @media (max-width: 720px) {
+    .ai-pick-sub { right: 0; bottom: calc(100% + 6px); }
+  }
   /* Opens upward for the same reason .ai-plus-menu does: the composer is
      pinned to the bottom of the panel. */
   .ai-mode-menu {
@@ -5083,10 +5118,11 @@
     <div class="ai-mode-menu" id="aiModeMenu" hidden role="menu" aria-label="Mode">
       <div class="ai-mode-head">Mode</div>
     </div>
-    <button type="button" class="ai-mode-btn ai-pick-btn" id="aiModelBtn" aria-haspopup="true" aria-expanded="false" title="Which model answers"><span id="aiModelLabel">Sonnet 5</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="ai-mode-menu ai-pick-menu" id="aiModelMenu" hidden role="menu" aria-label="Model"></div>
-    <button type="button" class="ai-mode-btn ai-pick-btn" id="aiEffortBtn" aria-haspopup="true" aria-expanded="false" title="How hard the model thinks"><span id="aiEffortLabel">High</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="ai-mode-menu ai-pick-menu" id="aiEffortMenu" hidden role="menu" aria-label="Effort"></div>
+    <!-- Model and effort, one trigger at the right end of the strip: the
+         model's name, then the effort in grey. Opens a menu of models with
+         an Effort row that flies out to the levels. -->
+    <button type="button" class="ai-mode-btn ai-pick-btn" id="aiModelBtn" aria-haspopup="true" aria-expanded="false" title="Model and effort"><span class="ai-pick-model" id="aiModelLabel">Sonnet 5</span><span class="ai-pick-effort" id="aiEffortLabel">High</span></button>
+    <div class="ai-mode-menu ai-pick-menu" id="aiModelMenu" hidden role="menu" aria-label="Model and effort"></div>
   </div>
   </div>
 </aside>
@@ -31505,18 +31541,18 @@
   const AI_MODEL_KEY = "ai-model";
   const AI_EFFORT_KEY = "ai-effort";   // suffixed with ":" + model id
   const AI_MODELS = [
-    { id: "claude-sonnet-5", name: "Sonnet 5", defaultEffort: "high",
+    { id: "claude-sonnet-5", name: "Sonnet 5", desc: "Strongest on the board's tools", defaultEffort: "high",
       efforts: [
-        { id: "auto",   name: "Auto",   desc: "Medium, raised to high when a run struggles" },
-        { id: "medium", name: "Medium", desc: "Less thinking per turn" },
-        { id: "high",   name: "High",   desc: "The model's default" }
+        { id: "auto",   name: "Auto",   badge: "Medium, raised if stuck" },
+        { id: "medium", name: "Medium" },
+        { id: "high",   name: "High" }
       ] },
-    { id: "deepseek-flash", name: "DeepSeek Flash", defaultEffort: "high",
+    { id: "deepseek-flash", name: "DeepSeek Flash", desc: "About 20\u00d7 cheaper, under test", defaultEffort: "high",
       efforts: [
-        { id: "none", name: "Off",  desc: "No thinking" },
-        { id: "low",  name: "Low",  desc: "Brief thinking" },
-        { id: "high", name: "High", desc: "The model's default" },
-        { id: "max",  name: "Max",  desc: "Longest thinking" }
+        { id: "none", name: "Off",  badge: "No thinking" },
+        { id: "low",  name: "Low" },
+        { id: "high", name: "High" },
+        { id: "max",  name: "Max",  badge: "Costs more", warn: true }
       ] }
   ];
   let aiModel = AI_MODELS[0].id;
@@ -35148,6 +35184,7 @@
   if (aiModeBtn) {
     aiModeBtn.addEventListener("click", function (e) {
       e.stopPropagation();
+      setPickOpen(false);
       setModeMenuOpen(aiModeMenu.hidden);
     });
   }
@@ -35188,47 +35225,86 @@
   });
   setAiMode(aiMode, false);
 
-  /* ---------------- the model and effort pickers ----------------
-     Same menu styling as the mode picker, built from AI_MODELS. */
-  const aiModelBtn = $("aiModelBtn"), aiModelMenu = $("aiModelMenu"), aiModelLabel = $("aiModelLabel");
-  const aiEffortBtn = $("aiEffortBtn"), aiEffortMenu = $("aiEffortMenu"), aiEffortLabel = $("aiEffortLabel");
+  /* ---------------- the model and effort picker ----------------
+     One trigger, one menu. Models are listed with a tick on the current
+     one; below a divider, an Effort row shows the current level and flies
+     out to the levels for the current model. See AI_MODELS. */
+  const aiModelBtn = $("aiModelBtn"), aiModelMenu = $("aiModelMenu");
+  const aiModelLabel = $("aiModelLabel"), aiEffortLabel = $("aiEffortLabel");
+  const CHEV_SVG = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" ' +
+                   'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
 
-  function renderPickMenu(menu, head, items, currentId, onPick) {
-    if (!menu) return;
-    menu.innerHTML = "";
-    menu.appendChild(el("div", "ai-mode-head", head));
-    items.forEach(function (m) {
-      const b = el("button", "ai-mode-item" + (m.id === currentId ? " is-current" : ""));
-      b.type = "button";
-      b.setAttribute("role", "menuitemradio");
-      b.setAttribute("aria-checked", String(m.id === currentId));
-      const txt = el("span", "ai-mode-item-text");
-      txt.appendChild(el("span", "ai-mode-item-name", m.name));
-      if (m.desc) txt.appendChild(el("span", "ai-mode-item-desc", m.desc));
-      b.appendChild(txt);
-      const tick = el("span", "ai-mode-tick");
-      tick.innerHTML = TICK_SVG;
-      b.appendChild(tick);
-      b.addEventListener("click", function () { onPick(m.id); });
-      menu.appendChild(b);
-    });
+  function effortDef(m, id) {
+    return m.efforts.filter(function (x) { return x.id === id; })[0] || null;
   }
-  function setPickOpen(btn, menu, open) {
-    if (!btn || !menu) return;
-    menu.hidden = !open;
-    btn.setAttribute("aria-expanded", String(!!open));
-    if (open) { const f = menu.querySelector(".ai-mode-item"); if (f) f.focus(); }
+  function pickItem(name, desc, current, onPick) {
+    const b = el("button", "ai-mode-item" + (current ? " is-current" : ""));
+    b.type = "button";
+    b.setAttribute("role", "menuitemradio");
+    b.setAttribute("aria-checked", String(!!current));
+    const txt = el("span", "ai-mode-item-text");
+    const nm = el("span", "ai-mode-item-name");
+    nm.appendChild(document.createTextNode(name));
+    txt.appendChild(nm);
+    if (desc) txt.appendChild(el("span", "ai-mode-item-desc", desc));
+    b.appendChild(txt);
+    const tick = el("span", "ai-mode-tick");
+    tick.innerHTML = TICK_SVG;
+    b.appendChild(tick);
+    b.addEventListener("click", onPick);
+    return { button: b, name: nm };
+  }
+  function renderPickMenu() {
+    if (!aiModelMenu) return;
+    const m = modelDefOf(aiModel);
+    const e = currentEffort();
+    aiModelMenu.innerHTML = "";
+    AI_MODELS.forEach(function (md) {
+      aiModelMenu.appendChild(pickItem(md.name, md.desc, md.id === aiModel, function () {
+        setAiModel(md.id, true); setPickOpen(false);
+      }).button);
+    });
+    aiModelMenu.appendChild(el("div", "ai-pick-sep"));
+
+    const row = el("button", "ai-pick-row");
+    row.type = "button";
+    row.setAttribute("aria-haspopup", "true");
+    row.appendChild(el("span", "", "Effort"));
+    const cur = effortDef(m, e);
+    row.appendChild(el("span", "ai-pick-row-val", cur ? cur.name : e));
+    const chev = el("span", ""); chev.innerHTML = CHEV_SVG; row.appendChild(chev);
+    aiModelMenu.appendChild(row);
+
+    const sub = el("div", "ai-pick-sub");
+    sub.hidden = true;
+    sub.setAttribute("role", "menu");
+    sub.appendChild(el("div", "ai-pick-sub-note", "Higher effort means more thorough answers, but takes longer and costs more."));
+    m.efforts.forEach(function (ed) {
+      const it = pickItem(ed.name, null, ed.id === e, function () { setAiEffort(ed.id, true); setPickOpen(false); });
+      if (ed.id === m.defaultEffort) it.name.appendChild(el("span", "ai-pick-badge", "Default"));
+      if (ed.badge) it.name.appendChild(el("span", "ai-pick-badge" + (ed.warn ? " is-warn" : ""), ed.badge));
+      sub.appendChild(it.button);
+    });
+    aiModelMenu.appendChild(sub);
+
+    function openSub(open) { sub.hidden = !open; row.classList.toggle("is-open", open); }
+    row.addEventListener("click", function (ev) { ev.stopPropagation(); openSub(sub.hidden); });
+    row.addEventListener("mouseenter", function () { openSub(true); });
+    aiModelMenu.addEventListener("mouseleave", function () { openSub(false); });
+  }
+  function setPickOpen(open) {
+    if (!aiModelBtn || !aiModelMenu) return;
+    aiModelMenu.hidden = !open;
+    aiModelBtn.setAttribute("aria-expanded", String(!!open));
+    if (open) { renderPickMenu(); const f = aiModelMenu.querySelector(".ai-mode-item"); if (f) f.focus(); }
   }
   function refreshPickers() {
     const m = modelDefOf(aiModel);
     const e = currentEffort();
+    const ed = effortDef(m, e);
     if (aiModelLabel) aiModelLabel.textContent = m.name;
-    if (aiModelBtn) aiModelBtn.classList.toggle("is-set", aiModel !== AI_MODELS[0].id);
-    const ed = m.efforts.filter(function (x) { return x.id === e; })[0];
     if (aiEffortLabel) aiEffortLabel.textContent = ed ? ed.name : e;
-    if (aiEffortBtn) aiEffortBtn.classList.toggle("is-set", e !== m.defaultEffort);
-    renderPickMenu(aiModelMenu, "Model", AI_MODELS, aiModel, function (id) { setAiModel(id, true); setPickOpen(aiModelBtn, aiModelMenu, false); });
-    renderPickMenu(aiEffortMenu, "Effort", m.efforts, e, function (id) { setAiEffort(id, true); setPickOpen(aiEffortBtn, aiEffortMenu, false); });
+    if (aiModelMenu && !aiModelMenu.hidden) renderPickMenu();
   }
   function setAiModel(id, persist) {
     aiModel = modelDefOf(id).id;
@@ -35237,32 +35313,25 @@
   }
   function setAiEffort(id, persist) {
     const m = modelDefOf(aiModel);
-    aiEffortByModel[m.id] = m.efforts.some(function (x) { return x.id === id; }) ? id : m.defaultEffort;
+    aiEffortByModel[m.id] = effortDef(m, id) ? id : m.defaultEffort;
     refreshPickers();
     if (persist) window.storageSet(AI_EFFORT_KEY + ":" + m.id, aiEffortByModel[m.id]);
   }
   /* Locked during a run: see the note on AI_MODELS. */
   function setPickersLocked(on) {
     if (aiModelBtn) aiModelBtn.disabled = !!on;
-    if (aiEffortBtn) aiEffortBtn.disabled = !!on;
-    if (on) { setPickOpen(aiModelBtn, aiModelMenu, false); setPickOpen(aiEffortBtn, aiEffortMenu, false); }
+    if (on) setPickOpen(false);
   }
   if (aiModelBtn) aiModelBtn.addEventListener("click", function (e) {
-    e.stopPropagation(); setPickOpen(aiEffortBtn, aiEffortMenu, false); setPickOpen(aiModelBtn, aiModelMenu, aiModelMenu.hidden);
-  });
-  if (aiEffortBtn) aiEffortBtn.addEventListener("click", function (e) {
-    e.stopPropagation(); setPickOpen(aiModelBtn, aiModelMenu, false); setPickOpen(aiEffortBtn, aiEffortMenu, aiEffortMenu.hidden);
+    e.stopPropagation(); setModeMenuOpen(false); setPickOpen(aiModelMenu.hidden);
   });
   document.addEventListener("click", function (e) {
     const t = e.target;
     if (t && (t.closest(".ai-pick-menu") || t.closest(".ai-pick-btn"))) return;
-    setPickOpen(aiModelBtn, aiModelMenu, false);
-    setPickOpen(aiEffortBtn, aiEffortMenu, false);
+    setPickOpen(false);
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key !== "Escape") return;
-    if (aiModelMenu && !aiModelMenu.hidden) { setPickOpen(aiModelBtn, aiModelMenu, false); aiModelBtn.focus(); }
-    if (aiEffortMenu && !aiEffortMenu.hidden) { setPickOpen(aiEffortBtn, aiEffortMenu, false); aiEffortBtn.focus(); }
+    if (e.key === "Escape" && aiModelMenu && !aiModelMenu.hidden) { setPickOpen(false); aiModelBtn.focus(); }
   });
   refreshPickers();
   /* ---------------- attachments ----------------
