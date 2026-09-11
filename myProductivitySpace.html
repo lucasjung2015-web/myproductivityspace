@@ -319,6 +319,8 @@
      same "Menu" header treatment as every other widget (icon-less here,
      since individual links carry their own icons). */
   .links-row-wrap { position: relative; flex: 0 0 auto; }
+  /* A coloured bar is painted like a coloured widget: the tint gets corners. */
+  .links-row-wrap.widget-colored { border-radius: 12px; }
   .links-menu-header { padding: 0 28px; }
   /* Fallback anchor for the hover controls: the row's own top-right corner,
      used only when the menu is empty or stacked vertically inside another
@@ -806,7 +808,11 @@
   .widget-header-controls .col-color-btn,
   .widget-header-controls .widget-fullscreen-btn,
   .widget-header-controls .widget-hide-btn,
-  .widget-header-controls .col-delete-btn { display: none; }
+  .widget-header-controls .col-delete-btn,
+  .links-menu-controls .col-color-btn,
+  .links-menu-controls .widget-fullscreen-btn,
+  .links-menu-controls .widget-hide-btn,
+  .links-menu-controls .col-delete-btn { display: none; }
   .wd-dots { color: var(--ink-soft); }
   .wd-dots:hover { color: var(--ink); }
   /* The ••• menu is the phone's element (#mobMenu), whose styles sit inside
@@ -2668,12 +2674,14 @@
      widget at a time: a maximized widget's stack-mates are hidden behind it
      (the page is fully covered) rather than maximized alongside it. */
   body.widget-fullscreen-mode { overflow: hidden; }
-  body.widget-fullscreen-mode .col.collapsible-col-wrap.widget-maximized {
+  body.widget-fullscreen-mode .col.collapsible-col-wrap.widget-maximized,
+  body.widget-fullscreen-mode .links-row-wrap.widget-maximized {
     position: fixed; inset: 0; z-index: 2000;
     width: auto !important; height: auto !important; max-width: none;
     flex: 1 1 auto !important; margin: 0; padding: 16px 20px;
     background: #ffffff; border-radius: 0; overflow: auto;
   }
+  body.widget-fullscreen-mode .links-row-wrap.widget-maximized .links-menu-controls { opacity: 1; }
   /* Its own controls stay visible without hovering, so the way back out is
      always on screen. */
   body.widget-fullscreen-mode .widget-maximized .widget-header-controls { opacity: 1; transform: scale(1); }
@@ -2684,7 +2692,7 @@
      maximized widget's siblings share its stacking context, and #alwaysOnTopBtn
      / #addWidgetBtn are position:fixed at z-index 3000, above it. */
   body.widget-fullscreen-mode .page-title,
-  body.widget-fullscreen-mode .links-row,
+  body.widget-fullscreen-mode .links-row-wrap:not(.widget-maximized),
   body.widget-fullscreen-mode .collapsed-tabs-bar,
   body.widget-fullscreen-mode .col-resizer,
   body.widget-fullscreen-mode .row-resizer,
@@ -13044,6 +13052,14 @@
     const MANUALLY_RESIZED = {}; // Track which page ids have been manually row-dragged
 
     function widgetEl(id) { return document.querySelector('.col.collapsible-col-wrap[data-col-id="' + id + '"]'); }
+    /* The original Bookmarks bar floats above the grid as a .links-row-wrap
+       until it is dragged in, and widgetEl cannot see it there. Colour, hide
+       and full screen want the element either way, so they look through
+       this instead. */
+    function anyWidgetEl(id) {
+      return widgetEl(id) ||
+        (id === "menu" ? document.querySelector('.links-row-wrap[data-col-id="menu"]') : null);
+    }
     // ---- hidden state ----
     // Replaces the two collapse notions this used to carry (an in-place
     // mini-collapse that kept the header, and a per-slot collapse-to-strip).
@@ -13499,6 +13515,23 @@
         }
       });
 
+      /* The floating Bookmarks bar is not in the layout, so the loop above
+         skips it; it hides and comes back through the same tab as everyone
+         else, parked in the tabs bar while hidden. */
+      if (!slotOf("menu")) {
+        const fel = anyWidgetEl("menu");
+        const ftab = tabFor("menu");
+        if (fel) fel.style.display = isHidden("menu") ? "none" : "";
+        if (ftab) {
+          if (isHidden("menu")) {
+            if (ftab.parentNode !== collapsedTabsBar) collapsedTabsBar.appendChild(ftab);
+            applyTabIcon("menu");
+          } else if (fel && ftab.parentNode !== fel) {
+            fel.appendChild(ftab);
+          }
+        }
+      }
+
       // A row-resizer only earns its place with a visible widget on both sides
       // of it; a slot with nothing visible left in it disappears entirely so
       // the remaining slots reflow across its width.
@@ -13866,13 +13899,13 @@
 
     function setMaximized(id) {
       if (maximizedId) {
-        const prev = widgetEl(maximizedId);
+        const prev = anyWidgetEl(maximizedId);
         if (prev) prev.classList.remove("widget-maximized");
       }
       maximizedId = id || null;
       document.body.classList.toggle("widget-fullscreen-mode", !!maximizedId);
       if (maximizedId) {
-        const el = widgetEl(maximizedId);
+        const el = anyWidgetEl(maximizedId);
         if (el) el.classList.add("widget-maximized");
       }
       // The widget just changed size by a lot in either direction.
@@ -13892,15 +13925,23 @@
       if (e.key === "Escape" && maximizedId) setMaximized(null);
     });
 
-    // The hyperlink Menu widget is built by its own script module, which can't
-    // reach in here — but it's a grid widget like any other and so gets the same
-    // Full screen control. Only that one: Menu has no .collapsible-strip to be
-    // parked in the tab bar, and it already has its own Remove/re-add flow via
-    // the "+" menu, so it deliberately doesn't take a Hide button (which would
-    // strand it with no tab to come back from).
+    // The Bookmarks widget is built by its own script module, which can't
+    // reach in here, so the controls every other widget gets wired at build
+    // are exposed for it one by one. It rebuilds its floating header on every
+    // render, which is why these take an element rather than an id: the
+    // buttons are new each time, while the tab (a .collapsible-strip the
+    // module keeps across renders) is wired once through __wireWidgetTab.
     window.__wireWidgetFullscreen = function (el) {
       if (el) wireFullscreenButton(el.querySelector("[data-fullscreen-col]"));
     };
+    window.__wireWidgetHide = function (el) {
+      if (el) wireHideButton(el.querySelector("[data-hide-col]"));
+    };
+    window.__wireWidgetColor = function (el) {
+      if (el) Array.prototype.forEach.call(el.querySelectorAll("[data-color-btn]"), wireColorButton);
+    };
+    window.__wireWidgetTab = function (id) { wireTab(id); loadHiddenState(id); };
+    window.__reapplyHiddenState = function () { applyHiddenState(); };
 
     loadHideGroups();
     WIDGET_IDS.forEach(function (id) { wireWidgetVisibility(id); });
@@ -16659,6 +16700,13 @@
     }
 
     function deleteWidget(id) {
+      /* The original Bookmarks is never destroyed, only parked, and its own
+         module knows how (it comes back from the + popup). Floating or in
+         the grid, its Delete goes there. */
+      if (id === "menu" && window.__bookmarksApi && window.__bookmarksApi.menu && window.__bookmarksApi.menu.park) {
+        window.__bookmarksApi.menu.park();
+        return;
+      }
       if (dynamicWidgets[id]) deleteDynamicWidget(id);
       else hideWidget(id);
     }
@@ -16807,7 +16855,7 @@
 
     function applyWidgetColor(id) {
       applyWidgetColorButton(id);
-      const el = widgetEl(id);
+      const el = anyWidgetEl(id);
       if (!el) return;
       const color = WIDGET_COLORS[id];
       const customColor = color && color.toUpperCase() !== "#FFFFFF";
@@ -28309,6 +28357,9 @@
   var TRASH_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>';
   // Matches the Full screen control every other widget carries.
   var FULLSCREEN_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg>';
+  var COLOR_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg>';
+  var HIDE_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg>';
+  var UNHIDE_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg>';
 
   /* Every live Bookmarks widget. The right-click menu and the document-level
      dismiss handlers are shared across all of them (only one menu or open
@@ -28371,6 +28422,46 @@
      existing dashboard loads unchanged; extras namespace by id. */
   function createBookmarks(cfg) {
   var isPrimary = cfg.id === "menu";
+
+  /* The same five board controls every other widget carries, after this
+     widget's own edit pencil. Colour, full screen, hide and delete are the
+     ones the desktop folds into its ••• (see the widget-layout stylesheet);
+     they are still here, wired, for the phone and for anything that
+     addresses them by class. */
+  function boardControlsHtml() {
+    return '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + cfg.id + '" title="Customize color">' + COLOR_ICON_SVG + '</button>' +
+      '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + cfg.id + '" title="Full screen" aria-label="Full screen">' + FULLSCREEN_ICON_SVG + '</button>' +
+      '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + cfg.id + '" title="Hide" aria-label="Hide">' + HIDE_ICON_SVG + '</button>' +
+      '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove Bookmarks">' + TRASH_ICON_SVG + '</button>';
+  }
+  /* The tab a hidden Bookmarks comes back through. One element for the life
+     of the page: the floating header is rebuilt every render, and a tab that
+     was rebuilt with it would be lost from the tabs bar while hidden. */
+  var stripEl = null, tabWired = false;
+  function ensureStripEl() {
+    if (stripEl) return stripEl;
+    stripEl = document.createElement("div");
+    stripEl.className = "collapsible-strip";
+    stripEl.id = cfg.id + "Strip";
+    stripEl.innerHTML =
+      '<span class="collapsible-tab-icon" data-tab-icon="' + cfg.id + '" hidden></span>' +
+      '<span class="collapsible-strip-label">Bookmarks</span>' +
+      '<button type="button" class="collapsible-unhide" aria-label="Hidden. Show this widget" title="Hidden \u2014 tap to show">' + UNHIDE_ICON_SVG + '</button>';
+    return stripEl;
+  }
+  /* Attach the tab to whichever wrap is current, unless it is parked in the
+     tabs bar because the widget is hidden, and wire the board controls the
+     wrap carries. Called after every build of either wrap. */
+  function attachBoardControls(wrap) {
+    var strip = ensureStripEl();
+    var bar = document.getElementById("collapsedTabsBar");
+    if (!(bar && strip.parentNode === bar)) wrap.appendChild(strip);
+    if (window.__wireWidgetColor) window.__wireWidgetColor(wrap);
+    if (window.__wireWidgetFullscreen) window.__wireWidgetFullscreen(wrap);
+    if (window.__wireWidgetHide) window.__wireWidgetHide(wrap);
+    if (!tabWired && window.__wireWidgetTab) { tabWired = true; window.__wireWidgetTab(cfg.id); }
+    if (window.__reapplyHiddenState) window.__reapplyHiddenState();
+  }
   var LINKS_KEY = isPrimary ? "links-menu-items" : "links-menu-items:" + cfg.id;
   var POSITION_KEY = isPrimary ? "links-menu-position" : null;
 
@@ -29189,7 +29280,7 @@
     controls.innerHTML =
       '<button type="button" class="col-drag-handle" title="Drag to move Bookmarks">' + DRAG_HANDLE_SVG + '</button>' +
       '<button type="button" class="collapse-btn links-edit-btn' + (editMode ? " active" : "") + '" title="Edit bookmarks">' + EDIT_ICON_SVG + '</button>' +
-      '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove Bookmarks">' + TRASH_ICON_SVG + '</button>';
+      boardControlsHtml();
 
     var built = buildLinksRow(false);
 
@@ -29212,6 +29303,7 @@
 
     wireEditBtn(wrapEl);
     wireRemoveBtn(wrapEl);
+    attachBoardControls(wrapEl);
     wireFloatingDrag(wrapEl);
   }
 
@@ -29261,8 +29353,7 @@
           '<div class="widget-header-controls">' +
             '<button type="button" class="col-drag-handle" data-drag-col="' + cfg.id + '" title="Drag to reorder Bookmarks">' + DRAG_HANDLE_SVG + '</button>' +
             '<button type="button" class="collapse-btn links-edit-btn" title="Edit bookmarks">' + EDIT_ICON_SVG + '</button>' +
-            '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + cfg.id + '" title="Full screen" aria-label="Full screen">' + FULLSCREEN_ICON_SVG + '</button>' +
-            '<button type="button" class="collapse-btn col-delete-btn links-remove-btn" title="Remove Bookmarks">' + TRASH_ICON_SVG + '</button>' +
+            boardControlsHtml() +
           '</div>' +
         '</div>' +
         '<div class="widget-body"><div class="links-row links-row-vertical"></div></div>' +
@@ -29272,8 +29363,13 @@
     // Built once and kept (see the note above), so wiring it once is enough.
     if (window.__wireWidgetIcon) window.__wireWidgetIcon(el.querySelector("[data-icon-btn]"));
     if (window.__applyWidgetIcon) window.__applyWidgetIcon(cfg.id);
-    // Wired by the widget-layout script, which owns the maximized state.
-    if (window.__wireWidgetFullscreen) window.__wireWidgetFullscreen(el);
+    /* The board controls are wired by the widget-layout script, which owns
+       colour, hidden and maximized state. An extra Bookmarks gets that
+       wiring from registerDynamicWidget like every dynamic widget; the
+       original reaches the grid by being dragged in (window.__menuGrid),
+       a path that wires only its drag handle, so it wires the rest here. */
+    if (isPrimary) attachBoardControls(el);
+    else el.appendChild(ensureStripEl());
     return el;
   }
 
@@ -29319,11 +29415,16 @@
         if (window.__deleteDynamicWidget) window.__deleteDynamicWidget(cfg.id);
         return;
       }
-      if (window.__menuGrid && window.__menuGrid.isIn()) window.__menuGrid.remove();
-      if (wrapEl && wrapEl.parentNode) { wrapEl.parentNode.removeChild(wrapEl); wrapEl = null; }
-      position = { type: "removed" };
-      savePosition();
+      park();
     });
+  }
+  /* Parks the original Bookmarks: off the board, still in the + popup. The
+     trash button and the ••• menu's Delete both land here. */
+  function park() {
+    if (window.__menuGrid && window.__menuGrid.isIn()) window.__menuGrid.remove();
+    if (wrapEl && wrapEl.parentNode) { wrapEl.parentNode.removeChild(wrapEl); wrapEl = null; }
+    position = { type: "removed" };
+    savePosition();
   }
 
   // Dragging the menu's own handle while it's floating: dropping it onto a
@@ -29543,6 +29644,7 @@
   }
   window.__bookmarksApi = window.__bookmarksApi || {};
   window.__bookmarksApi[cfg.id] = {
+    park: isPrimary ? park : undefined,
     list: function () { return links.map(function (e) { return publicEntry(e, null); }); },
     addLink: function (o) {
       o = o || {};
@@ -35988,6 +36090,9 @@
       const hit = (window.__aiBoard.list() || []).filter(function (w) { return w.id === id; })[0];
       if (hit) return { title: hit.title || id, icon: hit.icon || "" };
     } catch (e) {}
+    // The floating Bookmarks bar is not on the board's list until it is
+    // dragged in, and "menu" is not a name anyone would recognise.
+    if (id === "menu") return { title: "Bookmarks", icon: "" };
     return { title: id, icon: "" };
   }
 
@@ -36344,7 +36449,9 @@
       c.title = p.name;
       c.setAttribute("aria-label", p.name);
       c.style.background = p.hex;
-      c.addEventListener("click", function () { closeMenu(); try { B.setColor(id, p.name); } catch (e) {} });
+      // The board takes a hex; the name is for the tooltip. Passing the
+      // name stored "Rose" as a background colour and painted nothing.
+      c.addEventListener("click", function () { closeMenu(); try { B.setColor(id, p.hex); } catch (e) {} });
       sw.appendChild(c);
     });
     if (presets.length) {
@@ -36487,9 +36594,11 @@
      observer catches them all. Idempotent per header. */
   function ensureDesktopDots(root) {
     if (isMobile()) return;
-    Array.prototype.forEach.call((root || document).querySelectorAll(".col.collapsible-col-wrap .widget-header-controls"), function (ctl) {
+    /* Every widget header, plus the floating Bookmarks bar's own control
+       chip, which is the same array under a different class. */
+    Array.prototype.forEach.call((root || document).querySelectorAll(".col.collapsible-col-wrap .widget-header-controls, .links-row-wrap .links-menu-controls"), function (ctl) {
       if (ctl.querySelector(".wd-dots")) return;
-      const el = ctl.closest(".col.collapsible-col-wrap");
+      const el = ctl.closest("[data-col-id]");
       const id = idOf(el);
       if (!id) return;
       const more = document.createElement("button");
@@ -36514,7 +36623,7 @@
         const added = muts[i].addedNodes;
         for (let j = 0; j < added.length; j++) {
           const n = added[j];
-          if (n && n.nodeType === 1 && (n.matches(".col.collapsible-col-wrap, .widget-header-controls") || n.querySelector(".widget-header-controls"))) {
+          if (n && n.nodeType === 1 && (n.matches(".col.collapsible-col-wrap, .widget-header-controls, .links-row-wrap, .links-menu-controls") || n.querySelector(".widget-header-controls, .links-menu-controls"))) {
             ensureDesktopDots();
             return;
           }
