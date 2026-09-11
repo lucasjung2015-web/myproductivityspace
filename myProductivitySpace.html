@@ -3232,25 +3232,27 @@
   }
   .ai-starter:hover { background: #f5f5f6; border-color: #c9c9c9; }
   .ai-starter:active { transform: scale(0.96); }
+  /* ---------- the composer bubble ----------
+     One rounded white surface holding the message box and, under it, the
+     row of controls. The box itself has no border; the bubble's border
+     darkens slightly while the box has focus. */
   .ai-composer {
     position: relative;
-    flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px;
-    /* Bottom padding moved to .ai-modebar, which now sits under this row. */
-    padding: 12px 14px 6px; border-top: 1px solid var(--hair);
+    flex: 0 0 auto; display: flex; flex-direction: column;
+    margin: 8px 12px 12px; padding: 10px 12px 8px;
+    background: var(--bg); border: 1px solid #dcdcdc; border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.05);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
   }
-  /* ---------- mode strip ----------
-     Sits directly below the message box and is indented to line up with the
-     box's own left edge, not the panel's: 14px of composer padding + the
-     34px round + button + the 8px gap = 56px. Hard-coded rather than derived
-     because all three of those are hard-coded a few rules above. */
-  .ai-modebar {
+  .ai-composer:focus-within { border-color: #b8b8b8; box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 6px 18px rgba(0,0,0,0.07); }
+  .ai-composer-row {
     position: relative;
-    flex: 0 0 auto; display: flex; align-items: center;
-    padding: 0 14px 10px 56px;
+    display: flex; align-items: center; gap: 4px;
+    margin-top: 6px;
   }
   .ai-mode-btn {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 3px 7px; margin-left: -7px;
+    padding: 3px 7px;
     border: none; border-radius: 7px; background: transparent;
     color: var(--ink-soft); cursor: pointer;
     font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.2;
@@ -3266,9 +3268,9 @@
   /* The model/effort trigger: pushed to the strip's right edge, model name
      in ink and effort in grey, no chevron, the way the same control reads
      in Claude's own composer. */
-  .ai-pick-btn { margin-left: auto; margin-right: -7px; gap: 6px; color: var(--ink); font-weight: 500; }
+  .ai-pick-btn { margin-left: auto; margin-right: 4px; gap: 6px; color: var(--ink); font-weight: 500; }
   .ai-pick-btn .ai-pick-effort { color: #9a9a9a; font-weight: 500; }
-  .ai-pick-menu { left: auto; right: 14px; min-width: 250px; max-width: 320px; }
+  .ai-pick-menu { left: auto; right: 40px; min-width: 250px; max-width: 320px; }
   .ai-pick-sep { height: 1px; margin: 6px 4px; background: var(--hair); }
   /* The Effort row: label left, current level and a chevron right. */
   .ai-pick-row {
@@ -3304,7 +3306,7 @@
   /* Opens upward for the same reason .ai-plus-menu does: the composer is
      pinned to the bottom of the panel. */
   .ai-mode-menu {
-    position: absolute; left: 49px; bottom: 34px; right: 14px; z-index: 20;
+    position: absolute; left: 34px; bottom: 36px; right: 40px; z-index: 20;
     min-width: 240px; padding: 6px;
     background: var(--bg); border: 1px solid var(--hair); border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
@@ -3330,18 +3332,18 @@
   .ai-mode-item.is-current .ai-mode-tick { opacity: 1; }
   .ai-mode-key { flex: 0 0 auto; margin-top: 2px; font-size: 11.5px; color: #9a9a9a; }
   .ai-plus {
-    flex: 0 0 auto; width: 34px; height: 34px; padding: 0;
+    flex: 0 0 auto; width: 28px; height: 28px; padding: 0; margin-left: -4px;
     display: flex; align-items: center; justify-content: center;
-    border: 1px solid var(--hair); border-radius: 50%;
+    border: none; border-radius: 8px;
     background: transparent; color: var(--ink); cursor: pointer;
-    transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s var(--ease-spring);
+    transition: background 0.12s ease, transform 0.1s var(--ease-spring);
   }
-  .ai-plus:hover { background: #f5f5f6; border-color: #c9c9c9; }
+  .ai-plus:hover { background: #f3f3f4; }
   .ai-plus:active { transform: scale(0.9); }
   /* Opens upward: the composer is pinned to the bottom of the panel, so a
      menu below it would be off-screen. */
   .ai-plus-menu {
-    position: absolute; left: 14px; bottom: 54px; z-index: 20;
+    position: absolute; left: -4px; bottom: 36px; z-index: 20;
     min-width: 232px; padding: 6px;
     background: var(--bg); border: 1px solid var(--hair); border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
@@ -3393,15 +3395,14 @@
   .ai-drop[hidden] { display: none; }
   .ai-drop-text { font-size: 13.5px; font-weight: 500; }
   .ai-composer textarea {
-    flex: 1 1 auto; min-width: 0; resize: none; max-height: 140px;
-    padding: 9px 12px; border: 1px solid var(--hair); border-radius: 10px;
+    width: 100%; min-width: 0; resize: none; max-height: 140px;
+    padding: 4px 2px; border: none; border-radius: 0;
     font-family: inherit; font-size: 13.5px; line-height: 1.4; color: var(--ink);
     outline: none; background: transparent;
   }
-  .ai-composer textarea:focus { border-color: var(--ink); }
   .ai-composer textarea::placeholder { color: #9a9a9a; }
   .ai-send {
-    flex: 0 0 auto; width: 34px; height: 34px; padding: 0;
+    flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
     display: flex; align-items: center; justify-content: center;
     border: none; border-radius: 50%; background: var(--ink); color: var(--bg);
     cursor: pointer; transition: background 0.12s ease, transform 0.1s var(--ease-spring);
@@ -5096,7 +5097,14 @@
   </div>
   <div class="ai-starters" id="aiStarters"></div>
   <div class="ai-attachments" id="aiAttachments" hidden></div>
+  <!-- The composer is one white bubble, the way Claude's own is: the message
+       box on top with no border of its own, and a row of controls under it
+       inside the same bubble. Left: attach, then the mode (how much the
+       assistant does on its own). Right: model and effort, then send. -->
   <div class="ai-composer">
+    <input type="file" id="aiFileInput" multiple accept="image/*,application/pdf,text/*,.md,.csv,.json,.log" hidden>
+    <textarea id="aiInput" rows="1" placeholder="Write a message..."></textarea>
+    <div class="ai-composer-row">
     <button type="button" class="ai-plus" id="aiPlusBtn" title="Add files or photos" aria-label="Add files or photos" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
     <div class="ai-plus-menu" id="aiPlusMenu" hidden>
       <button type="button" class="ai-plus-item" id="aiAddFilesBtn">
@@ -5105,24 +5113,14 @@
         <kbd>&#8984; U</kbd>
       </button>
     </div>
-    <input type="file" id="aiFileInput" multiple accept="image/*,application/pdf,text/*,.md,.csv,.json,.log" hidden>
-    <textarea id="aiInput" rows="1" placeholder="Write a message..."></textarea>
-    <button type="button" class="ai-send" id="aiSendBtn" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button>
-  </div>
-  <!-- The mode strip: below the message box, aligned to its left edge, the
-       way the same control sits in Claude Code. Its own row rather than a
-       control inside the composer, because it describes the NEXT message
-       rather than being part of writing one. -->
-  <div class="ai-modebar">
     <button type="button" class="ai-mode-btn" id="aiModeBtn" aria-haspopup="true" aria-expanded="false" title="Change how much this assistant does on its own (Shift+Tab)"><span id="aiModeLabel">Auto</span><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="ai-mode-menu" id="aiModeMenu" hidden role="menu" aria-label="Mode">
       <div class="ai-mode-head">Mode</div>
     </div>
-    <!-- Model and effort, one trigger at the right end of the strip: the
-         model's name, then the effort in grey. Opens a menu of models with
-         an Effort row that flies out to the levels. -->
     <button type="button" class="ai-mode-btn ai-pick-btn" id="aiModelBtn" aria-haspopup="true" aria-expanded="false" title="Model and effort"><span class="ai-pick-model" id="aiModelLabel">Sonnet 5</span><span class="ai-pick-effort" id="aiEffortLabel">High</span></button>
     <div class="ai-mode-menu ai-pick-menu" id="aiModelMenu" hidden role="menu" aria-label="Model and effort"></div>
+    <button type="button" class="ai-send" id="aiSendBtn" title="Send" aria-label="Send"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></button>
+    </div>
   </div>
   </div>
 </aside>
