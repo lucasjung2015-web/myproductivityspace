@@ -17761,7 +17761,8 @@
          addressable in both directions. */
       maximized: function () { return maximizedId; },
       setMaximized: function (id) {
-        if (id && WIDGET_IDS.indexOf(id) === -1) return { error: "No widget with id '" + id + "'." };
+        // The floating Bookmarks bar is a widget with no WIDGET_IDS entry.
+        if (id && WIDGET_IDS.indexOf(id) === -1 && !anyWidgetEl(id)) return { error: "No widget with id '" + id + "'." };
         setMaximized(id || null);
         return { ok: true, maximized: maximizedId };
       },
