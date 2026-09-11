@@ -796,6 +796,44 @@
     opacity: 1; transform: scale(1);
     backdrop-filter: blur(8px) saturate(180%); -webkit-backdrop-filter: blur(8px) saturate(180%);
   }
+  /* The hover array is the drag grip and a ••• now. Colour, full screen,
+     hide and delete were four 13px glyphs competing with the title, and they
+     had a twin on the phone already (the ••• menu below, built for touch,
+     where there is no hover). One menu on both is one system to learn. The
+     buttons stay in the markup, still wired, so nothing that addressed them
+     breaks; they are simply not shown. Widget-specific buttons (a list's
+     edit, a bookmark bar's edit) are not board actions and stay visible. */
+  .widget-header-controls .col-color-btn,
+  .widget-header-controls .widget-fullscreen-btn,
+  .widget-header-controls .widget-hide-btn,
+  .widget-header-controls .col-delete-btn { display: none; }
+  .wd-dots { color: var(--ink-soft); }
+  .wd-dots:hover { color: var(--ink); }
+  /* The ••• menu is the phone's element (#mobMenu), whose styles sit inside
+     the touch media query. These are the same rules for a pointer. */
+  .mob-menu.is-open { display: block; }
+  .mob-menu {
+    position: fixed; z-index: 3200; min-width: 208px; padding: 5px; border-radius: 14px;
+    border: 1px solid var(--hair);
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(22px) saturate(180%);
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,.32);
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  .mob-menu button {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px;
+    padding: 0 11px; border: 0; background: transparent; border-radius: 10px;
+    color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; text-align: left;
+  }
+  .mob-menu button:hover { background: rgba(0,0,0,.05); }
+  .mob-menu button:active { background: rgba(0,0,0,.07); }
+  .mob-menu button svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-soft); }
+  .mob-menu hr { border: 0; border-top: 1px solid var(--hair); margin: 4px 6px; }
+  .mob-swatches { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 9px 5px; }
+  .mob-swatches button {
+    width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%;
+    border: 1px solid rgba(0,0,0,.14);
+  }
 
   /* A "note" widget (Atomic Habits / Affirmations) doesn't need its own
      section-header at all — the sticky note's own title already reads as
@@ -35902,10 +35940,12 @@
    because there is no correct label to fall back to and the dots plus a
    swipe already answer where you are.
 
-   Everything here is inert unless the pointer is a finger. The same
+   Almost everything here is inert unless the pointer is a finger. The same
    question the stylesheet asks, asked once in JS, so the two can never
-   disagree about what kind of device this is. On a Mac this module
-   installs one listener and then does nothing for the life of the page.
+   disagree about what kind of device this is. The one thing a Mac takes
+   from this module is the ••• menu (openMenu / ensureDesktopDots), which
+   the desktop hover array now opens as well, so both devices share one
+   set of widget commands.
    ===================================================================== */
 (function () {
   "use strict";
@@ -36000,6 +36040,9 @@
     dots.innerHTML = "";
     tabsEl.innerHTML = "";
     const list = pages();
+    // The desktop's ••• pass lives here too, so a device-mode flip (the
+    // force-desktop switch, or a media query change) reaches both sides.
+    ensureDesktopDots();
     if (!isMobile() || list.length < 1) { filterTabs(); return; }
 
     // The dots count the pages you can swipe through.
@@ -36258,7 +36301,11 @@
   function openMenu(btn, id) {
     const B = board();
     if (!menuEl || !B) return;
-    const boardView = currentView() === "board";
+    /* On a desktop there is one view, the board, so everything the board
+       view offers is on the table; the phone's widget view is the only
+       place section commands and delete are withheld. */
+    const desktop = !isMobile();
+    const boardView = desktop || currentView() === "board";
     menuEl.innerHTML = "";
     const add = function (label, icon, fn) {
       const b = document.createElement("button");
@@ -36270,14 +36317,20 @@
     };
     const cur = nameFor(id);
 
-    add("Rename", ICO.pencil, function () {
-      const v = window.prompt("Widget name", cur.title);
-      if (v != null && v.trim()) B.rename(id, v.trim());
-    });
-    add("Change icon", ICO.smile, function () {
-      const v = window.prompt("Emoji for this widget (leave blank to remove)", cur.icon || "");
-      if (v != null) B.setIcon(id, v.trim());
-    });
+    /* Rename and icon are phone-only entries: on a desktop the title is
+       edited in place and the icon has its own button beside it, and both
+       of these fall back to window.prompt, which is a poor thing to put in
+       front of a pointer. */
+    if (!desktop) {
+      add("Rename", ICO.pencil, function () {
+        const v = window.prompt("Widget name", cur.title);
+        if (v != null && v.trim()) B.rename(id, v.trim());
+      });
+      add("Change icon", ICO.smile, function () {
+        const v = window.prompt("Emoji for this widget (leave blank to remove)", cur.icon || "");
+        if (v != null) B.setIcon(id, v.trim());
+      });
+    }
 
     // Colour is a row of the board's own presets rather than a text field:
     // the palette is a closed set, so a picker is both faster and unmissable.
@@ -36305,14 +36358,20 @@
       menuEl.appendChild(sw);
     }
 
-    add("Open fullscreen", ICO.expand, function () { B.setMaximized(id); });
+    let maxed = false;
+    try { maxed = B.maximized && B.maximized() === id; } catch (e) {}
+    if (maxed) add("Exit full screen", ICO.expand, function () { B.setMaximized(null); });
+    else add("Full screen", ICO.expand, function () { B.setMaximized(id); });
 
     /* Two scopes, two menu items, so what you are about to drag is decided
        before the drag rather than by which of two adjacent handles your thumb
-       found. Move section only when there is a section to move. */
-    add("Move widget", ICO.grip, function () { enterMove(id, "widget"); });
-    if (boardView && matesOf(id).length > 1) {
-      add("Move section", ICO.grip, function () { enterMove(id, "section"); });
+       found. Move section only when there is a section to move. A desktop
+       drags by the grip, so it gets neither. */
+    if (!desktop) {
+      add("Move widget", ICO.grip, function () { enterMove(id, "widget"); });
+      if (boardView && matesOf(id).length > 1) {
+        add("Move section", ICO.grip, function () { enterMove(id, "section"); });
+      }
     }
 
     /* No divider. It was fencing the destructive items off from the rest, but
@@ -36418,6 +36477,61 @@
       el.appendChild(size);
     });
   }
+
+  /* The desktop counterpart of ensureControls: a ••• at the end of every
+     widget's hover array, opening the same menu the phone uses. Injected
+     rather than authored into the dozen header builders, and watched for
+     rather than called from each of them, because headers are created by
+     many builders at many moments (the six built-ins at load, dynamic
+     widgets on add, a few that rebuild their header on every render). One
+     observer catches them all. Idempotent per header. */
+  function ensureDesktopDots(root) {
+    if (isMobile()) return;
+    Array.prototype.forEach.call((root || document).querySelectorAll(".col.collapsible-col-wrap .widget-header-controls"), function (ctl) {
+      if (ctl.querySelector(".wd-dots")) return;
+      const el = ctl.closest(".col.collapsible-col-wrap");
+      const id = idOf(el);
+      if (!id) return;
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "collapse-btn wd-dots";
+      more.title = "Widget options";
+      more.setAttribute("aria-label", "Widget options");
+      more.setAttribute("aria-haspopup", "true");
+      more.innerHTML = svgIcon(ICO.dots, true);
+      more.addEventListener("click", function (e) {
+        e.stopPropagation(); e.preventDefault();
+        if (menuEl && menuEl.classList.contains("is-open")) { closeMenu(); return; }
+        openMenu(more, id);
+      });
+      ctl.appendChild(more);
+    });
+  }
+  ensureDesktopDots();
+  if (window.MutationObserver) {
+    new MutationObserver(function (muts) {
+      for (let i = 0; i < muts.length; i++) {
+        const added = muts[i].addedNodes;
+        for (let j = 0; j < added.length; j++) {
+          const n = added[j];
+          if (n && n.nodeType === 1 && (n.matches(".col.collapsible-col-wrap, .widget-header-controls") || n.querySelector(".widget-header-controls"))) {
+            ensureDesktopDots();
+            return;
+          }
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+  /* The phone closes the menu by tapping its scrim, which a desktop never
+     shows; a click anywhere outside, or Escape, does it here. */
+  document.addEventListener("click", function (e) {
+    if (!menuEl || !menuEl.classList.contains("is-open")) return;
+    if (e.target.closest && e.target.closest(".mob-menu, .wd-dots")) return;
+    closeMenu();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && menuEl && menuEl.classList.contains("is-open")) closeMenu();
+  });
 
   /* Phone-local widget size. Deliberately not the desktop width: those are
      pixel column widths for a layout this view does not use, and writing to
