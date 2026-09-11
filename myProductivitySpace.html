@@ -13573,6 +13573,9 @@
         collapsedTabsBar.querySelectorAll(".collapsible-strip"),
         function (tab) {
           const tid = (tab.id || "").replace(/Strip$/, "");
+          /* The floating Bookmarks bar is a real widget that is never in
+             WIDGET_IDS; its tab stays as long as its element exists. */
+          if (tid === "menu" && anyWidgetEl("menu")) return;
           if (!tid || WIDGET_IDS.indexOf(tid) === -1) tab.remove();
         }
       );
