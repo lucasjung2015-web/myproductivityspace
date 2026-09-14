@@ -319,6 +319,26 @@
      same "Menu" header treatment as every other widget (icon-less here,
      since individual links carry their own icons). */
   .links-row-wrap { position: relative; flex: 0 0 auto; }
+  /* The board at 75%. Chrome's own zoom at 75% was the size that read right
+     on a laptop, so the app starts there instead of needing it set by hand.
+     Scoped to what sits on the page itself (wordmark, floating Bookmarks bar,
+     grid, hidden-widget tabs) rather than <html>: the popups attached to
+     <body> place themselves from button rects in screen pixels, and a
+     page-wide zoom would scale those numbers and open menus away from their
+     buttons. A literal value, because WebKit ignores zoom: var(...). Touch
+     devices keep their fit-to-screen board. Code that turns pointer travel
+     into a size divides by window.__mpsZoomOf. */
+  @media not all and (hover: none) and (pointer: coarse) {
+    .page-title, body > .links-row-wrap, #widgetGrid, #collapsedTabsBar { zoom: 0.75; }
+    /* The few fixed popups that live inside the grid are placed in screen
+       pixels too. Undoing the zoom on them puts them back at full size and
+       their coordinates back in screen pixels. */
+    #widgetGrid .cal-viewtoggle-menu, #widgetGrid .timer-popup { zoom: 1.333333; }
+  }
+  html.force-desktop .page-title, html.force-desktop body > .links-row-wrap,
+  html.force-desktop #widgetGrid, html.force-desktop #collapsedTabsBar { zoom: 0.75; }
+  html.force-desktop #widgetGrid .cal-viewtoggle-menu,
+  html.force-desktop #widgetGrid .timer-popup { zoom: 1.333333; }
   /* A coloured bar is painted like a coloured widget: the tint gets corners. */
   .links-row-wrap.widget-colored { border-radius: 12px; }
   .links-menu-header { padding: 0 28px; }
@@ -12942,6 +12962,22 @@
   // popups...) is ever lost.
   (function () {
     const widget = document.getElementById("widgetGrid");
+
+    /* How zoomed the board is at `el` (see the zoom rule on #widgetGrid).
+       Pointer coordinates and getBoundingClientRect are screen pixels, but a
+       width, height or offset written inside a zoomed element is in its own
+       unzoomed pixels, so anything that turns pointer travel or a measured
+       rect into a size divides by this first. */
+    window.__mpsZoomOf = function (el) {
+      if (!el) return 1;
+      if (typeof el.currentCSSZoom === "number" && el.currentCSSZoom > 0) return el.currentCSSZoom;
+      let z = 1;
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const v = parseFloat(getComputedStyle(n).zoom);
+        if (v > 0 && isFinite(v)) z *= v;
+      }
+      return z;
+    };
     const collapsedTabsBar = document.getElementById("collapsedTabsBar");
 
     /* Nothing in the app tracked "which widget am I working in" before this —
@@ -13847,8 +13883,9 @@
 
         function onMoveInner(ev) {
           if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
-          const dx = clientX(ev) - startX;
-          const totalWidth = widget.getBoundingClientRect().width;
+          const z = window.__mpsZoomOf(widget);
+          const dx = (clientX(ev) - startX) / z;
+          const totalWidth = widget.getBoundingClientRect().width / z;
           // Available width = widget's own box minus its horizontal padding
           // (28px each side), minus this resizer's own 20px, minus every
           // other visible slot's current width + its own 20px handle.
@@ -13886,15 +13923,16 @@
         const aboveId = aboveEl.getAttribute("data-col-id");
         const slotEl = aboveEl.parentElement;
         const startY = clientY(e);
-        const startH = heights[aboveId] || aboveEl.getBoundingClientRect().height;
+        const startH = heights[aboveId] || aboveEl.getBoundingClientRect().height / window.__mpsZoomOf(aboveEl);
 
         widget.classList.add("dragging-col");
         resizer.classList.add("dragging");
 
         function onMoveInner(ev) {
           if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
-          const dy = clientY(ev) - startY;
-          const slotHeight = slotEl.getBoundingClientRect().height;
+          const z = window.__mpsZoomOf(slotEl);
+          const dy = (clientY(ev) - startY) / z;
+          const slotHeight = slotEl.getBoundingClientRect().height / z;
           const maxH = Math.max(MIN_ROW, slotHeight - MIN_ROW - 14);
           heights[aboveId] = clamp(startH + dy, MIN_ROW, maxH);
           aboveEl.style.flex = "0 1 " + heights[aboveId] + "px";
@@ -15110,11 +15148,12 @@
       // The rail is the block's own left padding, which is where the CSS
       // draws every marker. getBoundingClientRect is already past the
       // indent margin, so no depth arithmetic is needed here.
-      const rail = nbType(block) === "callout" ? 34 : 24;
+      const z = (window.__mpsZoomOf ? window.__mpsZoomOf(block) : 1);
+      const rail = (nbType(block) === "callout" ? 34 : 24) * z;
       if (e.clientX < r.left - 4 || e.clientX > r.left + rail) return false;
       // A twisty and a checkbox sit on the first line of the block; clicking
       // the rail beside the third line of a long item is not a toggle.
-      const lineBottom = r.top + parseFloat(window.getComputedStyle(block).lineHeight || "20") + 8;
+      const lineBottom = r.top + (parseFloat(window.getComputedStyle(block).lineHeight || "20") + 8) * z;
       return e.clientY <= lineBottom;
     }
 
@@ -22230,7 +22269,7 @@
       }
 
       function onMove(me) {
-        const dy = me.clientY - startY;
+        const dy = (me.clientY - startY) / (window.__mpsZoomOf ? window.__mpsZoomOf(box) : 1);
         if (!moved && Math.abs(dy) < MOVE_MIN) return;
         if (!moved) { moved = true; box.classList.add("is-dragging"); }
 
@@ -23291,7 +23330,7 @@
       const startY = e.clientY;
       const startH = ta.offsetHeight;
       function onMove(ev) {
-        ta.style.height = Math.max(minH, startH + (ev.clientY - startY)) + "px";
+        ta.style.height = Math.max(minH, startH + (ev.clientY - startY) / (window.__mpsZoomOf ? window.__mpsZoomOf(ta) : 1)) + "px";
       }
       function onUp() {
         document.removeEventListener("pointermove", onMove, true);
@@ -28709,6 +28748,7 @@
       var dropBar = null;
       var dropIndex = -1;
       var lastX = e.clientX;
+      var liftZoom = (window.__mpsZoomOf ? window.__mpsZoomOf(wrap) : 1);
 
       // Carries the held item under the pointer. Much simpler than it used to
       // be: the row no longer reorders mid-drag, so the item never leaves its
@@ -28718,7 +28758,7 @@
         var tilt = Math.max(-6, Math.min(6, (ev.clientX - lastX) * 0.35));
         lastX = ev.clientX;
         wrap.style.transform =
-          "translate(" + (ev.clientX - startX) + "px," + (ev.clientY - startY) + "px)" +
+          "translate(" + (ev.clientX - startX) / liftZoom + "px," + (ev.clientY - startY) / liftZoom + "px)" +
           " rotate(" + tilt.toFixed(2) + "deg) scale(1.04)";
       }
 
@@ -28772,6 +28812,7 @@
         }
         var list = itemWraps();
         var rowRect = row.getBoundingClientRect();
+        var bz = (window.__mpsZoomOf ? window.__mpsZoomOf(row) : 1);
         // The gap is drawn against whichever item sits after the insertion
         // point, or after the last one when dropping at the end.
         var atEnd = index >= list.length;
@@ -28780,15 +28821,15 @@
         var r = slotRect(ref);
         dropBar.style.display = "block";
         if (vertical) {
-          dropBar.style.left = (r.left - rowRect.left) + "px";
-          dropBar.style.width = r.width + "px";
+          dropBar.style.left = (r.left - rowRect.left) / bz + "px";
+          dropBar.style.width = r.width / bz + "px";
           dropBar.style.height = "2px";
-          dropBar.style.top = ((atEnd ? r.bottom : r.top) - rowRect.top - 1) + "px";
+          dropBar.style.top = ((atEnd ? r.bottom : r.top) - rowRect.top) / bz - 1 + "px";
         } else {
-          dropBar.style.top = (r.top - rowRect.top - 3) + "px";
-          dropBar.style.height = (r.height + 6) + "px";
+          dropBar.style.top = (r.top - rowRect.top) / bz - 3 + "px";
+          dropBar.style.height = r.height / bz + 6 + "px";
           dropBar.style.width = "2px";
-          dropBar.style.left = ((atEnd ? r.right + 7 : r.left - 9) - rowRect.left) + "px";
+          dropBar.style.left = ((atEnd ? r.right : r.left) - rowRect.left) / bz + (atEnd ? 7 : -9) + "px";
         }
       }
 
