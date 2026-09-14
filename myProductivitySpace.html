@@ -652,55 +652,9 @@
      widget, or several stacked vertically (with a row-resizer between
      each) once widgets have been dropped on top of one another. */
   .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s var(--ease-spring); position: relative; }
-  /* Section-level controls: move + hide for the whole vertical stack in this
-     slot, revealed by hovering anywhere over it. Pinned to the section's own
-     top-right corner and nudged up-and-out past its edge (rather than inset
-     4px like the old single hide button) so the pair reads as sitting ON the
-     section's corner rather than floating inside it — while staying short of
-     the bookmarks bar above, which sits clear of the grid's own top edge. */
-  .section-controls {
-    position: absolute; top: -11px; right: -6px;
-    z-index: 6; display: flex; align-items: center; gap: 2px;
-    /* Materializes rather than just fading in: blur radius and a small
-       scale animate together with opacity, so the chip reads as a real
-       piece of glass arriving on the corner instead of a flat rectangle
-       cross-fading — see the apple-design skill's "materialize, don't just
-       fade" guidance for translucent surfaces. At rest the blur is 0 (no
-       glass yet to see), reaching its full 8px only once revealed. */
-    opacity: 0; transform: scale(0.92); transform-origin: top right;
-    transition: opacity 0.15s var(--ease-spring), transform 0.15s var(--ease-spring),
-                backdrop-filter 0.15s ease, -webkit-backdrop-filter 0.15s ease;
-    /* One connected glass chip housing both buttons, same recipe as
-       .widget-header-controls below it — the background/blur/shadow live on
-       the shared container rather than on each button individually, so the
-       pair reads as one bar rather than two separate floating buttons. */
-    background: rgba(255,255,255,0.72); backdrop-filter: blur(0px) saturate(100%);
-    -webkit-backdrop-filter: blur(0px) saturate(100%);
-    border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.14); padding: 2px;
-  }
-  .col-slot:hover .section-controls,
-  .section-controls:focus-within {
-    opacity: 1; transform: scale(1);
-    backdrop-filter: blur(8px) saturate(180%); -webkit-backdrop-filter: blur(8px) saturate(180%);
-  }
-  /* Icon only, no caption — the same treatment .collapsible-unhide gets, so
-     the hide and unhide controls read as a matched pair. Transparent here —
-     the chip's own background above is what shows through — so hovering one
-     button highlights just that button inside the shared bar. */
-  .section-hide-btn, .section-drag-handle {
-    display: flex; align-items: center; justify-content: center;
-    width: 22px; height: 22px; padding: 0; border: none; border-radius: 4px;
-    background: transparent; color: #6b6b6b; cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, transform 0.1s var(--ease-spring);
-  }
-  .section-hide-btn:hover, .section-drag-handle:hover { color: #000000; background: rgba(0,0,0,0.06); }
-  .section-hide-btn:active, .section-drag-handle:active { transform: scale(0.88); }
-  .section-hide-btn svg, .section-drag-handle svg { width: 13px; height: 13px; flex: 0 0 auto; display: block; }
-  .section-drag-handle { cursor: grab; }
-  @media (prefers-reduced-transparency: reduce) {
-    .section-controls { background: #ffffff; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  }
-  .section-drag-handle:active { cursor: grabbing; }
+  /* A section picked up from the ••• menu ("Move section") follows the
+     cursor until a click places it; the grabbing cursor says a drop is armed. */
+  html.section-picking, html.section-picking * { cursor: grabbing !important; }
   .widget.dragging-col .col-slot { transition: none; }
   .col-slot.section-drop-left::after, .col-slot.section-drop-right::after,
   .col-slot.section-drop-top::after, .col-slot.section-drop-bottom::after {
@@ -709,7 +663,7 @@
   .col-slot.section-drop-left::after { box-shadow: inset 4px 0 0 0 #9099a8; }
   .col-slot.section-drop-right::after { box-shadow: inset -4px 0 0 0 #9099a8; }
   /* Dropping on the middle band's top/bottom half merges the whole dragged
-     section into this one (see wireSectionDragHandle) rather than reordering
+     section into this one (see commitSectionDrop) rather than reordering
      past it — same inset-line language as the left/right reorder indicator,
      just on the other axis. */
   .col-slot.section-drop-top::after { box-shadow: inset 0 4px 0 0 #9099a8; }
@@ -772,31 +726,21 @@
      corner rather than a permanently-visible header row, so a widget reads
      clean until you actually need to touch one. */
   .col.collapsible-col-wrap .collapsible-body { position: relative; }
-  /* top:30px rather than flush with the widget's own top edge: the section-hide
-     control above sits at top:4px and is 22px tall, so anchoring this cluster
-     at 4px too left the two touching whenever a narrow slot brought them into
-     the same horizontal band. 30px clears it with a few pixels of air, which is
-     enough for the section control to read as belonging to the whole stacked
-     group rather than to the widget directly beneath it. */
+  /* Pinned to the widget's own top-right corner. It sat at top:30px only to
+     clear the section chip above it, and that chip is gone (move and hide
+     section live in the ••• now). No glass behind it either: small grey
+     glyphs on the widget's own surface, revealed on hover. */
   .col.collapsible-col-wrap .widget-header-controls {
-    position: absolute; top: 30px; right: 4px; z-index: 5;
-    /* Same materialize treatment as .section-controls above — blur radius
-       and a small scale animate in together with opacity, so this chip
-       arrives as glass rather than cross-fading in as a flat rectangle. */
+    position: absolute; top: 3px; right: 3px; z-index: 5; gap: 0;
     opacity: 0; transform: scale(0.92); transform-origin: top right;
-    transition: opacity 0.15s var(--ease-spring), transform 0.15s var(--ease-spring),
-                backdrop-filter 0.15s ease, -webkit-backdrop-filter 0.15s ease;
-    background: rgba(255,255,255,0.72); backdrop-filter: blur(0px) saturate(100%);
-    -webkit-backdrop-filter: blur(0px) saturate(100%);
-    border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.14); padding: 2px;
+    transition: opacity 0.15s var(--ease-spring), transform 0.15s var(--ease-spring);
   }
-  @media (prefers-reduced-transparency: reduce) {
-    .col.collapsible-col-wrap .widget-header-controls { background: #ffffff; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  }
+  .col.collapsible-col-wrap .widget-header-controls .collapse-btn,
+  .col.collapsible-col-wrap .widget-header-controls .col-drag-handle { width: 18px; height: 18px; }
+  .col.collapsible-col-wrap .widget-header-controls svg { width: 11px; height: 11px; }
   .col.collapsible-col-wrap:hover .widget-header-controls,
   .col.collapsible-col-wrap .widget-header-controls:focus-within {
     opacity: 1; transform: scale(1);
-    backdrop-filter: blur(8px) saturate(180%); -webkit-backdrop-filter: blur(8px) saturate(180%);
   }
   /* The hover array is the drag grip and a ••• now. Colour, full screen,
      hide and delete were four 13px glyphs competing with the title, and they
@@ -813,6 +757,14 @@
   .links-menu-controls .widget-fullscreen-btn,
   .links-menu-controls .widget-hide-btn,
   .links-menu-controls .col-delete-btn { display: none; }
+  /* Settings opens from the ••• too. The gear stays in the markup because
+     both settings popovers position themselves against the button that
+     opened them, so it is parked, invisible, at the corner the ••• sits in. */
+  .col.collapsible-col-wrap .widget-header-controls .widget-settings-btn,
+  .col.collapsible-col-wrap .widget-header-controls .list-config-btn {
+    position: absolute; right: 0; top: 0; width: 1px; height: 18px;
+    padding: 0; opacity: 0; pointer-events: none; overflow: hidden;
+  }
   .wd-dots { color: var(--ink-soft); }
   .wd-dots:hover { color: var(--ink); }
   /* The ••• menu is the phone's element (#mobMenu), whose styles sit inside
@@ -1256,8 +1208,7 @@
      solid fill on hover replaced that translucency with a flat opaque
      square right where the cursor is — the one moment the "glass" was
      supposed to keep reading as glass. A low-opacity black tint sits ON
-     TOP of the blur instead of covering it, matching how .section-hide-btn/
-     .section-drag-handle (the section-corner chip) already do this. */
+     TOP of the blur instead of covering it. */
   .collapse-btn:hover { background: rgba(0,0,0,0.06); }
   .collapse-btn { transition: transform 0.1s var(--ease-spring), background 0.15s ease, color 0.15s ease; }
   .collapse-btn:active { transform: scale(0.86); }
@@ -1293,7 +1244,6 @@
      Anything other than 0 here re-opens the same corner gap, so this value
      tracks the widget's own radius rather than being a style choice. */
   .col.collapsible-col-wrap.widget-colored { border-radius: 0; }
-  .col.collapsible-col-wrap.widget-colored .widget-header-controls { background: rgba(255,255,255,0.92); }
 
   .color-popover {
     position: fixed; z-index: 60; background: #ffffff; border-radius: 8px;
@@ -1642,7 +1592,6 @@
     .widget { flex-direction: column; padding: 8px 14px 24px 14px; }
     .col-resizer, .row-resizer { display: none; }
     .col-drag-handle { display: none; }
-    .section-drag-handle { display: none; }
     .col-slot { flex: 0 0 auto !important; width: 100% !important; }
     .col.collapsible-col-wrap { flex: 0 0 auto !important; width: 100% !important; min-height: auto; }
     /* Hover doesn't exist on touch, so the controls overlay would otherwise
@@ -4291,8 +4240,6 @@
     html:not(.force-desktop) .collapse-btn,
     html:not(.force-desktop) .widget-icon-btn,
     html:not(.force-desktop) .col-drag-handle,
-    html:not(.force-desktop) .section-hide-btn,
-    html:not(.force-desktop) .section-drag-handle,
     html:not(.force-desktop) .cal-navbtn,
     html:not(.force-desktop) .cal-refreshbtn,
     html:not(.force-desktop) .collapsible-unhide,
@@ -4578,17 +4525,6 @@
     }
     .col.collapsible-col-wrap.mob-sizing { outline: 2px solid var(--ink); outline-offset: -2px; }
     html.mob-board:not(.force-desktop) .mob-chrome { display: none; }
-
-    /* The standalone section controls go too. `.section-controls` is already
-       hidden above, but the two buttons it builds are named individually and
-       can be reached through other paths, so they are struck out by name as
-       well rather than only through the container that happens to hold them
-       today. Hiding a section is in the ••• now, where it sits next to the
-       widget it belongs to instead of floating at the corner of a column you
-       cannot point at on a phone. */
-    html:not(.force-desktop) .section-hide-btn,
-    html:not(.force-desktop) .section-drag-handle,
-    html:not(.force-desktop) .section-controls { display: none !important; }
 
     /* The desktop hover array goes. `.widget-header-controls` is the row of
        drag / colour / fullscreen / hide / delete buttons that appears on
@@ -13250,14 +13186,6 @@
           }
         });
 
-        /* On every section, not only the stacked ones. The pair was once
-           gated on slot.length > 1, on the reasoning that a lone widget's
-           own header controls already move and hide it -- true, but it made
-           the board inconsistent in a way that reads as breakage: hover two
-           stacked Pages and the chip appears, hover the Calendar beside them
-           and nothing does. A control that exists on some sections and not
-           others is harder to trust than one that is simply always there. */
-        slotEl.appendChild(buildSectionControls(slot));
         frag.appendChild(slotEl);
 
         /* One after every slot now, the trailing one included -- it grabs
@@ -13651,198 +13579,137 @@
       applyHiddenState();
     }
 
-    const HIDE_ICON_SVG =
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
-      'stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/>' +
-      '<circle cx="12" cy="12" r="3"/>' +
-      '<path d="M3 21 21 3"/></svg>';
-
-    function buildSectionHideButton(slot) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "section-hide-btn";
-      btn.title = "Hide every widget in this section";
-      btn.setAttribute("aria-label", "Hide this section");
-      // Icon only. The caption lives on title/aria-label instead, matching the
-      // unhide control inside each collapsed tab.
-      btn.innerHTML = HIDE_ICON_SVG;
-      btn.addEventListener("click", function (e) {
-        e.stopPropagation();
-        hideSection(slot);
-      });
-      return btn;
-    }
-
-    const SECTION_DRAG_ICON_SVG =
-      '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">' +
-      '<circle cx="9" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/>' +
-      '<circle cx="15" cy="6" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
-
-    // Drags the whole section (every widget stacked in this slot) onto
-    // another one. Dropping on a target's outer left/right quarter reorders
-    // — swaps this section's place in the row, same as before. Dropping on
-    // the middle band's top/bottom half instead MERGES: every widget in the
-    // dragged section joins the target's own slot array (stacked above or
-    // below whatever's already there), so two sections can be combined into
-    // one taller stack the same way the per-widget drag handle
-    // (wireDragHandle) already lets a single widget join an existing
-    // section — this is that same move, carrying a whole section's widgets
-    // at once instead of just one. `slot` is the live array reference from
-    // `layout`, so mutating it (or the merge target) in place keeps this in
-    // sync with whatever else is holding onto the same array.
-    function wireSectionDragHandle(handle, slot) {
-      function onDown(e) {
-        if (e.button != null && e.button !== 0) return;
-        e.preventDefault();
-        const slotEl = handle.closest(".col-slot");
-        if (!slotEl) return;
-        // Snapshot slot elements <-> layout entries together, in DOM order —
-        // render() always builds one .col-slot per layout entry in order, so
-        // zipping them by index here is safe for the life of this drag.
-        const slotEls = Array.prototype.slice.call(widget.querySelectorAll(".col-slot"));
-        let dropTargetEl = null;
-        let dropZone = null; // "left" | "right" | "top" | "bottom"
-        let dragActive = false;
-
-        function pointXY(ev) {
-          if (ev.touches && ev.touches.length) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
-          return { x: ev.clientX, y: ev.clientY };
-        }
-
-        const start = pointXY(e);
-        const MOVE_THRESHOLD = 6;
-
-        function clearHighlight() {
-          if (dropTargetEl) {
-            dropTargetEl.classList.remove("section-drop-left", "section-drop-right", "section-drop-top", "section-drop-bottom");
-          }
-          dropTargetEl = null;
-          dropZone = null;
-        }
-
-        function onMove(ev) {
-          const p = pointXY(ev);
-          if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
-          if (!dragActive) {
-            const dist = Math.hypot(p.x - start.x, p.y - start.y);
-            if (dist < MOVE_THRESHOLD) { ev.preventDefault(); return; }
-            dragActive = true;
-            slotEl.classList.add("section-dragging");
-            widget.classList.add("dragging-col");
-          }
-          clearHighlight();
-
-          const others = slotEls.filter(function (s) { return s !== slotEl; });
-          if (!others.length) { ev.preventDefault(); return; }
-
-          let match = null;
-          for (const s of others) {
-            const r = s.getBoundingClientRect();
-            if (p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) { match = s; break; }
-          }
-          if (!match) {
-            // Outside every other section — fall back to whichever is
-            // currently leftmost/rightmost, so dropping past either edge of
-            // the row still does something sensible. Always a reorder (this
-            // is off the row entirely, not over any section to merge into).
-            let leftMost = others[0], rightMost = others[0];
-            others.forEach(function (s) {
-              if (s.getBoundingClientRect().left < leftMost.getBoundingClientRect().left) leftMost = s;
-              if (s.getBoundingClientRect().right > rightMost.getBoundingClientRect().right) rightMost = s;
-            });
-            const lr = leftMost.getBoundingClientRect(), rr = rightMost.getBoundingClientRect();
-            if (p.x <= lr.left) match = leftMost;
-            else if (p.x >= rr.right) match = rightMost;
-          }
-
-          if (match) {
-            const r = match.getBoundingClientRect();
-            const relX = (p.x - r.left) / r.width;
-            // Outer quarters reorder (same threshold the per-widget drag
-            // uses); the middle half splits top/bottom to merge instead.
-            const edge = 0.25;
-            if (relX < edge) dropZone = "left";
-            else if (relX > 1 - edge) dropZone = "right";
-            else dropZone = (p.y - r.top) / r.height < 0.5 ? "top" : "bottom";
-            dropTargetEl = match;
-            match.classList.add("section-drop-" + dropZone);
-          }
-          ev.preventDefault();
-        }
-
-        function onUp() {
-          slotEl.classList.remove("section-dragging");
-          widget.classList.remove("dragging-col");
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
-          document.removeEventListener("touchmove", onMove);
-          document.removeEventListener("touchend", onUp);
-
-          if (dropTargetEl) {
-            const targetSlotEl = dropTargetEl, zone = dropZone;
-            clearHighlight();
-            const targetLayoutIdx = slotEls.indexOf(targetSlotEl);
-            const targetSlot = targetLayoutIdx !== -1 ? layout[targetLayoutIdx] : null;
-            if (targetSlot && targetSlot !== slot) {
-              if (zone === "left" || zone === "right") {
-                const fromIdx = layout.indexOf(slot);
-                layout.splice(fromIdx, 1);
-                const newTargetIdx = layout.indexOf(targetSlot);
-                let insertIdx = zone === "right" ? newTargetIdx + 1 : newTargetIdx;
-                layout.splice(insertIdx, 0, slot);
-              } else {
-                // Merge: every widget in the dragged section joins the
-                // target's slot array, above or below what's already there.
-                // Width lives on whichever widget ends up first in a slot
-                // (see applyWidth) — syncing it to the target's existing
-                // width before merging means the section keeps that width
-                // rather than jumping to the dragged section's old one.
-                widths[slot[0]] = widths[targetSlot[0]];
-                if (zone === "top") targetSlot.unshift.apply(targetSlot, slot);
-                else targetSlot.push.apply(targetSlot, slot);
-                const fromIdx = layout.indexOf(slot);
-                if (fromIdx !== -1) layout.splice(fromIdx, 1);
-              }
-              render();
-              persistLayout();
-            }
-          } else {
-            clearHighlight();
-          }
-        }
-
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
-        document.addEventListener("touchmove", onMove, { passive: false });
-        document.addEventListener("touchend", onUp);
+    /* Where a picked-up section would land if dropped at `p`. The outer
+       quarters of another section reorder (beside it); the middle half merges
+       into it, above or below by which half. Off the end of the row it snaps
+       to whichever section is outermost on that side, so dropping past either
+       edge still does something sensible. */
+    function sectionDropAt(p, slotEl, slotEls) {
+      const others = slotEls.filter(function (s) { return s !== slotEl; });
+      if (!others.length) return null;
+      let match = null;
+      for (const s of others) {
+        const r = s.getBoundingClientRect();
+        if (p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) { match = s; break; }
       }
-
-      handle.addEventListener("mousedown", onDown);
-      handle.addEventListener("touchstart", onDown, { passive: false });
+      if (!match) {
+        let leftMost = others[0], rightMost = others[0];
+        others.forEach(function (s) {
+          if (s.getBoundingClientRect().left < leftMost.getBoundingClientRect().left) leftMost = s;
+          if (s.getBoundingClientRect().right > rightMost.getBoundingClientRect().right) rightMost = s;
+        });
+        if (p.x <= leftMost.getBoundingClientRect().left) match = leftMost;
+        else if (p.x >= rightMost.getBoundingClientRect().right) match = rightMost;
+      }
+      if (!match) return null;
+      const r = match.getBoundingClientRect();
+      const relX = (p.x - r.left) / r.width;
+      const edge = 0.25;
+      let zone;
+      if (relX < edge) zone = "left";
+      else if (relX > 1 - edge) zone = "right";
+      else zone = (p.y - r.top) / r.height < 0.5 ? "top" : "bottom";
+      return { el: match, zone: zone };
     }
 
-    function buildSectionDragHandle(slot) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "section-drag-handle";
-      btn.title = "Drag to reorder this section";
-      btn.setAttribute("aria-label", "Move this section");
-      btn.innerHTML = SECTION_DRAG_ICON_SVG;
-      wireSectionDragHandle(btn, slot);
-      return btn;
+    // `slot` is the live array from `layout`, so reordering or merging it in
+    // place keeps anything else holding the same array in step.
+    function commitSectionDrop(slot, slotEls, targetSlotEl, zone) {
+      const targetIdx = slotEls.indexOf(targetSlotEl);
+      const targetSlot = targetIdx !== -1 ? layout[targetIdx] : null;
+      if (!targetSlot || targetSlot === slot) return;
+      if (zone === "left" || zone === "right") {
+        const fromIdx = layout.indexOf(slot);
+        layout.splice(fromIdx, 1);
+        const newTargetIdx = layout.indexOf(targetSlot);
+        layout.splice(zone === "right" ? newTargetIdx + 1 : newTargetIdx, 0, slot);
+      } else {
+        // Merge: width lives on whichever widget leads a slot (see
+        // applyWidth), so the dragged section takes the target's width
+        // rather than jumping the column to its own old one.
+        widths[slot[0]] = widths[targetSlot[0]];
+        if (zone === "top") targetSlot.unshift.apply(targetSlot, slot);
+        else targetSlot.push.apply(targetSlot, slot);
+        const fromIdx = layout.indexOf(slot);
+        if (fromIdx !== -1) layout.splice(fromIdx, 1);
+      }
+      render();
+      persistLayout();
     }
 
-    // Small cluster pinned to the section's top-right corner, poking out past
-    // its own edge: the move handle sits to the left of the hide button so
-    // the pair reads as one control group rather than two unrelated chips.
-    function buildSectionControls(slot) {
-      const wrap = document.createElement("div");
-      wrap.className = "section-controls";
-      wrap.appendChild(buildSectionDragHandle(slot));
-      wrap.appendChild(buildSectionHideButton(slot));
-      return wrap;
+    /* "Move section" in the ••• menu. A menu item cannot be dragged, so the
+       section is picked up instead: it dims, the same drop lines a drag shows
+       follow the cursor, a click places it and Escape puts it back. The drop
+       lines are the ones the widget grip uses, so there is one way of reading
+       where a thing will land. */
+    let sectionPickup = null;
+    function pickUpSection(id) {
+      if (sectionPickup) sectionPickup.cancel();
+      const slot = slotOf(id);
+      const el = widgetEl(id);
+      const slotEl = el && el.closest(".col-slot");
+      if (!slot || !slotEl) return false;
+      const slotEls = Array.prototype.slice.call(widget.querySelectorAll(".col-slot"));
+      let target = null;
+      function clear() {
+        if (target) target.el.classList.remove("section-drop-left", "section-drop-right", "section-drop-top", "section-drop-bottom");
+        target = null;
+      }
+      function onMove(ev) {
+        clear();
+        target = sectionDropAt({ x: ev.clientX, y: ev.clientY }, slotEl, slotEls);
+        if (target) target.el.classList.add("section-drop-" + target.zone);
+      }
+      // The press that places the section must not also start a widget drag,
+      // edit a title or tick a task underneath it.
+      function swallow(ev) { ev.preventDefault(); ev.stopPropagation(); }
+      function onClick(ev) {
+        swallow(ev);
+        const t = target;
+        finish();
+        if (t) commitSectionDrop(slot, slotEls, t.el, t.zone);
+      }
+      function onKey(ev) { if (ev.key === "Escape") { ev.preventDefault(); finish(); } }
+      function finish() {
+        clear();
+        slotEl.classList.remove("section-dragging");
+        widget.classList.remove("dragging-col");
+        document.documentElement.classList.remove("section-picking");
+        window.removeEventListener("mousemove", onMove, true);
+        window.removeEventListener("pointerdown", swallow, true);
+        window.removeEventListener("mousedown", swallow, true);
+        window.removeEventListener("click", onClick, true);
+        window.removeEventListener("keydown", onKey, true);
+        if (sectionPickup === handle) sectionPickup = null;
+      }
+      const handle = { cancel: finish };
+      sectionPickup = handle;
+      slotEl.classList.add("section-dragging");
+      widget.classList.add("dragging-col");
+      document.documentElement.classList.add("section-picking");
+      // Armed on the next tick: the menu click that started this is still
+      // travelling, and would otherwise land as the drop.
+      setTimeout(function () {
+        if (sectionPickup !== handle) return;
+        window.addEventListener("mousemove", onMove, true);
+        window.addEventListener("pointerdown", swallow, true);
+        window.addEventListener("mousedown", swallow, true);
+        window.addEventListener("click", onClick, true);
+        window.addEventListener("keydown", onKey, true);
+      }, 0);
+      return true;
     }
+
+    // For the ••• menu, which lives in another module.
+    window.__mpsSection = {
+      pickUp: pickUpSection,
+      hide: function (id) {
+        const slot = slotOf(id);
+        if (!slot) return false;
+        hideSection(slot);
+        return true;
+      }
+    };
 
     function wireHideButton(btn) {
       if (!btn) return;
@@ -21481,6 +21348,32 @@
       return true;
     }
 
+    /* A silent re-mint is answered for whichever Google account the browser
+       treats as current unless it names one. The address a widget was
+       switched to is that name (setLoginHint), and even then Google may
+       ignore it, so the answer is checked: a token for someone else is thrown
+       away and the widget asks to reconnect instead of showing the other
+       account's data. This check used to run only at boot, which is why a
+       second-account calendar showed the first account's events about an
+       hour after a switch, once its token expired. A lookup that fails
+       outright proves nothing either way, so it does not block. */
+    let wrongAccount = "";
+    async function confirmAccount(tok) {
+      if (!opts.loginHint || !tok) return;
+      let who = "";
+      try {
+        const r = await fetch(CAL_API + "/calendars/primary", { headers: { "Authorization": "Bearer " + tok } });
+        if (r.ok) who = ((await r.json()) || {}).id || "";
+      } catch (e) {}
+      if (who && who.toLowerCase() !== String(opts.loginHint).toLowerCase()) {
+        accessToken = null; tokenExpiry = 0; authed = false;
+        clearCachedToken();
+        wrongAccount = who;
+        throw new Error("Google answered for " + who + " instead of " + opts.loginHint);
+      }
+      wrongAccount = "";
+    }
+
     async function ensureToken() {
       if (accessToken && Date.now() < tokenExpiry) return accessToken;
       const cached = readCachedToken();
@@ -21494,7 +21387,9 @@
       // for an account that signed in before the broker existed, or one whose
       // consent never returned a refresh token.
       if (await mintFromBroker()) return accessToken;
-      return requestToken(false);
+      const tok = await requestToken(false);
+      await confirmAccount(tok);
+      return tok;
     }
 
     /* Every Google request for THIS account. A 401 means the token was
@@ -21516,6 +21411,7 @@
         accessToken = null; tokenExpiry = 0;
         clearCachedToken();
         const fresh = await requestToken(false);
+        await confirmAccount(fresh);
         res = await call(fresh);
       }
       if (!res.ok) {
@@ -21526,8 +21422,9 @@
         } catch (e) {}
         throw new Error("Google API " + res.status + (detail ? ": " + detail : ""));
       }
-      if (res.status === 204) return null;
-      return res.json();
+      const out = res.status === 204 ? null : await res.json();
+      if (String(o.method || "GET").toUpperCase() !== "GET") announceWrite(url, o.method);
+      return out;
     }
 
     /* Which account this actually is. `calendars/primary` answers with the
@@ -21544,6 +21441,8 @@
       ensureToken: ensureToken,
       api: apiFor,
       whoAmI: whoAmI,
+      setLoginHint: function (email) { if (email) opts.loginHint = email; },
+      wrongAccount: function () { return wrongAccount; },
       isAuthed: function () { return !!authed; },
       hasCachedToken: function () { return !!readCachedToken(); },
       connect: function (interactive) { return requestToken(!!interactive); },
@@ -21645,6 +21544,17 @@
      reconnecting instead, because showing the wrong account's data without
      saying so is the exact bug this whole map exists to prevent. */
   const widgetAccountStale = {};
+  /* A widget whose token came back for someone else (see confirmAccount) is
+     treated like one whose account is gone: it says so and offers to
+     reconnect that account. */
+  function flagWrongAccounts() {
+    let any = false;
+    Object.keys(widgetAuth).forEach(function (id) {
+      const a = widgetAuth[id];
+      if (a && a.wrongAccount && a.wrongAccount()) { widgetAccountStale[id] = true; any = true; }
+    });
+    return any;
+  }
   function persistWidgetAccounts() {
     try { storageSet(WIDGET_ACCOUNTS_KEY, JSON.stringify(widgetAccountEmail)); } catch (e) {}
   }
@@ -21761,6 +21671,9 @@
       const next = createGoogleAuth("unbleep-gcal-token:" + widgetId, { selectAccount: true });
       await next.connect(true);
       const who = await next.whoAmI();
+      // Named from now on, so its hourly silent re-mint asks for THIS
+      // account rather than whichever one the browser treats as current.
+      if (who) next.setLoginHint(who);
       widgetAuth[widgetId] = next;
       widgetAccountEmail[widgetId] = who || "another account";
       delete widgetAccountStale[widgetId];
@@ -27499,6 +27412,7 @@
       // it renders itself in when it lands.
       ensureCompletedCount();
     } catch (e) {
+      if (flagWrongAccounts() && widgetAccountStale["cal"]) { fillWithReconnectButton(viewport, "cal"); return; }
       viewport.innerHTML = "";
       const err = document.createElement("div");
       err.className = "cal-empty";
@@ -27507,6 +27421,82 @@
       console.warn("Calendar refresh failed:", e);
     } finally {
       refreshing = false;
+    }
+  }
+
+  /* ---------------- one change, every surface ----------------
+     Every write to Google, from any widget, account or the AI panel, is
+     announced board-wide as `mps:data-changed` from apiFor, the one place all
+     of those requests pass through, so no edit path can forget to. Anything
+     on the board that shows the same data listens and redraws; the Google
+     listener is below, and a widget that comes to share data with another
+     joins by listening for (or dispatching) the same event.
+
+     Announced only after the response is parsed and then a tick later: each
+     caller updates its own local rows in the code that follows its request,
+     and the announcement has to land after that or it redraws the old rows. */
+  function announceWrite(url, method) {
+    const source = String(url).indexOf(TASKS_API) === 0 ? "google-tasks" : "google-calendar";
+    setTimeout(function () {
+      try {
+        window.dispatchEvent(new CustomEvent("mps:data-changed", {
+          detail: { source: source, method: String(method || "").toUpperCase(), url: String(url) }
+        }));
+      } catch (e) {}
+    }, 0);
+  }
+
+  // Signed in on the account it is meant to read. A widget showing a Connect
+  // or Reconnect button is left showing it.
+  function surfaceIsLive(id) {
+    return !widgetAccountStale[id] && (!!widgetAuth[id] || primaryAuth.isAuthed());
+  }
+
+  const pendingSources = {};
+  let pendingSyncTimer = null;
+  window.addEventListener("mps:data-changed", function (e) {
+    const src = e && e.detail && e.detail.source;
+    if (src !== "google-tasks" && src !== "google-calendar") return;
+    pendingSources[src] = true;
+    // Coalesced: a drag that writes three tasks redraws once.
+    clearTimeout(pendingSyncTimer);
+    pendingSyncTimer = setTimeout(syncGoogleSurfaces, 40);
+  });
+
+  function syncGoogleSurfaces() {
+    const tasksChanged = !!pendingSources["google-tasks"];
+    const eventsChanged = !!pendingSources["google-calendar"];
+    delete pendingSources["google-tasks"];
+    delete pendingSources["google-calendar"];
+
+    if (tasksChanged) {
+      /* Tasks redraw from memory on every calendar and every task list, never
+         a refetch: the Tasks API is eventually consistent, and a list read
+         straight after a write can still return the row just completed or
+         deleted. The rows in memory are already right. */
+      if (surfaceIsLive("cal")) { try { renderGrid(); } catch (err) {} }
+      Object.keys(extraCtxById).forEach(function (id) {
+        if (surfaceIsLive(id)) { try { renderCalendarInto(extraCtxById[id]); } catch (err) {} }
+      });
+      // Not while a row is open for editing: a redraw would tear the form
+      // down under the cursor (same rule as refreshTagSurfaces).
+      if (!editingTaskId) {
+        if (surfaceIsLive(PRIMARY_TASKS_ID)) { try { renderTasks(); } catch (err) {} }
+        Object.keys(extraRedrawById).forEach(function (id) {
+          if (surfaceIsLive(id)) { try { extraRedrawById[id](); } catch (err) {} }
+        });
+      }
+    }
+    if (eventsChanged) {
+      /* Events are refetched instead. Each calendar holds its own account's
+         copy, and only the widget that made the edit updated its copy. */
+      if (surfaceIsLive("cal") && !refreshing) {
+        fetchEvents().then(function () { renderGrid(); }).catch(function () {});
+      }
+      Object.keys(extraCtxById).forEach(function (id) {
+        const r = extraRefreshById[id];
+        if (r && surfaceIsLive(id)) { try { r(true); } catch (err) {} }
+      });
     }
   }
 
@@ -28076,7 +28066,7 @@
       return { start: g, end: addDays(g, 42) };
     }
 
-    async function refresh() {
+    async function refresh(quiet) {
       setViewLabel();
       // Its own account first: a widget pointed somewhere else is not signed
       // out just because the board is signed in, and must not borrow the
@@ -28086,7 +28076,9 @@
         fillWithConnectButton(vp, "Connect Google Calendar");
         return;
       }
-      vp.innerHTML = '<div class="cal-loading">Loading&#8230;</div>';
+      // Quiet when another widget's edit asked for this: the grid already
+      // on screen stays up until the new one replaces it.
+      if (!quiet || !ctx.events.length) vp.innerHTML = '<div class="cal-loading">Loading&#8230;</div>';
       try {
         const r = rangeFor();
         // A day of slack at each end, for the same reason the primary fetch
@@ -28103,6 +28095,7 @@
           .map(normalizeEvent), auth);
         renderCalendarInto(ctx);
       } catch (e) {
+        if (flagWrongAccounts() && widgetAccountStale[id]) { fillWithReconnectButton(vp, id); return; }
         vp.innerHTML = '<div class="cal-loading">Couldn\u2019t load events.</div>';
       }
     }
@@ -28296,7 +28289,14 @@
           return (auth || primaryAuth).api(tasksUrl("?showCompleted=false&maxResults=100"));
         });
         ownTasks = ((data && data.items) || []).filter(function (t) { return t.title; });
-      } catch (e) { ownTasks = []; }
+      } catch (e) {
+        if (flagWrongAccounts() && widgetAccountStale[id]) {
+          if (addBtn) addBtn.hidden = true;
+          fillWithReconnectButton(viewport, id);
+          return;
+        }
+        ownTasks = [];
+      }
       /* Registered before the render, because every handler renderTasks binds
          reaches back through withTaskWidget for exactly this array. */
       tasksByWidget[id] = ownTasks;
@@ -36389,6 +36389,7 @@
     eyeOff: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/>'
            + '<circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/>'
           + '<path d="M6.5 6.7A17 17 0 0 0 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
     trash: '<path d="M3 6h18"/><path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6"/>'
          + '<path d="M18.5 6l-1 13.2A1.8 1.8 0 0 1 15.7 21H8.3a1.8 1.8 0 0 1-1.8-1.8L5.5 6"/>'
   };
@@ -36441,6 +36442,15 @@
       });
     }
 
+    /* Settings left the header for this menu. The gear is still in the
+       markup, parked invisibly in the corner (see .widget-settings-btn), and
+       clicked from here so each settings popover keeps its own opener. */
+    if (desktop) {
+      const wrapEl = elFor(id);
+      const gear = wrapEl && wrapEl.querySelector(".widget-header-controls .widget-settings-btn, .widget-header-controls .list-config-btn");
+      if (gear) add("Settings", ICO.gear, function () { gear.click(); });
+    }
+
     // Colour is a row of the board's own presets rather than a text field:
     // the palette is a closed set, so a picker is both faster and unmissable.
     const sw = document.createElement("div");
@@ -36477,12 +36487,14 @@
     /* Two scopes, two menu items, so what you are about to drag is decided
        before the drag rather than by which of two adjacent handles your thumb
        found. Move section only when there is a section to move. A desktop
-       drags by the grip, so it gets neither. */
+       drags a widget by its grip, and picks a section up from here. */
     if (!desktop) {
       add("Move widget", ICO.grip, function () { enterMove(id, "widget"); });
       if (boardView && matesOf(id).length > 1) {
         add("Move section", ICO.grip, function () { enterMove(id, "section"); });
       }
+    } else if (matesOf(id).length > 1 && window.__mpsSection) {
+      add("Move section", ICO.grip, function () { window.__mpsSection.pickUp(id); });
     }
 
     /* No divider. It was fencing the destructive items off from the rest, but
@@ -36510,6 +36522,9 @@
     const mates = matesOf(id);
     if (boardView && mates.length > 1) {
       add("Hide section (" + mates.length + ")", ICO.eyeOff, function () {
+        // The desktop hides it as one group, so unhiding any member brings
+        // the whole section back, as the old section button did.
+        if (desktop && window.__mpsSection && window.__mpsSection.hide(id)) { rebuild(); return; }
         mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
         rebuild();
       });
