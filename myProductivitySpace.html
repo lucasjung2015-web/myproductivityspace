@@ -345,31 +345,33 @@
   /* Fallback anchor for the hover controls: the row's own top-right corner,
      used only when the menu is empty or stacked vertically inside another
      widget (see .links-menu-anchor below for the normal case). */
+  /* Drawn like every grid widget's corner controls (see
+     .widget-header-controls): small grey glyphs, no glass chip behind them,
+     revealed on hover. */
   .links-row-wrap > .links-menu-controls {
     position: absolute; top: 4px; right: 4px; z-index: 5;
-    display: flex; align-items: center; gap: 2px;
-    opacity: 0; transition: opacity 0.15s var(--ease-spring);
-    background: rgba(255,255,255,0.72); backdrop-filter: blur(8px) saturate(180%);
-    -webkit-backdrop-filter: blur(8px) saturate(180%);
-    border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.14); padding: 2px;
   }
   /* In the normal horizontal layout, the hover controls instead track the
      rightmost/most-recently-added link — the row spans the full page width,
      so a corner-pinned toolbar would sit far from a short list of links. */
   .link-item-wrap.links-menu-anchor > .links-menu-controls {
-    position: absolute; top: -26px; right: -28px; z-index: 5;
-    display: flex; align-items: center; gap: 2px;
-    opacity: 0; transition: opacity 0.15s var(--ease-spring);
-    background: rgba(255,255,255,0.72); backdrop-filter: blur(8px) saturate(180%);
-    -webkit-backdrop-filter: blur(8px) saturate(180%);
-    border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.14); padding: 2px;
+    position: absolute; top: -22px; right: -24px; z-index: 5;
   }
+  .links-row-wrap .links-menu-controls {
+    display: flex; align-items: center; gap: 0;
+    opacity: 0; transform: scale(0.92); transform-origin: top right;
+    transition: opacity 0.15s var(--ease-spring), transform 0.15s var(--ease-spring);
+  }
+  .links-row-wrap .links-menu-controls .collapse-btn,
+  .links-row-wrap .links-menu-controls .col-drag-handle { width: 18px; height: 18px; }
+  .links-row-wrap .links-menu-controls svg { width: 11px; height: 11px; }
   .links-row-wrap:hover .links-menu-controls,
-  .links-row-wrap .links-menu-controls:focus-within { opacity: 1; }
-  @media (prefers-reduced-transparency: reduce) {
-    .links-row-wrap > .links-menu-controls,
-    .link-item-wrap.links-menu-anchor > .links-menu-controls { background: #ffffff; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  }
+  .links-row-wrap .links-menu-controls:focus-within { opacity: 1; transform: scale(1); }
+  /* Edit bookmarks opens from the ••• like every other widget command. The
+     pencil stays in the markup, still wired (the ••• item clicks it), and
+     shows only while edit mode is on, as the way back out of it. */
+  .links-menu-controls .links-edit-btn:not(.active),
+  .widget-header-controls .links-edit-btn:not(.active) { display: none; }
   .links-edit-btn.active { background: #eeeeee; color: #000000; }
 
   /* Vertical/stacked link list — used inside a grid-mode Menu widget (a
@@ -4306,6 +4308,9 @@
     html:not(.force-desktop) .cal-chip-check .tcb-check {
       opacity: 1 !important; transform: none !important;
     }
+    /* The floating bar gets no ••• on a phone (only grid widgets do), so its
+       pencil stays the way into edit mode there. */
+    html:not(.force-desktop) .links-row-wrap .links-menu-controls .links-edit-btn { display: flex; }
     /* display:none, not opacity -- so removing a bookmark was impossible. */
     html:not(.force-desktop) .links-row.edit-mode .link-item-wrap .link-remove-btn {
       display: flex !important;
@@ -36483,6 +36488,18 @@
       });
     }
 
+    /* Edit bookmarks, for a Bookmarks widget. It is a command on the
+       widget's contents, so it sits here with the other commands rather
+       than inside Settings, which holds preferences. The pencil it clicks
+       stays wired in the markup and owns the edit-mode state. Offered on
+       the phone too, where the grid widget's pencil was never reachable. */
+    const bmWrap = elFor(id) || floatingBarFor(id);
+    const bmEdit = bmWrap && bmWrap.querySelector(".links-edit-btn");
+    if (bmEdit) {
+      const editing = bmEdit.classList.contains("active");
+      add(editing ? "Done editing" : "Edit bookmarks", ICO.pencil, function () { bmEdit.click(); });
+    }
+
     /* Settings left the header for this menu. The gear is still in the
        markup, parked invisibly in the corner (see .widget-settings-btn), and
        clicked from here so each settings popover keeps its own opener. */
@@ -36847,6 +36864,14 @@
   function elFor(id) {
     let hit = null;
     Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (n) {
+      if (n.getAttribute("data-col-id") === id) hit = n;
+    });
+    return hit;
+  }
+  // The original Bookmarks in its floating form is outside the grid.
+  function floatingBarFor(id) {
+    let hit = null;
+    Array.prototype.forEach.call(document.querySelectorAll(".links-row-wrap[data-col-id]"), function (n) {
       if (n.getAttribute("data-col-id") === id) hit = n;
     });
     return hit;
