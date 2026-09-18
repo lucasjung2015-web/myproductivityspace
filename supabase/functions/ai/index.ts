@@ -23,13 +23,24 @@
    nothing else.
 
    Deploy a second provider with its key, e.g.
-     supabase secrets set DEEPSEEK_API_KEY=sk-...
+     supabase secrets set FIREWORKS_API_KEY=fw_...
    A provider whose key is not set is simply not offered: the request falls
    back to MODEL rather than failing. */
-type Provider = { url: string; keyEnv: string; kind: "anthropic" | "deepseek" };
+type Provider = {
+  url: string; keyEnv: string; kind: "anthropic" | "fireworks";
+  upstreamModel?: string;  // the provider's own name for the model, when it differs from the page's id
+};
 const PROVIDERS: Record<string, Provider> = {
   "claude-sonnet-5": { url: "https://api.anthropic.com/v1/messages", keyEnv: "ANTHROPIC_API_KEY", kind: "anthropic" },
-  "deepseek-flash":  { url: "https://api.deepseek.com/anthropic/v1/messages", keyEnv: "DEEPSEEK_API_KEY", kind: "deepseek" },
+  /* The open-weights DeepSeek V4.1 Flash, served by Fireworks from US
+     infrastructure rather than by DeepSeek itself, so board data does not
+     go to DeepSeek's servers. The id stays "deepseek-flash" so pages
+     already in browsers, and each browser's stored model choice, keep
+     working. */
+  "deepseek-flash": {
+    url: "https://api.fireworks.ai/inference/v1/messages", keyEnv: "FIREWORKS_API_KEY", kind: "fireworks",
+    upstreamModel: "accounts/fireworks/models/deepseek-v4p1-flash",
+  },
 };
 
 /* The fallback when the page names nothing, or names something off the list.
@@ -38,12 +49,7 @@ const PROVIDERS: Record<string, Provider> = {
 const MODEL = Deno.env.get("AI_MODEL") ?? "claude-sonnet-5";
 const MAX_TOKENS = Number(Deno.env.get("AI_MAX_TOKENS") ?? "32000");
 
-/* DeepSeek's Anthropic-compatible endpoint takes the same request with four
-   differences, per its compatibility table: `cache_control` is ignored (its
-   caching is automatic), `thinking` is enabled/disabled rather than adaptive,
-   `display` is not a field it knows, and effort "none" is spelled as thinking
-   off. Stripping the ignored fields rather than forwarding them keeps a
-   future strictness change on their side from turning into a 400 here. */
+/* Removes cache_control at any depth, for upstreams that cache on their own. */
 function stripCacheControl(x: unknown): void {
   if (Array.isArray(x)) { for (const y of x) stripCacheControl(y); return; }
   if (x && typeof x === "object") {
@@ -52,17 +58,21 @@ function stripCacheControl(x: unknown): void {
     for (const k of Object.keys(o)) stripCacheControl(o[k]);
   }
 }
-function adaptForDeepseek(payload: Record<string, unknown>): void {
+/* Fireworks' Messages endpoint takes thinking only as a fixed budget (at
+   least 1,024 tokens, counted inside max_tokens) and has no adaptive mode or
+   effort field, so effort becomes a budget here. Its prefix caching is
+   automatic, so cache_control is stripped. */
+const FIREWORKS_BUDGET: Record<string, number> = { low: 4096, medium: 12000, high: 12000, max: 24000 };
+function adaptForFireworks(payload: Record<string, unknown>): void {
   stripCacheControl(payload);
   const oc = (payload.output_config ?? {}) as Record<string, unknown>;
   const effort = typeof oc.effort === "string" ? oc.effort : "high";
-  if (effort === "none") {
-    payload.thinking = { type: "disabled" };
-    delete payload.output_config;
-  } else {
-    payload.thinking = { type: "enabled" };
-    payload.output_config = { effort };
-  }
+  delete payload.output_config;
+  const maxTokens = Number(payload.max_tokens);
+  const budget = Math.min(FIREWORKS_BUDGET[effort] ?? FIREWORKS_BUDGET.high, maxTokens - 1024);
+  payload.thinking = effort === "none" || budget < 1024
+    ? { type: "disabled" }
+    : { type: "enabled", budget_tokens: budget };
 }
 
 // The board is served from one origin; echo it back rather than using "*",
@@ -112,9 +122,9 @@ Deno.serve(async (req) => {
     if (!PROVIDERS[model]) model = "claude-sonnet-5";
     provider = PROVIDERS[model];
     key = Deno.env.get(provider.keyEnv) ?? "";
-    payload.model = model;
+    payload.model = provider.upstreamModel ?? model;
     payload.max_tokens = Math.min(Number(payload.max_tokens) || MAX_TOKENS, MAX_TOKENS);
-    if (provider.kind === "deepseek") adaptForDeepseek(payload);
+    if (provider.kind === "fireworks") adaptForFireworks(payload);
 
     body = JSON.stringify(payload);
   } catch {
@@ -134,7 +144,8 @@ Deno.serve(async (req) => {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": key,
+      // Fireworks signs with a bearer token; Anthropic with x-api-key.
+      ...(provider.kind === "fireworks" ? { authorization: `Bearer ${key}` } : { "x-api-key": key }),
       "anthropic-version": req.headers.get("anthropic-version") ?? "2023-06-01",
     },
     body,

@@ -31804,9 +31804,9 @@
      choosing a price. The EFFORT is how hard that model thinks, and the
      levels on offer are the model's own: Sonnet takes medium and high, plus
      "auto" (medium, raised to high for the rest of the run and chat the
-     moment a run struggles; see escalateEffort in the loop). DeepSeek takes
-     none (thinking off), low, high and max; it maps medium to high itself,
-     so it is not offered.
+     moment a run struggles; see escalateEffort in the loop). DeepSeek (served
+     by Fireworks in the US) takes none (thinking off), low, high and max; the
+     proxy turns each into a fixed thinking budget (adaptForFireworks).
 
      One stored effort per model, so switching models brings back the level
      last used with that model. Both pickers lock while a run is in progress:
@@ -31825,7 +31825,7 @@
         { id: "medium", name: "Medium" },
         { id: "high",   name: "High" }
       ] },
-    { id: "deepseek-flash", name: "DeepSeek Flash", desc: "About 20\u00d7 cheaper, under test", defaultEffort: "high",
+    { id: "deepseek-flash", name: "DeepSeek-V4.1-Flash (US Servers)", desc: "About 20\u00d7 cheaper, hosted by Fireworks, under test", defaultEffort: "high",
       efforts: [
         { id: "none", name: "Off",  badge: "No thinking" },
         { id: "low",  name: "Low" },
