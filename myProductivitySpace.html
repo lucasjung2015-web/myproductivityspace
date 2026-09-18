@@ -5417,11 +5417,11 @@
      hidden-widget tabs (only present when something is hidden), then the
      page dots. The dots sit lowest because position is glanced at
      constantly and recovery is touched rarely. -->
+<div class="tabs-bar-resizer" id="tabsBarResizer" aria-hidden="true" title="Drag to resize. Double-click to fit"></div>
 <div class="collapsed-tabs-bar" id="collapsedTabsBar"></div>
 
 <!-- Phone chrome. Both are inert on a desktop: the stylesheet only shows them
      inside the touch media query, and the script only wires them there. The
-<div class="tabs-bar-resizer" id="tabsBarResizer" aria-hidden="true" title="Drag to resize. Double-click to fit"></div>
      dots give absolute position, which a scrolling tab bar cannot; the tabs
      name the destinations, which dots cannot. -->
 <div class="mob-seg" id="mobSeg" role="tablist" aria-label="View">
@@ -13989,33 +13989,6 @@
       resizer.addEventListener("touchstart", onDown, { passive: false });
     }
 
-    // ---- drag-to-reorder / re-split (the grip icon in each widget's own
-    // header) ----
-    // Dropping onto the left/right quarter of a target widget creates a new
-    // slot beside it (horizontal split — this is what turns "drag Reading
-    // List to the screen's edge" into "Reading List becomes its own
-    // section there"); dropping on its top/bottom half joins the target's
-    // own slot, stacked above/below it (vertical split). Dropping in the
-    // empty margin beyond the first/last widget falls back to the
-    // horizontal case against whichever widget is currently leftmost/
-    // rightmost.
-    function wireDragHandle(handle) {
-      const draggedId = handle.getAttribute("data-drag-col");
-
-      function onDown(e) {
-        if (e.button != null && e.button !== 0) return;
-        e.preventDefault();
-        const draggedEl = widgetEl(draggedId);
-        let dropTargetId = null;
-        let dropZone = null; // "left" | "right" | "top" | "bottom"
-        let dragActive = false; // only true once the pointer has actually moved a few px — see MOVE_THRESHOLD
-        // Menu-only: dragging it above/below the grid's own bounds exits
-        // back to the full-width floating bar (see the links-menu script)
-        // instead of splitting some widget's slot — every other widget has
-        // no floating mode, so this is gated on draggedId === "menu"
-        // throughout and is a no-op for anything else.
-        let menuExitZone = null; // "top" | "bottom" | null
-        let menuExitDropzone = null;
     // ---- height of the hidden-widget tabs bar (drag its top rule) ----
     // Dragging up makes the bar taller and the board shorter. The height is
     // stored in the bar's own unzoomed px, like the widget heights above, so
@@ -14085,6 +14058,33 @@
       });
     })();
 
+    // ---- drag-to-reorder / re-split (the grip icon in each widget's own
+    // header) ----
+    // Dropping onto the left/right quarter of a target widget creates a new
+    // slot beside it (horizontal split — this is what turns "drag Reading
+    // List to the screen's edge" into "Reading List becomes its own
+    // section there"); dropping on its top/bottom half joins the target's
+    // own slot, stacked above/below it (vertical split). Dropping in the
+    // empty margin beyond the first/last widget falls back to the
+    // horizontal case against whichever widget is currently leftmost/
+    // rightmost.
+    function wireDragHandle(handle) {
+      const draggedId = handle.getAttribute("data-drag-col");
+
+      function onDown(e) {
+        if (e.button != null && e.button !== 0) return;
+        e.preventDefault();
+        const draggedEl = widgetEl(draggedId);
+        let dropTargetId = null;
+        let dropZone = null; // "left" | "right" | "top" | "bottom"
+        let dragActive = false; // only true once the pointer has actually moved a few px — see MOVE_THRESHOLD
+        // Menu-only: dragging it above/below the grid's own bounds exits
+        // back to the full-width floating bar (see the links-menu script)
+        // instead of splitting some widget's slot — every other widget has
+        // no floating mode, so this is gated on draggedId === "menu"
+        // throughout and is a no-op for anything else.
+        let menuExitZone = null; // "top" | "bottom" | null
+        let menuExitDropzone = null;
 
         function pointXY(ev) {
           if (ev.touches && ev.touches.length) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
