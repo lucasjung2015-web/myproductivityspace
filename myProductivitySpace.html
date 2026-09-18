@@ -13595,58 +13595,33 @@
     })();
 
     /* ---------- starter board ----------
-       What a first-time account sees instead of the owner's own setup: their
-       live Google Calendar and Tasks, three pastel template Pages (a welcome
-       note, semester goals, habits) and two starter books. Runs once, from
-       init(), only on a brand-new account (see brandNewBoard). Everything
-       goes through the same calls the buttons and the AI use, so it persists
-       and syncs like a hand edit and an existing board is never touched.
+       What a first-time account sees instead of the owner's own setup: three
+       widgets side by side -- their live Google Calendar, their Google Tasks,
+       and one Page (the widget that syncs with Notion once Notion is
+       connected). Runs once, from init(), only on a brand-new account (see
+       brandNewBoard). Everything goes through the same calls the buttons and
+       the AI use, so it persists and syncs like a hand edit and an existing
+       board is never touched.
 
-       The built-in Atomic Habits / Affirmations notes and Vocabulary are
-       hidden rather than reused: those notes carry links to the owner's own
-       Notion pages, and hidden widgets stay one click away in the tabs bar. */
-    const STARTER_PAGES = [
-      { key: "start", color: "#FDF3D0", icon: "👋", md:
-        "# Welcome to your board\n" +
-        "Drag a widget's grip to move it, drag its edge to resize it, and press + (top right) to add more.\n" +
-        "Try asking the assistant (✦, top right):\n" +
-        "- Build me a habit tracker that resets every morning\n" +
-        "- Plan my week around my classes and exams\n" +
-        "- Turn my semester goals into weekly tasks\n" +
-        "Delete this note when you're done." },
-      { key: "goals", color: "#DCF0DC", icon: "🎯", md:
-        "# Semester Goals\n" +
-        "1. Academic:\n" +
-        "2. Health:\n" +
-        "3. Personal / career:\n" +
-        "Why each one matters to me:" },
-      { key: "habits", color: "#E6DCF5", icon: "🔁", md:
-        "# Habits\n" +
-        "Tiny habits, stacked on things I already do.\n" +
-        "After I ______, I will ______.\n" +
-        "After I ______, I will ______.\n" +
-        "Never miss twice." }
-    ];
-    const STARTER_BOOKS = ["Atomic Habits (James Clear)", "Deep Work (Cal Newport)"];
+       The other built-ins are taken off the board (see takeOffBoard): no
+       widget and no tab, and Reading List and Vocabulary come back from the
+       Marketplace's Built-in row. The Atomic Habits / Affirmations notes
+       carry links to the owner's own Notion pages and are not offered. */
+    const STARTER_OFF_BOARD = ["readingList", "vocab", "atomicHabits", "affirmations"];
 
     function seedStarterBoard() {
       try {
-        const ids = {};
-        STARTER_PAGES.forEach(function (p) {
-          const id = createDynamicWidgetInstance("page");
-          ids[p.key] = id;
-          writePageHtml(id, markdownToNoteHtml(p.md, { allowH1: true }));
-          setWidgetColor(id, p.color);
-          setWidgetIcon(id, p.icon);
-        });
-        ["atomicHabits", "affirmations", "vocab"].forEach(function (id) {
-          if (WIDGET_IDS.indexOf(id) !== -1) setHidden(id, true);
+        const pageId = createDynamicWidgetInstance("page");
+        writePageHtml(pageId, markdownToNoteHtml("# Notes\n", { allowH1: true }));
+        setWidgetIcon(pageId, "\ud83d\udcdd");
+        STARTER_OFF_BOARD.forEach(function (id) {
+          if (WIDGET_IDS.indexOf(id) !== -1) takeOffBoard(id);
         });
 
-        // Four columns; anything else on the board (the hidden widgets
+        // Three columns; anything else on the board (the hidden widgets
         // above included) follows as its own slot, since a stored layout
         // must name every widget to be accepted on the next load.
-        const want = [["cal"], ["unschedTasks", ids.goals], [ids.start, ids.habits], ["readingList"]];
+        const want = [["cal"], ["unschedTasks"], [pageId]];
         const placed = new Set();
         const next = [];
         want.forEach(function (slot) {
@@ -13662,21 +13637,6 @@
       } catch (e) {
         console.warn("[mps] starter board:", e);
       }
-
-      // The Reading List only persists once its stored items have loaded,
-      // which is async; wait for that rather than adding into the gap.
-      let tries = 0;
-      (function addBooks() {
-        const api = window.__listItemsApi && window.__listItemsApi.readingList;
-        if (!api || !api.ready || !api.ready()) {
-          if (++tries < 50) setTimeout(addBooks, 200);
-          return;
-        }
-        if (api.list().items.length) return;
-        STARTER_BOOKS.forEach(function (t) {
-          api.add({ text: t, tags: { status: "To-do", mediaType: "Book" } });
-        });
-      })();
     }
 
     /* ---------- hide / unhide ----------
@@ -13716,6 +13676,27 @@
     // Wholesale rather than patching just the widget that changed: hiding one
     // widget can silence a row-resizer, a whole slot and a column-resizer at
     // once, and there are only a handful of elements involved either way.
+    /* ---------- off the board ----------
+       The built-ins that are part of the page's markup (Reading List,
+       Vocabulary, the two note widgets) cannot be destroyed, only hidden, and
+       a hidden widget leaves a tab in the bar at the bottom. "Off the board"
+       is hidden with no tab: the widget is simply not there until it is added
+       again from the Marketplace, which unhides it. A new account's board
+       starts with these off (see seedStarterBoard); nothing else sets it.
+       `var`, not `const`: applyHiddenState can run before this line has. */
+    var offBoard = {};
+    const OFF_BOARD_KEY = "widgets-off-board";
+    function persistOffBoard() { storageSet(OFF_BOARD_KEY, JSON.stringify(Object.keys(offBoard))); }
+    function takeOffBoard(id) {
+      offBoard[id] = true;
+      persistOffBoard();
+      setHidden(id, true);
+    }
+    storageGet(OFF_BOARD_KEY).then(function (raw) {
+      try { (JSON.parse(raw || "[]") || []).forEach(function (id) { offBoard[id] = true; }); } catch (e) {}
+      if (Object.keys(offBoard).length) applyHiddenState();
+    });
+
     function applyHiddenState() {
       WIDGET_IDS.forEach(function (id) {
         // Skip anything not currently in the layout — a Calendar/Tasks widget
@@ -13726,6 +13707,11 @@
         if (el) el.style.display = isHidden(id) ? "none" : "";
         const tab = tabFor(id);
         if (!tab) return;
+        // Off the board: the tab stays inside its own (hidden) widget.
+        if (isHidden(id) && offBoard[id]) {
+          if (el && tab.parentNode !== el) el.appendChild(tab);
+          return;
+        }
         if (isHidden(id)) {
           if (tab.parentNode !== collapsedTabsBar) collapsedTabsBar.appendChild(tab);
           applyTabIcon(id);
@@ -13829,6 +13815,8 @@
     }
 
     function setHidden(id, value) {
+      // Showing a widget by any route (tab, AI, Marketplace) puts it back.
+      if (!value && offBoard[id]) { delete offBoard[id]; persistOffBoard(); }
       hidden[id] = !!value;
       storageSet(hideStorageKey(id), value ? "true" : "false");
       if (value && maximizedId === id) setMaximized(null);
@@ -18598,7 +18586,11 @@
       el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     }
 
+    /* "+" opens the Marketplace, whose Built-in row holds everything this
+       popup used to. The popup stays as the fallback for a board whose
+       Marketplace script has not loaded. */
     addWidgetBtn.addEventListener("click", function () {
+      if (window.__mpsMarketplaceUI) { closeAddWidgetPopup(); window.__mpsMarketplaceUI.open(); return; }
       if (addWidgetPopup.hidden) openAddWidgetPopup(); else closeAddWidgetPopup();
     });
     addWidgetOverlay.addEventListener("click", closeAddWidgetPopup);
@@ -18606,8 +18598,20 @@
     addWidgetPopup.addEventListener("click", function (e) {
       const btn = e.target.closest(".add-widget-card");
       if (!btn) return;
-      const type = btn.getAttribute("data-add-type");
       closeAddWidgetPopup();
+      addWidgetOfType(btn.getAttribute("data-add-type"), btn);
+    });
+
+    /* Adds one widget of a built-in type: the popup's cards and the
+       Marketplace's Built-in row both land here. */
+    function addWidgetOfType(type, btn) {
+      /* Reading List and Vocabulary taken off this board (a new account's
+         starting state) come back as themselves rather than as a copy. */
+      if ((type === "readingList" || type === "vocab") && WIDGET_IDS.indexOf(type) !== -1 && isHidden(type)) {
+        setHidden(type, false);
+        flashWidget(type);
+        return;
+      }
 
       /* Custom widgets rather than a built-in type, so they go through the
          custom-widget API instead of createDynamicWidgetInstance. Adding a
@@ -18711,6 +18715,12 @@
         else restoreSingleton("unschedTasks");
         return;
       }
+    }
+    window.__mpsAddWidget = addWidgetOfType;
+    // The routine-fed widgets, for the Marketplace to list (it shows each one
+    // only on a board its routine has posted to).
+    window.__mpsRoutineFeeds = Object.keys(ROUTINE_FEEDS).map(function (k) {
+      return { type: k, name: ROUTINE_FEEDS[k].name, reads: (ROUTINE_FEEDS[k].reads || []).slice() };
     });
 
     // ---- Vocabulary "+" setup flow: Language -> Frequency -> Words/Phrases per day ----
@@ -28786,8 +28796,9 @@
   var DEFAULT_LINKS = [
     { id: "gmail", url: "https://mail.google.com/mail/u/0/", label: "Gmail", iconSvg: '<svg role="img" viewBox="0 0 256 193" xmlns="http://www.w3.org/2000/svg"><title>Gmail</title><path fill="#4285f4" d="M58.182 192.05V93.14L27.507 65.077L0 49.504v125.091c0 9.658 7.825 17.455 17.455 17.455z"/><path fill="#34a853" d="M197.818 192.05h40.727c9.659 0 17.455-7.826 17.455-17.455V49.505l-31.156 17.837l-27.026 25.798z"/><path fill="#ea4335" d="m58.182 93.14l-4.174-38.647l4.174-36.989L128 69.868l69.818-52.364l4.669 34.992l-4.669 40.644L128 145.504z"/><path fill="#fbbc04" d="M197.818 17.504V93.14L256 49.504V26.231c0-21.585-24.64-33.89-41.89-20.945z"/><path fill="#c5221f" d="m0 49.504l26.759 20.07L58.182 93.14V17.504L41.89 5.286C24.61-7.66 0 4.646 0 26.23z"/></svg>' },
     { id: "gcal", url: "https://calendar.google.com/calendar/u/0/r", label: "Google Calendar", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Google Calendar</title><path fill="#4285F4" d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/></svg>' },
-    { id: "gdrive", url: "https://drive.google.com/drive/my-drive", label: "Google Drive", iconImg: "https://www.google.com/s2/favicons?sz=64&domain=drive.google.com" },
-    { id: "claude", url: "https://claude.ai/chat", label: "Claude", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Claude</title><path fill="#D97757" d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>' }
+    { id: "gtasks", url: "https://tasks.google.com/", label: "Google Tasks", iconImg: "https://www.google.com/s2/favicons?sz=64&domain=tasks.google.com" },
+    { id: "notion", url: "https://www.notion.so/", label: "Notion", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Notion</title><path fill="#000000" d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg>' },
+    { id: "chatgpt", url: "https://chatgpt.com/", label: "ChatGPT", iconImg: "https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com" }
   ];
 
   var FALLBACK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l1.93-1.93a5 5 0 0 0-7.07-7.07L10.5 5.5"/><path d="M14 11a5 5 0 0 0-7.07 0L5 12.93a5 5 0 0 0 7.07 7.07L13.5 18.5"/></svg>';
@@ -38121,6 +38132,15 @@
   .mkt-creator .nm { font-weight: 600; margin-top: 4px; }
   .mkt-creator .ct { font-size: 12px; color: var(--ink-soft); }
   .mkt-av { border-radius: 50%; display: inline-grid; place-items: center; font-weight: 600; color: var(--ink); flex: none; overflow: hidden; object-fit: cover; }
+  .mkt-bi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .mkt-bi { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px; border-radius: 10px; border: 1px solid var(--hair) !important; background: var(--panel, #ffffff) !important; }
+  .mkt-bi:hover { background: #f2f2f2 !important; }
+  .mkt-bi-icon { width: 38px; height: 38px; flex: none; border-radius: 9px; display: grid; place-items: center; font-size: 19px; background: #f2f2f2; }
+  .mkt-bi-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .mkt-bi-name { font-weight: 600; font-size: 14px; color: var(--ink); }
+  .mkt-bi-desc { font-size: 12px; color: var(--ink-soft); line-height: 1.35; }
+  .mkt-bi-add { flex: none; font-size: 12px; font-weight: 600; color: #ffffff; background: var(--mps-blue); border-radius: 99px; padding: 4px 11px; }
+  .mkt-bi:hover .mkt-bi-add { background: var(--mps-blue-hover); }
   .mkt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
   .mkt-card { text-align: left; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px rgba(15,15,15,.06), 0 2px 4px rgba(15,15,15,.06); display: flex; flex-direction: column; transition: box-shadow .15s ease; }
   .mkt-card:hover { box-shadow: 0 0 0 1px rgba(15,15,15,.05), 0 3px 6px rgba(15,15,15,.1), 0 9px 24px rgba(15,15,15,.14); }
@@ -38229,7 +38249,39 @@
   const INSTALLS_KEY = "marketplace-installs";   // { localWidgetId: { listing, version } }
   const BAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1 12.2a1 1 0 0 1-1 .8H7a1 1 0 0 1-1-.8L5 8Z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>';
 
-  const st = { rows: [], loaded: false, view: "home", cat: null, creator: null, listing: null, q: "" };
+  const st = { rows: [], loaded: false, loadError: "", view: "home", cat: null, creator: null, listing: null, q: "" };
+
+  /* The Built-in row: every widget type the "+" popup used to offer, added
+     through the same code (window.__mpsAddWidget). Reading List and
+     Vocabulary come back as themselves on a board that took them off. */
+  const BUILTINS = [
+    { type: "cal", emoji: "\ud83d\udcc5", name: "Google Calendar", desc: "Your week, live from Google Calendar." },
+    { type: "tasks", emoji: "\u2705", name: "Google Tasks", desc: "Your Google Tasks, with timers and subtasks." },
+    { type: "page", emoji: "\ud83d\udcdd", name: "Page", desc: "A note. Syncs with Notion once it's connected." },
+    { type: "list", emoji: "\ud83d\uddc2\ufe0f", name: "List", desc: "Any list, with your own tags and colours." },
+    { type: "readingList", emoji: "\ud83d\udcda", name: "Reading List", desc: "Books, articles and videos to get through." },
+    { type: "vocab", emoji: "\ud83d\udd24", name: "Vocabulary", desc: "New English or Chinese words on a schedule." },
+    { type: "menu", emoji: "\ud83d\udd16", name: "Bookmarks", desc: "Your links, in a bar or a widget." }
+  ];
+  /* The routine-fed widgets only have content on a board a routine posts to,
+     so each is offered only where its topic already exists. */
+  const FEED_META = {
+    "feed-news": { emoji: "\ud83d\udcf0", desc: "This morning's briefing from your news routine." },
+    "feed-stocks": { emoji: "\ud83d\udcc8", desc: "Your portfolio summary from its routine." },
+    "feed-email": { emoji: "\u2709\ufe0f", desc: "Your inbox digest from its routine." },
+    "feed-automations": { emoji: "\u2699\ufe0f", desc: "Your scheduled Claude automations and their results." }
+  };
+  function builtins() {
+    let topics = [];
+    try { topics = (CW() && CW().topics ? CW().topics() : []).map(function (t) { return t.name; }); } catch (e) {}
+    const feeds = (window.__mpsRoutineFeeds || []).filter(function (f) {
+      return f.reads.some(function (r) { return topics.indexOf(r) !== -1; });
+    }).map(function (f) {
+      const m = FEED_META[f.type] || {};
+      return { type: f.type, emoji: m.emoji || "\ud83d\udcec", name: f.name, desc: m.desc || "" };
+    });
+    return BUILTINS.concat(feeds);
+  }
   let installs = {};
   let mine = {};    // source widget id -> my listing row
 
@@ -38280,7 +38332,8 @@
   }
   function saveInstalls() { window.storageSet(INSTALLS_KEY, JSON.stringify(installs)); }
   async function load() {
-    if (!M()) return { error: "Sign in to use the Marketplace." };
+    try { if (CW() && CW().topicsReady) await CW().topicsReady(); } catch (e) {}
+    if (!M()) return { error: "Sign in to see widgets other people built." };
     const r = await M().list();
     if (r.error) return r;
     st.rows = r.rows; st.loaded = true;
@@ -38311,12 +38364,10 @@
     $("mktScrim").hidden = false;
     document.documentElement.style.overflow = "hidden";
     go(next || { view: "home" });
-    if (!st.loaded) {
-      $("mktView").innerHTML = '<div class="mkt-loading">Loading the Marketplace…</div>';
-    }
     load().then(function (r) {
-      if (r.error) { $("mktView").innerHTML = '<div class="mkt-loading">' + esc(r.error) + "</div>"; return; }
-      go({ view: st.view, cat: st.cat, creator: st.creator, listing: st.listing });
+      // A failed load still opens: the Built-in row needs none of it.
+      if (r.error) { st.loaded = true; st.loadError = r.error; } else st.loadError = "";
+      if (!$("mkt").hidden) go({ view: st.view, cat: st.cat, creator: st.creator, listing: st.listing });
     });
   }
   function close() {
@@ -38332,8 +38383,13 @@
     const v = $("mktView");
     v.innerHTML = "";
     $("mktMain").scrollTop = 0;
-    if (!st.loaded) return;
+    // Home and Built-in render before the community rows arrive; the rest wait.
+    if (!st.loaded && st.view !== "home" && st.view !== "builtin") {
+      v.innerHTML = '<div class="mkt-loading">Loading the Marketplace…</div>';
+      return;
+    }
     if (st.view === "home") home(v);
+    else if (st.view === "builtin") builtinView(v);
     else if (st.view === "mine") mineView(v);
     else if (st.view === "cat") catView(v);
     else if (st.view === "creator") creatorView(v);
@@ -38363,6 +38419,7 @@
     s.appendChild(brand);
     const rows = visible();
     s.appendChild(sitem("🧭", "Discover", null, st.view === "home", function () { go({ view: "home" }); }));
+    s.appendChild(sitem("\ud83e\uddf1", "Built-in", builtins().length, st.view === "builtin", function () { go({ view: "builtin" }); }));
     const mineCount = st.rows.filter(function (r) { return r.author_id === me(); }).length;
     s.appendChild(sitem("🗂️", "Published by you", mineCount, st.view === "mine", function () { go({ view: "mine" }); }));
     const l1 = document.createElement("div"); l1.className = "mkt-slabel"; l1.textContent = "Categories"; s.appendChild(l1);
@@ -38406,6 +38463,32 @@
     rows.forEach(function (r) { g.appendChild(card(r)); });
     return g;
   }
+  function builtinGrid(list) {
+    const g = document.createElement("div"); g.className = "mkt-bi-grid";
+    list.forEach(function (b) {
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "mkt-bi";
+      c.setAttribute("aria-label", "Add " + b.name);
+      c.innerHTML = '<span class="mkt-bi-icon" aria-hidden="true">' + b.emoji + "</span>" +
+        '<span class="mkt-bi-text"><span class="mkt-bi-name">' + esc(b.name) + '</span><span class="mkt-bi-desc">' + esc(b.desc) + "</span></span>" +
+        '<span class="mkt-bi-add">Add</span>';
+      c.addEventListener("click", function () {
+        close();
+        // After the Marketplace is gone, so a setup popup (Vocabulary, the
+        // Notion page chooser) opens over the board rather than under this.
+        setTimeout(function () { if (window.__mpsAddWidget) window.__mpsAddWidget(b.type); }, 0);
+      });
+      g.appendChild(c);
+    });
+    return g;
+  }
+  function builtinView(v) {
+    crumbs([["Marketplace", { view: "home" }], ["Built-in"]]);
+    const h = document.createElement("div"); h.style.padding = "22px 0 10px";
+    h.innerHTML = '<h1 class="mkt-serif mkt-dtitle">Built-in</h1><p class="mkt-dsub" style="margin:0">The widgets that come with myProductivityspace. Each one adds in a click.</p>';
+    v.appendChild(h);
+    v.appendChild(builtinGrid(builtins()));
+  }
   function h2(html) { const h = document.createElement("h2"); h.className = "mkt-h2"; h.innerHTML = html; return h; }
   const EMPTY_PUBLISH = "Nothing here yet. Build a widget with the assistant, then choose ••• → Publish to Marketplace.";
 
@@ -38413,8 +38496,8 @@
   function home(v) {
     crumbs([["Marketplace"]]);
     const hero = document.createElement("div"); hero.className = "mkt-hero";
-    hero.innerHTML = '<h1 class="mkt-serif">Widgets your friends built</h1>' +
-      "<p>Try any widget live, add a copy to your board, or remix it with the assistant.</p>" +
+    hero.innerHTML = '<h1 class="mkt-serif">Add to your board</h1>' +
+      "<p>The basics, plus widgets people on myProductivityspace built. Try theirs live before adding a copy, or remix one with the assistant.</p>" +
       '<label class="mkt-search"><span aria-hidden="true">🔍</span><input id="mktQ" type="search" placeholder="Search widgets and creators" aria-label="Search the Marketplace"></label>' +
       '<div class="mkt-quick"></div>';
     v.appendChild(hero);
@@ -38429,9 +38512,20 @@
       const q = st.q.trim().toLowerCase();
       if (q) {
         out.appendChild(h2('Results <small>for “' + esc(st.q) + '”</small>'));
-        out.appendChild(grid(visible().filter(function (r) {
+        const bi = builtins().filter(function (b) { return (b.name + " " + b.desc).toLowerCase().indexOf(q) !== -1; });
+        if (bi.length) out.appendChild(builtinGrid(bi));
+        const found = visible().filter(function (r) {
           return (r.name + " " + r.subtitle + " " + r.about + " " + nameOf(r) + " " + r.category).toLowerCase().indexOf(q) !== -1;
-        }), "No widgets match that yet."));
+        });
+        if (found.length || !bi.length) out.appendChild(grid(found, "No widgets match that yet."));
+        return;
+      }
+      out.appendChild(h2("Built-in <small>the basics, one click each</small>"));
+      out.appendChild(builtinGrid(builtins()));
+      if (!st.loaded || st.loadError) {
+        out.appendChild(h2("From the community"));
+        const n = document.createElement("div"); n.className = "mkt-none"; n.textContent = st.loadError || "Loading widgets people built…";
+        out.appendChild(n);
         return;
       }
       const cs = creators();
@@ -38448,7 +38542,7 @@
         });
         out.appendChild(wrap);
       }
-      out.appendChild(h2("Most used <small>by people on myProductivitySpace</small>"));
+      out.appendChild(h2("From the community <small>most used first</small>"));
       out.appendChild(grid(visible(), "The Marketplace is empty so far. Be the first: open a custom widget's ••• menu and choose Publish to Marketplace."));
     }
     const q = hero.querySelector("#mktQ"); q.value = st.q;
