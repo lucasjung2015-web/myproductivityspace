@@ -10324,6 +10324,13 @@
      such call and the app hangs forever behind an opaque overlay with no
      error at all. Reads go straight to the tiers, in the same local-wins
      order storageGet itself uses. */
+  /* True only when this boot's pull SUCCEEDED and the server held nothing for
+     this account: a first sign-in. The widget engine seeds the starter board
+     on it. A failed or timed-out pull leaves it false, because a board that
+     merely could not be fetched must never be mistaken for a new one and
+     have starter widgets synced over it. */
+  let freshAccount = false;
+
   async function hydrate() {
     setStatus("syncing");
     const T = await tiersReady;
@@ -10334,6 +10341,7 @@
     const res = await sb.from("kv").select("key,value,updated_at");
     if (res.error) throw res.error;
     const rows = res.data || [];
+    freshAccount = rows.length === 0;
 
     const serverKeys = new Set();
     let cursor = readCursor();
@@ -10766,6 +10774,7 @@
     forcePushAll: forcePushAll,
     signOut: signOut,
     user: function () { return session && session.user; },
+    isFreshAccount: function () { return freshAccount; },
     status: function () { return status; },
     onStatus: function (fn) { statusListeners.push(fn); fn(status); },
     token: async function () {
@@ -13348,6 +13357,12 @@
           }
         });
       }
+      /* Decided before the write just below, which is what makes it a
+         once-only test: every boot saves "dynamic-widgets", so only a board
+         that has never booted lacks it. The sync side's word is required as
+         well, so a board whose cloud pull failed is never taken for new. */
+      const brandNewBoard = !dynamicList &&
+        !!(window.__mpsSync && window.__mpsSync.isFreshAccount && window.__mpsSync.isFreshAccount());
       persistDynamicWidgets();
 
       layout = defaultLayout();
@@ -13448,7 +13463,93 @@
       applyAllWidgetTitles();
       // Anything whose builder hadn't loaded when it was registered above.
       ensureDynamicWidgetElements();
+      if (brandNewBoard) setTimeout(seedStarterBoard, 0);
     })();
+
+    /* ---------- starter board ----------
+       What a first-time account sees instead of the owner's own setup: their
+       live Google Calendar and Tasks, three pastel template Pages (a welcome
+       note, semester goals, habits) and two starter books. Runs once, from
+       init(), only on a brand-new account (see brandNewBoard). Everything
+       goes through the same calls the buttons and the AI use, so it persists
+       and syncs like a hand edit and an existing board is never touched.
+
+       The built-in Atomic Habits / Affirmations notes and Vocabulary are
+       hidden rather than reused: those notes carry links to the owner's own
+       Notion pages, and hidden widgets stay one click away in the tabs bar. */
+    const STARTER_PAGES = [
+      { key: "start", color: "#FDF3D0", icon: "👋", md:
+        "# Welcome to your board\n" +
+        "Drag a widget's grip to move it, drag its edge to resize it, and press + (top right) to add more.\n" +
+        "Try asking the assistant (✦, top right):\n" +
+        "- Build me a habit tracker that resets every morning\n" +
+        "- Plan my week around my classes and exams\n" +
+        "- Turn my semester goals into weekly tasks\n" +
+        "Delete this note when you're done." },
+      { key: "goals", color: "#DCF0DC", icon: "🎯", md:
+        "# Semester Goals\n" +
+        "1. Academic:\n" +
+        "2. Health:\n" +
+        "3. Personal / career:\n" +
+        "Why each one matters to me:" },
+      { key: "habits", color: "#E6DCF5", icon: "🔁", md:
+        "# Habits\n" +
+        "Tiny habits, stacked on things I already do.\n" +
+        "After I ______, I will ______.\n" +
+        "After I ______, I will ______.\n" +
+        "Never miss twice." }
+    ];
+    const STARTER_BOOKS = ["Atomic Habits (James Clear)", "Deep Work (Cal Newport)"];
+
+    function seedStarterBoard() {
+      try {
+        const ids = {};
+        STARTER_PAGES.forEach(function (p) {
+          const id = createDynamicWidgetInstance("page");
+          ids[p.key] = id;
+          writePageHtml(id, markdownToNoteHtml(p.md, { allowH1: true }));
+          setWidgetColor(id, p.color);
+          setWidgetIcon(id, p.icon);
+        });
+        ["atomicHabits", "affirmations", "vocab"].forEach(function (id) {
+          if (WIDGET_IDS.indexOf(id) !== -1) setHidden(id, true);
+        });
+
+        // Four columns; anything else on the board (the hidden widgets
+        // above included) follows as its own slot, since a stored layout
+        // must name every widget to be accepted on the next load.
+        const want = [["cal"], ["unschedTasks", ids.goals], [ids.start, ids.habits], ["readingList"]];
+        const placed = new Set();
+        const next = [];
+        want.forEach(function (slot) {
+          const present = slot.filter(function (id) { return WIDGET_IDS.indexOf(id) !== -1; });
+          present.forEach(function (id) { placed.add(id); });
+          if (present.length) next.push(present);
+        });
+        WIDGET_IDS.forEach(function (id) { if (!placed.has(id)) next.push([id]); });
+        layout = next;
+        persistLayout();
+        render();
+        applyHiddenState();
+      } catch (e) {
+        console.warn("[mps] starter board:", e);
+      }
+
+      // The Reading List only persists once its stored items have loaded,
+      // which is async; wait for that rather than adding into the gap.
+      let tries = 0;
+      (function addBooks() {
+        const api = window.__listItemsApi && window.__listItemsApi.readingList;
+        if (!api || !api.ready || !api.ready()) {
+          if (++tries < 50) setTimeout(addBooks, 200);
+          return;
+        }
+        if (api.list().items.length) return;
+        STARTER_BOOKS.forEach(function (t) {
+          api.add({ text: t, tags: { status: "To-do", mediaType: "Book" } });
+        });
+      })();
+    }
 
     /* ---------- hide / unhide ----------
        One control per widget, replacing the two this used to have: an in-place
@@ -20444,6 +20545,9 @@
           };
         },
         tagDefs: function () { return tagDefs; },
+        // Whether the stored items have been read, i.e. whether add() will
+        // persist. See `loaded`.
+        ready: function () { return loaded; },
         add: function (o) {
           o = o || {};
           const text = String(o.text == null ? "" : o.text).trim();
@@ -28478,14 +28582,13 @@
   var LINKS_KEY = "links-menu-items";
   var POSITION_KEY = "links-menu-position";
 
+  /* A new board's bar: generic tools every student has, nothing personal.
+     Boards that have saved their own bookmarks keep them (see LINKS_KEY). */
   var DEFAULT_LINKS = [
-    { id: "claude", url: "https://claude.ai/chat", label: "Claude", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Claude</title><path fill="#D97757" d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>' },
     { id: "gmail", url: "https://mail.google.com/mail/u/0/", label: "Gmail", iconSvg: '<svg role="img" viewBox="0 0 256 193" xmlns="http://www.w3.org/2000/svg"><title>Gmail</title><path fill="#4285f4" d="M58.182 192.05V93.14L27.507 65.077L0 49.504v125.091c0 9.658 7.825 17.455 17.455 17.455z"/><path fill="#34a853" d="M197.818 192.05h40.727c9.659 0 17.455-7.826 17.455-17.455V49.505l-31.156 17.837l-27.026 25.798z"/><path fill="#ea4335" d="m58.182 93.14l-4.174-38.647l4.174-36.989L128 69.868l69.818-52.364l4.669 34.992l-4.669 40.644L128 145.504z"/><path fill="#fbbc04" d="M197.818 17.504V93.14L256 49.504V26.231c0-21.585-24.64-33.89-41.89-20.945z"/><path fill="#c5221f" d="m0 49.504l26.759 20.07L58.182 93.14V17.504L41.89 5.286C24.61-7.66 0 4.646 0 26.23z"/></svg>' },
     { id: "gcal", url: "https://calendar.google.com/calendar/u/0/r", label: "Google Calendar", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Google Calendar</title><path fill="#4285F4" d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/></svg>' },
-    { id: "bloomberg", url: "https://www.bloomberg.com", label: "Bloomberg", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Bloomberg</title><rect width="24" height="24" rx="4" fill="#000000"/><path fill="#ffffff" d="M6.5 6.5h5.1c1.9 0 3.2.9 3.2 2.6 0 1.1-.6 1.9-1.5 2.3 1.2.4 2 1.3 2 2.7 0 2-1.5 3-3.5 3H6.5V6.5zm4.6 4.4c.9 0 1.4-.4 1.4-1.1s-.5-1.1-1.4-1.1H9v2.2h2.1zm.2 4.5c1 0 1.5-.4 1.5-1.2s-.5-1.2-1.5-1.2H9v2.4h2.3z"/></svg>' },
-    { id: "ft", url: "https://www.ft.com", label: "Financial Times", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Financial Times</title><rect width="24" height="24" rx="4" fill="#FFF1E5"/><text x="12" y="16.5" text-anchor="middle" font-family="Georgia, \'Times New Roman\', serif" font-weight="700" font-size="12" fill="#000000">FT</text></svg>' },
-    { id: "ibkr", url: "https://www.interactivebrokers.com", label: "IBKR", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Interactive Brokers</title><defs><clipPath id="ibkrClip"><rect width="24" height="24" rx="5"/></clipPath><linearGradient id="ibkrTopStripe" x1="0" y1="0" x2="10" y2="16" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#e2372f"/><stop offset="1" stop-color="#b21f24"/></linearGradient><linearGradient id="ibkrBotStripe" x1="0" y1="14" x2="11" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8f1a1e"/><stop offset="1" stop-color="#5c1013"/></linearGradient></defs><g clip-path="url(#ibkrClip)"><rect width="24" height="24" fill="#0a0a0a"/><polygon points="0,0 9,0 0,15" fill="url(#ibkrTopStripe)"/><polygon points="0,16 11,24 0,24" fill="url(#ibkrBotStripe)"/><circle cx="14.5" cy="12" r="4.6" fill="#d8292c"/></g></svg>' },
-    { id: "notion", url: "https://app.notion.com/p/Home-32d7788c9c0d80edb25dcb3db97e9c0a", label: "Notion", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Notion</title><path fill="#000000" d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg>' }
+    { id: "gdrive", url: "https://drive.google.com/drive/my-drive", label: "Google Drive", iconImg: "https://www.google.com/s2/favicons?sz=64&domain=drive.google.com" },
+    { id: "claude", url: "https://claude.ai/chat", label: "Claude", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Claude</title><path fill="#D97757" d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/></svg>' }
   ];
 
   var FALLBACK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l1.93-1.93a5 5 0 0 0-7.07-7.07L10.5 5.5"/><path d="M14 11a5 5 0 0 0-7.07 0L5 12.93a5 5 0 0 0 7.07 7.07L13.5 18.5"/></svg>';
