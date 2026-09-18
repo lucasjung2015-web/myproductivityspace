@@ -298,6 +298,94 @@ create trigger connector_secrets_touch_trg
   for each row execute function public.kv_touch();
 
 -- ---------------------------------------------------------------------------
+-- Claude agents (scheduled automations)
+-- ---------------------------------------------------------------------------
+-- Each automation is a Claude Managed Agent plus a scheduled deployment,
+-- created and managed by the agents Edge Function. The agent reaches the board
+-- through the board-mcp Edge Function with a per-user bearer token.
+--
+-- agent_accounts: one row per user who has used agents. The Anthropic
+-- environment and vault ids, and the SHA-256 hash of the board token (the
+-- token itself lives only in the user's Anthropic vault). RLS on with ZERO
+-- policies: service_role only.
+
+create table if not exists public.agent_accounts (
+  user_id          uuid        primary key references auth.users(id) on delete cascade,
+  environment_id   text,
+  vault_id         text,
+  board_token_hash text        unique,
+  -- MCP server URLs whose connector token is already in the vault, as JSON.
+  vault_urls       text        not null default '[]',
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.agent_accounts enable row level security;
+-- Deliberately no policies. Do not add any.
+
+drop trigger if exists agent_accounts_touch_trg on public.agent_accounts;
+create trigger agent_accounts_touch_trg
+  before insert or update on public.agent_accounts
+  for each row execute function public.kv_touch();
+
+-- agent_automations: what the user created. Readable by its owner (so the
+-- board could list them directly); every write goes through the functions,
+-- which are the only place that keeps this in step with Anthropic.
+
+create table if not exists public.agent_automations (
+  user_id          uuid        not null references auth.users(id) on delete cascade,
+  id               text        not null,
+  name             text        not null,
+  instructions     text        not null,
+  schedule         text        not null,   -- 5-field cron, minute field fixed
+  timezone         text        not null,
+  budget_cents     integer     not null default 100,
+  connector_ids    text        not null default '[]',
+  agent_id         text,
+  deployment_id    text,
+  status           text        not null default 'active',  -- active | paused | over_cap
+  last_run_at      timestamptz,
+  last_session_id  text,
+  last_cost_cents  integer,
+  last_error       text,
+  result_text      text,
+  result_at        timestamptz,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  primary key (user_id, id)
+);
+
+alter table public.agent_automations enable row level security;
+
+drop policy if exists agent_automations_select on public.agent_automations;
+create policy agent_automations_select on public.agent_automations for select to authenticated
+  using (auth.uid() = user_id);
+
+drop trigger if exists agent_automations_touch_trg on public.agent_automations;
+create trigger agent_automations_touch_trg
+  before insert or update on public.agent_automations
+  for each row execute function public.kv_touch();
+
+-- agent_runs: the spend ledger. One row per agent session with its list cost
+-- in cents, so a month's spend (and the monthly cap) is one sum.
+
+create table if not exists public.agent_runs (
+  session_id     text        primary key,
+  user_id        uuid        not null references auth.users(id) on delete cascade,
+  automation_id  text        not null,
+  cost_cents     integer     not null default 0,
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists agent_runs_user_created_idx on public.agent_runs (user_id, created_at desc);
+
+alter table public.agent_runs enable row level security;
+
+drop policy if exists agent_runs_select on public.agent_runs;
+create policy agent_runs_select on public.agent_runs for select to authenticated
+  using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
 -- Marketplace (custom widgets shared between accounts)
 -- ---------------------------------------------------------------------------
 -- The one table any signed-in user can read rows of someone else's: a widget
