@@ -19,7 +19,7 @@
 <!-- --mps-blue, matching the wordmark band that is now the top of the page,
      so the browser bar and the band read as one strip. The dark value
      belongs to dark mode, where it is actually true. -->
-<meta name="theme-color" content="#003399" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#3A6EA5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)">
 
 <!-- Installable to the home screen. The manifest is a real file rather than a
@@ -236,8 +236,8 @@
      the sign-in screen. Semantic tag colors (status/type/depth pills) are
      functional, not brand, and are deliberately left alone. */
   :root {
-    --mps-blue: #003399;
-    --mps-blue-hover: #00287A;
+    --mps-blue: #3A6EA5;
+    --mps-blue-hover: #2F5A88;
     --bg: #FFFFFF;
     --ink: #0A0A0A;
     --ink-soft: #6B6B6B;
@@ -335,6 +335,8 @@
      same "Menu" header treatment as every other widget (icon-less here,
      since individual links carry their own icons). */
   .links-row-wrap { position: relative; flex: 0 0 auto; }
+  /* Breathing room between the blue wordmark band and the Bookmarks bar under it. */
+  body > .links-row-wrap { margin-top: 16px; }
   /* The board at 75%. Chrome's own zoom at 75% was the size that read right
      on a laptop, so the app starts there instead of needing it set by hand.
      Scoped to what sits on the page itself (wordmark, floating Bookmarks bar,
@@ -5170,7 +5172,7 @@
   <div class="ai-head">
     <button type="button" class="ai-side-btn ai-head-side-btn" id="aiHeadSideToggle" title="Show sidebar" aria-label="Show sidebar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
     <span class="ai-head-mark"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></span>
-    <span class="ai-head-title">myProductivitySpace</span>
+    <span class="ai-head-title">myProductivityspace</span>
     <button type="button" class="mps-x-btn" id="aiCloseBtn" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="ai-log" id="aiLog"></div>
