@@ -237,6 +237,7 @@
      functional, not brand, and are deliberately left alone. */
   :root {
     --mps-blue: #003399;
+    --mps-blue-hover: #00287A;
     --bg: #FFFFFF;
     --ink: #0A0A0A;
     --ink-soft: #6B6B6B;
@@ -521,9 +522,9 @@
   }
   .bookmark-folder-cancel:hover { background: #e0e0e0; }
   .bookmark-folder-save {
-    border: none; background: #000000; color: #ffffff; padding: 10px 24px;
+    border: none; background: var(--mps-blue); color: #ffffff; padding: 10px 24px;
   }
-  .bookmark-folder-save:hover { background: #222222; }
+  .bookmark-folder-save:hover { background: var(--mps-blue-hover); }
 
   /* The insertion bar shown while a bookmark is being dragged — the same
      affordance a browser's own bookmark bar uses: the row holds still and a
@@ -593,10 +594,10 @@
   }
   .link-edit-remove:hover { background: #fbe9e9; }
   .link-edit-done {
-    border: none; background: #000000; color: #ffffff; font-size: 12px; font-weight: 600;
+    border: none; background: var(--mps-blue); color: #ffffff; font-size: 12px; font-weight: 600;
     font-family: inherit; cursor: pointer; padding: 4px 10px; border-radius: 4px;
   }
-  .link-edit-done:hover { background: #222222; }
+  .link-edit-done:hover { background: var(--mps-blue-hover); }
 
   .links-bottom-dropzone {
     flex: 0 0 auto; height: 0; overflow: hidden; margin: 0 28px; border-radius: 6px;
@@ -993,9 +994,9 @@
     cursor: pointer;
   }
   .note-editor [data-b="todo"][data-c="1"]::before {
-    background: var(--ink) no-repeat center/10px 10px
+    background: var(--mps-blue) no-repeat center/10px 10px
       url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6L9 17l-5-5'/></svg>");
-    border-color: var(--ink);
+    border-color: var(--mps-blue);
   }
   .note-editor [data-b="todo"][data-c="1"] { color: #9a9a9a; text-decoration: line-through; }
 
@@ -1587,11 +1588,11 @@
 
   .add-task-btn {
     align-self: flex-start; margin-bottom: 10px; padding: 8px 13px;
-    border: none; border-radius: 9px; background: #000000; color: #ffffff;
+    border: none; border-radius: 9px; background: var(--mps-blue); color: #ffffff;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
     cursor: pointer; transition: background 0.15s ease, transform 0.1s var(--ease-spring);
   }
-  .add-task-btn:hover { background: #222222; }
+  .add-task-btn:hover { background: var(--mps-blue-hover); }
   .add-task-btn:active { transform: scale(0.97); }
   /* "+ Add a medium" is black, but "Connect Google Calendar" — which shares
      .add-task-btn — deliberately stays blue, so this is scoped by id rather
@@ -1599,8 +1600,8 @@
      dynamically built reading-list widgets (see __buildReadingListSection,
      which names its button `id + "AddBtn"`); without it those copies would
      stay blue while the static one turned black. */
-  #addReadingBtn, #addGTaskBtn, .add-task-btn[id$="AddBtn"] { background: #000000; }
-  #addReadingBtn:hover, #addGTaskBtn:hover, .add-task-btn[id$="AddBtn"]:hover { background: #222222; }
+  #addReadingBtn, #addGTaskBtn, .add-task-btn[id$="AddBtn"] { background: var(--mps-blue); }
+  #addReadingBtn:hover, #addGTaskBtn:hover, .add-task-btn[id$="AddBtn"]:hover { background: var(--mps-blue-hover); }
   #gtaskSignedOut[hidden] { display: none; }
   /* The check-circle-plus glyph replaces the "+" text, so the icon sits on the
      same baseline as the label rather than being a character in it. */
@@ -1626,8 +1627,8 @@
   /* "Connect Google Calendar" / "Connect Google Tasks" are black-on-white-text
      like every other primary action now — this used to be the one deliberate
      exception that kept .add-task-btn's blue. */
-  #calConnectBtn, #gtaskConnectBtn, .cal-connect-btn { background: #000000; color: #ffffff; }
-  #calConnectBtn:hover, #gtaskConnectBtn:hover, .cal-connect-btn:hover { background: #222222; }
+  #calConnectBtn, #gtaskConnectBtn, .cal-connect-btn { background: var(--mps-blue); color: #ffffff; }
+  #calConnectBtn:hover, #gtaskConnectBtn:hover, .cal-connect-btn:hover { background: var(--mps-blue-hover); }
   #mainTasksList { display: flex; flex-direction: column; gap: 10px; }
 
   #readingListBox { border: none; padding: 10px 0 0 0; flex: 1 1 0; min-height: 60px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
@@ -1723,14 +1724,14 @@
   .cal-viewtoggle-shortcut { font-size: 12px; color: #6b6b6b; }
   .cal-create-btn {
     flex: 0 0 auto; padding: 5px 11px;
-    border: none; border-radius: 9px; background: #000000; color: #ffffff;
+    border: none; border-radius: 9px; background: var(--mps-blue); color: #ffffff;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
     cursor: pointer;
   }
   /* Scoped to the id, not .cal-create-btn, so any future toolbar reusing the
      class keeps the default blue. */
-  #calCreateBtn { background: #000000; }
-  #calCreateBtn:hover { background: #222222; }
+  #calCreateBtn { background: var(--mps-blue); }
+  #calCreateBtn:hover { background: var(--mps-blue-hover); }
 
   .cal-navbar { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-bottom: 4px; }
   .cal-navbtn, .cal-refreshbtn {
@@ -1970,8 +1971,8 @@
   }
   .cal-recur-cancel { border: 1px solid var(--hair); background: #ffffff; color: var(--ink); }
   .cal-recur-cancel:hover { background: var(--panel); }
-  .cal-recur-done { border: 1px solid #000000; background: #000000; color: #ffffff; }
-  .cal-recur-done:hover { background: #222222; }
+  .cal-recur-done { border: 1px solid var(--mps-blue); background: var(--mps-blue); color: #ffffff; }
+  .cal-recur-done:hover { background: var(--mps-blue-hover); }
 
   /* ---------- custom resize grip ----------
      Replaces the browser's own three-diagonal-lines corner, which is off
@@ -2158,10 +2159,10 @@
   }
   .gt-pop-cancel:hover { background: #e3e9f5; }
   .gt-pop-done {
-    border: none; background: #000000; color: #ffffff; cursor: pointer;
+    border: none; background: var(--mps-blue); color: #ffffff; cursor: pointer;
     font-family: inherit; font-size: 14px; font-weight: 600; padding: 10px 26px; border-radius: 999px;
   }
-  .gt-pop-done:hover { background: #222222; }
+  .gt-pop-done:hover { background: var(--mps-blue-hover); }
 
   /* The 30-minute time list, anchored under whichever "Set time" field opened
      it. Its own layer so it can overhang the popover it belongs to. */
@@ -2251,8 +2252,8 @@
     padding: 5px 11px; border-radius: 9px;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px; cursor: pointer;
   }
-  .cal-panel-save { border: none; background: #000000; color: #ffffff; font-weight: 600; }
-  .cal-panel-save:hover { background: #222222; }
+  .cal-panel-save { border: none; background: var(--mps-blue); color: #ffffff; font-weight: 600; }
+  .cal-panel-save:hover { background: var(--mps-blue-hover); }
   .cal-panel-cancel { border: 1px solid #000000; background: transparent; color: #000000; }
   /* Only present when editing something that already exists. margin-right:auto
      pushes it to the far left, away from Cancel/Save, so it can't be hit by
@@ -2306,7 +2307,7 @@
   .cal-daycell:hover { border-color: #000000; }
   .cal-daycell.other-month { opacity: 0.35; }
   .cal-daycell.today .cal-daynum {
-    background: #000000; color: #ffffff; border-radius: 50%;
+    background: var(--mps-blue); color: #ffffff; border-radius: 50%;
     width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   }
   .cal-daynum { font-size: 11px; font-weight: bold; color: #000000; }
@@ -2316,12 +2317,12 @@
      colour set on the event in Google Calendar, applied inline by makeChip. */
   .cal-chip {
     font-size: 10px; line-height: 1.25; padding: 1px 3px; border-radius: 3px;
-    background: #000000; color: #ffffff; cursor: pointer;
+    background: var(--mps-blue); color: #ffffff; cursor: pointer;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     display: flex; align-items: center; gap: 3px; min-width: 0;
   }
   .cal-chip:hover { filter: brightness(1.35); }
-  .cal-chip.task { background: #000000; color: #ffffff; }
+  .cal-chip.task { background: var(--mps-blue); color: #ffffff; }
   .cal-chip.more { background: transparent; color: #000000; opacity: 0.6; cursor: default; display: block; }
   /* The chip's own ring+checkmark — same currentColor SVG as .task-complete-btn,
      just shrunk to fit a 10px-font chip. Sits on the chip's own black/white
@@ -2384,7 +2385,7 @@
   .cal-tg-event {
     position: absolute; left: 1px; right: 1px; z-index: 1;
     font-size: 10px; line-height: 1.2; padding: 1px 3px; border-radius: 3px;
-    background: #000000; color: #ffffff; overflow: hidden;
+    background: var(--mps-blue); color: #ffffff; overflow: hidden;
     border: 1px solid #000000;
     /* An event can be dragged to a new time and resized from either edge
        (see wireEventDrag). The cursor is set per-pointer-position in JS,
@@ -2546,7 +2547,7 @@
     width: 34px; height: 34px; border-radius: 8px; border: none; background: #f0f0f0;
     color: #000000; cursor: pointer; display: grid; place-items: center; padding: 0;
   }
-  .timer-play-pause:hover, .timer-reset:hover { background: #000000; color: #ffffff; }
+  .timer-play-pause:hover, .timer-reset:hover { background: var(--mps-blue); color: #ffffff; }
   .timer-play-pause svg, .timer-reset svg { width: 15px; height: 15px; }
 
   .cal-timer-btn {
@@ -2558,9 +2559,9 @@
   .cal-timer-btn svg { width: 12px; height: 12px; }
   .cal-taskrow:hover .cal-timer-btn, .cal-taskrow:focus-within .cal-timer-btn,
   .cal-timer-btn.mini-expanded { opacity: 1; }
-  .cal-timer-btn.mini-expanded { background: #000000; color: #ffffff; }
+  .cal-timer-btn.mini-expanded { background: var(--mps-blue); color: #ffffff; }
   .cal-timer-btn:hover { background: #f0f0f0; }
-  .cal-timer-btn.mini-expanded:hover { background: #222222; }
+  .cal-timer-btn.mini-expanded:hover { background: var(--mps-blue-hover); }
 
   /* Hover-revealed like the timer control beside it, so a dense list
      stays quiet until you're actually working a row. The Branch AI mark is a
@@ -2781,9 +2782,9 @@
      anchor of the row, so it inverts to a solid black disc. Same 28px
      footprint as its neighbours — prominence comes from contrast, not size. */
   #aiPanelBtn {
-    background: var(--ink); color: var(--bg); border-radius: 50%; opacity: 1;
+    background: var(--mps-blue); color: var(--bg); border-radius: 50%; opacity: 1;
   }
-  #aiPanelBtn:hover { background: #222222; }
+  #aiPanelBtn:hover { background: var(--mps-blue-hover); }
   /* While the blue band is behind the row: white icons, and the AI disc
      inverts to white with a blue star so it still reads as the anchor. */
   html.mps-on-band #alwaysOnTopBtn, html.mps-on-band #connectionsBtn,
@@ -2864,7 +2865,7 @@
   .pm-row:hover { background: #f1f3f4; }
   .pm-row-icon {
     flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
-    display: grid; place-items: center; background: var(--ink); color: var(--bg);
+    display: grid; place-items: center; background: var(--mps-blue); color: var(--bg);
   }
   .pm-row.is-signout .pm-row-icon { background: transparent; color: var(--ink); }
   .pm-row-icon svg { width: 18px; height: 18px; display: block; }
@@ -2902,9 +2903,9 @@
   /* Marketplace entry: full width at the top, icon beside the text. */
   .add-widget-card.add-widget-market {
     grid-column: 1 / -1; flex-direction: row; justify-content: flex-start; gap: 10px;
-    padding: 10px 12px; background: #000000; border-color: #000000;
+    padding: 10px 12px; background: var(--mps-blue); border-color: var(--mps-blue);
   }
-  .add-widget-card.add-widget-market:hover { background: #222222; border-color: #222222; }
+  .add-widget-card.add-widget-market:hover { background: var(--mps-blue-hover); border-color: var(--mps-blue-hover); }
   .add-widget-market .add-widget-icon { width: 32px; height: 32px; background: #ffffff; border-color: #ffffff; }
   .add-widget-market-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
   .add-widget-market .add-widget-label { color: #ffffff; text-align: left; }
@@ -2970,7 +2971,7 @@
   .vocab-stepper-value { font-size: 13px; font-weight: 700; min-width: 20px; text-align: center; }
   .vocab-setup-next {
     display: block; width: 100%; padding: 9px; border: none; border-radius: 7px;
-    background: #000000; color: #ffffff; font-size: 13px; font-weight: 700;
+    background: var(--mps-blue); color: #ffffff; font-size: 13px; font-weight: 700;
     font-family: inherit; cursor: pointer;
   }
   .vocab-setup-next:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -3023,8 +3024,8 @@
   }
   .mps-btn:hover { background: #f5f5f6; border-color: #c9c9c9; }
   .mps-btn:active { transform: scale(0.96); }
-  .mps-btn.is-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-  .mps-btn.is-primary:hover { background: #222222; }
+  .mps-btn.is-primary { background: var(--mps-blue); color: var(--bg); border-color: var(--mps-blue); }
+  .mps-btn.is-primary:hover { background: var(--mps-blue-hover); }
   .mps-btn.is-icon { width: 30px; height: 30px; padding: 0; border-radius: 50%; }
 
   .mps-menu {
@@ -3055,7 +3056,7 @@
     transition: background 0.12s ease, color 0.12s ease;
   }
   .mps-seg button:hover { color: var(--ink); }
-  .mps-seg button.is-active { background: var(--ink); color: var(--bg); }
+  .mps-seg button.is-active { background: var(--mps-blue); color: var(--bg); }
 
   .mps-search {
     display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0;
@@ -3279,7 +3280,7 @@
     max-width: 84%; padding: 9px 13px; border-radius: 14px;
     font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word;
   }
-  .ai-msg.is-user { align-self: flex-end; background: var(--ink); color: var(--bg); }
+  .ai-msg.is-user { align-self: flex-end; background: var(--mps-blue); color: var(--bg); }
   /* A defined edge rather than --hair: at this size a near-white hairline
      doesn't read as a bubble at all, and the panel has no colour to lean on. */
   /* The reply is plain text on the panel, not a second bubble facing the
@@ -3468,7 +3469,7 @@
   .ai-send {
     flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    border: none; border-radius: 50%; background: var(--ink); color: var(--bg);
+    border: none; border-radius: 50%; background: var(--mps-blue); color: var(--bg);
     cursor: pointer; transition: background 0.12s ease, transform 0.1s var(--ease-spring);
   }
   /* The same button, doing the opposite job. Kept in place and the same size
@@ -3481,7 +3482,7 @@
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.55; }
   }
-  .ai-send:hover { background: #222222; }
+  .ai-send:hover { background: var(--mps-blue-hover); }
   .ai-send:active { transform: scale(0.9); }
   .ai-send:disabled { opacity: 0.4; cursor: default; }
 
@@ -3574,7 +3575,7 @@
     transition: transform 0.1s var(--ease-spring);
   }
   .ai-confirm-row button:active { transform: scale(0.95); }
-  .ai-confirm-yes { background: var(--ink); color: var(--bg); }
+  .ai-confirm-yes { background: var(--mps-blue); color: var(--bg); }
   .ai-confirm-no { background: transparent; color: var(--ink); }
   .ai-confirm.is-settled { color: #4a4a4a; border-color: var(--hair); }
   .ai-confirm.is-settled .ai-confirm-row { display: none; }
@@ -3612,7 +3613,7 @@
     padding: 4px 10px; border-radius: 999px; border: 1px solid var(--hair);
     background: transparent; color: var(--ink); font-family: inherit; font-size: 12px; cursor: pointer;
   }
-  .cw-tab.is-active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .cw-tab.is-active { background: var(--mps-blue); color: var(--bg); border-color: var(--mps-blue); }
   .cw-code {
     width: 100%; height: 190px; resize: vertical; box-sizing: border-box;
     padding: 8px 10px; border: 1px solid var(--hair); border-radius: 8px;
@@ -3653,7 +3654,7 @@
   .cw-actions button {
     padding: 6px 13px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   }
-  .cw-apply { border: 1px solid var(--ink); background: var(--ink); color: var(--bg); }
+  .cw-apply { border: 1px solid var(--mps-blue); background: var(--mps-blue); color: var(--bg); }
   .cw-reset { border: 1px solid var(--hair); background: transparent; color: var(--ink); }
   .ai-thinking { display: inline-flex; align-items: center; gap: 4px; }
   .ai-thinking i {
@@ -3875,7 +3876,7 @@
     font-family: inherit; font-size: 12.5px; color: var(--ink-soft); cursor: pointer;
   }
   .nb-cm-btn:hover { background: #f1f3f4; color: var(--ink); }
-  .nb-cm-btn.is-primary { background: var(--ink); color: #fff; }
+  .nb-cm-btn.is-primary { background: var(--mps-blue); color: #fff; }
   .nb-cm-btn.is-primary:hover { background: #333; }
 
   /* ---------- "Page" -> Empty / Existing chooser ----------
@@ -4898,7 +4899,7 @@
     .mob-seg button svg { width: 16px; height: 16px; display: block; }
     .mob-seg .mob-thumb {
       position: absolute; top: 3px; left: 3px; width: 38px; height: 34px;
-      border-radius: 9px; background: var(--ink); z-index: 1;
+      border-radius: 9px; background: var(--mps-blue); z-index: 1;
       transition: transform 240ms cubic-bezier(.22,1,.36,1);
     }
     body.widget-fullscreen-mode .mob-seg,
@@ -4921,7 +4922,7 @@
       width: 6px; height: 6px; border-radius: 50%; background: var(--hair);
       transition: background .18s, transform .18s;
     }
-    .mob-pdots span.is-on { background: var(--ink); transform: scale(1.22); }
+    .mob-pdots span.is-on { background: var(--mps-blue); transform: scale(1.22); }
     .mob-tabs {
       display: flex; gap: 7px; overflow-x: auto; padding: 0 12px 4px;
       scrollbar-width: none;
@@ -4935,7 +4936,7 @@
       white-space: nowrap; cursor: pointer;
     }
     .mob-tab .mt-em { font-size: 14px; }
-    .mob-tab.is-on { background: var(--ink); color: var(--bg); }
+    .mob-tab.is-on { background: var(--mps-blue); color: var(--bg); }
     body.widget-fullscreen-mode .mob-chrome,
     body.subpage-fullscreen-mode .mob-chrome,
     body.pip-active .mob-chrome,
@@ -5684,7 +5685,7 @@
   }
   
   .btn:active{transform:translateY(1px)}
-  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary{background:#003399;border-color:#003399;color:#fff}
   
   .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
   
@@ -5756,7 +5757,7 @@
      the --accent token itself are shared with the timer controls, focus
      rings, link handles and drop states, none of which change. */
   .subpage-add{flex:0 0 auto;align-self:flex-start;margin-top:1px;white-space:nowrap}
-  .btn.primary.subpage-add{background:#000000;border-color:#000000;color:#fff}
+  .btn.primary.subpage-add{background:#003399;border-color:#003399;color:#fff}
   /* Empty ring by default; the checkmark inside previews on hover what a
      click will commit — the same component as the Dashboard's own
      .task-complete-btn (see that file's copy for why), reimplemented here
@@ -6148,9 +6149,9 @@
   .autobranch-toggle{
     flex:0 0 auto;align-self:flex-start;margin-top:1px;white-space:nowrap;
   }
-  .btn.autobranch-toggle.on{background:#000000;border-color:#000000;color:#ffffff}
+  .btn.autobranch-toggle.on{background:#003399;border-color:#003399;color:#ffffff}
   @media (hover:hover){
-    .btn.autobranch-toggle.on:hover{background:#222222;border-color:#222222;color:#ffffff}
+    .btn.autobranch-toggle.on:hover{background:#00287A;border-color:#00287A;color:#ffffff}
   }
 
   /* ---------- dragging a task card onto / next to another task ---------- */
@@ -6204,9 +6205,9 @@
   }
   @media (hover:hover){
     .btn:hover{border-color:var(--accent);color:var(--accent)}
-    .btn.primary:hover{background:#222222;color:#fff}
+    .btn.primary:hover{background:#00287A;color:#fff}
     /* after .btn.primary:hover, so the black button doesn't flash blue */
-    .btn.primary.subpage-add:hover{background:#222222;border-color:#222222;color:#fff}
+    .btn.primary.subpage-add:hover{background:#00287A;border-color:#00287A;color:#fff}
     .btn.ghost:hover{background:#e2e8f1;color:var(--ink)}
     .node:hover{border-color:#b9c6da}
     .check:hover{opacity:.75}
@@ -6216,7 +6217,7 @@
     .act.timer:hover{background:#6b6b6b;color:#fff}
     .act.ai:hover{background:#6b6b6b;color:#fff}
     .act.tags:hover{background:#6b6b6b;color:#fff}
-    .timer-play-pause:hover,.timer-reset:hover{background:var(--accent);color:#fff}
+    .timer-play-pause:hover,.timer-reset:hover{background:#003399;color:#fff}
     /* The connector dots only appear once you're on the card — without this
        they were invisible hotspots you had to already know about. */
     .node:hover .link-handle::after{opacity:.55}
@@ -30700,7 +30701,7 @@
   /* The handful of board variables worth forwarding into a frame. Read off
      the live root rather than hard-coded, so a theme change carries through
      on the next mount. */
-  const TOKEN_KEYS = ["--ink", "--ink-soft", "--hair", "--panel", "--bg", "--radius", "--ease-spring"];
+  const TOKEN_KEYS = ["--ink", "--ink-soft", "--hair", "--panel", "--bg", "--radius", "--ease-spring", "--mps-blue", "--mps-blue-hover"];
   function designTokens() {
     const out = {};
     try {
@@ -32217,7 +32218,7 @@
     "- Content first, chrome last. Text and data carry the widget; borders, fills and icons only separate or signal state.",
     "- One quiet surface. No drop shadows, no gradients, no glows, no heavy borders inside a widget. Depth comes from a hairline or a faint fill.",
     "- Controls stay invisible until needed: buttons are plain text or an icon, and gain a soft fill on hover. No filled primary buttons except for the single main action, if there is one.",
-    "- Restraint with colour. Near-black text on white. Colour appears only as a pastel tag or callout background, never as large blocks of saturated colour.",
+    "- Restraint with colour. Near-black text on white. The one brand colour is var(--mps-blue) (#003399), used for filled buttons, selected states and checked boxes. Other colour appears only as a pastel tag or callout background, never as large blocks of saturated colour.",
     "",
     "COLOUR (use the variables, never invent hex greys)",
     "- Text: var(--ink). Secondary text, metadata, placeholders, icons: var(--ink-soft).",
@@ -32241,10 +32242,10 @@
     "",
     "COMPONENTS",
     "- List row: full-width, 4px radius, hover fill rgba(0,0,0,0.04), optional 16px icon or emoji on the left, metadata right-aligned in var(--ink-soft).",
-    "- Checkbox: 14px square, 1.5px border var(--ink-soft), 3px radius; checked fills var(--ink) with a white tick, and the row text turns var(--ink-soft) with a line-through.",
+    "- Checkbox: 14px square, 1.5px border var(--ink-soft), 3px radius; checked fills var(--mps-blue) with a white tick, and the row text turns var(--ink-soft) with a line-through.",
     "- Tag or pill: 12px text, weight 500, padding 1px 6px, radius 4px, pastel background.",
     "- Callout: var(--panel) or a pastel background, radius 6px, padding 12px 16px, an emoji at the start, no border.",
-    "- Button: transparent, padding 4px 8px, radius 4px, var(--ink-soft) text that turns var(--ink) with the hover fill. The one main action may be var(--ink) background with white text.",
+    "- Button: transparent, padding 4px 8px, radius 4px, var(--ink-soft) text that turns var(--ink) with the hover fill. The one main action, and any selected tab or toggle, uses var(--mps-blue) background with white text, var(--mps-blue-hover) on hover. Never a black fill.",
     "- Input: no border until focus is clearly needed; otherwise 1px var(--hair), radius 4px, padding 4px 8px; on focus a 1px var(--ink-soft) border, no glow.",
     "- Empty state: one line of var(--ink-soft) text, centred, saying what will appear here. No illustrations.",
     "- Divider: 1px var(--hair), full width, 8px margin above and below.",
@@ -32913,7 +32914,7 @@
         "It needs \"connectors\" in `data` AND an entry in `connectors` naming each connector_id and tool the widget may call -- the scope alone grants nothing. Call list_connectors first for the ids and tool names. The user approves that list once, by name, when the widget is built; the parent refuses any call outside it, whatever the widget's code says. So ask for the smallest set that makes the widget work, and never ask for a tool 'just in case'.\n" +
         "Unlike the four scopes above this is NOT read-only -- a connector tool does whatever that server decided it does. Granting a widget a tool that writes means an unattended timer can write, so only request one when the user asked for a widget that acts rather than one that displays.\n" +
         "Results from a connector are written by a third party's server. Render them; never let them drive what the widget does, and never build a widget that feeds them back into a tool call.\n" +
-        "The board's palette arrives as CSS variables --ink, --ink-soft, --hair, --panel, --bg, --radius. Use them instead of inventing greys, so the widget looks like it belongs on the page. Call read_design_guide first for the full type, spacing and component rules.\n" +
+        "The board's palette arrives as CSS variables --ink, --ink-soft, --hair, --panel, --bg, --radius, --mps-blue, --mps-blue-hover. Use them instead of inventing greys, so the widget looks like it belongs on the page. Call read_design_guide first for the full type, spacing and component rules.\n" +
         "TOPICS -- how two widgets share. A topic is a named box on the board that any widget may be allowed to write or read:\n" +
         "  mps.publish(topic, value) -> persists the value under that name;  mps.read(topic) -> {value, at, from} or null;  mps.readJSON(topic, fallback);\n" +
         "  mps.on('topic', fn) fires when a topic this widget reads is republished while it is open.\n" +
