@@ -25216,6 +25216,49 @@
       + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
   }
 
+  /* The instant at which a clock in `zone` reads the wall clock spelled by
+     `date`'s LOCAL fields -- the inverse of zoneWallClock above, and what the
+     event panel needs: its date and time boxes are filled from a Date whose
+     local fields are the READ zone's reading, while the zone sent with them
+     is the event's own. Two passes, because the offset to apply depends on
+     the instant and the instant depends on the offset; the second settles it
+     across a DST boundary. */
+  function instantAtWallClock(date, zone) {
+    const want = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(),
+                          date.getHours(), date.getMinutes(), date.getSeconds());
+    let guess = want;
+    for (let i = 0; i < 2; i++) {
+      const read = zoneWallClock(new Date(guess), zone);
+      const asUtc = Date.UTC(read.getFullYear(), read.getMonth(), read.getDate(),
+                             read.getHours(), read.getMinutes(), read.getSeconds());
+      guess += (want - asUtc);
+    }
+    return new Date(guess);
+  }
+
+  /* A Date whose LOCAL fields are the read zone's reading of a moment, as
+     local wall-clock ISO in `zone`, keeping the SAME moment.
+
+     The event panel's date and time boxes hold the read zone's wall clock --
+     the only reading consistent with the grid the panel was opened from --
+     while the Time zone control under them holds the EVENT's own zone, which
+     for an invitation from an organiser abroad is a different one. Sending
+     the boxes' wall clock straight out with the event's zone label restated
+     the time in the wrong place, moving such an event by the offset between
+     the two and often onto another day. */
+  function isoInZone(displayDate, zone) {
+    const readZone = gcalTimeZone();
+    try {
+      if (zone && zone !== readZone) {
+        const instant = readZone === deviceTimeZone()
+          ? displayDate : instantAtWallClock(displayDate, readZone);
+        const shown = zoneWallClock(instant, zone);
+        if (isFinite(shown.getTime())) return gcalLocalIso(shown);
+      }
+    } catch (e) {}
+    return gcalLocalIso(displayDate);
+  }
+
   /* ---------------- event recurrence (RRULE) ----------------
      Real Google Calendar `recurrence` values, not a second local-only format
      — the event's `recurrence` field is one of the few things this app sends
@@ -25956,11 +25999,22 @@
              statement about a place, not about a moment. A UTC instant is
              also the wrong thing to send even when it is accepted, since the
              event would drift by an hour across a DST boundary while the
-             rest of the calendar stayed put. Sending the time the user
-             actually typed, with the zone their browser is in, is the only
-             form that means what the form says. */
-          body.start = { dateTime: gcalLocalIso(startAt), timeZone: tz.getStart() };
-          body.end = { dateTime: gcalLocalIso(endAt), timeZone: tz.getEnd() };
+             rest of the calendar stayed put.
+
+             Which zone, though. The boxes above hold the READ zone's wall
+             clock (normalizeEvent shifts every event into it), while the Time
+             zone control under them holds the EVENT's own -- and for an
+             invitation from an organiser abroad those are not the same. So
+             pairing the box's reading with the event's zone restated the time
+             in the wrong place, moving such an event by the offset between
+             the two and often onto another day: accepting a Hong Kong
+             invitation the grid drew at 23:30 New York wrote it back as
+             23:30 Hong Kong, twelve hours and a day away, which is how an
+             accepted invitation appeared to vanish. isoInZone converts
+             through the instant instead, so the moment the panel showed is
+             the moment that is saved. */
+          body.start = { dateTime: isoInZone(startAt, tz.getStart()), timeZone: tz.getStart() };
+          body.end = { dateTime: isoInZone(endAt, tz.getEnd()), timeZone: tz.getEnd() };
         }
         const guestEmails = guests.input.value.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
         // On an edit, an emptied-but-changed field still sends [] — that's how
