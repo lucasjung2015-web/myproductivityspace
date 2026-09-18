@@ -843,6 +843,22 @@
     padding: 8px 28px; flex: 0 0 auto; border-top: 1px solid #000000;
   }
   .collapsed-tabs-bar.has-tabs { display: flex; }
+  /* Once its top rule has been dragged, the bar holds that height: rows of
+     tabs past it scroll inside the bar, and the board gives up (or takes
+     back) the difference. Until then it is as tall as its tabs. */
+  .collapsed-tabs-bar.is-sized { overflow-y: auto; align-content: flex-start; }
+  /* The grab zone for that top rule. A sibling of the bar rather than a child,
+     because the bar's children are exactly its tabs and several places count
+     and walk them. Zero height, so it moves nothing; the strip it paints
+     straddles the rule, reaching up into the board's bottom padding. Shown
+     only while the bar is, and only on the desktop board (see the touch query,
+     where the bar is a single scrolling row). */
+  .tabs-bar-resizer { display: none; position: relative; flex: 0 0 0px; height: 0; }
+  body:has(> #collapsedTabsBar.has-tabs) > .tabs-bar-resizer { display: block; }
+  .tabs-bar-resizer::after {
+    content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 12px;
+    z-index: 5; cursor: row-resize; -webkit-tap-highlight-color: transparent;
+  }
   /* Tab layout now lives on .collapsible-strip itself — a strip is only ever a
      tab in this bar, so there's no in-row form left for this to override. */
 
@@ -2617,6 +2633,7 @@
   body.subpage-fullscreen-mode .links-row,
   body.subpage-fullscreen-mode .widget,
   body.subpage-fullscreen-mode .collapsed-tabs-bar,
+  body.subpage-fullscreen-mode .tabs-bar-resizer,
   /* These are position:fixed at z-index 3000 — above the subpage host (2000) —
      so unlike everything else on the dashboard they don't get covered by the
      overlay and have to be hidden explicitly. */
@@ -2665,6 +2682,7 @@
   body.widget-fullscreen-mode .page-title,
   body.widget-fullscreen-mode .links-row-wrap:not(.widget-maximized),
   body.widget-fullscreen-mode .collapsed-tabs-bar,
+  body.widget-fullscreen-mode .tabs-bar-resizer,
   body.widget-fullscreen-mode .col-resizer,
   body.widget-fullscreen-mode .row-resizer,
   body.widget-fullscreen-mode .section-controls,
@@ -4254,6 +4272,8 @@
       border-top: 1px solid var(--hair); background: var(--bg);
     }
     html:not(.force-desktop) .collapsed-tabs-bar::-webkit-scrollbar { display: none; }
+    html:not(.force-desktop) body > .tabs-bar-resizer { display: none !important; }
+    html:not(.force-desktop) .collapsed-tabs-bar.is-sized { height: auto !important; overflow-y: visible; }
     html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip { flex: 0 0 auto; min-height: 44px; }
 
     /* ---------- 3. touch targets ----------
@@ -5401,6 +5421,7 @@
 
 <!-- Phone chrome. Both are inert on a desktop: the stylesheet only shows them
      inside the touch media query, and the script only wires them there. The
+<div class="tabs-bar-resizer" id="tabsBarResizer" aria-hidden="true" title="Drag to resize. Double-click to fit"></div>
      dots give absolute position, which a scrolling tab bar cannot; the tabs
      name the destinations, which dots cannot. -->
 <div class="mob-seg" id="mobSeg" role="tablist" aria-label="View">
@@ -13995,6 +14016,75 @@
         // throughout and is a no-op for anything else.
         let menuExitZone = null; // "top" | "bottom" | null
         let menuExitDropzone = null;
+    // ---- height of the hidden-widget tabs bar (drag its top rule) ----
+    // Dragging up makes the bar taller and the board shorter. The height is
+    // stored in the bar's own unzoomed px, like the widget heights above, so
+    // it survives the 75% board zoom. A double-click forgets it and the bar
+    // goes back to fitting its tabs.
+    (function wireTabsBarResizer() {
+      const resizer = document.getElementById("tabsBarResizer");
+      const bar = collapsedTabsBar;
+      if (!resizer || !bar) return;
+      const KEY = "collapsed-tabs-height";
+      // One row of tabs: 32px tab + 8px padding each side + the 1px rule.
+      const MIN_H = 49;
+
+      function maxH() { return (window.innerHeight * 0.6) / window.__mpsZoomOf(bar); }
+      function apply(h) {
+        if (h == null) {
+          bar.style.height = "";
+          bar.classList.remove("is-sized");
+          return;
+        }
+        bar.style.height = Math.round(clamp(h, MIN_H, maxH())) + "px";
+        bar.classList.add("is-sized");
+      }
+
+      storageGet(KEY).then(function (v) {
+        const h = parseInt(v, 10);
+        if (h > 0) apply(h);
+      });
+
+      function onDown(e) {
+        if (e.button != null && e.button !== 0) return;
+        const z = window.__mpsZoomOf(bar);
+        const startY = clientY(e);
+        const startH = bar.getBoundingClientRect().height / z;
+        let h = startH;
+        document.documentElement.style.cursor = "row-resize";
+
+        function onMove(ev) {
+          if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
+          h = startH - (clientY(ev) - startY) / z;
+          apply(h);
+          ev.preventDefault();
+        }
+        function onUp() {
+          document.documentElement.style.cursor = "";
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          document.removeEventListener("touchmove", onMove);
+          document.removeEventListener("touchend", onUp);
+          if (Math.abs(h - startH) >= 1) {
+            storageSet(KEY, String(Math.round(clamp(h, MIN_H, maxH()))));
+          }
+        }
+
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+        document.addEventListener("touchmove", onMove, { passive: false });
+        document.addEventListener("touchend", onUp);
+        e.preventDefault();
+      }
+
+      resizer.addEventListener("mousedown", onDown);
+      resizer.addEventListener("touchstart", onDown, { passive: false });
+      resizer.addEventListener("dblclick", function () {
+        apply(null);
+        storageSet(KEY, "");
+      });
+    })();
+
 
         function pointXY(ev) {
           if (ev.touches && ev.touches.length) return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
