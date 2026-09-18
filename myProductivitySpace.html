@@ -3278,12 +3278,15 @@
      same two paths .ai-head-mark draws at 15px, just at 140. Drawn by CSS on
      :empty so it costs no markup and disappears by itself the instant the
      first message lands -- #aiLog has no whitespace children, so :empty holds
-     until appendMessage adds the first node. Full black, per the brand's
-     monochrome rule; it is decoration, not an icon, so it gets no label. */
+     until appendMessage adds the first node. Painted --mps-blue through a
+     mask, so it follows the brand colour instead of hard-coding it into the
+     SVG; it is decoration, not an icon, so it gets no label. */
   .ai-log:empty { justify-content: center; align-items: center; }
   .ai-log:empty::before {
     content: ""; width: 140px; height: 140px; flex: 0 0 auto;
-    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230A0A0A'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
+    background: var(--mps-blue);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
   }
   .ai-msg {
     max-width: 84%; padding: 9px 13px; border-radius: 14px;
