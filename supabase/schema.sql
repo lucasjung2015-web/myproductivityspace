@@ -296,3 +296,129 @@ drop trigger if exists connector_secrets_touch_trg on public.connector_secrets;
 create trigger connector_secrets_touch_trg
   before insert or update on public.connector_secrets
   for each row execute function public.kv_touch();
+
+-- ---------------------------------------------------------------------------
+-- Marketplace (custom widgets shared between accounts)
+-- ---------------------------------------------------------------------------
+-- The one table any signed-in user can read rows of someone else's: a widget
+-- an author chose to publish from its ••• menu. It holds the widget's CODE
+-- only (html/css/js and the permissions it asks for), never its saved data
+-- or connector grants, which stay on the author's board.
+--
+-- Installed copies are frozen: installing copies the code into the
+-- installer's own board, and a later version only reaches them when they
+-- press Update. So an author's edit can never change what already runs on
+-- someone else's board.
+--
+-- Hiding a listing (moderation) is done by the owner in the SQL editor:
+--   update public.marketplace_widgets set hidden = true where id = '...';
+
+create table if not exists public.marketplace_widgets (
+  id               uuid        primary key default gen_random_uuid(),
+  author_id        uuid        not null default auth.uid() references auth.users(id) on delete cascade,
+  source_widget_id text        not null,
+  author_name      text        not null default '',
+  author_avatar    text,
+  name             text        not null check (char_length(name) between 1 and 80),
+  subtitle         text        not null default '' check (char_length(subtitle) <= 160),
+  about            text        not null default '' check (char_length(about) <= 2000),
+  emoji            text        not null default '' check (char_length(emoji) <= 16),
+  category         text        not null check (category in ('Study','Habits','Health','Planning','Fun')),
+  color            text        not null default '#FFFFFF' check (color ~ '^#[0-9A-Fa-f]{6}$'),
+  blob             jsonb       not null check (pg_column_size(blob) <= 262144),
+  version          int         not null default 1,
+  installs         int         not null default 0,
+  hidden           boolean     not null default false,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  unique (author_id, source_widget_id)
+);
+
+alter table public.marketplace_widgets enable row level security;
+
+drop policy if exists marketplace_select on public.marketplace_widgets;
+create policy marketplace_select on public.marketplace_widgets for select to authenticated
+  using (not hidden or author_id = auth.uid());
+drop policy if exists marketplace_insert on public.marketplace_widgets;
+create policy marketplace_insert on public.marketplace_widgets for insert to authenticated
+  with check (author_id = auth.uid());
+drop policy if exists marketplace_update on public.marketplace_widgets;
+create policy marketplace_update on public.marketplace_widgets for update to authenticated
+  using (author_id = auth.uid()) with check (author_id = auth.uid());
+drop policy if exists marketplace_delete on public.marketplace_widgets;
+create policy marketplace_delete on public.marketplace_widgets for delete to authenticated
+  using (author_id = auth.uid());
+
+-- An author controls the listing's content, not its bookkeeping. The byline
+-- comes from their own sign-in token rather than from the request, so nobody
+-- can publish under a friend's name, and version/installs/hidden cannot be
+-- set from the browser. Only a direct request (current_user 'authenticated')
+-- is constrained: the install counter below runs as the table owner and
+-- must be able to write installs.
+create or replace function public.marketplace_stamp()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  meta jsonb := coalesce(auth.jwt() -> 'user_metadata', '{}'::jsonb);
+begin
+  if current_user <> 'authenticated' then
+    return new;
+  end if;
+  new.author_name   := split_part(coalesce(meta ->> 'full_name', meta ->> 'name', ''), ' ', 1);
+  new.author_avatar := coalesce(meta ->> 'avatar_url', meta ->> 'picture');
+  if tg_op = 'INSERT' then
+    new.version := 1; new.installs := 0; new.hidden := false;
+    new.created_at := now(); new.updated_at := now();
+  else
+    new.author_id := old.author_id; new.source_widget_id := old.source_widget_id;
+    new.installs := old.installs; new.hidden := old.hidden; new.created_at := old.created_at;
+    new.version := case when new.blob is distinct from old.blob then old.version + 1 else old.version end;
+    new.updated_at := now();
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists marketplace_stamp_trg on public.marketplace_widgets;
+create trigger marketplace_stamp_trg
+  before insert or update on public.marketplace_widgets
+  for each row execute function public.marketplace_stamp();
+
+-- Who installed what, so "Used by N" counts people rather than clicks.
+-- RLS on with no policies: only the function below touches it.
+create table if not exists public.marketplace_installs (
+  user_id    uuid        not null references auth.users(id) on delete cascade,
+  widget_id  uuid        not null references public.marketplace_widgets(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, widget_id)
+);
+alter table public.marketplace_installs enable row level security;
+
+-- Counts each person once per listing, and never the author themselves.
+create or replace function public.marketplace_record_install(p_widget uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n int;
+begin
+  if auth.uid() is null then
+    raise exception 'not signed in';
+  end if;
+  insert into public.marketplace_installs (user_id, widget_id)
+  values (auth.uid(), p_widget)
+  on conflict do nothing;
+  if found then
+    update public.marketplace_widgets
+       set installs = installs + 1
+     where id = p_widget and not hidden and author_id <> auth.uid();
+  end if;
+  select installs into n from public.marketplace_widgets where id = p_widget;
+  return coalesce(n, 0);
+end $$;
+
+revoke all on function public.marketplace_record_install(uuid) from public;
+grant execute on function public.marketplace_record_install(uuid) to authenticated;
