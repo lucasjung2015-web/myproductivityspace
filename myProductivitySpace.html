@@ -2770,17 +2770,22 @@
   /* ---------- the fixed top-right corner button row ----------
      Authored right-to-left because they're position:fixed off the right edge
      — so the RIGHTMOST button carries the SMALLEST `right`.
-     Order left→right: always-on-top, add-widget, AI.
+     Order left→right: always-on-top, Connections, add-widget, AI.
      Every offset is wrapped in the docked AI sidebar's width, so opening the
      panel slides the whole row left with the page instead of leaving the
      buttons stranded underneath it.
 
-     Connections used to sit at 114px, between the first two. Its button is
-     vaulted (see the markup), so always-on-top takes that slot and the row
-     closes up rather than showing a 34px hole where a button used to be.
-     The rule below keeps its offset and its shared styling: bringing the
-     button back is uncommenting the markup and moving this one number. */
-  #alwaysOnTopBtn { right: calc(114px + var(--ai-panel-w)); }
+     The two leftmost are owner-only (see revealOwnerControls). They keep
+     their original offsets, and nothing reflows when they are absent: the
+     row is authored from the right, so a viewer who never sees them has
+     empty space where they would have been, not a hole between buttons.
+
+     Both carry `hidden` in the markup, and the rule below is what makes that
+     stick: the shared block further down sets `display: flex` on all five
+     ids, which has the same specificity as the UA stylesheet's
+     `[hidden] { display: none }` and, being later, would win. */
+  #alwaysOnTopBtn[hidden], #connectionsBtn[hidden] { display: none; }
+  #alwaysOnTopBtn { right: calc(148px + var(--ai-panel-w)); }
   #connectionsBtn { right: calc(114px + var(--ai-panel-w)); }
   #addWidgetBtn   { right: calc(80px  + var(--ai-panel-w)); }
   #aiPanelBtn     { right: calc(46px  + var(--ai-panel-w)); }
@@ -5066,15 +5071,18 @@
 
 <div class="page-title"><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-prefix">my</span><span class="pt-main">Productivity</span><span class="pt-accent">space</span></div>
 
-<button type="button" id="alwaysOnTopBtn" title="Pop this dashboard out into a floating window that stays on top of everything else — you can then resize it to any size you like. Chrome/Edge/Opera only."><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><rect x="12" y="2" width="10" height="7" rx="2" ry="2"/></svg></button>
+<!-- Owner-only, and so hidden in the markup rather than hidden later: a
+     button that paints for one frame and then vanishes is worse than one
+     that was never there. revealOwnerControls() below unhides both of these
+     once the session says who is signed in. -->
+<button type="button" id="alwaysOnTopBtn" hidden title="Pop this dashboard out into a floating window that stays on top of everything else — you can then resize it to any size you like. Chrome/Edge/Opera only."><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><rect x="12" y="2" width="10" height="7" rx="2" ry="2"/></svg></button>
 
-<!-- Vaulted, not removed. The Connectors modal and everything behind it
+<!-- Back from the vault, owner-only. The modal and everything behind it
      (Google's sign-in row, Notion's connect/disconnect, the custom-connector
-     runtime) is untouched and still wired; only this way in is gone, so the
-     board stops advertising a half-built directory. Deleting this comment's
-     two markers brings the button straight back. Its click handler already
-     guards on the element existing, so nothing throws while it is away. -->
-<!-- <button type="button" id="connectionsBtn" title="Connections"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v4"/><path d="M15 2v4"/><path d="M7 6h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V6Z"/><path d="M12 15v4"/><path d="M9 19h6"/></svg></button> -->
+     runtime) was never touched, so this is only the way in returning. A
+     tester keeps the tidy corner row; the owner keeps Notion, which this
+     button is the only door to. -->
+<button type="button" id="connectionsBtn" hidden title="Connections"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v4"/><path d="M15 2v4"/><path d="M7 6h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V6Z"/><path d="M12 15v4"/><path d="M9 19h6"/></svg></button>
 
 <button type="button" id="addWidgetBtn" title="Add a section"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
@@ -10916,6 +10924,55 @@
       return r.data && r.data.session ? r.data.session.access_token : null;
     }
   };
+
+  /* ---------- the owner gate ----------
+     Two controls are for whoever builds this board rather than for whoever
+     uses it: Always on top, which is a Chrome-only window mode a tester
+     would misread, and Connections, which is a half-built directory plus
+     the two sign-in rows. Both stay in the file and both stay wired; they
+     simply are not drawn for anyone else.
+
+     Say plainly what this is and is not. It HIDES, it does not LOCK. The
+     board is one HTML file that every account downloads, so the code behind
+     both buttons is in every copy and anyone who opened a console could put
+     them back on their own screen. That is an acceptable trade here and
+     only here: everyone who can sign in is already on allowed_emails, so
+     the room is people who were invited, and neither control reaches data
+     that RLS is not already the real boundary for. Anything that actually
+     has to be one account's alone belongs in a policy, not in this file.
+
+     Matched on the Supabase user id rather than on an email address. The id
+     is opaque and grants nothing on its own -- RLS keys off the signed
+     token, not off whether someone can recite a string -- while an email in
+     here would publish a real address in a public repo forever.
+
+     Empty means nobody, which fails closed: a board that cannot tell who is
+     signed in draws the tester's view, never the owner's. */
+  const OWNER_UIDS = [
+    // Paste your Supabase user id here. From the live board, signed in:
+    //   window.__mpsSync.user().id
+    // or Supabase dashboard -> Authentication -> Users -> your row.
+  ];
+  window.__mpsIsOwner = function () {
+    if (!OWNER_UIDS.length) return false;
+    try {
+      const u = window.__mpsSync && window.__mpsSync.user && window.__mpsSync.user();
+      return !!(u && u.id && OWNER_UIDS.indexOf(u.id) !== -1);
+    } catch (e) { return false; }
+  };
+
+  /* Waits for the session before deciding, so the answer is made once with
+     the real user rather than guessed early and corrected. Both buttons are
+     `hidden` in the markup, so the wait costs a tester nothing: they never
+     see either one appear or disappear. */
+  (async function revealOwnerControls() {
+    try { await window.__mpsSync.ready; } catch (e) {}
+    if (!window.__mpsIsOwner()) return;
+    ["alwaysOnTopBtn", "connectionsBtn"].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.hidden = false;
+    });
+  })();
 
   /* ---------- Notion connection ----------
      Stage 1 of backing the Pages widgets with Notion: connect/disconnect
