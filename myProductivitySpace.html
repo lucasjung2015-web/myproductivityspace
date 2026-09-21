@@ -11490,25 +11490,48 @@
      that RLS is not already the real boundary for. Anything that actually
      has to be one account's alone belongs in a policy, not in this file.
 
-     Matched on the Supabase user id rather than on an email address. The id
-     is opaque and grants nothing on its own -- RLS keys off the signed
-     token, not off whether someone can recite a string -- while an email in
-     here would publish a real address in a public repo forever.
+     Two ways to match, and neither puts a real address in a public repo.
 
-     Empty means nobody, which fails closed: a board that cannot tell who is
-     signed in draws the tester's view, never the owner's. */
+     OWNER_UIDS is the Supabase user id, opaque and granting nothing on its
+     own -- RLS keys off the signed token, not off whether somebody can
+     recite a string. It is still the more direct answer when you have it.
+
+     OWNER_EMAIL_SHA256 is what makes this work with nothing pasted in. It
+     was empty before, and empty means nobody: every owner-only control in
+     this file -- Always on top, Connections, the Sonnet model -- was hidden
+     from the owner as well, which is a gate that is not so much failing
+     closed as welded shut. A hash of the address is not the address: it
+     publishes nothing, it cannot be reversed into one, and it grants
+     nothing even if it could, for exactly the reason above.
+
+     Resolved ONCE, when the session lands, and cached -- the digest is
+     async and every caller here is not. Until then, and if the answer is
+     no, this is false, so a board that cannot yet tell who is signed in
+     draws the tester's view rather than guessing the owner's. */
   const OWNER_UIDS = [
-    // Paste your Supabase user id here. From the live board, signed in:
-    //   window.__mpsSync.user().id
-    // or Supabase dashboard -> Authentication -> Users -> your row.
+    // Optional. From the live board, signed in: window.__mpsSync.user().id
   ];
-  window.__mpsIsOwner = function () {
-    if (!OWNER_UIDS.length) return false;
+  const OWNER_EMAIL_SHA256 = [
+    "4894ef378394ffc4673491fcd3bd885c3b87b4711c8a34fb991f911046f67b1a"
+  ];
+
+  let ownerIsResolved = false;
+  window.__mpsIsOwner = function () { return ownerIsResolved; };
+
+  async function resolveOwner() {
     try {
       const u = window.__mpsSync && window.__mpsSync.user && window.__mpsSync.user();
-      return !!(u && u.id && OWNER_UIDS.indexOf(u.id) !== -1);
+      if (!u) return false;
+      if (OWNER_UIDS.length && u.id && OWNER_UIDS.indexOf(u.id) !== -1) return true;
+      const email = String(u.email || "").trim().toLowerCase();
+      if (!email || !window.crypto || !crypto.subtle) return false;
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
+      const hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+      return OWNER_EMAIL_SHA256.indexOf(hex) !== -1;
     } catch (e) { return false; }
-  };
+  }
 
   /* Waits for the session before deciding, so the answer is made once with
      the real user rather than guessed early and corrected. Both buttons are
@@ -11516,7 +11539,12 @@
      see either one appear or disappear. */
   (async function revealOwnerControls() {
     try { await window.__mpsSync.ready; } catch (e) {}
-    if (!window.__mpsIsOwner()) return;
+    ownerIsResolved = await resolveOwner();
+    /* Told, not polled. The "+" menu decides which cards exist the moment it
+       is built, which is before the session has landed, so it draws the
+       tester's set and then has to hear that the answer changed. */
+    try { if (window.__mpsRefreshAddCards) window.__mpsRefreshAddCards(); } catch (e) {}
+    if (!ownerIsResolved) return;
     ["alwaysOnTopBtn", "connectionsBtn"].forEach(function (id) {
       const el = document.getElementById(id);
       if (el) el.hidden = false;
@@ -19559,13 +19587,56 @@
     /* Hidden rather than removed from the DOM: the card keeps its place in the
        order the grid persists, so a recovered card comes back exactly where it
        was rather than at the end. */
+    /* ---------- cards that only the owner has anything behind ----------
+
+       The four routine-fed tiles display what a scheduled routine last wrote
+       to a topic on THIS board. The write path (the `feed` Edge Function)
+       targets one account, named by FEED_USER_ID in the server's own
+       environment and never taken from the request, and the topic rows it
+       writes live in `kv`, whose RLS returns only rows belonging to whoever
+       is asking. So a tester's board is not at risk of showing somebody
+       else's inbox -- it cannot; there is no query that reaches another
+       user's row.
+
+       The problem is the opposite one. Nothing fills those topics for a
+       tester either, so all four cards add a widget that reads an empty box
+       and says "No digest yet. The 8:30am routine posts here once it has
+       run." -- naming a routine they do not have and cannot create. Four
+       widgets that look broken is a worse first board than four widgets
+       that are not offered.
+
+       Hidden, not deleted: the cards stay in the DOM and keep their slot in
+       the stored order, exactly like a card in the Deleted folder, so the
+       owner's board draws them in place the moment the session resolves.
+       They are deliberately NOT routed through addRemoved -- that is the
+       user's own curation and belongs to them, and mixing the two would put
+       these in a tester's Deleted folder, which is an invitation to recover
+       something that will never work. */
+    const OWNER_ONLY_CARDS = { "feed-news": 1, "feed-stocks": 1, "feed-email": 1, "feed-automations": 1 };
+
+    function cardIsOwnerOnly(type) {
+      if (!OWNER_ONLY_CARDS[type]) return false;
+      try { return !(window.__mpsIsOwner && window.__mpsIsOwner()); } catch (e) { return true; }
+    }
+
     function applyAddCardRemoved() {
       addCardEls().forEach(function (el) {
-        el.hidden = !!addRemoved[addCardTypeOf(el)];
+        const t = addCardTypeOf(el);
+        el.hidden = !!addRemoved[t] || cardIsOwnerOnly(t);
       });
       applyAddCardGroups();
       renderDeletedBar();
     }
+    /* Called once the session lands and the owner answer is known; see
+       revealOwnerControls. The menu is built before the session resolves, so
+       it draws the tester's set first and has to hear that it changed. */
+    window.__mpsRefreshAddCards = function () {
+      applyAddCardRemoved();
+      if (!addWidgetPopup.hidden) {
+        paintAddPreviews();
+        updateAddScrollFade();
+      }
+    };
 
     /* ---------- the deleted folder ----------
        Called "Deleted", not "Recently deleted": nothing here is ever purged,
@@ -19578,7 +19649,12 @@
     const addDeletedBack = document.getElementById("addDeletedBack");
 
     function deletedTypes() {
-      return addCardEls().filter(function (el) { return !!addRemoved[addCardTypeOf(el)]; });
+      return addCardEls().filter(function (el) {
+        const t = addCardTypeOf(el);
+        // addRemoved only. An owner-only card is not something this account
+        // deleted, so it is not something this account can recover.
+        return !!addRemoved[t] && !cardIsOwnerOnly(t);
+      });
     }
 
     function renderDeletedBar() {
@@ -20541,6 +20617,11 @@
     /* Adds one widget of a built-in type: every card in the popup lands
        here, keyed by its data-add-type. */
     function addWidgetOfType(type, btn) {
+      /* The menu is the door, not the lock. __mpsAddWidget is on window and
+         the assistant can call it, so the refusal lives with the action
+         rather than only with the card that normally triggers it. */
+      if (cardIsOwnerOnly(type)) return;
+
       /* "Your widgets": a card standing for a row in the custom-widget
          library, added back as a fresh tile running the code you had built. */
       if (String(type).indexOf(MINE_PREFIX) === 0) {
