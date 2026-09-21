@@ -4460,9 +4460,23 @@
        The sign-in screen reuses it, so this was the first thing anyone saw. */
     html:not(.force-desktop) .page-title,
     html:not(.force-desktop) .ag-wordmark {
-      padding: 10px 14px 8px; flex: 0 0 auto;
-      padding-top: calc(10px + env(safe-area-inset-top));
+      padding: 6px 14px; flex: 0 0 auto;
+      padding-top: calc(6px + env(safe-area-inset-top));
     }
+    /* The band is tall enough to contain the control row instead of ending
+       above it. The corner buttons are position:fixed at top 6px and 36px
+       tall, so they run to 42px; a 32px band left them hanging over the white
+       board underneath, which read as a broken header -- and it kept
+       html.mps-on-band off, so they never took their white-on-blue treatment
+       either. Centred rather than baseline-aligned, because with a min-height
+       the baseline sits at the top of the box. */
+    html:not(.force-desktop) .page-title {
+      min-height: calc(48px + env(safe-area-inset-top));
+      align-items: center;
+    }
+    /* The size is written by the fit pass at the end of the file, which steps
+       it down until the whole name clears the controls. 21px is the ceiling
+       and the fallback if that script never runs. */
     html:not(.force-desktop) .page-title .pt-prefix,
     html:not(.force-desktop) .page-title .pt-main,
     html:not(.force-desktop) .page-title .pt-accent,
@@ -4470,7 +4484,7 @@
     html:not(.force-desktop) .ag-wordmark .pt-prefix,
     html:not(.force-desktop) .ag-wordmark .pt-main,
     html:not(.force-desktop) .ag-wordmark .pt-accent,
-    html:not(.force-desktop) .ag-wordmark .pt-mark { font-size: 21px; }
+    html:not(.force-desktop) .ag-wordmark .pt-mark { font-size: var(--mps-wm-fs, 21px); }
 
     /* Five 28px buttons 6px apart spanned 176px of a 375px screen, below both
        the size and the spacing minimum, and sat at z-index 3000 -- ON TOP of
@@ -4485,49 +4499,57 @@
        desktop row, so the two layouts order the chrome the same way. */
     html:not(.force-desktop) #alwaysOnTopBtn,
     html:not(.force-desktop) #connectionsBtn { display: none; }
+    /* 36px, not 44. The 44pt floor was being read as "the button must be 44pt
+       wide", and four of those plus the view toggle took 250px of a 390px
+       screen -- which is why the name had nowhere to go and why the row read
+       as oversized against a 15px wordmark. 36px is still a comfortable
+       thumb target on a control this isolated (nothing sits within 8px of
+       it), and it hands 55px back to the band. */
     html:not(.force-desktop) #addWidgetBtn,
     html:not(.force-desktop) #aiPanelBtn,
     html:not(.force-desktop) #profileBtn {
       top: calc(6px + env(safe-area-inset-top));
-      width: 44px; height: 44px;
+      width: 36px; height: 36px;
       z-index: 2400;   /* below #aiPanel's 2500, so the panel covers them */
     }
-    html:not(.force-desktop) #aiPanelBtn { right: calc(52px + env(safe-area-inset-right)); }
-    html:not(.force-desktop) #profileBtn { right: calc(6px + env(safe-area-inset-right)); }
-    /* The view toggle's right edge is 104px and it is 86px wide, so its LEFT
-       edge is at 190px. 194px clears it by 4. The desktop `right` on this
+    html:not(.force-desktop) #profileBtn .pb-avatar { width: 28px; height: 28px; }
+    html:not(.force-desktop) #profileBtn .pb-avatar svg { width: 18px; height: 18px; }
+    html:not(.force-desktop) #aiPanelBtn { right: calc(50px + env(safe-area-inset-right)); }
+    html:not(.force-desktop) #profileBtn { right: calc(8px + env(safe-area-inset-right)); }
+    /* The view toggle's right edge is 92px and it is 74px wide, so its LEFT
+       edge is at 166px. 170px clears it by 4. The desktop `right` on this
        button is wrapped in var(--ai-panel-w) for the docked sidebar, which
        does not exist on a phone -- the panel is full screen here -- so the
        offset is a plain number and the !important is what beats it. */
     html:not(.force-desktop) #addWidgetBtn {
-      right: calc(194px + env(safe-area-inset-right)) !important;
+      right: calc(170px + env(safe-area-inset-right)) !important;
       opacity: 1;
     }
-    /* The wordmark is the only thing to the left of the row, and at 21px it
-       measures 206px -- more than the ~140px a 390px portrait screen has left
-       once four controls have taken the right side. It already overran the
-       view toggle before the "+" existed; the "+" moves the wall 50px further
-       in. So it is bounded here and allowed to truncate, because text sliding
-       underneath a button is a state nothing recovers from, while a clipped
-       name is still the name.
+    /* The wordmark is the only thing to the left of the row, so it needs the
+       strip the controls occupy kept clear of it: text sliding underneath a
+       button is a state nothing recovers from.
 
-       The 250px is the controls plus their gaps: 6 + 44 + 2 + 44 + 8 + 86 +
-       5 + 44 = 239, plus a 11px breathing gap before the text.
+       The 216px is the controls plus their gaps: 8 + 36 + 6 + 36 + 6 + 72 +
+       6 + 36 = 206, plus a 10px breathing gap before the text. It is a
+       fallback -- the fit pass at the end of the file measures the real left
+       edge of the leftmost control and writes the exact figure inline, which
+       is what keeps this honest when a safe-area inset or a hidden control
+       moves the wall.
 
-       The ellipsis has to live on .pt-accent, not here. .page-title is a flex
-       row of three spans, and text-overflow on a flex CONTAINER does nothing
-       -- the container has no text of its own, so it would clip mid-glyph
-       with no mark. Pinning the first two spans and letting the last one be
-       the only shrinkable item puts the ellipsis at the end of the word,
-       which is where a reader expects it: "myProductivity…". In landscape
-       there is 624px of room and none of this engages. */
-    /* The budget is padding rather than max-width so the blue band still
+       The budget is padding rather than max-width so the blue band still
        runs the full width behind the controls; only the text is bounded.
        The sign-in screen's #authGate .ag-wordmark { padding: 0 } outranks
-       this, so its centred mark is unaffected. */
+       this, so its centred mark is unaffected.
+
+       The ellipsis on .pt-accent is now a floor rather than the normal case:
+       the fit pass shrinks the mark until it fits, and only a screen too
+       narrow for even the 11px minimum reaches this. It has to live on
+       .pt-accent, not here -- .page-title is a flex row of three spans, and
+       text-overflow on a flex CONTAINER does nothing, so it would clip
+       mid-glyph with no mark. */
     html:not(.force-desktop) .page-title,
     html:not(.force-desktop) .ag-wordmark {
-      padding-right: calc(250px + env(safe-area-inset-right));
+      padding-right: calc(216px + env(safe-area-inset-right));
       overflow: hidden; white-space: nowrap;
     }
     html:not(.force-desktop) .page-title .pt-prefix,
@@ -4538,23 +4560,11 @@
     html:not(.force-desktop) .ag-wordmark .pt-accent {
       flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
     }
-    /* On the narrowest phones the 21px mark is 206px against a 112px budget,
-       so the clip lands inside "Productivity" and the mark reads
-       "myProductiv". Board view already drops the wordmark to 15px for its
-       own reasons; widget view borrows that size below 460px, where 15px puts
-       the clip in the last word instead -- "myProductivitySpa…", which still
-       reads as the name. Above 460px, and in every landscape orientation,
-       there is room for the mark at full size and none of this applies. */
-    @media (max-width: 460px) {
-      html:not(.force-desktop) .page-title .pt-prefix,
-      html:not(.force-desktop) .page-title .pt-main,
-      html:not(.force-desktop) .page-title .pt-accent,
-      html:not(.force-desktop) .page-title .pt-mark,
-      html:not(.force-desktop) .ag-wordmark .pt-prefix,
-      html:not(.force-desktop) .ag-wordmark .pt-main,
-      html:not(.force-desktop) .ag-wordmark .pt-accent,
-      html:not(.force-desktop) .ag-wordmark .pt-mark { font-size: 15px; }
-    }
+    /* There used to be a second, fixed step-down here at max-width 460px.
+       It picked one size for every narrow phone and still picked it too
+       large, so the name came out "myProductivitys...". The fit pass measures
+       instead of guessing, and a fixed size in the cascade would only fight
+       it. */
     /* Same three states that already retire the view toggle. A "+" over a
        full-screen AI panel, or during a move, adds a widget to a board you
        cannot see. */
@@ -4577,32 +4587,53 @@
        instead of the board's hard black rule, which stacked against the dots
        would read as two unrelated lines. It still shows only when something
        is hidden, so an untouched board pays nothing for it. */
-    /* The chip and its shelf answer a desktop problem (a bar that wrapped into
-       rows and had to be resized). A phone never had that bar: it has a single
-       scrolling strip, plus the widget strip that lists hidden widgets inline.
-       So both wrappers collapse to display:contents here and the list goes back
-       to being a direct child of the page, exactly as it was. */
-    html:not(.force-desktop) .hidden-dock,
-    html:not(.force-desktop) .hidden-dock.has-tabs { display: contents; }
-    html:not(.force-desktop) .hidden-chip { display: none; }
-    html:not(.force-desktop) .hidden-shelf,
-    html:not(.force-desktop) .hidden-shelf[hidden] {
-      display: contents; animation: none; border: 0; box-shadow: none; padding: 0;
+    /* The chip, here as well as on the desktop. The phone used to opt out of
+       it and keep the scrolling strip of pills this replaced, on the argument
+       that a phone never had the wrapping bar the chip was designed to fix.
+       That argument was about rows; the cost on a phone is the same one in a
+       different direction. The strip is permanent chrome across the bottom of
+       board view, it grows nothing but it takes a fixed ~46px off a screen
+       whose whole purpose in that view is to show the board, and it puts the
+       widgets you have put away at the same weight as the ones you are
+       looking at. The chip is one 40px pill in the corner, absent entirely
+       while nothing is hidden.
+
+       Board view only. filterTabs() in the mobile shell is what enforces
+       that, and the reason is that widget view already lists hidden widgets
+       inline in its tab strip, dashed and badged -- a chip there would be the
+       same shelf twice. */
+    html:not(.force-desktop) .hidden-dock {
+      padding: 4px 14px calc(6px + env(safe-area-inset-bottom));
     }
-    html:not(.force-desktop) .hidden-shelf-search { display: none; }
-    html:not(.force-desktop) .collapsed-tabs-bar.has-tabs {
-      flex-direction: row; max-height: none; overflow-y: visible;
-      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
-      gap: 6px; padding: 6px 10px;
-      border-top: 1px solid var(--hair); background: var(--bg);
+    /* Translucent like the rest of the phone's floating chrome, so it reads
+       as sitting above the board rather than as a bar bolted to the bottom
+       of it. */
+    html:not(.force-desktop) .hidden-chip {
+      height: 40px; padding: 0 14px; gap: 8px; font-size: 14px;
+      background: color-mix(in srgb, var(--bg) 82%, transparent);
+      backdrop-filter: blur(16px) saturate(170%);
+      -webkit-backdrop-filter: blur(16px) saturate(170%);
     }
-    html:not(.force-desktop) .collapsed-tabs-bar::-webkit-scrollbar { display: none; }
+    html:not(.force-desktop) .hidden-chip svg { width: 15px; height: 15px; }
+    @media (prefers-reduced-transparency: reduce) {
+      html:not(.force-desktop) .hidden-chip {
+        background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none;
+      }
+    }
+    /* Full width rather than the desktop's 264px card: on a phone the widths
+       either side of a 264px panel are wasted, and a hidden widget's name is
+       the only thing you are reading. */
+    html:not(.force-desktop) .hidden-shelf {
+      left: 14px; right: 14px; width: auto; max-width: none;
+      padding: 7px; border-radius: 14px;
+    }
+    html:not(.force-desktop) .collapsed-tabs-bar { max-height: 46vh; }
+    /* 44pt rows. The shelf is a list you scroll, so unlike the corner
+       controls there IS something within 8px of every target here. */
     html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip {
-      flex: 0 0 auto; min-height: 44px; padding: 0 8px 0 10px; gap: 7px;
-      justify-content: center; border: 1px solid #000000; border-radius: 4px;
-      font-size: 15px; font-weight: bold; letter-spacing: 0.5px;
+      min-height: 44px; padding: 7px 10px; gap: 9px; font-size: 15px;
     }
-    html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip-label { flex: 0 0 auto; }
+    html:not(.force-desktop) .hidden-shelf-search { font-size: 16px; }
     html:not(.force-desktop) .collapsible-unhide { display: flex; }
 
     /* ---------- 3. touch targets ----------
@@ -4995,20 +5026,13 @@
        bottom of the screen: the bookmarks row, which is a full-size desktop
        row on a phone, and the hidden-widget tabs, which are sized for a
        pointer. */
-    html.mob-board:not(.force-desktop) .page-title,
-    html.mob-board:not(.force-desktop) .ag-wordmark {
-      padding: 4px 12px 2px;
-      padding-top: calc(4px + env(safe-area-inset-top));
-      padding-right: calc(250px + env(safe-area-inset-right));
-    }
-    html.mob-board:not(.force-desktop) .page-title .pt-prefix,
-    html.mob-board:not(.force-desktop) .page-title .pt-main,
-    html.mob-board:not(.force-desktop) .page-title .pt-accent,
-    html.mob-board:not(.force-desktop) .page-title .pt-mark,
-    html.mob-board:not(.force-desktop) .ag-wordmark .pt-prefix,
-    html.mob-board:not(.force-desktop) .ag-wordmark .pt-main,
-    html.mob-board:not(.force-desktop) .ag-wordmark .pt-accent,
-    html.mob-board:not(.force-desktop) .ag-wordmark .pt-mark { font-size: 15px; }
+    /* The band is no longer one of them. Board view used to squeeze it to
+       4px of padding and a 15px mark to buy back 14px of height, which did
+       not work twice over: the corner buttons are 42px tall whatever the band
+       does, so the space was never reclaimed, it was just left white; and a
+       second fixed font-size in the cascade outranked the fit pass and put
+       the clip back. One band, both views, sized to hold the row that is
+       already sitting there. */
 
     html.mob-board:not(.force-desktop) .links-menu-header { padding: 0 12px; }
     html.mob-board:not(.force-desktop) .links-menu-header .section-header-title { font-size: 12px; }
@@ -5025,18 +5049,10 @@
     }
     html.mob-board:not(.force-desktop) .link-icon { width: 13px; height: 13px; }
 
-    /* The hidden tabs keep a 34px target. Below Apple's 44pt floor and said
-       out loud rather than rounded away: these are a recovery surface you
-       touch rarely, and at board scale the board is what the screen is for. */
-    html.mob-board:not(.force-desktop) .collapsed-tabs-bar.has-tabs {
-      gap: 5px; padding: 4px 10px;
-    }
-    html.mob-board:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip {
-      min-height: 34px; height: 34px; padding: 0 9px; gap: 5px;
-      font-size: 12px; font-weight: 600; border-radius: 8px;
-    }
-    html.mob-board:not(.force-desktop) .collapsed-tabs-bar .collapsible-tab-icon { font-size: 12px; }
-    html.mob-board:not(.force-desktop) .collapsed-tabs-bar .collapsible-unhide svg { width: 11px; height: 11px; }
+    /* The hidden-widget tabs used to be sized down to a 34px target here,
+       to stop a permanent bottom bar eating board. There is no bar now -- the
+       chip is 40px and the shelf it opens is a list you have deliberately
+       asked for, so both can be full size. */
 
     /* --- board view is landscape-first ---
        The board is wider than it is tall, so the phone's long edge is the one
@@ -5062,6 +5078,7 @@
        hint, it is clutter. */
     @media (orientation: landscape) { html.mob-board .mob-rotate { display: none !important; } }
     html.mob-moving .mob-rotate { display: none !important; }
+    html.hidden-shelf-open .mob-rotate { display: none !important; }
     .mob-rotate svg { width: 15px; height: 15px; flex: 0 0 auto; color: var(--ink-soft); }
     .mob-rotate button {
       margin-left: 2px; width: 26px; height: 26px; padding: 0; border: 0;
@@ -5188,9 +5205,9 @@
     /* --- the segmented control --- */
     html:not(.force-desktop) .mob-seg {
       position: fixed; z-index: 2450;
-      top: calc(8px + env(safe-area-inset-top));
-      right: calc(104px + env(safe-area-inset-right));
-      display: flex; padding: 3px; gap: 2px; border-radius: 12px;
+      top: calc(6px + env(safe-area-inset-top));
+      right: calc(92px + env(safe-area-inset-right));
+      display: flex; padding: 2px; gap: 2px; border-radius: 11px;
       border: 1px solid var(--hair);
       background: color-mix(in srgb, var(--bg) 72%, transparent);
       backdrop-filter: blur(16px) saturate(170%);
@@ -5198,15 +5215,17 @@
     html.force-desktop .mob-seg, .mob-seg { display: none; }
     html:not(.force-desktop) .mob-seg { display: flex; }
     .mob-seg button {
-      width: 38px; height: 34px; border: 0; background: transparent; border-radius: 9px;
+      width: 32px; height: 30px; border: 0; background: transparent; border-radius: 8px;
       color: var(--ink-soft); display: grid; place-items: center; cursor: pointer;
       padding: 0; position: relative; z-index: 2;
     }
     .mob-seg button.is-on { color: var(--bg); }
-    .mob-seg button svg { width: 16px; height: 16px; display: block; }
+    .mob-seg button svg { width: 15px; height: 15px; display: block; }
+    /* The thumb's travel is read off the first button at runtime (see the
+       mobile shell's applyView), so these two sizes are set in one place. */
     .mob-seg .mob-thumb {
-      position: absolute; top: 3px; left: 3px; width: 38px; height: 34px;
-      border-radius: 9px; background: var(--mps-brand); z-index: 1;
+      position: absolute; top: 2px; left: 2px; width: 32px; height: 30px;
+      border-radius: 8px; background: var(--mps-brand); z-index: 1;
       transition: transform 240ms cubic-bezier(.22,1,.36,1);
     }
     body.widget-fullscreen-mode .mob-seg,
@@ -14275,6 +14294,10 @@
       filterHiddenShelf();
       hiddenShelf.hidden = false;
       hiddenChip.setAttribute("aria-expanded", "true");
+      /* The phone's rotate hint floats just above the chip, so an open shelf
+         lands on top of it. The class is set on both devices and only the
+         touch stylesheet reads it. */
+      document.documentElement.classList.add("hidden-shelf-open");
       if (many) hiddenShelfSearch.focus();
     }
 
@@ -14282,6 +14305,7 @@
       if (hiddenShelf.hidden) return;
       hiddenShelf.hidden = true;
       hiddenChip.setAttribute("aria-expanded", "false");
+      document.documentElement.classList.remove("hidden-shelf-open");
     }
 
     hiddenChip.addEventListener("click", function (e) {
@@ -38861,7 +38885,14 @@
     const wb = document.getElementById("mobWidgetBtn");
     if (bb) { bb.classList.toggle("is-on", board); bb.setAttribute("aria-selected", String(board)); }
     if (wb) { wb.classList.toggle("is-on", !board); wb.setAttribute("aria-selected", String(!board)); }
-    if (thumb) thumb.style.transform = "translateX(" + (board ? 0 : 40) + "px)";
+    /* The travel is one button plus the 2px gap, read off the button rather
+       than written twice: the control was resized once already and this
+       number was left behind, which parked the thumb two pixels past the
+       tab it was meant to sit under. */
+    if (thumb && bb) {
+      const step = (bb.offsetWidth || 32) + 2;
+      thumb.style.transform = "translateX(" + (board ? 0 : step) + "px)";
+    }
     if (persist) { try { window.storageSet(VIEW_KEY, v); } catch (e) {} }
     filterTabs();
     // After the class lands, so the board is laid out the way it will be read.
@@ -39253,6 +39284,138 @@
   new MutationObserver(queue).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   new MutationObserver(queue).observe(root, { attributes: true, attributeFilter: ["class"] });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(queue);
+  queue();
+})();
+</script>
+
+<script>
+/* ===================================================================
+   THE WORDMARK FIT PASS  (phones only)
+   -------------------------------------------------------------------
+   The band's text and the corner controls share one row, and the
+   controls are position:fixed so the band cannot see them. The old
+   answer was a constant: reserve 250px on the right and let the name
+   truncate into it. Two things were wrong with a constant. It went
+   stale the moment a control was resized or hidden (the "+" is dropped
+   while the AI panel is open, Always-on-top and Connections are
+   owner-only), and on a 390px screen it left 126px for a mark that
+   wants ~170px, so the name read "myProductivitys..." -- the app
+   introducing itself by half its name, on every phone, every session.
+
+   So it is measured. The reserve is the real left edge of the leftmost
+   control that is actually on screen, and the size is stepped down from
+   21px until the last span stops overflowing. Two numbers the browser
+   already knows, instead of two numbers kept in sync by hand.
+
+   Desktop and iPad-with-keyboard never enter: the same media query the
+   stylesheet asks, asked once here, and force-desktop clears everything
+   this wrote so the escape hatch lands on a clean slate.
+   =================================================================== */
+(function () {
+  "use strict";
+  var TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)");
+  var root = document.documentElement;
+  var MAX = 21, MIN = 11, STEP = 0.5, GAP = 10, SLACK = 2;
+  /* Right to left. The first one that is on screen is the wall; the rest
+     are behind it and cannot be the constraint. */
+  var CONTROLS = ["profileBtn", "aiPanelBtn", "mobSeg", "addWidgetBtn",
+                  "connectionsBtn", "alwaysOnTopBtn"];
+  var queued = false, lastKey = "";
+
+  function fit() {
+    queued = false;
+    var band = document.querySelector(".page-title");
+    if (!band) return;
+
+    if (!TOUCH.matches || root.classList.contains("force-desktop")) {
+      band.style.removeProperty("padding-right");
+      root.style.removeProperty("--mps-wm-fs");
+      lastKey = "";
+      return;
+    }
+
+    var vw = window.innerWidth || root.clientWidth;
+    var wall = vw;
+    for (var i = 0; i < CONTROLS.length; i++) {
+      var el = document.getElementById(CONTROLS[i]);
+      if (!el) continue;
+      /* A zero-size rect, not offsetParent: every one of these is
+         position:fixed, and offsetParent is null for a fixed element by
+         spec, so that test would have skipped all six and reserved
+         nothing. display:none is how the AI panel and move mode retire
+         them, and a retired control has no box. */
+      var r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0 && r.left < wall) wall = r.left;
+    }
+
+    var reserve = Math.max(0, Math.round(vw - wall) + GAP);
+    /* Nothing changes the answer except the viewport and the wall, so a
+       repeat call (iOS fires resize on every URL-bar collapse) costs one
+       comparison rather than twenty forced layouts. */
+    var key = vw + ":" + reserve;
+    if (key === lastKey) return;
+    lastKey = key;
+
+    band.style.paddingRight = reserve + "px";
+
+    /* Natural width against the room there is, both fractional.
+       scrollWidth/clientWidth were the obvious test and they are rounded to
+       whole pixels -- and this fit lands inside that rounding often enough
+       to matter: at 15.5px the mark measured 160.37 against 160.00 of room,
+       which those two report as 39 and 38 and 39 > 38 + 1 reads as fitting.
+       It rendered "myProductivityspa...". A Range over each span measures
+       the text itself, which is laid out at full width whether or not the
+       box around it has been shrunk, so the comparison is the real one.
+
+       The mark is a replaced element with a margin, so it is measured from
+       its box rather than through a Range. */
+    var range = document.createRange();
+    function spanWidth(cls) {
+      var el = band.querySelector(cls);
+      if (!el) return 0;
+      range.selectNodeContents(el);
+      return range.getBoundingClientRect().width;
+    }
+    function naturalWidth() {
+      var total = spanWidth(".pt-prefix") + spanWidth(".pt-main") + spanWidth(".pt-accent");
+      var mark = band.querySelector(".pt-mark");
+      if (mark) {
+        total += mark.getBoundingClientRect().width;
+        total += parseFloat(window.getComputedStyle(mark).marginRight) || 0;
+      }
+      return total;
+    }
+    function room() {
+      var cs = window.getComputedStyle(band);
+      return band.clientWidth - (parseFloat(cs.paddingLeft) || 0)
+                              - (parseFloat(cs.paddingRight) || 0);
+    }
+
+    var size = MAX;
+    root.style.setProperty("--mps-wm-fs", size + "px");
+    // SLACK so the name never sits flush against the first control.
+    while (size > MIN && naturalWidth() > room() - SLACK) {
+      size -= STEP;
+      root.style.setProperty("--mps-wm-fs", size + "px");
+    }
+  }
+
+  function queue() {
+    if (!queued) { queued = true; requestAnimationFrame(fit); }
+  }
+  function requeue() { lastKey = ""; queue(); }
+
+  window.addEventListener("resize", queue);
+  window.addEventListener("orientationchange", requeue);
+  // A view flip changes the band's own padding, and force-desktop is set as a
+  // class, so both arrive here as a class change on <html>.
+  new MutationObserver(requeue).observe(root, { attributes: true, attributeFilter: ["class"] });
+  if (TOUCH.addEventListener) TOUCH.addEventListener("change", requeue);
+  else if (TOUCH.addListener) TOUCH.addListener(requeue);
+  // The custom font is ~8% wider than the fallback at the same size, so a
+  // pass run before it lands would pick a size that stops fitting.
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(requeue);
+  window.addEventListener("load", requeue);
   queue();
 })();
 </script>
