@@ -3025,6 +3025,26 @@
   .add-widget-grid {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 280px;
   }
+  /* The group headings. Quiet on purpose: they are a map of the grid, not
+     items in it, so they sit at label weight in the soft ink the rest of the
+     app uses for captions and never compete with a card for the click. Sentence
+     case rather than Title Case or the uppercase micro-label pattern used
+     inside the routine feeds -- this popup is an insert menu, and every other
+     string in it ("New chat", "Add files or photos") is sentence case too. */
+  .add-widget-grouphead {
+    grid-column: 1 / -1;
+    font-size: 11px; font-weight: 600; color: #8a8a8a; letter-spacing: 0.01em;
+    padding: 2px 2px 0; user-select: none;
+  }
+  /* Every heading but the first opens a new band, so it gets air above it.
+     :first-child would miss it the moment a drag makes some other group
+     first, so the rule keys on having a card before it instead. */
+  .add-widget-card + .add-widget-grouphead { margin-top: 6px; }
+  /* No display is set above, so the UA's [hidden] rule already wins -- this is
+     here so that a later display declaration on this class cannot silently
+     resurrect an empty group's heading, the same footgun .add-widget-card
+     and .add-widget-popup each carry a guard for. */
+  .add-widget-grouphead[hidden] { display: none; }
   .add-widget-card {
     display: flex; flex-direction: column; align-items: center; gap: 6px;
     padding: 12px 8px; border: 1px solid #e5e5e5; border-radius: 8px;
@@ -5348,7 +5368,7 @@
      button is the only door to. -->
 <button type="button" id="connectionsBtn" hidden title="Connections"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v4"/><path d="M15 2v4"/><path d="M7 6h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V6Z"/><path d="M12 15v4"/><path d="M9 19h6"/></svg></button>
 
-<button type="button" id="addWidgetBtn" title="Add a section"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<button type="button" id="addWidgetBtn" title="Add a widget"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
 <button type="button" id="aiPanelBtn" title="myProductivityspace AI" aria-expanded="false"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></button>
 <button type="button" id="profileBtn" title="Account" aria-haspopup="true" aria-expanded="false"><span class="pb-avatar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path d="M3.5 21a8.5 8.5 0 0 1 17 0 1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1Z"/></svg></span></button>
@@ -5426,19 +5446,20 @@
 <div id="addWidgetOverlay" class="add-widget-overlay" hidden></div>
 <div id="addWidgetPopup" class="add-widget-popup" hidden>
   <div class="add-widget-grid">
-    <button type="button" class="add-widget-card" data-add-type="vocab">
-      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><text x="12" y="15.5" font-size="9" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial, sans-serif">Aa</text></svg></span>
-      <span class="add-widget-label">Vocabulary</span>
-    </button>
-    <!-- Reading List itself dropped out of this menu — "Lists" is strictly
-         more capable (customizable item name, any number of tag categories,
-         per-option colours) and replaces it as the way to add one. The
-         built-in Reading List already on the board, and its own widget
-         type/code, are untouched — this only removes the menu entry that
-         would create a new, permanently-fixed one. -->
-    <button type="button" class="add-widget-card" data-add-type="list">
-      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
-      <span class="add-widget-label">Lists</span>
+    <!-- Three groups, in the order a first-time board reads them. The headings
+         answer the one question the cards cannot: what you get when you click.
+         "Suggested" is the handful you reach for daily, "Built-in widgets" is
+         everything else this file ships, and "Your widgets" is what the AI
+         panel has built for you. Group is positional, not an attribute: a
+         card belongs to whichever heading it sits under, so dragging one
+         across a heading moves it between groups and the stored order (which
+         now carries the headings too) remembers it. That keeps the menu
+         yours -- "Suggested" is a shelf you arrange, not a list this file
+         decided for you and then mislabelled as personal. -->
+    <div class="add-widget-grouphead" data-add-head="suggested">Suggested</div>
+    <button type="button" class="add-widget-card" data-add-type="page">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg></span>
+      <span class="add-widget-label">Page</span>
     </button>
     <button type="button" class="add-widget-card" data-add-type="cal">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/></svg></span>
@@ -5451,18 +5472,29 @@
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.2 8.9l-6.3 6.3a1.2 1.2 0 0 1-1.7 0L6.8 12.8a1.2 1.2 0 0 1 1.7-1.7l1.55 1.55 5.45-5.45a1.2 1.2 0 0 1 1.7 1.7z"/></svg></span>
       <span class="add-widget-label">Google Tasks</span>
     </button>
-    <button type="button" class="add-widget-card" data-add-type="page">
-      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg></span>
-      <span class="add-widget-label">Page</span>
+    <div class="add-widget-grouphead" data-add-head="builtin">Built-in widgets</div>
+    <!-- Reading List itself dropped out of this menu — "List" is strictly
+         more capable (customizable item name, any number of tag categories,
+         per-option colours) and replaces it as the way to add one. The
+         built-in Reading List already on the board, and its own widget
+         type/code, are untouched — this only removes the menu entry that
+         would create a new, permanently-fixed one. -->
+    <button type="button" class="add-widget-card" data-add-type="list">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+      <span class="add-widget-label">List</span>
+    </button>
+    <button type="button" class="add-widget-card" data-add-type="vocab">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><text x="12" y="15.5" font-size="9" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial, sans-serif">Aa</text></svg></span>
+      <span class="add-widget-label">Vocabulary</span>
     </button>
     <button type="button" class="add-widget-card" data-add-type="menu">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg></span>
       <span class="add-widget-label">Bookmarks</span>
     </button>
-    <!-- The three routine-fed tiles. Each displays what a scheduled Claude
+    <!-- The four routine-fed tiles. Each displays what a scheduled Claude
          Code routine last posted to its topic; none of them fetches anything
          itself. Listed individually rather than behind one "Routine feed"
-         chooser because they are three different things you add, not three
+         chooser because they are four different things you add, not four
          settings of one thing. -->
     <button type="button" class="add-widget-card" data-add-type="feed-news">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1Z"/><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M7 9h7"/><path d="M7 13h7"/><path d="M7 17h4"/></svg></span>
@@ -5474,12 +5506,20 @@
     </button>
     <button type="button" class="add-widget-card" data-add-type="feed-email">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 7.6 5.4a1.5 1.5 0 0 0 1.8 0L20.5 7"/></svg></span>
-      <span class="add-widget-label">Email</span>
+      <span class="add-widget-label">Email Digest</span>
     </button>
     <button type="button" class="add-widget-card" data-add-type="feed-automations">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg></span>
       <span class="add-widget-label">Automations</span>
     </button>
+    <!-- Hidden until there is something to put under it. Custom widgets are
+         minted by the AI panel (__customWidgets.create), never from here, and
+         deleting one wipes its code, so today this group has no members and
+         showing an empty heading would promise a shelf that cannot fill. The
+         heading, its slot in the stored order and the reveal in
+         applyAddCardGroups() are all in place, so the day a built widget
+         survives its own deletion it lands here without another markup pass. -->
+    <div class="add-widget-grouphead" data-add-head="mine" hidden>Your widgets</div>
   </div>
 
   <!-- The way back from a delete. Absent until something has been deleted,
@@ -5600,7 +5640,7 @@
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="cal" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="cal" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
           <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="cal" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="cal" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="cal" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
 
@@ -5666,7 +5706,7 @@
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="unschedTasks" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="unschedTasks" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
           <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="unschedTasks" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="unschedTasks" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="unschedTasks" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
       <div class="widget-body" id="unschedTasksWidgetBody">
@@ -5713,7 +5753,7 @@
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="readingList" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="readingList" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
           <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="readingList" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="readingList" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="readingList" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
       <div class="widget-body" id="readingListWidgetBody">
@@ -5742,7 +5782,7 @@
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="atomicHabits" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="atomicHabits" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
           <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="atomicHabits" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="atomicHabits" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="atomicHabits" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
       <div class="widget-body" id="atomicHabitsWidgetBody">
@@ -5771,7 +5811,7 @@
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="affirmations" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
           <button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="affirmations" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>
           <button type="button" class="collapse-btn widget-hide-btn" data-hide-col="affirmations" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="affirmations" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="affirmations" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
       <div class="widget-body" id="affirmationsWidgetBody">
@@ -5804,7 +5844,7 @@
                every other widget — but still ahead of Delete, which is last
                everywhere so a misclick can't destroy a section. -->
           <button type="button" class="collapse-btn col-color-btn" data-color-btn="vocab" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>
-          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
+          <button type="button" class="collapse-btn col-delete-btn" data-delete-col="vocab" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>
         </div>
       </div>
       <!-- One colour control for the whole widget (in the header above), and no
@@ -17191,7 +17231,7 @@
     // Every instance of a type shows the same fixed label — there's no
     // per-instance renaming, so there's nothing to number ("Vocabulary 2")
     // or distinguish in the header.
-    const DYNAMIC_TYPE_LABEL = { readingList: "Reading List", list: "Lists", vocab: "Vocabulary", page: "Page", calView: "Google Calendar", menu: "Bookmarks", tasksView: "Google Tasks", custom: "Widget" };
+    const DYNAMIC_TYPE_LABEL = { readingList: "Reading List", list: "List", vocab: "Vocabulary", page: "Page", calView: "Google Calendar", menu: "Bookmarks", tasksView: "Google Tasks", custom: "Widget" };
 
     function buildPageWidgetEl(id) {
       const wrap = document.createElement("div");
@@ -17209,7 +17249,7 @@
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
               '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
               '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-              '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+              '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
             '</div>' +
           '</div>' +
           '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -18245,7 +18285,7 @@
       custom: "custom"
     };
     const WIDGET_FAMILY_LABEL = {
-      cal: "Google Calendar", tasks: "Google Tasks", readingList: "Reading List", list: "Lists",
+      cal: "Google Calendar", tasks: "Google Tasks", readingList: "Reading List", list: "List",
       vocab: "Vocabulary", page: "Page", menu: "Bookmarks", custom: "Widget"
     };
     // The built-ins that exist as static markup rather than through the dynamic
@@ -19009,7 +19049,7 @@
 
     Array.prototype.forEach.call(document.querySelectorAll("[data-icon-btn]"), wireIconButton);
 
-    // ---- "+" add-a-section popup ----
+    // ---- "+" add-a-widget popup ----
     const addWidgetBtn = document.getElementById("addWidgetBtn");
     const addWidgetPopup = document.getElementById("addWidgetPopup");
     const addWidgetOverlay = document.getElementById("addWidgetOverlay");
@@ -19088,6 +19128,54 @@
     function addCardTypeOf(el) { return el.getAttribute("data-add-type"); }
     function addCardLabelEl(el) { return el.querySelector(".add-widget-label"); }
 
+    /* ---------- the three groups ----------
+
+       A card's group is its position, not a property it carries: it belongs to
+       whichever heading it sits under. That is what lets the existing drag do
+       double duty -- pull a card past a heading and it has changed groups, with
+       no second gesture to learn and no rule about which cards are allowed
+       where. The stored order carries the headings along with the cards (a
+       heading's key is "#" + its data-add-head) so the arrangement survives a
+       reload the same way the old flat order did.
+
+       ADD_DEFAULT_GROUP is only consulted to migrate a board that saved its
+       order before the headings existed; after that the DOM is the truth. */
+    const ADD_DEFAULT_GROUP = {
+      page: "suggested", cal: "suggested", tasks: "suggested",
+      list: "builtin", vocab: "builtin", menu: "builtin",
+      "feed-news": "builtin", "feed-stocks": "builtin",
+      "feed-email": "builtin", "feed-automations": "builtin"
+    };
+    function addHeadEls() {
+      return Array.prototype.slice.call(addCardGrid.querySelectorAll(".add-widget-grouphead"));
+    }
+    function addGridNodes() {
+      return Array.prototype.slice.call(addCardGrid.children).filter(function (n) {
+        return n.classList.contains("add-widget-card") || n.classList.contains("add-widget-grouphead");
+      });
+    }
+    function addNodeKey(n) {
+      return n.classList.contains("add-widget-grouphead")
+        ? "#" + n.getAttribute("data-add-head")
+        : addCardTypeOf(n);
+    }
+
+    /* A heading with nothing under it is hidden, the way an empty group is
+       absent from Notion's own insert menu rather than present and empty.
+       The exception is while a card is being dragged: an emptied group whose
+       heading had vanished would be a group you could never put anything back
+       into, so every heading shows for the length of the gesture. */
+    let addDragActive = false;
+    function applyAddCardGroups() {
+      let head = null, shown = 0;
+      function settle() { if (head) head.hidden = !addDragActive && shown === 0; }
+      addGridNodes().forEach(function (n) {
+        if (n.classList.contains("add-widget-grouphead")) { settle(); head = n; shown = 0; }
+        else if (!n.hidden) shown++;
+      });
+      settle();
+    }
+
     /* The name a card carries now, or null when it has never been renamed.
        Null rather than the built-in label on purpose: a widget added from an
        untouched card must fall through to the board's own naming (a Page
@@ -19103,7 +19191,7 @@
     }
 
     function persistAddCardOrder() {
-      storageSet(ADD_ORDER_KEY, JSON.stringify(addCardEls().map(addCardTypeOf)));
+      storageSet(ADD_ORDER_KEY, JSON.stringify(addGridNodes().map(addNodeKey)));
     }
     function persistAddCardLabels() {
       storageSet(ADD_LABELS_KEY, JSON.stringify(addCardLabels));
@@ -19118,6 +19206,7 @@
       addCardEls().forEach(function (el) {
         el.hidden = !!addRemoved[addCardTypeOf(el)];
       });
+      applyAddCardGroups();
       renderDeletedBar();
     }
 
@@ -19189,6 +19278,7 @@
       delete addRemoved[type];
       persistAddCardRemoved();
       card.hidden = false;
+      applyAddCardGroups();
       renderDeletedBar();
       // Emptying the folder takes you back to the grid on its own; otherwise
       // the list closes the gap where the row was.
@@ -19204,16 +19294,42 @@
       showDeletedView(false);
     });
 
-    /* Cards the stored order never heard of go last rather than first: a card
-       added in a later version of this file should turn up at the end of a
-       board that has already been rearranged, not jump to the front of it. */
     function applyAddCardOrder(order) {
       if (!Array.isArray(order)) return;
-      const byType = {};
-      addCardEls().forEach(function (el) { byType[addCardTypeOf(el)] = el; });
-      const named = order.filter(function (t) { return byType[t]; });
-      const rest = addCardEls().map(addCardTypeOf).filter(function (t) { return named.indexOf(t) === -1; });
-      named.concat(rest).forEach(function (t) { addCardGrid.appendChild(byType[t]); });
+      const byKey = {};
+      addGridNodes().forEach(function (n) { byKey[addNodeKey(n)] = n; });
+
+      /* An order saved before the headings existed is a flat list of types.
+         Replaying it as-is would stack all ten cards and then trail the three
+         headings off the end, so it is re-slotted instead: the groups come back
+         in the order this file ships them, and inside each group the cards keep
+         whatever order the board had already dragged them into. The arrangement
+         is preserved, which is the part that was the user's. */
+      if (!order.some(function (k) { return String(k).charAt(0) === "#"; })) {
+        const rank = {};
+        order.forEach(function (t, i) { rank[t] = i; });
+        addHeadEls().forEach(function (head) {
+          addCardGrid.appendChild(head);
+          addCardEls()
+            .filter(function (el) {
+              return ADD_DEFAULT_GROUP[addCardTypeOf(el)] === head.getAttribute("data-add-head");
+            })
+            .sort(function (a, b) {
+              const ra = rank[addCardTypeOf(a)], rb = rank[addCardTypeOf(b)];
+              return (ra == null ? Infinity : ra) - (rb == null ? Infinity : rb);
+            })
+            .forEach(function (el) { addCardGrid.appendChild(el); });
+        });
+        persistAddCardOrder();
+        return;
+      }
+
+      /* Keys the stored order never heard of go last rather than first: a card
+         added in a later version of this file should turn up at the end of a
+         board that has already been rearranged, not jump to the front of it. */
+      const named = order.filter(function (k) { return byKey[k]; });
+      const rest = addGridNodes().map(addNodeKey).filter(function (k) { return named.indexOf(k) === -1; });
+      named.concat(rest).forEach(function (k) { addCardGrid.appendChild(byKey[k]); });
     }
 
     addCardEls().forEach(function (el) {
@@ -19328,7 +19444,7 @@
     let addDrag = null;
 
     function addCardFlip(mutate, skip) {
-      const cards = addCardEls();
+      const cards = addGridNodes();
       const before = cards.map(function (c) { return c.getBoundingClientRect(); });
       mutate();
       cards.forEach(function (c, i) {
@@ -19355,8 +19471,13 @@
       const r = card.getBoundingClientRect();
       const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       let best = null, bestD = Infinity;
-      addCardEls().forEach(function (c) {
-        if (c === card) return;
+      /* Headings are drop targets alongside the cards: landing just after one
+         is how a card joins a group that is empty, and landing just before one
+         is how it joins the tail of the group above. Hidden nodes are skipped
+         -- a deleted card and a heading with no members are both invisible, and
+         nothing should be droppable onto something that is not on screen. */
+      addGridNodes().forEach(function (c) {
+        if (c === card || c.hidden) return;
         const b = c.getBoundingClientRect();
         const dx = (b.left + b.width / 2) - cx, dy = (b.top + b.height / 2) - cy;
         const d = dx * dx + dy * dy;
@@ -19379,6 +19500,8 @@
       const card = grip.closest(".add-widget-card");
       const r = card.getBoundingClientRect();
       card.style.transition = "none";
+      addDragActive = true;
+      applyAddCardGroups();
       addDrag = {
         card: card, id: e.pointerId, moved: false,
         grabX: e.clientX - r.left, grabY: e.clientY - r.top,
@@ -19418,12 +19541,14 @@
       const d = addDrag;
       addDrag = null;
       const card = d.card;
-      if (!d.moved) { card.style.transition = ""; return; }
+      addDragActive = false;
+      if (!d.moved) { card.style.transition = ""; applyAddCardGroups(); return; }
       card.classList.remove("is-dragging");
       card.style.transition = "transform 0.24s var(--ease-spring)";
       card.style.transform = "";
       // The click that ends a drag is not a click that adds a widget.
       card.dataset.swallowClick = "1";
+      applyAddCardGroups();
       persistAddCardOrder();
     }
     addCardGrid.addEventListener("pointerup", endAddDrag);
@@ -19458,8 +19583,9 @@
       addRemoved[type] = true;
       persistAddCardRemoved();
       closeAddCardMenu();
-      // The gap closes with the same spring a reorder uses.
-      addCardFlip(function () { card.hidden = true; }, card);
+      // The gap closes with the same spring a reorder uses, and an emptied
+      // group's heading goes in the same movement rather than a frame later.
+      addCardFlip(function () { card.hidden = true; applyAddCardGroups(); }, card);
       renderDeletedBar();
     }
 
@@ -19536,6 +19662,9 @@
       if (i === j) return;
       addCardFlip(function () {
         addCardGrid.insertBefore(card, j > i ? cards[j].nextElementSibling : cards[j]);
+        // The move can empty a group or refill one, and the heading follows in
+        // the same flip rather than popping in afterwards.
+        applyAddCardGroups();
       });
       card.focus();
       persistAddCardOrder();
@@ -19578,7 +19707,7 @@
             ]
         },
         "feed-email": {
-            "name": "Email",
+            "name": "Email Digest",
             "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
             "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* Counts first. The routine's Telegram message is six sections of prose;\n   at this size the useful version is three numbers and the detail below. */\n.counts { display: flex; gap: 14px; }\n.ct { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.ct b { display: block; font-size: 19px; font-weight: 600; color: var(--ink, #1a1a1a); line-height: 1.1; }\n.ct.act b { color: #b4553f; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 4px; }\n.row { font-size: 11.5px; line-height: 1.35; padding: 3px 0;\n       border-bottom: 1px solid var(--hair, #ececec); }\n.row:last-child { border-bottom: none; }\n.who { color: var(--ink-soft, #6b6b6b); }\n.move { font-size: 10.5px; color: var(--ink-soft, #8a8a8a); }\n.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }\n.tag { font-size: 10px; padding: 1px 6px; border-radius: 999px;\n       background: rgba(0,0,0,0.055); color: var(--ink-soft, #565656); }\n.note { font-size: 11px; line-height: 1.4; margin-top: 10px; padding: 6px 8px;\n        border-radius: 8px; background: rgba(180,85,63,0.09); color: #8c4331; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
             "js": "var TOPIC = \"email-digest\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n}\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\nfunction list(rows, fmt) {\n  return (rows || []).slice(0, 8).map(fmt).join(\"\");\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No digest yet. The 8:30am routine posts here once it has run.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 26 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var d = payload.data;\n  if (!d) {\n    bodyEl.innerHTML = payload.text\n      ? '<div class=\"raw\">' + esc(payload.text) + \"</div>\"\n      : '<div class=\"msg\">The last run posted nothing readable.</div>';\n    return;\n  }\n\n  var drafted = d.drafted || [], awaiting = d.awaiting || [], reconciled = d.reconciled || [];\n  var html =\n    '<div class=\"counts\">' +\n      '<div class=\"ct act\">Needs you<b>' + drafted.length + \"</b></div>\" +\n      '<div class=\"ct\">Awaiting<b>' + awaiting.length + \"</b></div>\" +\n      '<div class=\"ct\">Activity<b>' + (d.activity == null ? \"—\" : d.activity) + \"</b></div>\" +\n    \"</div>\";\n\n  if (drafted.length) {\n    html += '<div class=\"sect\">Drafted, waiting on you</div>' + list(drafted, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") +\n        (r.from ? ' <span class=\"who\">— ' + esc(r.from) + \"</span>\" : \"\") + \"</div>\";\n    });\n  }\n  if (awaiting.length) {\n    html += '<div class=\"sect\">Awaiting their reply</div>' + list(awaiting, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") + \"</div>\";\n    });\n  }\n  if (reconciled.length) {\n    html += '<div class=\"sect\">Moved</div>' + list(reconciled, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") +\n        '<div class=\"move\">' + esc(r.move || \"\") + \"</div></div>\";\n    });\n  }\n  if (Array.isArray(d.labeled) && d.labeled.length) {\n    html += '<div class=\"sect\">Filed</div><div class=\"tags\">' + d.labeled.map(function (l) {\n      return '<span class=\"tag\">' + esc(l.label || \"\") + (l.count ? \" \" + l.count : \"\") + \"</span>\";\n    }).join(\"\") + \"</div>\";\n  }\n  if (d.suggested_label) {\n    html += '<div class=\"note\">Suggested new label: <b>' + esc(d.suggested_label) + \"</b></div>\";\n  }\n  if (!drafted.length && !awaiting.length && !reconciled.length && !d.activity) {\n    html += '<div class=\"msg\">Nothing new in Important, Action Needed or Awaiting Reply.</div>';\n  }\n  bodyEl.innerHTML = html;\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
@@ -20073,7 +20202,7 @@
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
           '</div>' +
         '</div>' +
         // Mirror widgets match the primary one: a single colour control in the
@@ -21965,7 +22094,7 @@
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -22015,7 +22144,7 @@
             '<button type="button" class="collapse-btn list-config-btn" id="' + id + 'ConfigBtn" title="Customize this list" aria-label="Customize this list"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -29526,7 +29655,7 @@
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -29781,7 +29910,7 @@
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody">' +
@@ -31644,7 +31773,7 @@
             '<button type="button" class="collapse-btn col-color-btn" data-color-btn="' + id + '" title="Customize color"><svg viewBox="0 0 24 24" width="13" height="13"><circle cx="12" cy="12" r="8.5"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-fullscreen-btn" data-fullscreen-col="' + id + '" title="Full screen" aria-label="Full screen"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4"/><path d="M15 3h4a2 2 0 0 1 2 2v4"/><path d="M9 21H5a2 2 0 0 1-2-2v-4"/><path d="M15 21h4a2 2 0 0 0 2-2v-4"/></svg></button>' +
             '<button type="button" class="collapse-btn widget-hide-btn" data-hide-col="' + id + '" title="Hide" aria-label="Hide"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg></button>' +
-            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this section"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
+            '<button type="button" class="collapse-btn col-delete-btn" data-delete-col="' + id + '" title="Delete this widget"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button>' +
           '</div>' +
         '</div>' +
         '<div class="widget-body" id="' + id + 'WidgetBody"><div class="cw-host" id="' + id + 'CwHost"></div></div>' +
