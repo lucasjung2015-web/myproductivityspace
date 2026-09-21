@@ -14881,11 +14881,14 @@
       });
     }
 
-    // Which other widgets, if any, `id` was hidden together with via
-    // hideSection() — unhiding any one member brings the whole group back.
-    // Populated by hideSection(), and fully cleared (for every member) the
-    // moment any one of them is unhidden, so a later individual hide of one
-    // of those widgets doesn't drag the old group back in with it.
+    // Which other widgets, if any, `id` was hidden together with as a whole
+    // slot — unhiding any one member brings the whole group back. Nothing
+    // writes a group any more: Hide section, which was the only thing that
+    // ever did, is gone from the ••• menu. This stays because boards that
+    // used it still have groups saved, and one of those has to unhide the
+    // way it was promised it would. Cleared for every member the moment any
+    // one is unhidden, so a later individual hide cannot drag the old group
+    // back in with it.
     const hideGroups = {};
     function persistHideGroups() { storageSet(HIDE_GROUPS_STORAGE_KEY, JSON.stringify(hideGroups)); }
     async function loadHideGroups() {
@@ -14935,36 +14938,6 @@
       }
     }
 
-    // Hides every widget in one slot, and remembers them as a group (see
-    // hideGroups above) so unhiding any single one of their tabs later
-    // brings every other member back too, rather than one tab at a time.
-    function hideSection(slot) {
-      const ids = slot.slice();
-      ids.forEach(function (id) {
-        hidden[id] = true;
-        storageSet(hideStorageKey(id), "true");
-        if (maximizedId === id) setMaximized(null);
-        hideGroups[id] = ids;
-      });
-      // Unhiding any one of a group brings the whole group back, so one id is
-      // enough for ⌘Z to reverse the whole section.
-      lastHiddenId = ids[0] || null;
-      persistHideGroups();
-      applyHiddenState();
-    }
-
-    /* For the ••• menu, which lives in another module. Hiding a whole slot
-       at once is all that is left here: Move section and the pick-up it ran
-       on are gone, so a column is rearranged by dragging its widgets, one
-       grip at a time, or by asking the assistant. */
-    window.__mpsSection = {
-      hide: function (id) {
-        const slot = slotOf(id);
-        if (!slot) return false;
-        hideSection(slot);
-        return true;
-      }
-    };
 
     function wireHideButton(btn) {
       if (!btn) return;
@@ -40013,27 +39986,19 @@
        that locked behind you; the tab bar carries hidden widgets now. */
     add("Hide widget", ICO.eyeOff, function () { B.setHidden(id, true); rebuild(); });
 
-    /* Sits beside Hide widget in BOTH views, not only board view. A section is
-       a grouping of widgets, and that grouping is just as real while you are
-       looking at one of its members full-screen -- gating it to board view
-       only meant the command was missing exactly where you were most likely
-       to reach for it. Shown only when the widget actually shares a slot: on
-       a section of one it is Hide widget under a second name. */
-    /* Section commands, board view only. A section is a column, and widget
-       view has no columns -- one widget fills the screen and its neighbours
-       are somewhere off to the side. Acting on a grouping you cannot see is
-       the kind of command that reads as working and quietly does something
-       to a part of the board you are not looking at. */
-    const mates = matesOf(id);
-    if (boardView && mates.length > 1) {
-      add("Hide section (" + mates.length + ")", ICO.eyeOff, function () {
-        // The desktop hides it as one group, so unhiding any member brings
-        // the whole section back, as the old section button did.
-        if (desktop && window.__mpsSection && window.__mpsSection.hide(id)) { rebuild(); return; }
-        mates.forEach(function (m) { try { B.setHidden(m, true); } catch (e) {} });
-        rebuild();
-      });
-    }
+    /* Hide section used to sit here. It was the last of the section commands
+       -- Move section and its pick-up went earlier -- and it was the only one
+       whose count changed under you: a menu that reads "Hide section (2)" on
+       one widget and is absent on the next, because the second one happens
+       not to share a slot, is a menu you cannot learn. A section is also not
+       a thing this board asks you to think about anywhere else; widgets are
+       hidden one at a time everywhere else in the app, and the shelf gets
+       them back one at a time too.
+
+       Boards that already hid a section keep working. hideGroups, its
+       storage, and the branch in setHidden that brings a whole group back
+       when one member is unhidden are all still there -- nothing new writes
+       a group, and an old one still unhides as a group. */
     if (boardView) {
       /* Delete lived only in the hover array this view now hides, so it has to
          land here or a phone loses the ability entirely.
@@ -40265,53 +40230,10 @@
   grid.addEventListener("pointerup", endSize);
   grid.addEventListener("pointercancel", endSize);
 
-  /* Everything sharing a slot with `id`, itself included. One widget means a
-     section of one. Read by Hide section, which is the only command left that
-     acts on a whole slot.
-
-     Read from __aiLayout.describe(), which returns the layout array itself and
-     is the authority on what shares a section. The previous version built a
-     CSS selector out of the widget id and walked the DOM, so any id that did
-     not survive being spliced into a selector threw, the catch returned "just
-     this one", and Hide section silently vanished from the menu for exactly
-     the widgets that had a section. Custom and Page widgets carry generated
-     ids, which is where that bites.
-
-     The DOM walk stays as a fallback, without the selector: comparing
-     attributes over a node list cannot be broken by the value of an id. */
-  function matesOf(id) {
-    try {
-      const layout = window.__aiLayout && window.__aiLayout.describe();
-      if (layout && layout.length) {
-        for (let i = 0; i < layout.length; i++) {
-          const w = layout[i] && layout[i].widgets;
-          if (w && w.indexOf(id) !== -1) return w.slice();
-        }
-      }
-    } catch (e) {}
-    try {
-      let el = null;
-      Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (n) {
-        if (n.getAttribute("data-col-id") === id) el = n;
-      });
-      const own = el && el.closest ? el.closest(".col-slot") : null;
-      if (!own) return [id];
-      const out = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
-        return n.getAttribute("data-col-id");
-      }).filter(Boolean);
-      return out.length ? out : [id];
-    } catch (e) { return [id]; }
-  }
-
-  /* ---------- move mode ----------
-     A state, not a handle. While it is on there is nothing to aim at: the
-     whole widget is the drag target, which at board scale is a 140px object
-     instead of a 36px one. Scope is chosen from the menu beforehand, so a
-     drag never has to guess whether you meant this widget or its column. */
-  /* Look a widget up by attribute rather than by selector, for the same
-     reason matesOf does: an id is data, and splicing data into a selector
-     makes a widget unreachable the moment its id contains anything the
-     selector grammar cares about. */
+  /* The widget element for an id, by comparing attributes over a node list
+     rather than by splicing the id into a CSS selector -- an id that does not
+     survive being put in a selector throws, and generated ids (custom and Page
+     widgets) are exactly the ones that do not. */
   function elFor(id) {
     let hit = null;
     Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (n) {
