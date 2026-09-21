@@ -19072,6 +19072,9 @@
       // Always opens on the cards. The folder is somewhere you go, not a place
       // the menu remembers leaving you.
       if (typeof showDeletedView === "function") showDeletedView(false);
+      /* The AI panel can have built a widget since the last time this opened,
+         so "Your widgets" is rebuilt on the way in rather than at boot only. */
+      renderMineCards();
     }
 
     /* ---------- the "+" popup's cards are yours ----------
@@ -19097,6 +19100,9 @@
        wait out; the six dots drag; and the rename is on the dots' click and
        on a hold of the name, neither of which the add path can consume. */
     const ADD_ORDER_KEY = "add-card-order";
+    // The arrangement this board last loaded, replayed when a "Your widgets"
+    // card turns up after boot and needs to find its saved slot.
+    let lastAddOrder = null;
     const ADD_LABELS_KEY = "add-card-labels";
     /* Cards deleted from this menu, by type. A card is a TYPE, so deleting one
        takes the entry out of the menu and touches nothing on the board: every
@@ -19160,6 +19166,90 @@
         : addCardTypeOf(n);
     }
 
+    /* ---------- "Your widgets" ----------
+
+       One card per row in the custom-widget library (see __customWidgets).
+       They are built here rather than shipped in the markup because the list
+       is whatever the AI panel has made for this board, and it changes while
+       the app is running. Everything else about them is an ordinary card:
+       they drag, rename, delete into the Deleted folder and persist their
+       position exactly like the ten that ship with the file. */
+    const MINE_PREFIX = "mine:";
+    const MINE_ICON_SVG =
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 3.2l1.5 4.3 4.3 1.5-4.3 1.5L12 14.8l-1.5-4.3L6.2 9l4.3-1.5L12 3.2z"/>' +
+      '<path d="M5 16.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z"/>' +
+      '<path d="M17.5 15.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6.6-1.7z"/></svg>';
+
+    function mineHeadEl() {
+      return addCardGrid.querySelector('.add-widget-grouphead[data-add-head="mine"]');
+    }
+    function buildMineCard(entry) {
+      const type = MINE_PREFIX + entry.lid;
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "add-widget-card";
+      el.setAttribute("data-add-type", type);
+
+      const icon = document.createElement("span");
+      icon.className = "add-widget-icon";
+      icon.innerHTML = MINE_ICON_SVG;
+      el.appendChild(icon);
+
+      const name = entry.name || "Widget";
+      ADD_CARD_BUILT_IN[type] = name;
+      const lab = document.createElement("span");
+      lab.className = "add-widget-label";
+      // A card renamed by hand keeps that name even after the widget it stands
+      // for is edited, the same rule the shipped cards follow.
+      lab.textContent = addCardLabels[type] || name;
+      lab.title = "Hold to rename";
+      el.appendChild(lab);
+
+      const grip = document.createElement("span");
+      grip.className = "add-widget-grip";
+      grip.setAttribute("aria-hidden", "true");
+      grip.innerHTML = ADD_GRIP_SVG;
+      el.appendChild(grip);
+      return el;
+    }
+
+    /* Brings the group level with the library: a card for every row, no card
+       for a row that is gone. New cards go in right under the heading in the
+       library's own order (newest first), and then the stored arrangement, if
+       this board has one, puts them back where they were dragged to. */
+    async function renderMineCards() {
+      const head = mineHeadEl();
+      if (!head) return;
+      const CW = window.__customWidgets;
+      let entries = [];
+      if (CW && CW.libraryReady) {
+        try { await CW.libraryReady(); entries = CW.library(); } catch (e) { entries = []; }
+      }
+      const want = {};
+      entries.forEach(function (e) { want[MINE_PREFIX + e.lid] = true; });
+
+      const have = {};
+      addCardEls().forEach(function (el) {
+        const t = addCardTypeOf(el);
+        if (String(t).indexOf(MINE_PREFIX) !== 0) return;
+        if (want[t]) have[t] = true;
+        else el.remove();   // its row is gone; the card has nothing left to add
+      });
+
+      const ref = head.nextSibling;
+      let added = false;
+      entries.forEach(function (e) {
+        const t = MINE_PREFIX + e.lid;
+        if (have[t]) return;
+        addCardGrid.insertBefore(buildMineCard(e), ref);
+        added = true;
+      });
+      if (added && lastAddOrder) applyAddCardOrder(lastAddOrder);
+      applyAddCardRemoved();
+    }
+
     /* A heading with nothing under it is hidden, the way an empty group is
        absent from Notion's own insert menu rather than present and empty.
        The exception is while a card is being dragged: an emptied group whose
@@ -19191,7 +19281,10 @@
     }
 
     function persistAddCardOrder() {
-      storageSet(ADD_ORDER_KEY, JSON.stringify(addGridNodes().map(addNodeKey)));
+      // One place the arrangement is written, so lastAddOrder can never drift
+      // from what is stored no matter which gesture produced the move.
+      lastAddOrder = addGridNodes().map(addNodeKey);
+      storageSet(ADD_ORDER_KEY, JSON.stringify(lastAddOrder));
     }
     function persistAddCardLabels() {
       storageSet(ADD_LABELS_KEY, JSON.stringify(addCardLabels));
@@ -19357,13 +19450,20 @@
       });
       try {
         const raw = await storageGet(ADD_ORDER_KEY);
-        if (raw) applyAddCardOrder(JSON.parse(raw));
+        if (raw) {
+          lastAddOrder = JSON.parse(raw);
+          applyAddCardOrder(lastAddOrder);
+        }
       } catch (e) {}
       try {
         const raw = await storageGet(ADD_REMOVED_KEY);
         (JSON.parse(raw || "[]") || []).forEach(function (t) { addRemoved[t] = true; });
       } catch (e) {}
       applyAddCardRemoved();
+      // The library lives in a script block that parses later, so this resolves
+      // on its own clock; applyAddCardRemoved above has already settled the
+      // headings for the shipped cards in the meantime.
+      renderMineCards();
     })();
 
     /* ---- rename, in place ---- */
@@ -19761,6 +19861,24 @@
     /* Adds one widget of a built-in type: every card in the popup lands
        here, keyed by its data-add-type. */
     function addWidgetOfType(type, btn) {
+      /* "Your widgets": a card standing for a row in the custom-widget
+         library, added back as a fresh tile running the code you had built. */
+      if (String(type).indexOf(MINE_PREFIX) === 0) {
+        const CW = window.__customWidgets;
+        if (!CW || !CW.addFromLibrary) { window.alert("The widget engine isn't ready yet. Try again in a second."); return; }
+        const lid = type.slice(MINE_PREFIX.length);
+        CW.addFromLibrary(lid).then(function (r) {
+          if (r && r.ok) { nameNewWidget(r.widget_id, cardTitleFor(type)); flashWidget(r.widget_id); }
+          else {
+            window.alert("Couldn't add that widget: " + ((r && r.error) || "unknown error"));
+            // The row may have just been dropped as unreadable; re-render so
+            // the menu stops offering a card that cannot produce a widget.
+            renderMineCards();
+          }
+        });
+        return;
+      }
+
       /* The name typed over this card, or null if it was never renamed. It
          is applied only where a NEW widget is minted below. The branches
          that bring an existing widget back to the board deliberately skip
@@ -19783,7 +19901,14 @@
       if (ROUTINE_FEEDS[type]) {
         const CW = window.__customWidgets;
         if (!CW) { window.alert("The widget engine isn't ready yet. Try again in a second."); return; }
-        const r = CW.create(ROUTINE_FEEDS[type]);
+        /* library:false -- these four already have a card in this menu, and a
+           second one under "Your widgets" would list the same widget twice. */
+        const feed = ROUTINE_FEEDS[type];
+        const r = CW.create({
+          name: feed.name, html: feed.html, css: feed.css, js: feed.js,
+          net: feed.net, data: feed.data, publishes: feed.publishes,
+          reads: feed.reads, library: false
+        });
         if (r && r.ok) { nameNewWidget(r.widget_id, cardTitle); flashWidget(r.widget_id); }
         // A create can fail on the 200KB code cap or a not-ready board, and
         // failing silently here would look exactly like a dead menu entry.
@@ -31490,6 +31615,90 @@
   "use strict";
 
   const BLOB_KEY = function (id) { return "custom-widget:" + id; };
+
+  /* ---- the library: what "Your widgets" in the "+" menu is made of ----
+
+     A widget the AI panel built is code you asked for, but the only copy of
+     it lived in the instance's own blob -- which __unwireCustomSection wipes
+     when the tile is deleted. Deleting a widget therefore destroyed it, and
+     the "+" menu had nothing to offer under "Your widgets".
+
+     The library is a second copy, written on every create and update and kept
+     independently of any tile. Deleting a widget from the board now removes
+     the instance and leaves the library row, so the menu can build it again.
+     The row is keyed by `lid`, which the instance blob carries: re-adding from
+     the library makes a new tile that still points at the same row, so editing
+     either one updates one entry rather than breeding copies.
+
+     Routine feeds pass library:false -- they already have a card of their own
+     in the menu, and a second one under "Your widgets" would be the same
+     widget listed twice. */
+  const LIB_KEY = function (lid) { return "mine-widget:" + lid; };
+  const LIB_INDEX_KEY = "mine-widget-index";
+  const LIB_MAX = 24;
+  let libIndex = [];          // [{ lid, name, at }], newest last
+  let libLoaded = null;
+
+  function newLid() {
+    return "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function loadLibrary() {
+    if (libLoaded) return libLoaded;
+    libLoaded = (async function () {
+      try {
+        const raw = await window.storageGet(LIB_INDEX_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (Array.isArray(parsed)) {
+          libIndex = parsed.filter(function (e) { return e && e.lid; });
+        }
+      } catch (e) { libIndex = []; }
+      return libIndex;
+    })();
+    return libLoaded;
+  }
+  function saveLibraryIndex() {
+    window.storageSet(LIB_INDEX_KEY, JSON.stringify(libIndex));
+  }
+  /* Writes the row and its code. The index is a small list the menu can read
+     without pulling every widget's source, so the name lives in both places:
+     here for the card's label, and in the blob for the tile it mints. */
+  /* Every write goes through the load first. Writing into an index that has
+     not been read yet would push one row onto an empty array and then save
+     that over every row the board already had -- the widget you just built
+     would arrive by deleting the rest of the shelf. */
+  function libraryPut(blob) {
+    if (!blob || !blob.lid) return;
+    loadLibrary().then(function () { libraryPutNow(blob); });
+  }
+  function libraryPutNow(blob) {
+    const at = new Date().toISOString();
+    const i = libIndex.findIndex(function (e) { return e.lid === blob.lid; });
+    if (i !== -1) libIndex.splice(i, 1);
+    libIndex.push({ lid: blob.lid, name: blob.name, at: at });
+    // Oldest first out. A shelf that grows without limit is a sync payload
+    // that grows without limit, and 24 is well past what a board can show.
+    while (libIndex.length > LIB_MAX) {
+      const drop = libIndex.shift();
+      try { window.storageSet(LIB_KEY(drop.lid), ""); } catch (e) {}
+    }
+    window.storageSet(LIB_KEY(blob.lid), JSON.stringify(blob));
+    saveLibraryIndex();
+  }
+  async function libraryForget(lid) {
+    await loadLibrary();
+    const i = libIndex.findIndex(function (e) { return e.lid === lid; });
+    if (i === -1) return false;
+    libIndex.splice(i, 1);
+    window.storageSet(LIB_KEY(lid), "");
+    saveLibraryIndex();
+    return true;
+  }
+  async function libraryRead(lid) {
+    try {
+      const raw = await window.storageGet(LIB_KEY(lid));
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
   const STORE_PREFIX = function (id) { return "cw:" + id + ":"; };
   const KEYS_KEY = function (id) { return "cw:" + id + ":__keys"; };
   const MAX_KEYS = 200, MAX_VALUE = 64 * 1024, MAX_CODE = 200 * 1024;
@@ -32167,7 +32376,33 @@
       const b = JSON.parse(raw);
       if (b && typeof b === "object") blobs[id] = normalizeBlob(b);
     } catch (e) {}
+    if (blobs[id]) backfillLid(id);
     return blobs[id] || null;
+  }
+
+  /* Widgets built before the library existed carry no lid, so they would never
+     show up under "Your widgets" however many times you opened the menu. The
+     first time such a widget loads it is given one and filed, which is what
+     puts the ones you already have on the shelf.
+
+     Routine feeds are skipped: they are minted through the same API but have a
+     card of their own in the "+" menu, and on an old board they look exactly
+     like an AI-built widget except for the topic they read. That topic is the
+     tell, and __mpsRoutineFeeds is the list of them. */
+  function isRoutineFeedBlob(b) {
+    const feeds = window.__mpsRoutineFeeds || [];
+    const reads = b.reads || [];
+    if (!reads.length) return false;
+    return feeds.some(function (f) {
+      return (f.reads || []).some(function (t) { return reads.indexOf(t) !== -1; });
+    });
+  }
+  function backfillLid(id) {
+    const b = blobs[id];
+    if (!b || b.lid || isRoutineFeedBlob(b)) return;
+    b.lid = newLid();
+    saveBlob(id);
+    libraryPut(b);
   }
   async function loadStore(id) {
     if (stores[id]) return stores[id];
@@ -32188,6 +32423,9 @@
       name: String(b.name || "Widget").slice(0, 80),
       html: String(b.html || ""), css: String(b.css || ""), js: String(b.js || ""),
       version: Number(b.version) || 1, net: !!b.net, data: normalizeScopes(b.data),
+      /* Which library row this instance is a copy of, "" for the routine
+         feeds and for anything minted before the library existed. */
+      lid: b.lid ? String(b.lid).slice(0, 40) : "",
       /* Which connector tools this widget may call. Normalized here rather
          than trusted from the caller, because this list IS the permission --
          see the note on the connectors scope for why it is a list and not a
@@ -32393,6 +32631,12 @@
       Array.prototype.forEach.call(host.querySelectorAll("iframe"), function (f) { frames.delete(f); });
       if (host.__cwRo) { host.__cwRo.disconnect(); host.__cwRo = null; }
     }
+    /* The instance goes: its saved data, its key list, its code. The library
+       row this instance was a copy of is deliberately left alone -- that copy
+       is what "Your widgets" in the "+" menu offers, and deleting a tile is
+       not a request to destroy the widget you had built. The card in that
+       menu can still be deleted, which parks it in the Deleted folder like
+       any other card, so nothing here is a one-way door. */
     const store = stores[id] || {};
     Object.keys(store).forEach(function (k) { window.storageSet(STORE_PREFIX(id) + k, ""); });
     window.storageSet(KEYS_KEY(id), "");
@@ -32408,14 +32652,19 @@
       o = o || {};
       const b = window.__aiBoard;
       if (!b) return { error: "The board is not ready." };
+      /* library:false is the routine feeds, which have their own card in the
+         "+" menu. Everything else the panel builds gets a library row, and a
+         widget re-added from the library keeps the row it came from. */
       const blob = normalizeBlob({ name: o.name, html: o.html, css: o.css, js: o.js, version: 1, net: o.net,
-        data: o.data, publishes: o.publishes, reads: o.reads });
+        data: o.data, publishes: o.publishes, reads: o.reads,
+        lid: o.library === false ? "" : (o.lid || newLid()) });
       if (!blob.html.trim() && !blob.js.trim()) return { error: "Provide at least html or js." };
       if (codeTooBig(blob)) return { error: "Widget code is too large (200 KB max)." };
       const id = b.create("custom");
       blobs[id] = blob;
       stores[id] = {};
       saveBlob(id);
+      libraryPut(blob);
       if (o.name) b.rename(id, String(o.name));
       registerGear(id);
       mount(id);
@@ -32434,11 +32683,13 @@
         data: patch.data != null ? patch.data : cur.data,
         publishes: patch.publishes != null ? patch.publishes : cur.publishes,
         reads: patch.reads != null ? patch.reads : cur.reads,
+        lid: cur.lid,
         createdAt: cur.createdAt, updatedAt: new Date().toISOString()
       });
       if (codeTooBig(next)) return { error: "Widget code is too large (200 KB max)." };
       blobs[id] = next;
       saveBlob(id);
+      libraryPut(next);
       if (patch.name != null && window.__aiBoard) window.__aiBoard.rename(id, String(patch.name));
       mount(id);
       return { ok: true, widget_id: id, version: next.version };
@@ -32504,6 +32755,31 @@
       });
     },
     isCustom: function (id) { return !!blobs[id]; },
+
+    /* ---- library, read by the "+" menu's "Your widgets" group ---- */
+    libraryReady: loadLibrary,
+    // Newest first: the thing you just built is the one you are looking for.
+    library: function () {
+      return libIndex.slice().reverse().map(function (e) {
+        return { lid: e.lid, name: e.name, at: e.at };
+      });
+    },
+    libraryForget: libraryForget,
+    /* Build a fresh tile from a saved row. The new instance carries the same
+       lid, so editing it updates that row instead of adding a second one. */
+    addFromLibrary: async function (lid) {
+      const blob = await libraryRead(lid);
+      if (!blob) {
+        // The index outlived its row (a half-synced board, a cleared key).
+        await libraryForget(lid);
+        return { error: "That widget's code is no longer saved." };
+      }
+      return api.create({
+        name: blob.name, html: blob.html, css: blob.css, js: blob.js,
+        net: blob.net, data: blob.data, publishes: blob.publishes,
+        reads: blob.reads, lid: lid
+      });
+    },
     // A sandboxed, data-less run of any widget code (see servePreview).
     previewFrame: previewFrame,
 
