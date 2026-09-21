@@ -3046,6 +3046,38 @@
      sets its own display and can be hidden. */
   .add-widget-popup[hidden], .add-widget-overlay[hidden] { display: none; }
 
+  /* Shaped like the sidebar's own search field rather than a new kind of
+     input. Sits above the scroller and outside it: a field that scrolls away
+     while you are typing into it is a field that loses the cursor. */
+  .add-widget-search {
+    flex: 0 0 auto; margin: 11px 15px 2px; padding: 7px 10px;
+    border: 1px solid var(--hair); border-radius: 8px; background: var(--panel);
+    font-family: inherit; font-size: 13px; color: var(--ink); outline: none;
+    transition: border-color 0.12s var(--ease-spring), background-color 0.12s var(--ease-spring);
+  }
+  .add-widget-search::placeholder { color: var(--ink-soft); }
+  .add-widget-search:focus { border-color: var(--ink-soft); background: var(--bg); }
+  .add-widget-search[hidden] { display: none; }
+
+  /* A card the query does not match. A THIRD state, deliberately separate
+     from `hidden`: hidden is owned by applyAddCardRemoved and answers "does
+     this card exist for this account", which a search must never get a vote
+     on -- filter a card out, then let a repaint decide it was deleted, and
+     the two would fight over one attribute. */
+  .add-widget-card[data-filtered="1"] { display: none; }
+
+  /* Where the keyboard is. Not :hover -- a pointer and the arrow keys can be
+     in two different places at once, and the one that acts on Enter is this
+     one. */
+  .add-widget-card.is-active { background: rgba(10,10,10,0.075); }
+  .add-widget-card.is-active .add-widget-preview { border-color: var(--ink-soft); }
+
+  .add-widget-empty {
+    padding: 22px 6px 26px; text-align: center;
+    font-size: 12.5px; color: var(--ink-soft);
+  }
+  .add-widget-empty[hidden] { display: none; }
+
   /* The scroller, as its own element so the label above it and the Deleted
      bar below it are outside the scroll. The two fade depths are written by
      JS (see updateAddScrollFade) and are 0px until the list actually
@@ -5666,12 +5698,18 @@
        two of them carrying nothing the third did not. The group headings do
        the labelling now, and they do it better because they distinguish.
        (Notion's own insert menu has no title either.) -->
+  <!-- Hidden until the menu is long enough to need it; see ADD_SEARCH_MIN.
+       Outside the scroller on purpose, so it does not slide away from under
+       the cursor that is typing into it. -->
+  <input type="text" class="add-widget-search" id="addWidgetSearch" hidden
+         placeholder="Search widgets" autocomplete="off" spellcheck="false"
+         aria-label="Search widgets">
   <div class="add-widget-scroll" id="addWidgetScroll">
   <div class="add-widget-grid">
     <!-- Three groups, in the order a first-time board reads them. The headings
          answer the one question the cards cannot: what you get when you click.
          "Suggested" is the handful you reach for daily, "Built-in widgets" is
-         everything else this file ships, and "Your widgets" is what the AI
+         everything else this file ships, and "My widgets" is what the AI
          panel has built for you. Group is positional, not an attribute: a
          card belongs to whichever heading it sits under, so dragging one
          across a heading moves it between groups and the stored order (which
@@ -5741,7 +5779,7 @@
          heading, its slot in the stored order and the reveal in
          applyAddCardGroups() are all in place, so the day a built widget
          survives its own deletion it lands here without another markup pass. -->
-    <div class="add-widget-grouphead" data-add-head="mine" hidden>Your widgets</div>
+    <div class="add-widget-grouphead" data-add-head="mine" hidden>My widgets</div>
   </div>
 
   <!-- The way back from a delete. Absent until something has been deleted,
@@ -5751,6 +5789,7 @@
     <button type="button" class="add-deleted-back" id="addDeletedBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Deleted</span></button>
     <div class="add-deleted-list" id="addDeletedList"></div>
   </div>
+    <div class="add-widget-empty" id="addWidgetEmpty" hidden></div>
   </div><!-- /.add-widget-scroll -->
   <button type="button" class="add-deleted-bar" id="addDeletedBar" hidden aria-haspopup="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg><span class="add-deleted-count" id="addDeletedCount">0 deleted</span>
@@ -19330,7 +19369,7 @@
       // the menu remembers leaving you.
       if (typeof showDeletedView === "function") showDeletedView(false);
       /* The AI panel can have built a widget since the last time this opened,
-         so "Your widgets" is rebuilt on the way in rather than at boot only. */
+         so "My widgets" is rebuilt on the way in rather than at boot only. */
       /* Chained, not fired and forgotten: renderMineCards is async (it waits
          on the library index), so a paint one frame later would measure the
          grid as it was BEFORE the library cards landed and leave every one of
@@ -19341,8 +19380,14 @@
       if (painted && painted.then) painted.then(function () {
         if (addWidgetPopup.hidden) return;
         paintAddPreviews();
+        applyAddSearch();
+        // The count changed, so the threshold has to be asked again.
+        syncAddSearchVisibility();
         updateAddScrollFade();
       }).catch(function () {});
+      /* A fresh field every time. A query left over from last time would
+         open the menu onto a filtered list with no visible cause. */
+      addWidgetSearch.value = ""; addQuery = "";
       addWidgetScroll.scrollTop = 0;
       /* After renderMineCards, never before: a library card is minted on the
          way in, so painting first would measure a grid that is about to grow
@@ -19352,6 +19397,13 @@
          decided by whether there is anything to scroll. */
       requestAnimationFrame(function () {
         if (typeof paintAddPreviews === "function") paintAddPreviews();
+        if (typeof applyAddSearch === "function") applyAddSearch();
+        if (typeof syncAddSearchVisibility === "function" && syncAddSearchVisibility()) {
+          /* Desktop only. Focusing a field on a phone summons the software
+             keyboard over a sheet that was opened to look at pictures, and
+             covers half of them to do it. */
+          if (!addIsTouch()) addWidgetSearch.focus();
+        }
         if (typeof updateAddScrollFade === "function") updateAddScrollFade();
       });
     }
@@ -19379,7 +19431,7 @@
        wait out; the six dots drag; and the rename is on the dots' click and
        on a hold of the name, neither of which the add path can consume. */
     const ADD_ORDER_KEY = "add-card-order";
-    // The arrangement this board last loaded, replayed when a "Your widgets"
+    // The arrangement this board last loaded, replayed when a "My widgets"
     // card turns up after boot and needs to find its saved slot.
     let lastAddOrder = null;
     const ADD_LABELS_KEY = "add-card-labels";
@@ -19445,7 +19497,7 @@
         : addCardTypeOf(n);
     }
 
-    /* ---------- "Your widgets" ----------
+    /* ---------- "My widgets" ----------
 
        One card per row in the custom-widget library (see __customWidgets).
        They are built here rather than shipped in the markup because the list
@@ -19627,13 +19679,158 @@
       applyAddCardGroups();
       renderDeletedBar();
     }
+    /* ---------- search ----------
+
+       Threshold-revealed, the way the hidden-widget shelf's own search is
+       (SHELF_SEARCH_MIN). Below the line this menu is six to ten cards you
+       can see at a glance, each carrying a picture of the widget it makes,
+       and a field to type a name into saves nobody anything. Above it --
+       "My widgets" is capped at LIB_MAX, 24 -- the same menu is thirty-odd
+       cards and seventeen rows of scrolling, which is a different object.
+
+       12 rather than the shelf's 6, because a shelf row is a line of text
+       and a card here is a 16:10 picture two to a row: 12 cards is six
+       rows, which is about one panel's worth before the scroll starts.
+
+       The real reason to build it is the keyboard. Until now the ONLY way
+       to add a widget was to move a pointer onto a card and press it. With
+       a field there is a path that never leaves the home row: open, type
+       three letters, Enter. */
+    const ADD_SEARCH_MIN = 12;
+    /* The board's own touch test, restated here rather than borrowed:
+       isMobile() further down this file is local to the phone shell's IIFE,
+       so naming it from here is a ReferenceError, not a falsy value. Same
+       two conditions it uses -- the coarse-pointer query, and the escape
+       hatch that lets a phone ask for the desktop layout. */
+    const ADD_TOUCH = window.matchMedia("(hover: none) and (pointer: coarse)");
+    function addIsTouch() {
+      return ADD_TOUCH.matches && !document.documentElement.classList.contains("force-desktop");
+    }
+    const addWidgetSearch = document.getElementById("addWidgetSearch");
+    const addWidgetEmpty = document.getElementById("addWidgetEmpty");
+    let addQuery = "";
+
+    function addCardName(el) {
+      const lab = addCardLabelEl(el);
+      // The name it carries NOW, so a card renamed to "Journal" is findable
+      // as Journal and not only as Page.
+      return ((lab && lab.textContent) || addCardTypeOf(el) || "").toLowerCase();
+    }
+
+    /* Prefix on the name, or on any word inside it: "cal" finds Google
+       Calendar, "tasks" finds Google Tasks. Deliberately not fuzzy --
+       across a list this short, fuzzy matching mostly produces confident
+       wrong answers, and the top match is what Enter is about to add. */
+    function addCardMatches(el, q) {
+      if (!q) return true;
+      const name = addCardName(el);
+      if (name.indexOf(q) === 0) return true;
+      return name.split(/[^a-z0-9]+/).some(function (w) { return w && w.indexOf(q) === 0; });
+    }
+
+    function visibleAddCards() {
+      return addCardEls().filter(function (el) {
+        return !el.hidden && el.getAttribute("data-filtered") !== "1";
+      });
+    }
+
+    function applyAddSearch() {
+      const q = addQuery;
+      addCardEls().forEach(function (el) {
+        if (!q || addCardMatches(el, q)) el.removeAttribute("data-filtered");
+        else el.setAttribute("data-filtered", "1");
+      });
+      /* Headings follow their cards. applyAddCardGroups already hides a
+         heading with nothing under it, but it counts `hidden` alone, so a
+         group emptied by a QUERY would keep its heading over no cards. */
+      applyAddCardGroups();
+      let head = null, shown = 0;
+      function settle() { if (head && !head.hidden) head.hidden = shown === 0; }
+      addGridNodes().forEach(function (n) {
+        if (n.classList.contains("add-widget-grouphead")) { settle(); head = n; shown = 0; }
+        else if (!n.hidden && n.getAttribute("data-filtered") !== "1") shown++;
+      });
+      settle();
+
+      const n = visibleAddCards().length;
+      addWidgetEmpty.hidden = !(q && n === 0);
+      if (!addWidgetEmpty.hidden) addWidgetEmpty.textContent = "No widget matches \u201c" + addWidgetSearch.value.trim() + "\u201d";
+      setActiveAddCard(q ? visibleAddCards()[0] || null : null);
+      updateAddScrollFade();
+    }
+
+    /* Where Enter would land. Kept off :hover deliberately -- a pointer and
+       the arrow keys can be in two places at once, and only one of them is
+       the thing Enter acts on. */
+    function setActiveAddCard(el) {
+      addCardEls().forEach(function (c) { c.classList.toggle("is-active", c === el); });
+      if (el) el.scrollIntoView({ block: "nearest" });
+    }
+    function activeAddCard() {
+      return addCardEls().filter(function (c) { return c.classList.contains("is-active"); })[0] || null;
+    }
+    function moveActiveAddCard(step) {
+      const list = visibleAddCards();
+      if (!list.length) return;
+      const i = list.indexOf(activeAddCard());
+      setActiveAddCard(list[(i < 0 ? (step > 0 ? 0 : list.length - 1) : (i + step + list.length) % list.length)]);
+    }
+
+    addWidgetSearch.addEventListener("input", function () {
+      addQuery = (addWidgetSearch.value || "").trim().toLowerCase();
+      addWidgetScroll.scrollTop = 0;
+      applyAddSearch();
+    });
+
+    addWidgetSearch.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        moveActiveAddCard(e.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (e.key === "Enter") {
+        const el = activeAddCard() || visibleAddCards()[0];
+        if (!el) return;
+        e.preventDefault();
+        closeAddWidgetPopup();
+        addWidgetOfType(addCardTypeOf(el), el);
+        return;
+      }
+      /* Escape clears a query before it closes the menu, so a mistyped
+         search is one key from a clean list rather than from square one.
+         Stopped either way, or the document handler closes the popup on the
+         same press that was only meant to clear the field. */
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        if (addWidgetSearch.value) {
+          e.preventDefault();
+          addWidgetSearch.value = ""; addQuery = ""; applyAddSearch();
+        } else {
+          closeAddWidgetPopup();
+        }
+      }
+    });
+
+    /* Shown or hidden by how many cards this account actually has, which is
+       decided after owner gating and after the library has loaded -- so it
+       is asked here, on the way in, rather than answered once at boot. */
+    function syncAddSearchVisibility() {
+      const many = addCardEls().filter(function (el) { return !el.hidden; }).length >= ADD_SEARCH_MIN;
+      addWidgetSearch.hidden = !many;
+      if (!many && addQuery) { addWidgetSearch.value = ""; addQuery = ""; applyAddSearch(); }
+      return many;
+    }
+
     /* Called once the session lands and the owner answer is known; see
        revealOwnerControls. The menu is built before the session resolves, so
        it draws the tester's set first and has to hear that it changed. */
     window.__mpsRefreshAddCards = function () {
       applyAddCardRemoved();
+      // Owner gating changes the count, which is what the threshold reads.
+      syncAddSearchVisibility();
       if (!addWidgetPopup.hidden) {
         paintAddPreviews();
+        applyAddSearch();
         updateAddScrollFade();
       }
     };
@@ -19669,6 +19866,15 @@
     function showDeletedView(on) {
       addDeletedView.hidden = !on;
       addCardGrid.hidden = !!on;
+      /* The folder is a different list, and the field does not filter it.
+         The query is dropped rather than kept, so coming back out lands on
+         the whole menu instead of on whatever was typed before going in. */
+      if (addWidgetSearch) {
+        addWidgetSearch.hidden = on || addWidgetSearch.hidden;
+        if (on && addQuery) { addWidgetSearch.value = ""; addQuery = ""; applyAddSearch(); }
+        if (!on) syncAddSearchVisibility();
+      }
+      if (addWidgetEmpty) addWidgetEmpty.hidden = true;
       if (on) renderDeletedList();
       addWidgetScroll.scrollTop = 0;
       updateAddScrollFade();
@@ -19951,7 +20157,7 @@
        keeps its mock until the answer lands and simply swaps then -- the box
        is a fixed size, so nothing moves when it does. */
     /* Serves BOTH kinds of card whose widget lives in a frame: the four
-       routine feeds, matched by name, and a "Your widgets" card, matched by
+       routine feeds, matched by name, and a "My widgets" card, matched by
        the library id its instance carries. They are one problem -- a
        sandboxed frame whose DOM this side cannot read -- so they get one
        answer rather than two that drift apart. */
@@ -20622,7 +20828,7 @@
          rather than only with the card that normally triggers it. */
       if (cardIsOwnerOnly(type)) return;
 
-      /* "Your widgets": a card standing for a row in the custom-widget
+      /* "My widgets": a card standing for a row in the custom-widget
          library, added back as a fresh tile running the code you had built. */
       if (String(type).indexOf(MINE_PREFIX) === 0) {
         const CW = window.__customWidgets;
@@ -20663,7 +20869,7 @@
         const CW = window.__customWidgets;
         if (!CW) { window.alert("The widget engine isn't ready yet. Try again in a second."); return; }
         /* library:false -- these four already have a card in this menu, and a
-           second one under "Your widgets" would list the same widget twice. */
+           second one under "My widgets" would list the same widget twice. */
         const feed = ROUTINE_FEEDS[type];
         const r = CW.create({
           name: feed.name, html: feed.html, css: feed.css, js: feed.js,
@@ -32474,12 +32680,12 @@
 
   const BLOB_KEY = function (id) { return "custom-widget:" + id; };
 
-  /* ---- the library: what "Your widgets" in the "+" menu is made of ----
+  /* ---- the library: what "My widgets" in the "+" menu is made of ----
 
      A widget the AI panel built is code you asked for, but the only copy of
      it lived in the instance's own blob -- which __unwireCustomSection wipes
      when the tile is deleted. Deleting a widget therefore destroyed it, and
-     the "+" menu had nothing to offer under "Your widgets".
+     the "+" menu had nothing to offer under "My widgets".
 
      The library is a second copy, written on every create and update and kept
      independently of any tile. Deleting a widget from the board now removes
@@ -32489,7 +32695,7 @@
      either one updates one entry rather than breeding copies.
 
      Routine feeds pass library:false -- they already have a card of their own
-     in the menu, and a second one under "Your widgets" would be the same
+     in the menu, and a second one under "My widgets" would be the same
      widget listed twice. */
   const LIB_KEY = function (lid) { return "mine-widget:" + lid; };
   const LIB_INDEX_KEY = "mine-widget-index";
@@ -33246,7 +33452,7 @@
   }
 
   /* Widgets built before the library existed carry no lid, so they would never
-     show up under "Your widgets" however many times you opened the menu. The
+     show up under "My widgets" however many times you opened the menu. The
      first time such a widget loads it is given one and filed, which is what
      puts the ones you already have on the shelf.
 
@@ -33498,7 +33704,7 @@
     }
     /* The instance goes: its saved data, its key list, its code. The library
        row this instance was a copy of is deliberately left alone -- that copy
-       is what "Your widgets" in the "+" menu offers, and deleting a tile is
+       is what "My widgets" in the "+" menu offers, and deleting a tile is
        not a request to destroy the widget you had built. The card in that
        menu can still be deleted, which parks it in the Deleted folder like
        any other card, so nothing here is a one-way door. */
@@ -33621,7 +33827,7 @@
     },
     isCustom: function (id) { return !!blobs[id]; },
 
-    /* ---- library, read by the "+" menu's "Your widgets" group ---- */
+    /* ---- library, read by the "+" menu's "My widgets" group ---- */
     libraryReady: loadLibrary,
     // Newest first: the thing you just built is the one you are looking for.
     library: function () {
