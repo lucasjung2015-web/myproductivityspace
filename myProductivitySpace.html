@@ -3057,14 +3057,6 @@
      sets its own display and can be hidden. */
   .add-widget-popup[hidden], .add-widget-overlay[hidden] { display: none; }
 
-  /* Notion's section label: small, grey, sentence case. It says what the list
-     below it is without pretending to be a window title. */
-  .add-widget-head {
-    flex: 0 0 auto; padding: 12px 15px 6px;
-    font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em;
-    color: var(--ink-soft);
-  }
-
   /* The scroller, as its own element so the label above it and the Deleted
      bar below it are outside the scroll. The two fade depths are written by
      JS (see updateAddScrollFade) and are 0px until the list actually
@@ -3072,7 +3064,9 @@
      really does overlap content, so a list that fits has no fade at all. */
   .add-widget-scroll {
     flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
-    padding: 0 15px; --fade-top: 0px; --fade-bot: 0px;
+    /* The top padding the panel title used to supply, now that the scroller
+       is the first thing in the panel. */
+    padding: 10px 15px 0; --fade-top: 0px; --fade-bot: 0px;
     -webkit-mask-image: linear-gradient(to bottom,
       transparent 0, #000 var(--fade-top),
       #000 calc(100% - var(--fade-bot)), transparent 100%);
@@ -3205,6 +3199,22 @@
              text-transform: uppercase; color: var(--ink-soft); }
   .amk-rule { height: 1px; background: var(--hair); margin: 1px 0; }
   .amk-tile { width: 13px; height: 13px; border-radius: 3px; background: rgba(10,10,10,0.08); flex: 0 0 auto; }
+  /* The text cursor on the blank page. Two pixels of the brand blue where a
+     first character would go -- enough to read as "waiting for you", not
+     enough to read as content. */
+  .amk-caret {
+    width: 1.5px; height: 11px; border-radius: 1px;
+    background: var(--mps-brand); opacity: 0.75; margin-top: 1px;
+  }
+  /* Paper. The Page card is the only preview that is not a photograph of a
+     widget, so it is the only one that gets to look like a material instead:
+     a warm sheet a shade off white, with its hairline and its header rule
+     tinted to match rather than left grey on yellow. */
+  .add-widget-preview.is-paper {
+    background: #FDF7DC;
+    border-color: #E8DDA8;
+  }
+  .add-widget-preview.is-paper .amk-head { border-bottom-color: #EBE1B4; }
 
   .add-widget-label {
     margin-top: 7px; padding: 0 2px;
@@ -5008,8 +5018,7 @@
     /* The grab handle every iOS sheet has is a ::before, so inside a flex
        column it is the first flex item and needs telling not to stretch. */
     html:not(.force-desktop) .add-widget-popup::before { flex: 0 0 auto; }
-    html:not(.force-desktop) .add-widget-head { padding: 2px 16px 6px; }
-    html:not(.force-desktop) .add-widget-scroll { padding: 0 16px; }
+    html:not(.force-desktop) .add-widget-scroll { padding: 4px 16px 0; }
     html:not(.force-desktop) .add-deleted-bar { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
     /* The grid stops at two columns rather than counting them from the width.
        A card now carries a 16:10 picture of a widget, and the point of the
@@ -5662,11 +5671,13 @@
 
 <div id="addWidgetOverlay" class="add-widget-overlay" hidden></div>
 <div id="addWidgetPopup" class="add-widget-popup" hidden>
-  <!-- Three rows: a section label, the scroller, and the Deleted bar. Only
-       the middle one moves, so the label still says what you are looking at
-       when you are four rows down the list, and the way into Deleted does not
-       drift off the bottom of the sheet. -->
-  <div class="add-widget-head">Add a widget</div>
+  <!-- Two rows: the scroller, and the Deleted bar under it. There is no
+       panel title. It said "Add a widget" over a menu opened by clicking a
+       "+" that is titled "Add a widget", above a "Suggested" heading that
+       was already labelling the first group -- three names for one thing,
+       two of them carrying nothing the third did not. The group headings do
+       the labelling now, and they do it better because they distinguish.
+       (Notion's own insert menu has no title either.) -->
   <div class="add-widget-scroll" id="addWidgetScroll">
   <div class="add-widget-grid">
     <!-- Three groups, in the order a first-time board reads them. The headings
@@ -19291,7 +19302,6 @@
     // already on the board) — so nothing needs an "already on board" badge
     // any more.
     const addWidgetScroll = document.getElementById("addWidgetScroll");
-    const addWidgetHead = addWidgetPopup.querySelector(".add-widget-head");
 
     function openAddWidgetPopup() {
       addWidgetPopup.hidden = false;
@@ -19591,11 +19601,6 @@
     function showDeletedView(on) {
       addDeletedView.hidden = !on;
       addCardGrid.hidden = !!on;
-      /* The label says which of the two lists you are looking at. Leaving it
-         on "Add a widget" over the Deleted folder would be naming the panel
-         rather than its contents, and the folder already has its own heading
-         one line below -- two headings, one of them wrong. */
-      if (addWidgetHead) addWidgetHead.textContent = on ? "Deleted cards" : "Add a widget";
       if (on) renderDeletedList();
       addWidgetScroll.scrollTop = 0;
       updateAddScrollFade();
@@ -19762,7 +19767,13 @@
       list:  ["list", "readingList"],
       cal:   ["cal", "calView"],
       tasks: ["tasks", "tasksView"],
-      page:  ["page"],
+      /* `page` is deliberately absent. Every other card photographs the
+         widget you already have because that IS what the card makes another
+         of -- a second List looks like your List. The Page card does not:
+         it makes an EMPTY page, so showing it full of last week's notes
+         advertises the wrong thing, and the one card whose whole promise is
+         "blank" was the one card showing somebody's writing. It keeps the
+         drawn stand-in, which is a blank sheet, which is the truth. */
       menu:  ["menu"]
     };
 
@@ -19961,10 +19972,10 @@
         row('<span class="amk-dot on"></span>' + bar(44, "lite")) +
         row('<span class="amk-dot"></span>' + bar(70)) +
         row('<span class="amk-dot"></span>' + bar(36)),
-      page:
-        row(bar(52, "dark")) + row(bar(96)) + row(bar(89)) +
-        row('<span class="amk-dot" style="width:3px;height:3px;border:0;background:rgba(10,10,10,.26)"></span>' + bar(64)) +
-        row('<span class="amk-dot" style="width:3px;height:3px;border:0;background:rgba(10,10,10,.26)"></span>' + bar(52, "lite")),
+      /* Nothing on it. A caret and no text: a page you are about to write
+         on, which is exactly what the button makes. Ruled lines or lorem
+         bars would be a page somebody had already used. */
+      page: '<div class="amk-caret"></div>',
       menu:
         '<div class="amk-cap">Pinned</div>' +
         row('<span class="amk-tile"></span><span class="amk-tile"></span>' +
@@ -20028,6 +20039,13 @@
       if (box) box.innerHTML = mockHtml(card);
     }
 
+    /* Only the Page card, and only ever the mock -- a live snapshot would
+       paint over this class's box with a real widget's own colour, which is
+       why `page` is not in PREVIEW_SOURCES. */
+    function markPaper(card, box) {
+      box.classList.toggle("is-paper", addCardTypeOf(card) === "page");
+    }
+
     /* Repainted on every open rather than kept: the board changes under this
        menu constantly, and a snapshot of a Page from four edits ago is worse
        than no snapshot, because it looks current. Ten cards of cloned DOM is
@@ -20044,6 +20062,7 @@
         // The mock goes down first either way, so the card is never empty
         // while a live one is being measured or waited for.
         box.innerHTML = mockHtml(card);
+        markPaper(card, box);
         try {
           const type = addCardTypeOf(card);
           const feed = ROUTINE_FEEDS[type];
@@ -20082,6 +20101,7 @@
       box.setAttribute("aria-hidden", "true");
       el.insertBefore(box, el.firstChild);
       box.innerHTML = mockHtml(el);
+      markPaper(el, box);
 
       const grip = document.createElement("span");
       grip.className = "add-widget-grip";
@@ -21361,7 +21381,29 @@
   // the single-word pipeline always used, so existing defaults are unchanged.
   function pickWords(list, count, periodDays, mode) {
     if (!list.length || count <= 0) return [];
-    const dayNumber = Math.floor(cacheRolloverDate.getTime() / 86400000);
+    /* vocabDayKey()'s clock, not `cacheRolloverDate`. That one is a const
+       computed while the file parses and never again, and it is what decides
+       WHICH words come out of the bank -- so on a tab that has been open
+       since Tuesday, every regeneration, on any day, walked to Tuesday's
+       block and returned Tuesday's words.
+
+       This is the half the last fix missed. That one moved the CACHE key on
+       to a live clock, so the day did roll over and the widget did rebuild
+       -- and then rebuilt the identical set, because the pick was still
+       reading the frozen date. A widget that regenerates correctly and
+       produces yesterday's answer looks exactly like one that never ran. */
+    /* Counted off the LOCAL calendar day, not off raw epoch milliseconds.
+       Dividing the timestamp by 86400000 counts UTC days, so the pick rolled
+       at 00:00 UTC while the cache key -- which reads getFullYear/getMonth/
+       getDate, and so is local -- rolled at 05:00 local. In New York that is
+       four hours apart, and in that gap the two disagreed about what day it
+       was: a load at 02:00 got a cache hit on yesterday's key holding words
+       the pick had already moved past, or generated tomorrow's set and filed
+       it under today. Date.UTC of the shifted date's own Y/M/D gives a number
+       that ticks exactly when vocabDayKey's string changes, so there is no
+       gap left for them to disagree in. */
+    const d = new Date(vocabDayMs());
+    const dayNumber = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
     const period = Math.floor(dayNumber / periodDays);
     count = Math.min(count, list.length);
     if (mode === "shuffle") {
@@ -21514,7 +21556,14 @@
       console.warn("Preloaded vocabulary selection failed, showing fallback:", e);
       liveVocab = FALLBACK; liveSource = "fallback"; liveError = String((e && e.message) || e);
       renderVocab(FALLBACK);
-      await storageSet(cacheKey, JSON.stringify(FALLBACK));
+      /* Deliberately NOT cached. It used to be, and that turned one bad
+         minute into a stale day: the fallback is a hardcoded pair of terms,
+         so writing it under today's key meant every reload for the rest of
+         the period was served the same two words from cache and never tried
+         again. A dictionary lookup that failed because the wifi dropped
+         should cost this render, not this day. The fallback still shows, so
+         the widget is never blank; it just does not get to call itself the
+         answer. */
     }
   }
 
@@ -21598,9 +21647,17 @@
      so coming back to the tab is checked too. Both call the same guard,
      which compares days and returns if they match, so the pair can never
      generate twice for one day. */
-  function vocabDayKey() {
+  /* ONE clock, read by both things that care what day it is: the cache key
+     (which decides whether to regenerate) and pickWords (which decides what
+     comes out). They were two clocks, one live and one frozen, and a cache
+     miss then regenerated the same set forever. Anything that needs today
+     asks here. */
+  function vocabDayMs() {
     // The same 5 AM shift the page-level dateKey applies, recomputed on ask.
-    const d = new Date(Date.now() - 5 * 60 * 60 * 1000);
+    return Date.now() - 5 * 60 * 60 * 1000;
+  }
+  function vocabDayKey() {
+    const d = new Date(vocabDayMs());
     return d.getFullYear() + "-" +
       String(d.getMonth() + 1).padStart(2, "0") + "-" +
       String(d.getDate()).padStart(2, "0");
