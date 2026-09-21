@@ -236,13 +236,19 @@
      the sign-in screen. Semantic tag colors (status/type/depth pills) are
      functional, not brand, and are deliberately left alone. */
   :root {
-    /* Two jobs, two tokens. BRAND is the product: the wordmark band, the sign-in
-       screen, the mark itself. It is fixed, and a user's colour choice never
-       reaches it -- a board in someone's favourite green should still be
-       recognisably this app. ACCENT means one thing only, "this is pressable",
-       and it is the one the Appearance picker rewrites. Both start on the same
-       blue, which is why nothing looks different until somebody chooses. */
+    /* Two tokens, split by what they belong to rather than by how loud they are.
+
+       BRAND is the app: the wordmark band, the sign-in screen, the mark, the AI
+       panel, the account menu, the "+" menu, the modals, the phone's tab bar.
+       Fixed, and no setting reaches it -- the app is the same app whatever is
+       on the board inside it.
+
+       ACCENT is the board: the buttons and selected states inside a widget, and
+       everything inside a created widget's frame. This is what the Appearance
+       picker rewrites. Both start on the same blue, which is why nothing looks
+       different until somebody chooses. */
     --mps-brand: #3A6EA5;
+    --mps-brand-hover: #2F5A88;
     --mps-accent: #3A6EA5;
     --mps-accent-hover: #2F5A88;
     /* The accent at fill strength, for a quiet control's hover. Set alongside
@@ -534,7 +540,7 @@
   }
   .bookmark-folder-cancel:hover { background: #e0e0e0; }
   .bookmark-folder-save {
-    border: none; background: #000000; color: #ffffff; padding: 10px 24px;
+    border: none; background: var(--mps-accent); color: #ffffff; padding: 10px 24px;
   }
   .bookmark-folder-save:hover { background: #222222; }
 
@@ -606,7 +612,7 @@
   }
   .link-edit-remove:hover { background: #fbe9e9; }
   .link-edit-done {
-    border: none; background: #000000; color: #ffffff; font-size: 12px; font-weight: 600;
+    border: none; background: var(--mps-accent); color: #ffffff; font-size: 12px; font-weight: 600;
     font-family: inherit; cursor: pointer; padding: 4px 10px; border-radius: 4px;
   }
   .link-edit-done:hover { background: #222222; }
@@ -933,7 +939,7 @@
     font-family: inherit; font-size: 13px; outline: none;
   }
   .hidden-shelf-search::placeholder { color: var(--ink-soft); }
-  .hidden-shelf-search:focus { border-color: var(--mps-accent); background: var(--bg); }
+  .hidden-shelf-search:focus { border-color: var(--mps-brand); background: var(--bg); }
   .hidden-shelf-search[hidden] { display: none; }
 
   /* The list. Same element, same id it has always had, so every place that
@@ -1671,9 +1677,12 @@
   }
   .duration-unit { font-size: 10.5px; color: #555555; font-weight: 600; }
 
+  /* Every widget's own "add" button. Takes the board's accent rather than a
+     hardcoded colour, so choosing one in Appearance reaches the controls people
+     actually press all day. */
   .add-task-btn {
     align-self: flex-start; margin-bottom: 10px; padding: 8px 13px;
-    border: none; border-radius: 9px; background: #000000; color: #ffffff;
+    border: none; border-radius: 9px; background: var(--mps-accent); color: #ffffff;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
     cursor: pointer; transition: background 0.15s ease, transform 0.1s var(--ease-spring);
   }
@@ -1685,7 +1694,7 @@
      dynamically built reading-list widgets (see __buildReadingListSection,
      which names its button `id + "AddBtn"`); without it those copies would
      stay blue while the static one turned black. */
-  #addReadingBtn, #addGTaskBtn, .add-task-btn[id$="AddBtn"] { background: #000000; }
+  #addReadingBtn, #addGTaskBtn, .add-task-btn[id$="AddBtn"] { background: var(--mps-accent); }
   #addReadingBtn:hover, #addGTaskBtn:hover, .add-task-btn[id$="AddBtn"]:hover { background: #222222; }
   #gtaskSignedOut[hidden] { display: none; }
   /* The check-circle-plus glyph replaces the "+" text, so the icon sits on the
@@ -1712,7 +1721,7 @@
   /* "Connect Google Calendar" / "Connect Google Tasks" are black-on-white-text
      like every other primary action now — this used to be the one deliberate
      exception that kept .add-task-btn's blue. */
-  #calConnectBtn, #gtaskConnectBtn, .cal-connect-btn { background: #000000; color: #ffffff; }
+  #calConnectBtn, #gtaskConnectBtn, .cal-connect-btn { background: var(--mps-accent); color: #ffffff; }
   #calConnectBtn:hover, #gtaskConnectBtn:hover, .cal-connect-btn:hover { background: #222222; }
   #mainTasksList { display: flex; flex-direction: column; gap: 10px; }
 
@@ -1809,13 +1818,13 @@
   .cal-viewtoggle-shortcut { font-size: 12px; color: #6b6b6b; }
   .cal-create-btn {
     flex: 0 0 auto; padding: 5px 11px;
-    border: none; border-radius: 9px; background: #000000; color: #ffffff;
+    border: none; border-radius: 9px; background: var(--mps-accent); color: #ffffff;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
     cursor: pointer;
   }
   /* Scoped to the id, not .cal-create-btn, so any future toolbar reusing the
      class keeps the default blue. */
-  #calCreateBtn { background: #000000; }
+  #calCreateBtn { background: var(--mps-accent); }
   #calCreateBtn:hover { background: #222222; }
 
   .cal-navbar { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-bottom: 4px; }
@@ -2056,7 +2065,7 @@
   }
   .cal-recur-cancel { border: 1px solid var(--hair); background: #ffffff; color: var(--ink); }
   .cal-recur-cancel:hover { background: var(--panel); }
-  .cal-recur-done { border: 1px solid #000000; background: #000000; color: #ffffff; }
+  .cal-recur-done { border: 1px solid var(--mps-accent); background: var(--mps-accent); color: #ffffff; }
   .cal-recur-done:hover { background: #222222; }
 
   /* ---------- custom resize grip ----------
@@ -2244,7 +2253,7 @@
   }
   .gt-pop-cancel:hover { background: #e3e9f5; }
   .gt-pop-done {
-    border: none; background: #000000; color: #ffffff; cursor: pointer;
+    border: none; background: var(--mps-accent); color: #ffffff; cursor: pointer;
     font-family: inherit; font-size: 14px; font-weight: 600; padding: 10px 26px; border-radius: 999px;
   }
   .gt-pop-done:hover { background: #222222; }
@@ -2337,7 +2346,7 @@
     padding: 5px 11px; border-radius: 9px;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px; cursor: pointer;
   }
-  .cal-panel-save { border: none; background: #000000; color: #ffffff; font-weight: 600; }
+  .cal-panel-save { border: none; background: var(--mps-accent); color: #ffffff; font-weight: 600; }
   .cal-panel-save:hover { background: #222222; }
   .cal-panel-cancel { border: 1px solid #000000; background: transparent; color: #000000; }
   /* Only present when editing something that already exists. margin-right:auto
@@ -2392,7 +2401,7 @@
   .cal-daycell:hover { border-color: #000000; }
   .cal-daycell.other-month { opacity: 0.35; }
   .cal-daycell.today .cal-daynum {
-    background: #000000; color: #ffffff; border-radius: 50%;
+    background: var(--mps-accent); color: #ffffff; border-radius: 50%;
     width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center;
   }
   .cal-daynum { font-size: 11px; font-weight: bold; color: #000000; }
@@ -2632,7 +2641,7 @@
     width: 34px; height: 34px; border-radius: 8px; border: none; background: #f0f0f0;
     color: #000000; cursor: pointer; display: grid; place-items: center; padding: 0;
   }
-  .timer-play-pause:hover, .timer-reset:hover { background: #000000; color: #ffffff; }
+  .timer-play-pause:hover, .timer-reset:hover { background: var(--mps-accent); color: #ffffff; }
   .timer-play-pause svg, .timer-reset svg { width: 15px; height: 15px; }
 
   .cal-timer-btn {
@@ -2644,7 +2653,7 @@
   .cal-timer-btn svg { width: 12px; height: 12px; }
   .cal-taskrow:hover .cal-timer-btn, .cal-taskrow:focus-within .cal-timer-btn,
   .cal-timer-btn.mini-expanded { opacity: 1; }
-  .cal-timer-btn.mini-expanded { background: #000000; color: #ffffff; }
+  .cal-timer-btn.mini-expanded { background: var(--mps-accent); color: #ffffff; }
   .cal-timer-btn:hover { background: #f0f0f0; }
   .cal-timer-btn.mini-expanded:hover { background: #222222; }
 
@@ -2878,9 +2887,9 @@
      anchor of the row, so it inverts to a solid black disc. Same 28px
      footprint as its neighbours — prominence comes from contrast, not size. */
   #aiPanelBtn {
-    background: var(--mps-accent); color: var(--bg); border-radius: 50%; opacity: 1;
+    background: var(--mps-brand); color: var(--bg); border-radius: 50%; opacity: 1;
   }
-  #aiPanelBtn:hover { background: var(--mps-accent-hover); }
+  #aiPanelBtn:hover { background: var(--mps-brand-hover); }
   /* While the blue band is behind the row: white icons, and the AI disc
      inverts to white with a blue star so it still reads as the anchor. */
   html.mps-on-band #alwaysOnTopBtn, html.mps-on-band #connectionsBtn,
@@ -2911,6 +2920,14 @@
     display: grid; place-items: center;
   }
   #profileBtn .pb-avatar svg { width: 17px; height: 17px; display: block; }
+  /* The picture from the Google account, when there is one. It is added by
+     paintAvatar and removes itself if it fails to load, which is what makes
+     the fallback glyph beside it reappear on its own. */
+  .pb-avatar img, .pm-avatar img {
+    width: 100%; height: 100%; border-radius: 50%;
+    object-fit: cover; display: block;
+  }
+  .pb-avatar:has(img) svg, .pm-avatar:has(img) svg { display: none; }
   #profileBackdrop { position: fixed; inset: 0; z-index: 4400; background: transparent; }
   #profileBackdrop[hidden], #profileMenu[hidden] { display: none; }
   #profileMenu {
@@ -2951,7 +2968,7 @@
   .pm-swatch:hover { transform: scale(1.12); }
   .pm-swatch[aria-checked="true"] { border-color: var(--ink); }
   .pm-swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  .pm-appearance-note { font-size: 11px; color: var(--ink-soft); margin-top: 9px; }
+
   .pm-me { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
   /* The avatar carries its pencil badge, which is intentionally inert for
      now: there is no upload path behind it yet, and a control that looks
@@ -2983,7 +3000,7 @@
   .pm-row:hover { background: #f1f3f4; }
   .pm-row-icon {
     flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
-    display: grid; place-items: center; background: var(--mps-accent); color: var(--bg);
+    display: grid; place-items: center; background: var(--mps-brand); color: var(--bg);
   }
   .pm-row.is-signout .pm-row-icon { background: transparent; color: var(--ink); }
   .pm-row-icon svg { width: 18px; height: 18px; display: block; }
@@ -3120,7 +3137,7 @@
   .add-deleted-recover {
     flex: 0 0 auto; padding: 5px 8px;
     border: 0; border-radius: 6px; background: transparent;
-    font-family: inherit; font-size: 12px; font-weight: 600; color: var(--mps-accent);
+    font-family: inherit; font-size: 12px; font-weight: 600; color: var(--mps-brand);
     cursor: pointer;
   }
   .add-deleted-recover:hover { background: rgba(58, 110, 165, 0.10); }
@@ -3128,7 +3145,7 @@
   .add-widget-rename {
     font: inherit; font-size: 12px; font-weight: 600; text-align: center;
     width: 100%; min-width: 0; color: #000000; background: #ffffff;
-    border: 1px solid var(--mps-accent); border-radius: 4px; padding: 1px 2px;
+    border: 1px solid var(--mps-brand); border-radius: 4px; padding: 1px 2px;
     outline: none; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
   }
 
@@ -3245,8 +3262,8 @@
   }
   .mps-btn:hover { background: #f5f5f6; border-color: #c9c9c9; }
   .mps-btn:active { transform: scale(0.96); }
-  .mps-btn.is-primary { background: var(--mps-accent); color: var(--bg); border-color: var(--mps-accent); }
-  .mps-btn.is-primary:hover { background: var(--mps-accent-hover); }
+  .mps-btn.is-primary { background: var(--mps-brand); color: var(--bg); border-color: var(--mps-brand); }
+  .mps-btn.is-primary:hover { background: var(--mps-brand-hover); }
   .mps-btn.is-icon { width: 30px; height: 30px; padding: 0; border-radius: 50%; }
 
   .mps-menu {
@@ -3277,7 +3294,7 @@
     transition: background 0.12s ease, color 0.12s ease;
   }
   .mps-seg button:hover { color: var(--ink); }
-  .mps-seg button.is-active { background: var(--mps-accent); color: var(--bg); }
+  .mps-seg button.is-active { background: var(--mps-brand); color: var(--bg); }
 
   .mps-search {
     display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0;
@@ -3503,7 +3520,7 @@
   .ai-log:empty { justify-content: center; align-items: center; }
   .ai-log:empty::before {
     content: ""; width: 140px; height: 140px; flex: 0 0 auto;
-    background: var(--mps-accent);
+    background: var(--mps-brand);
     -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
     mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
   }
@@ -3511,7 +3528,7 @@
     max-width: 84%; padding: 9px 13px; border-radius: 14px;
     font-size: 13.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word;
   }
-  .ai-msg.is-user { align-self: flex-end; background: var(--mps-accent); color: var(--bg); }
+  .ai-msg.is-user { align-self: flex-end; background: var(--mps-brand); color: var(--bg); }
   /* A defined edge rather than --hair: at this size a near-white hairline
      doesn't read as a bubble at all, and the panel has no colour to lean on. */
   /* The reply is plain text on the panel, not a second bubble facing the
@@ -3700,7 +3717,7 @@
   .ai-send {
     flex: 0 0 auto; width: 30px; height: 30px; padding: 0;
     display: flex; align-items: center; justify-content: center;
-    border: none; border-radius: 50%; background: var(--mps-accent); color: var(--bg);
+    border: none; border-radius: 50%; background: var(--mps-brand); color: var(--bg);
     cursor: pointer; transition: background 0.12s ease, transform 0.1s var(--ease-spring);
   }
   /* The same button, doing the opposite job. Kept in place, the same size
@@ -3712,7 +3729,7 @@
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.55; }
   }
-  .ai-send:hover { background: var(--mps-accent-hover); }
+  .ai-send:hover { background: var(--mps-brand-hover); }
   .ai-send:active { transform: scale(0.9); }
   .ai-send:disabled { opacity: 0.4; cursor: default; }
 
@@ -3805,7 +3822,7 @@
     transition: transform 0.1s var(--ease-spring);
   }
   .ai-confirm-row button:active { transform: scale(0.95); }
-  .ai-confirm-yes { background: var(--mps-accent); color: var(--bg); }
+  .ai-confirm-yes { background: var(--mps-brand); color: var(--bg); }
   .ai-confirm-no { background: transparent; color: var(--ink); }
   .ai-confirm.is-settled { color: #4a4a4a; border-color: var(--hair); }
   .ai-confirm.is-settled .ai-confirm-row { display: none; }
@@ -3843,7 +3860,7 @@
     padding: 4px 10px; border-radius: 999px; border: 1px solid var(--hair);
     background: transparent; color: var(--ink); font-family: inherit; font-size: 12px; cursor: pointer;
   }
-  .cw-tab.is-active { background: var(--mps-accent); color: var(--bg); border-color: var(--mps-accent); }
+  .cw-tab.is-active { background: var(--mps-brand); color: var(--bg); border-color: var(--mps-brand); }
   .cw-code {
     width: 100%; height: 190px; resize: vertical; box-sizing: border-box;
     padding: 8px 10px; border: 1px solid var(--hair); border-radius: 8px;
@@ -3884,7 +3901,7 @@
   .cw-actions button {
     padding: 6px 13px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
   }
-  .cw-apply { border: 1px solid var(--mps-accent); background: var(--mps-accent); color: var(--bg); }
+  .cw-apply { border: 1px solid var(--mps-brand); background: var(--mps-brand); color: var(--bg); }
   .cw-reset { border: 1px solid var(--hair); background: transparent; color: var(--ink); }
   .ai-thinking { display: inline-flex; align-items: center; gap: 4px; }
   .ai-thinking i {
@@ -5191,7 +5208,7 @@
     .mob-seg button svg { width: 16px; height: 16px; display: block; }
     .mob-seg .mob-thumb {
       position: absolute; top: 3px; left: 3px; width: 38px; height: 34px;
-      border-radius: 9px; background: var(--mps-accent); z-index: 1;
+      border-radius: 9px; background: var(--mps-brand); z-index: 1;
       transition: transform 240ms cubic-bezier(.22,1,.36,1);
     }
     body.widget-fullscreen-mode .mob-seg,
@@ -5214,7 +5231,7 @@
       width: 6px; height: 6px; border-radius: 50%; background: var(--hair);
       transition: background .18s, transform .18s;
     }
-    .mob-pdots span.is-on { background: var(--mps-accent); transform: scale(1.22); }
+    .mob-pdots span.is-on { background: var(--mps-brand); transform: scale(1.22); }
     .mob-tabs {
       display: flex; gap: 7px; overflow-x: auto; padding: 0 12px 4px;
       scrollbar-width: none;
@@ -5228,7 +5245,7 @@
       white-space: nowrap; cursor: pointer;
     }
     .mob-tab .mt-em { font-size: 14px; }
-    .mob-tab.is-on { background: var(--mps-accent); color: var(--bg); }
+    .mob-tab.is-on { background: var(--mps-brand); color: var(--bg); }
     body.widget-fullscreen-mode .mob-chrome,
     body.subpage-fullscreen-mode .mob-chrome,
     body.pip-active .mob-chrome,
@@ -5329,7 +5346,7 @@
         <!-- Inert on purpose: no avatar upload exists yet. Rendered rather
              than omitted so the shape of the feature is visible, and
              disabled + not-allowed so it never reads as merely broken. -->
-        <button type="button" class="pm-pencil" disabled aria-label="Change picture (not available yet)" title="Profile pictures aren't available yet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button type="button" class="pm-pencil" disabled aria-label="Change picture (not available yet)" title="Your picture comes from your Google account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
       </span>
       <span style="min-width:0">
         <div class="pm-name" id="profileName">Signed in</div>
@@ -5341,7 +5358,6 @@
   <div class="pm-card pm-appearance">
     <div class="pm-appearance-label" id="pmAppearanceLabel">Appearance</div>
     <div class="pm-swatches" id="pmSwatches" role="radiogroup" aria-labelledby="pmAppearanceLabel"></div>
-    <div class="pm-appearance-note" id="pmAccentNote">Blue &middot; the default</div>
   </div>
 
   <div class="pm-card">
@@ -12952,7 +12968,54 @@
       const nEl = gateEl("profileName"), eEl = gateEl("profileEmail");
       if (nEl) nEl.textContent = name;
       if (eEl) eEl.textContent = email;
+      paintAvatar(meta, name);
     }
+
+    /* Google hands the picture over with the session, so this is a read rather
+       than a fetch. Both placements get it: the 26px button in the corner and
+       the 62px one inside the menu.
+
+       An <img> that removes itself on error, rather than a background-image:
+       a background that 404s leaves an empty grey disc with no way to notice,
+       while this puts the fallback glyph back automatically (see the :has
+       rules in the stylesheet). no-referrer because lh3.googleusercontent.com
+       serves nothing to a request carrying an unknown origin. */
+    function paintAvatar(meta, name) {
+      const url = String((meta && (meta.avatar_url || meta.picture)) || "").trim();
+      [["profileBtn", ".pb-avatar", 64], ["profileMenu", ".pm-avatar", 128]].forEach(function (spec) {
+        const host = gateEl(spec[0]);
+        const slot = host && host.querySelector(spec[1]);
+        if (!slot) return;
+        const existing = slot.querySelector("img");
+        if (!url) { if (existing) existing.remove(); return; }
+        // Google sizes the file through the URL itself; ask for the one this
+        // slot actually needs at 2x instead of scaling a 96px crop.
+        const sized = url.replace(/=s\d+(-c)?$/, "=s" + spec[2] + "-c");
+        if (existing) { if (existing.getAttribute("src") !== sized) existing.setAttribute("src", sized); return; }
+        const img = document.createElement("img");
+        img.alt = "";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+        img.addEventListener("error", function () { img.remove(); });
+        img.src = sized;
+        slot.appendChild(img);
+      });
+      if (name) {
+        const btn = gateEl("profileBtn");
+        if (btn) btn.title = name;
+      }
+    }
+
+    /* The corner button is on screen long before anyone opens the menu, so the
+       picture is painted once the session lands rather than on first open. */
+    (async function paintOnBoot() {
+      try { await window.__mpsSync.ready; } catch (e) {}
+      try {
+        const u = (window.__mpsSync.user && window.__mpsSync.user()) || null;
+        const meta = (u && u.user_metadata) || {};
+        paintAvatar(meta, meta.full_name || meta.name || "");
+      } catch (e) {}
+    })();
 
     function open() {
       paint();
@@ -13403,7 +13466,12 @@
     { name: "Amber",  accent: "#8E6229", hover: "#745122" },
     { name: "Red",    accent: "#B5483C", hover: "#953B31" },
     { name: "Pink",   accent: "#AF447A", hover: "#913864" },
-    { name: "Purple", accent: "#8853B5", hover: "#704299" }
+    { name: "Purple", accent: "#8853B5", hover: "#704299" },
+    /* The exception to the equal-lightness rule above, and a safe one: black is
+       darker than every swatch here rather than lighter, so contrast only ever
+       improves (21:1 on white, 15:1 on the palest widget tint). It is also what
+       these buttons were before they had a token, so it is the way back. */
+    { name: "Black",  accent: "#000000", hover: "#333333" }
   ];
 
   function accentDefOf(hex) {
@@ -13430,8 +13498,6 @@
     st.setProperty("--mps-accent", sw.accent);
     st.setProperty("--mps-accent-hover", sw.hover);
     st.setProperty("--mps-accent-wash", accentWash(sw.accent));
-    const note = document.getElementById("pmAccentNote");
-    if (note) note.textContent = sw.name + (sw.isDefault ? " · the default" : " · " + sw.accent);
     const row = document.getElementById("pmSwatches");
     if (row) {
       Array.prototype.forEach.call(row.children, function (b) {
@@ -31430,7 +31496,7 @@
     "      readyResolve(); emit('ready'); }",
     "    else if (m.t === 'reply'){ var p = pending[m.rid]; if (p){ delete pending[m.rid]; m.ok ? p.res(m.value) : p.rej(new Error(m.error||'store error')); } }",
     "    else if (m.t === 'theme'){ theme = m.value; mps.theme = theme; document.documentElement.style.setProperty('--mps-bg', theme); emit('theme', theme); }",
-    "    else if (m.t === 'accent'){ mps.accent = m.value; var st = document.documentElement.style; st.setProperty('--mps-accent', m.value); st.setProperty('--mps-accent-hover', m.hover); emit('accent', m.value); }",
+    "    else if (m.t === 'accent'){ mps.accent = m.value; var st = document.documentElement.style; st.setProperty('--mps-accent', m.value); st.setProperty('--mps-accent-hover', m.hover); st.setProperty('--mps-accent-wash', m.wash); emit('accent', m.value); }",
     "    else if (m.t === 'size'){ size = m.value; mps.size = size; emit('size', size); }",
     "    else if (m.t === 'topic'){ emit('topic', {topic: m.topic, value: m.value, at: m.at, from: m.from}); }",
     "    else if (m.t === 'probe'){ var r = {t:'probeReply', rid: m.rid};",
@@ -31496,6 +31562,12 @@
   function accentHoverHex() {
     try { return window.__mpsAccent().hover; } catch (e) { return "#2F5A88"; }
   }
+  // The accent at fill strength, for a hover inside a widget.
+  function accentWashRgba() {
+    const h = accentHex().replace("#", "");
+    return "rgba(" + parseInt(h.slice(0, 2), 16) + "," + parseInt(h.slice(2, 4), 16) +
+           "," + parseInt(h.slice(4, 6), 16) + ",0.10)";
+  }
 
   function compose(id, blob) {
     const csp = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
@@ -31510,6 +31582,7 @@
          accent to use and picked its own. */
       "<style>:root{color-scheme:light;--mps-bg:" + (themes[id] || "#FFFFFF") +
         ";--mps-accent:" + accentHex() + ";--mps-accent-hover:" + accentHoverHex() +
+        ";--mps-accent-wash:" + accentWashRgba() +
         ";--ink:#0a0a0a;--ink-soft:#6b6b6b;--hair:#e4e4e4;--panel:#fafafa}" +
       "html,body{margin:0;min-height:100%;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0a0a0a;background:transparent}" +
       "*{box-sizing:border-box}button,input,select,textarea{font:inherit}</style>" +
@@ -32266,7 +32339,7 @@
        immediately rather than on their next mount. */
     notifyAccent: function (accent, hover) {
       Object.keys(blobs).forEach(function (id) {
-        post(id, { t: "accent", value: accent, hover: hover });
+        post(id, { t: "accent", value: accent, hover: hover, wash: accentWashRgba() });
       });
     },
     isCustom: function (id) { return !!blobs[id]; },
@@ -33325,7 +33398,7 @@
     "- Hover fill: rgba(0,0,0,0.04). Pressed or selected: rgba(0,0,0,0.08).",
     "- Tag, pill and callout backgrounds: the board's pastel presets. Red #FADBD9, Orange #FDE8D2, Yellow #FDF3D0, Green #DCF0DC, Blue #D6E6FB, Purple #E6DCF5, Pink #FCE0EC, Gray #EDEDED. Text on them stays var(--ink).",
     "- Emphasis or error text: #E03131 (the board's red accent), used sparingly.",
-    "- The board's palette is injected into every frame: var(--mps-accent) and var(--mps-accent-hover) for anything the user can press, var(--ink) and var(--ink-soft) for text, var(--hair) for rules and borders, var(--panel) for a recessed surface. Use them instead of choosing colours: the accent is set by the user and a widget that hardcodes a blue stops matching the board the moment they change it. Reserve a red of your own for destructive actions only.\n" +
+    "- The board's palette is injected into every frame: var(--mps-accent), var(--mps-accent-hover) and var(--mps-accent-wash) for anything the user can press, var(--ink) and var(--ink-soft) for text, var(--hair) for rules and borders, var(--panel) for a recessed surface. Use them instead of choosing colours: the accent is set by the user and a widget that hardcodes a blue stops matching the board the moment they change it. Reserve a red of your own for destructive actions only.\n" +
     "- Inside a frame the widget background is var(--mps-bg); leave the body background transparent so the widget colour shows through.",
     "",
     "TYPE",
