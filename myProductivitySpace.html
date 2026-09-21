@@ -3004,45 +3004,251 @@
   .pm-row-icon svg { width: 18px; height: 18px; display: block; }
 
 
+  /* ---------- the "+" menu ----------
+
+     A Notion-shaped panel wearing Apple's materials and motion. Notion sets
+     the anatomy: a quiet grey section label rather than a title bar, cards
+     with no chrome of their own that come forward on hover, one accent and
+     otherwise a grey scale. Apple sets the surface and the movement: a
+     translucent pane that scales out of the "+" it came from, cards that
+     answer on pointer-DOWN rather than on release, a scroll edge that fades
+     where content passes under the chrome instead of a hard rule.
+
+     428px rather than the 280px it used to be. A card used to be a 36px icon
+     and a word; a card is now a picture of the widget it makes, and a picture
+     you cannot read is not worth the space it takes. */
   .add-widget-overlay { position: fixed; inset: 0; z-index: 4000; background: transparent; }
+
   /* Tracks the sidebar for the same reason its trigger button does. */
   .add-widget-popup {
     position: fixed; top: 44px; right: calc(12px + var(--ai-panel-w)); z-index: 4001;
-    background: #ffffff; border: 1px solid #000000; border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.16);
-    padding: 10px;
+    width: 428px;
+    /* The panel is a column with one scrolling row in the middle, so the
+       section label and the Deleted bar stay put while the cards move. It is
+       pinned 44px from the top, so the most it can ever be is what is below
+       that -- and ten cards carrying previews are taller than that on any
+       laptop, which is what made the last card unreachable. */
+    max-height: min(calc(100vh - 68px), 660px);
+    display: flex; flex-direction: column;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(10, 10, 10, 0.09);
+    border-radius: 14px;
+    /* Two shadows rather than one: a tight contact shadow that seats the
+       panel on the page, and a wide soft one that gives it height. A surface
+       this large should read as thicker than a chip does. */
+    box-shadow: 0 1px 3px rgba(10,10,10,0.07), 0 18px 48px rgba(10,10,10,0.20);
+    /* It belongs to the "+" button, so it grows out of the corner the button
+       is in and collapses back to it -- in and out along one path. */
+    transform-origin: top right;
+    animation: add-widget-in 0.26s var(--ease-spring) both;
   }
-  /* `display: grid` (set on .add-widget-grid) has the same specificity as the
-     UA stylesheet's `[hidden] { display: none }` and — being declared later —
-     would win and keep the popup visible even while `hidden` is set, without
-     this. The same trick is needed on every other child here that sets its own
-     display and can be hidden. */
+  /* Materialize, do not fade: blur and scale move together so the panel reads
+     as a pane of glass arriving rather than a picture turned up from zero. */
+  @keyframes add-widget-in {
+    from { opacity: 0; transform: scale(0.95) translateY(-6px); filter: blur(5px); }
+    to   { opacity: 1; transform: none; filter: blur(0); }
+  }
+  /* `display: flex` (and `display: grid` on .add-widget-grid) has the same
+     specificity as the UA stylesheet's `[hidden] { display: none }` and --
+     being declared later -- would win and keep the popup on screen while
+     `hidden` is set. The same trick is needed on every other box here that
+     sets its own display and can be hidden. */
   .add-widget-popup[hidden], .add-widget-overlay[hidden] { display: none; }
-  .add-widget-grid[hidden] { display: none; }
-  /* Three columns rather than two. Ten cards at two columns is five rows of a
-     narrow strip; at three it is four rows of something closer to square, and
-     a shorter list to run your eye down. */
+
+  /* Notion's section label: small, grey, sentence case. It says what the list
+     below it is without pretending to be a window title. */
+  .add-widget-head {
+    flex: 0 0 auto; padding: 12px 15px 6px;
+    font-size: 11.5px; font-weight: 600; letter-spacing: 0.01em;
+    color: var(--ink-soft);
+  }
+
+  /* The scroller, as its own element so the label above it and the Deleted
+     bar below it are outside the scroll. The two fade depths are written by
+     JS (see updateAddScrollFade) and are 0px until the list actually
+     overflows -- a scroll edge effect belongs only where floating chrome
+     really does overlap content, so a list that fits has no fade at all. */
+  .add-widget-scroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding: 0 15px; --fade-top: 0px; --fade-bot: 0px;
+    -webkit-mask-image: linear-gradient(to bottom,
+      transparent 0, #000 var(--fade-top),
+      #000 calc(100% - var(--fade-bot)), transparent 100%);
+    mask-image: linear-gradient(to bottom,
+      transparent 0, #000 var(--fade-top),
+      #000 calc(100% - var(--fade-bot)), transparent 100%);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(10,10,10,0.18) transparent;
+  }
+  .add-widget-scroll::-webkit-scrollbar { width: 8px; }
+  .add-widget-scroll::-webkit-scrollbar-thumb {
+    background: rgba(10,10,10,0.16); border-radius: 99px;
+    border: 2px solid transparent; background-clip: content-box;
+  }
+
+  /* Two columns, not three. A preview has to be big enough to recognise the
+     widget in it; at three across on a 428px panel it would be a thumbnail of
+     a thumbnail. */
   .add-widget-grid {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 280px;
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    padding: 4px 0 10px;
   }
+  .add-widget-grid[hidden] { display: none; }
+
   .add-widget-card {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    padding: 12px 8px; border: 1px solid #e5e5e5; border-radius: 8px;
-    background: #fafafa; cursor: pointer; position: relative;
+    display: block; position: relative;
+    padding: 6px 6px 8px; border: 1px solid transparent; border-radius: 11px;
+    background: transparent; cursor: pointer; text-align: left;
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    transition: background-color 0.16s var(--ease-spring),
+                transform 0.12s var(--ease-spring);
   }
-  .add-widget-card:hover { background: #f0f0f0; border-color: #cccccc; }
-  /* display:flex above has the same specificity as the UA stylesheet's
+  .add-widget-card:hover { background: rgba(10,10,10,0.045); }
+  /* The feedback is on the PRESS, not on the release. Waiting for `click` to
+     fire before anything moves is where a surface stops feeling like it is
+     under your finger. */
+  .add-widget-card:active { transform: scale(0.982); background: rgba(10,10,10,0.075); }
+  .add-widget-card:focus-visible { outline: 2px solid var(--mps-brand); outline-offset: 1px; }
+  /* display:block above has the same specificity as the UA stylesheet's
      [hidden] rule and is declared later, so a deleted card would stay on
      screen without this. Same footgun as .add-widget-popup[hidden]. */
   .add-widget-card[hidden] { display: none; }
+
+  /* ---------- the snapshot ----------
+     A fixed box with a live widget scaled into it and clipped, so a card
+     shows the thing it makes rather than a symbol standing in for it. Inert:
+     the whole card is one button, and nothing inside the picture is
+     clickable. */
+  .add-widget-preview {
+    /* display:block matters: this is a <span>, and aspect-ratio, overflow and
+       a percentage width all do nothing at all on an inline box. */
+    display: block; position: relative; width: 100%; aspect-ratio: 16 / 10;
+    border: 1px solid var(--hair); border-radius: 8px;
+    background: #ffffff; overflow: hidden;
+    pointer-events: none; user-select: none;
+    box-shadow: 0 1px 2px rgba(10,10,10,0.045);
+  }
+  .add-widget-preview-inner {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0;
+  }
+  /* The clone is still answering to the board's own widget CSS, which wants
+     to fill a grid column. Its width is set inline from the widget it was
+     copied from, so the scale factor is exact; these only stop the column
+     rules from overriding that. */
+  .add-widget-preview-inner > .col {
+    display: block; flex: none; max-width: none; height: auto; margin: 0;
+  }
+  .add-widget-preview iframe { display: block; border: 0; background: transparent; }
+  /* The card's original 36px icon. Still in the DOM -- the Deleted list reads
+     its SVG to draw a row -- and no longer shown on the card itself, whose
+     identifying mark is now the preview. */
+  .add-widget-card > .add-widget-icon { display: none; }
+
+  /* ---------- the drawn stand-in ----------
+     What a card wears before a snapshot is painted, and what it keeps when
+     there is nothing of that type on the board to photograph. Same box, same
+     seat, so nothing in the grid moves when a real snapshot replaces one. */
+  .add-widget-mock {
+    position: absolute; inset: 0; padding: 7px 8px; overflow: hidden;
+    display: flex; flex-direction: column; gap: 5px;
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
+  .amk-head {
+    display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
+    padding-bottom: 4px; border-bottom: 1px solid var(--hair);
+  }
+  .amk-head svg { width: 9px; height: 9px; flex: 0 0 auto; }
+  .amk-head span {
+    font-size: 7.5px; font-weight: 600; color: var(--ink); letter-spacing: 0.01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .amk-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+  .amk-row { display: flex; align-items: center; gap: 4px; }
+  .amk-bar { height: 4px; border-radius: 2px; background: rgba(10,10,10,0.11); flex: 0 0 auto; }
+  .amk-bar.lite { background: rgba(10,10,10,0.055); }
+  .amk-bar.dark { height: 5px; background: rgba(10,10,10,0.24); }
+  .amk-box { width: 6px; height: 6px; border-radius: 1.5px; border: 1px solid rgba(10,10,10,0.24); flex: 0 0 auto; }
+  .amk-dot { width: 6px; height: 6px; border-radius: 50%; border: 1px solid rgba(10,10,10,0.24); flex: 0 0 auto; }
+  .amk-dot.on { background: var(--mps-brand); border-color: var(--mps-brand); }
+  .amk-pill { height: 6px; border-radius: 3px; flex: 0 0 auto; background: var(--mps-accent-wash); }
+  .amk-num { font-size: 14px; font-weight: 600; letter-spacing: -0.015em; line-height: 1; color: var(--ink); }
+  .amk-up { font-size: 7.5px; font-weight: 600; color: #1a7f4b; }
+  .amk-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1 1 auto; }
+  .amk-cell { border-radius: 1.5px; background: rgba(10,10,10,0.045); }
+  .amk-cell.ev { background: rgba(58,110,165,0.38); }
+  .amk-word { font-size: 8.5px; font-weight: 600; color: var(--ink); letter-spacing: -0.005em; }
+  .amk-def { font-size: 7px; line-height: 1.35; color: var(--ink-soft); }
+  .amk-cap { font-size: 6.5px; font-weight: 600; letter-spacing: 0.07em;
+             text-transform: uppercase; color: var(--ink-soft); }
+  .amk-rule { height: 1px; background: var(--hair); margin: 1px 0; }
+  .amk-tile { width: 13px; height: 13px; border-radius: 3px; background: rgba(10,10,10,0.08); flex: 0 0 auto; }
+
+  .add-widget-label {
+    margin-top: 7px; padding: 0 2px;
+    font-size: 12.5px; font-weight: 600; color: var(--ink);
+    /* Tracking is size-specific, never one value for every size. At 12.5px
+       semibold a hair of positive tracking is what keeps a short label from
+       closing up on itself. */
+    letter-spacing: 0.004em; line-height: 1.3;
+    /* The rename field has no character cap any more, so the clamp lives here
+       instead: a name is stored in full and shows two lines of itself, then
+       an ellipsis. No typed name can stretch the grid. */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; overflow-wrap: anywhere;
+  }
+
+  /* The six dots that make a card draggable, in the corner every widget
+     header already puts its grip in -- which is now the corner of the
+     picture, so it sits on its own frosted chip rather than on whatever
+     happens to be behind it. Invisible until the card is hovered: this popup
+     is opened to click something, not to rearrange it, so the handle waits
+     until a pointer is actually on the card. Its own click opens the dots'
+     menu, which is a job no other part of the card can take -- one click
+     anywhere else adds the widget. */
+  .add-widget-grip {
+    position: absolute; top: 10px; right: 10px; width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; cursor: grab; touch-action: none;
+    color: rgba(10,10,10,0.34);
+    background: rgba(255,255,255,0.80);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 1px 2px rgba(10,10,10,0.10);
+    opacity: 0; transition: opacity 0.16s var(--ease-spring),
+                            color 0.16s var(--ease-spring),
+                            background-color 0.16s var(--ease-spring);
+  }
+  .add-widget-card:hover .add-widget-grip { opacity: 1; }
+  .add-widget-grip:hover { background: rgba(255,255,255,0.97); color: var(--ink); }
+  .add-widget-grip:focus-visible { opacity: 1; outline: 2px solid var(--mps-brand); outline-offset: 1px; }
+  .add-widget-grip svg { display: block; }
+  .add-widget-card.is-dragging {
+    z-index: 5; cursor: grabbing; transition: none;
+    background: rgba(255,255,255,0.94);
+    border-color: rgba(10,10,10,0.08);
+    box-shadow: 0 2px 8px rgba(10,10,10,0.08), 0 14px 32px rgba(10,10,10,0.18);
+  }
+  .add-widget-card.is-dragging .add-widget-grip { cursor: grabbing; opacity: 1; color: var(--ink); }
+
+  .add-widget-rename {
+    font: inherit; font-size: 12.5px; font-weight: 600; text-align: left;
+    width: 100%; min-width: 0; margin-top: 7px;
+    color: var(--ink); background: #ffffff;
+    border: 1px solid var(--mps-brand); border-radius: 6px; padding: 2px 5px;
+    outline: none; box-shadow: 0 0 0 3px var(--mps-accent-wash);
+    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  }
 
   /* The dots' menu. One item, so it is sized by that item rather than given a
      panel's padding, and it opens against the card it belongs to. */
   .add-card-menu {
     position: absolute; z-index: 4002;
-    background: #ffffff; border: 1px solid var(--hair); border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 10px 26px rgba(0,0,0,0.14);
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(10,10,10,0.08); border-radius: 9px;
+    box-shadow: 0 1px 3px rgba(10,10,10,0.06), 0 10px 26px rgba(10,10,10,0.16);
     padding: 4px;
     animation: add-card-menu-in 0.16s var(--ease-spring) both;
   }
@@ -3059,40 +3265,17 @@
   }
   .add-card-menu button:hover { background: rgba(232,89,90,0.10); }
   .add-card-menu svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
-  .add-widget-icon {
-    width: 36px; height: 36px; border-radius: 8px; background: #ffffff;
-    border: 1px solid #e5e5e5; display: flex; align-items: center; justify-content: center;
-    color: #000000; flex: 0 0 auto;
-  }
-  .add-widget-label { font-size: 12px; font-weight: 600; color: #000000; text-align: center; }
-  /* The six dots that make a card draggable, in the corner every widget
-     header already puts its grip in. Faint until the card is hovered: this
-     popup is opened to click something, not to rearrange it, so the handle
-     waits until a pointer is actually on the card. Its own click opens the
-     rename, which is a job no other part of the card can take -- one click
-     anywhere else adds the widget. */
-  .add-widget-grip {
-    position: absolute; top: 3px; right: 3px; width: 18px; height: 18px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 4px; color: #d4d4d4; cursor: grab; touch-action: none;
-  }
-  .add-widget-card:hover .add-widget-grip { color: #a8a8a8; }
-  .add-widget-grip:hover { background: #e9ebee; color: #5e5e5e; }
-  .add-widget-grip svg { display: block; }
-  .add-widget-card.is-dragging {
-    z-index: 5; background: #ffffff; border-color: #c8c8c8; cursor: grabbing;
-    box-shadow: 0 10px 24px rgba(0,0,0,0.18), 0 2px 6px rgba(0,0,0,0.08);
-  }
-  .add-widget-card.is-dragging .add-widget-grip { cursor: grabbing; color: #5e5e5e; }
+
   /* ---------- deleted cards ----------
      The same shape as the board's hidden-widget chip: an icon, a count, and
      nothing at all until there is something to count. It sits at the foot of
      the menu it belongs to, under a hairline, because it is about this menu
-     rather than about the board. */
+     rather than about the board. Outside the scroller, so it does not drift
+     away while you are looking at the cards. */
   .add-deleted-bar {
-    display: flex; align-items: center; gap: 7px;
-    width: 100%; margin-top: 8px; padding: 7px 6px 3px;
-    border: 0; border-top: 1px solid var(--hair); background: transparent;
+    display: flex; align-items: center; gap: 7px; flex: 0 0 auto;
+    width: 100%; padding: 8px 15px calc(9px + env(safe-area-inset-bottom));
+    border: 0; border-top: 1px solid rgba(10,10,10,0.07); background: transparent;
     font-family: inherit; font-size: 12px; font-weight: 500; color: var(--ink-soft);
     cursor: pointer; text-align: left;
     transition: color 0.16s var(--ease-spring);
@@ -3103,25 +3286,25 @@
   .add-deleted-count { font-variant-numeric: tabular-nums; }
 
   /* Navigating into a folder rather than opening a second floating panel on
-     top of this one: the popup is 280px and pinned near the screen's edge, so
-     a stacked popover would have nowhere to go. Same model as Recently
-     Deleted in Photos -- you go in, and there is a way back. */
-  .add-deleted-view { width: 280px; }
+     top of this one: the popup is pinned near the screen's edge, so a stacked
+     popover would have nowhere to go. Same model as Recently Deleted in
+     Photos -- you go in, and there is a way back. */
+  .add-deleted-view { padding: 2px 0 10px; }
   .add-deleted-view[hidden] { display: none; }
   .add-deleted-back {
     display: flex; align-items: center; gap: 6px;
-    width: 100%; padding: 4px 6px 8px;
+    width: 100%; padding: 4px 4px 8px;
     border: 0; background: transparent;
     font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--ink);
     cursor: pointer; text-align: left;
   }
   .add-deleted-back svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
-  .add-deleted-list { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+  .add-deleted-list { display: flex; flex-direction: column; gap: 2px; }
   .add-deleted-row {
     display: flex; align-items: center; gap: 8px;
     padding: 6px 4px 6px 6px; border-radius: 8px;
   }
-  .add-deleted-row:hover { background: var(--panel); }
+  .add-deleted-row:hover { background: rgba(10,10,10,0.045); }
   .add-deleted-icon {
     width: 24px; height: 24px; border-radius: 6px; background: #ffffff;
     border: 1px solid var(--hair); display: flex; align-items: center; justify-content: center;
@@ -3138,13 +3321,26 @@
     font-family: inherit; font-size: 12px; font-weight: 600; color: var(--mps-brand);
     cursor: pointer;
   }
-  .add-deleted-recover:hover { background: rgba(58, 110, 165, 0.10); }
+  .add-deleted-recover:hover { background: var(--mps-accent-wash); }
 
-  .add-widget-rename {
-    font: inherit; font-size: 12px; font-weight: 600; text-align: center;
-    width: 100%; min-width: 0; color: #000000; background: #ffffff;
-    border: 1px solid var(--mps-brand); border-radius: 4px; padding: 1px 2px;
-    outline: none; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+  /* Reduced motion gets the end state without the travel; reduced
+     transparency gets a solid panel instead of a frostier one, because a
+     half-measure here is the worst of both. */
+  @media (prefers-reduced-motion: reduce) {
+    .add-widget-popup { animation: none; }
+    .add-widget-card { transition: background-color 0.12s linear; }
+    .add-widget-card:active { transform: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .add-widget-popup, .add-card-menu {
+      background: #ffffff; backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+    .add-widget-grip { background: #ffffff; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+  @media (prefers-contrast: more) {
+    .add-widget-popup { background: #ffffff; border-color: var(--ink); }
+    .add-widget-card:hover { background: rgba(10,10,10,0.10); }
+    .add-widget-preview { border-color: rgba(10,10,10,0.45); }
   }
 
   /* Vocabulary "+" setup flow: Language -> Frequency -> Words/Phrases per day. */
@@ -4719,7 +4915,17 @@
     html:not(.force-desktop) .add-widget-popup,
     html:not(.force-desktop) .cal-createpanel.as-menu,
     html:not(.force-desktop) .cal-viewtoggle-menu,
-    html:not(.force-desktop) .mps-menu,
+    html:not(.force-desktop) .mps-menu {
+      position: fixed !important;
+      left: 0 !important; right: 0 !important; bottom: 0 !important;
+      top: auto !important; width: 100% !important; max-width: 100% !important;
+      max-height: 82dvh; overflow-y: auto;
+      border-radius: 18px 18px 0 0;
+      padding-bottom: calc(14px + env(safe-area-inset-bottom));
+      box-shadow: 0 -8px 40px rgba(0,0,0,.28);
+      transform-origin: bottom center;
+      animation: mob-sheet-up 0.22s var(--ease-spring);
+    }
     /* The dot stays 26px; the box around it reaches Apple's 44pt floor, so the
        row looks identical and is actually tappable. */
     html:not(.force-desktop) .pm-swatch {
@@ -4768,31 +4974,42 @@
        bottom), and a shorthand here would quietly reset it, putting the
        bottom row of cards under the home indicator on every phone that has
        one. */
-    html:not(.force-desktop) .add-widget-popup { padding-left: 14px; padding-right: 14px; }
-    /* The picker's grid carries a hard 208px width, which is what made it a
-       neat two-up popup hanging off a desktop corner. Inside a full-width
-       sheet that same 208px is a narrow column down one side with the rest of
-       the sheet empty, so the width comes off and the columns get counted
-       from the space instead.
-
-       Capped at 520px and centred rather than filling the sheet: left to
-       stretch, an 874px landscape screen fits eight columns and puts the
-       ninth card alone on a second row. 520px is five across, so nine cards
-       read as 5 + 4, and a 390px phone never reaches the cap and lays out as
-       a 3 x 3. Neither number is named -- auto-fit with a 92px floor derives
-       both from the width it is given. */
-    html:not(.force-desktop) .add-widget-grid {
-      width: auto; max-width: 520px; margin: 0 auto;
-      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
-      gap: 10px;
+    /* The "+" sheet opts out of the shared `overflow-y: auto` above: it is a
+       flex column with its OWN scroller in the middle (.add-widget-scroll), so
+       letting the sheet scroll as well would give the same list two scrollbars
+       and let the section label slide away under the grab handle. Its width
+       comes off with the 428px desktop clamp; the height stays a sheet's. */
+    html:not(.force-desktop) .add-widget-popup {
+      width: 100% !important; max-width: 100% !important;
+      max-height: 82dvh; overflow: hidden;
+      padding-bottom: 0;
+      background: rgba(255,255,255,0.92);
     }
-    /* Taller than the desktop card for the same reason every other target
-       here is: 90px of card is comfortable, and the label gets two lines
-       before it truncates so "Google Calendar" stays readable. */
-    html:not(.force-desktop) .add-widget-card { padding: 14px 8px; min-height: 92px; }
-    /* A thumb needs more than 18px, and there is room for it on a card this
-       tall. Darker at rest too: there is no hover on a phone to reveal it. */
-    html:not(.force-desktop) .add-widget-grip { width: 28px; height: 28px; top: 2px; right: 2px; color: #bdbdbd; }
+    /* The grab handle every iOS sheet has is a ::before, so inside a flex
+       column it is the first flex item and needs telling not to stretch. */
+    html:not(.force-desktop) .add-widget-popup::before { flex: 0 0 auto; }
+    html:not(.force-desktop) .add-widget-head { padding: 2px 16px 6px; }
+    html:not(.force-desktop) .add-widget-scroll { padding: 0 16px; }
+    html:not(.force-desktop) .add-deleted-bar { padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+    /* The grid stops at two columns rather than counting them from the width.
+       A card now carries a 16:10 picture of a widget, and the point of the
+       picture is that you can tell what it is -- at four or five across on a
+       landscape phone each one is 80px wide and the snapshot is a smudge.
+       Capped and centred so a wide screen gets bigger previews, not more of
+       them. */
+    html:not(.force-desktop) .add-widget-grid {
+      width: auto; max-width: 560px; margin: 0 auto;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    html:not(.force-desktop) .add-deleted-view { max-width: 560px; margin: 0 auto; }
+    /* A thumb needs more than 20px, and there is a picture underneath it to
+       stay clear of. Visible at rest, too: there is no hover on a phone to
+       reveal it with. */
+    html:not(.force-desktop) .add-widget-grip {
+      width: 30px; height: 30px; top: 11px; right: 11px; opacity: 1;
+      color: rgba(10,10,10,0.42);
+    }
 
     /* ---------- 7. the calendar ----------
        At 26px an hour, a 30-minute event is 12px tall -- and wireEventDrag's
@@ -5425,6 +5642,12 @@
 
 <div id="addWidgetOverlay" class="add-widget-overlay" hidden></div>
 <div id="addWidgetPopup" class="add-widget-popup" hidden>
+  <!-- Three rows: a section label, the scroller, and the Deleted bar. Only
+       the middle one moves, so the label still says what you are looking at
+       when you are four rows down the list, and the way into Deleted does not
+       drift off the bottom of the sheet. -->
+  <div class="add-widget-head">Add a widget</div>
+  <div class="add-widget-scroll" id="addWidgetScroll">
   <div class="add-widget-grid">
     <button type="button" class="add-widget-card" data-add-type="vocab">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><text x="12" y="15.5" font-size="9" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial, sans-serif">Aa</text></svg></span>
@@ -5489,6 +5712,7 @@
     <button type="button" class="add-deleted-back" id="addDeletedBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg><span>Deleted</span></button>
     <div class="add-deleted-list" id="addDeletedList"></div>
   </div>
+  </div><!-- /.add-widget-scroll -->
   <button type="button" class="add-deleted-bar" id="addDeletedBar" hidden aria-haspopup="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg><span class="add-deleted-count" id="addDeletedCount">0 deleted</span>
   </button>
@@ -5865,7 +6089,7 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <rect x="3" y="7" width="18" height="10" rx="2.2"/><path d="M8 3.5 12 7 8 10.5"/>
   </svg>
-  <span>Turn your phone for the full board</span>
+  <span>Flip your phone for the full board view</span>
   <button type="button" id="mobRotateX" aria-label="Dismiss">&#215;</button>
 </div>
 <div class="mob-scrim" id="mobScrim"></div>
@@ -19026,12 +19250,23 @@
     // deleted/hidden) or adds another read-only calendar view (if it's
     // already on the board) — so nothing needs an "already on board" badge
     // any more.
+    const addWidgetScroll = document.getElementById("addWidgetScroll");
+    const addWidgetHead = addWidgetPopup.querySelector(".add-widget-head");
+
     function openAddWidgetPopup() {
       addWidgetPopup.hidden = false;
       addWidgetOverlay.hidden = false;
       // Always opens on the cards. The folder is somewhere you go, not a place
       // the menu remembers leaving you.
       if (typeof showDeletedView === "function") showDeletedView(false);
+      addWidgetScroll.scrollTop = 0;
+      /* Both of these need the panel to have been laid out, so they wait one
+         frame: a preview is scaled by the box it lands in, and the scroll
+         fade is decided by whether there is anything to scroll. */
+      requestAnimationFrame(function () {
+        if (typeof paintAddPreviews === "function") paintAddPreviews();
+        if (typeof updateAddScrollFade === "function") updateAddScrollFade();
+      });
     }
 
     /* ---------- the "+" popup's cards are yours ----------
@@ -19147,8 +19382,39 @@
     function showDeletedView(on) {
       addDeletedView.hidden = !on;
       addCardGrid.hidden = !!on;
+      /* The label says which of the two lists you are looking at. Leaving it
+         on "Add a widget" over the Deleted folder would be naming the panel
+         rather than its contents, and the folder already has its own heading
+         one line below -- two headings, one of them wrong. */
+      if (addWidgetHead) addWidgetHead.textContent = on ? "Deleted cards" : "Add a widget";
       if (on) renderDeletedList();
+      addWidgetScroll.scrollTop = 0;
+      updateAddScrollFade();
     }
+
+    /* The scroll edge effect, as two numbers the stylesheet turns into a mask.
+       Both are 0 when the list fits, because a fade belongs only where the
+       chrome really does overlap content -- a permanent 12px of haze at the
+       top of a list that never scrolls is decoration pretending to be
+       information. */
+    function updateAddScrollFade() {
+      const el = addWidgetScroll;
+      const over = el.scrollHeight - el.clientHeight;
+      const top = over > 1 ? Math.min(14, el.scrollTop) : 0;
+      const bot = over > 1 ? Math.min(14, over - el.scrollTop) : 0;
+      el.style.setProperty("--fade-top", top.toFixed(1) + "px");
+      el.style.setProperty("--fade-bot", bot.toFixed(1) + "px");
+    }
+    addWidgetScroll.addEventListener("scroll", function () {
+      updateAddScrollFade();
+      // The dots' menu points at one card. Scrolling moves that card and the
+      // menu cannot follow it without being clipped, so it closes instead of
+      // hanging over some other card's picture.
+      if (typeof closeAddCardMenu === "function") closeAddCardMenu();
+    }, { passive: true });
+    window.addEventListener("resize", function () {
+      if (!addWidgetPopup.hidden) updateAddScrollFade();
+    });
 
     function renderDeletedList() {
       addDeletedList.innerHTML = "";
@@ -19216,12 +19482,351 @@
       named.concat(rest).forEach(function (t) { addCardGrid.appendChild(byType[t]); });
     }
 
+    /* ---------- a card shows the widget, not a symbol ----------
+
+       A card is a TYPE, and most types have an instance sitting on the board
+       already. When one does, the card shows THAT widget: the live element is
+       cloned, stripped of everything that made it a live widget, and scaled
+       into a small fixed box. The Page card shows your page; the Portfolio
+       card shows your numbers. When a type has nothing on the board to
+       photograph, the card keeps the drawn stand-in it was born with, so no
+       card is ever blank and the grid never reflows.
+
+       Three things this is careful about.
+
+       The clone is inert and anonymous. Every `id` and every `data-` handle
+       the board's own code queries widgets by is stripped, so no later
+       render(), rename, colour write or delete can find the copy and act on
+       it, and none of the copy's buttons can be reached (the whole box is
+       pointer-events: none, and the card above it is one button).
+
+       It is a picture, so nothing in it runs. Scripts, iframes, canvases and
+       media come out of the clone rather than being carried into a box where
+       they would load, tick and fetch for a menu that is open for two
+       seconds.
+
+       The routine-fed tiles are a special case with a different answer. They
+       run inside an iframe sandboxed WITHOUT allow-same-origin, so their DOM
+       genuinely cannot be read from this side -- cloning the <iframe> element
+       would just start a second, unbridged copy that sits on "Loading…"
+       forever. They are snapshotted the one way that is actually available:
+       the running frame is asked for its rendered HTML over the bridge it
+       already has (__customWidgets.inspect -> rendered_html), and that HTML
+       goes into a script-free iframe carrying the widget's own CSS. */
+
+    /* Which live widget types can stand in for a card, best first. Cards not
+       named here have no board equivalent to clone -- the routine feeds go
+       through the frame path below, and anything left keeps its mock. */
+    const PREVIEW_SOURCES = {
+      vocab: ["vocab"],
+      list:  ["list", "readingList"],
+      cal:   ["cal", "calView"],
+      tasks: ["tasks", "tasksView"],
+      page:  ["page"],
+      menu:  ["menu"]
+    };
+
+    /* Anything the board finds a widget BY. Stripping these is what makes the
+       clone a picture rather than a second widget with the same name. */
+    const PREVIEW_STRIP_ATTR = /^(id|contenteditable|tabindex|for|name|aria-controls|aria-labelledby|aria-describedby|data-(col-id|drag-col|delete-col|hide-col|color-btn|fullscreen-col|icon-btn|icon-display|tab-icon|widget-title-id|act|id|gear-for))$/i;
+
+    function scrubPreview(src, node) {
+      /* A clone does not carry a field's CURRENT value or a checkbox's
+         CURRENT state -- those live on the property, and cloneNode copies
+         attributes. Copied across here, from the live nodes to their
+         counterparts in the copy, so a snapshot shows what the widget
+         actually has in it rather than what its markup shipped with. The
+         live widget is never written to. */
+      const a = src.querySelectorAll("input, textarea, select");
+      const b = node.querySelectorAll("input, textarea, select");
+      for (let i = 0; i < a.length && i < b.length; i++) {
+        if (a[i].type === "checkbox" || a[i].type === "radio") {
+          if (a[i].checked) b[i].setAttribute("checked", "");
+          else b[i].removeAttribute("checked");
+        } else if (a[i].tagName === "TEXTAREA") {
+          b[i].textContent = a[i].value;
+        } else if (a[i].tagName !== "SELECT") {
+          b[i].setAttribute("value", a[i].value);
+        }
+      }
+      node.querySelectorAll("script, iframe, canvas, video, audio, object, embed")
+        .forEach(function (n) { n.remove(); });
+      /* The header's control cluster and the collapsed-tab strip are controls
+         for a widget this copy is not. The widget's own body -- including its
+         buttons, which read as part of what the widget looks like -- stays. */
+      node.querySelectorAll(".widget-header-controls, .section-controls, .collapsible-strip")
+        .forEach(function (n) { n.remove(); });
+      const all = [node].concat(Array.prototype.slice.call(node.querySelectorAll("*")));
+      all.forEach(function (el) {
+        Array.prototype.slice.call(el.attributes || []).forEach(function (a) {
+          if (PREVIEW_STRIP_ATTR.test(a.name)) el.removeAttribute(a.name);
+        });
+        /* Out of the tab order. NOT disabled: the box is already
+           pointer-events: none and the whole card is one button, so
+           `disabled` would buy no safety and would grey out controls that
+           are part of what the widget looks like ("Connect Google
+           Calendar" is most of that widget when it is signed out). */
+        if (/^(BUTTON|INPUT|SELECT|TEXTAREA|A)$/.test(el.tagName)) {
+          el.setAttribute("tabindex", "-1");
+        }
+      });
+      return node;
+    }
+
+    /* A visible instance only. A hidden widget is display:none, so it has no
+       width to scale from and would come out either zero-sized or wrong; the
+       mock is a better answer than a mis-scaled one. */
+    function liveWidgetIdFor(type) {
+      const want = PREVIEW_SOURCES[type];
+      if (!want) return null;
+      for (let i = 0; i < want.length; i++) {
+        const hit = WIDGET_IDS.filter(function (id) {
+          return widgetTypeOf(id) === want[i] && !isHidden(id) &&
+                 widgetEl(id) && widgetEl(id).offsetWidth > 40;
+        })[0];
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    /* Scales whatever has been put in the box so the widget's full WIDTH
+       fits, and lets the height fall where it falls and be clipped. A
+       preview is the top of a widget, which is the part that identifies it;
+       squashing the whole thing to fit would make every card the same
+       illegible grey. */
+    function fitPreview(box, inner, w) {
+      const boxW = box.clientWidth;
+      if (!boxW || !w) return;
+      inner.style.width = w + "px";
+      inner.style.transform = "scale(" + (boxW / w) + ")";
+    }
+
+    function paintLivePreview(card, box) {
+      const wid = liveWidgetIdFor(addCardTypeOf(card));
+      if (!wid) return false;
+      const src = widgetEl(wid);
+      const body = src && src.querySelector(".collapsible-body");
+      if (!body) return false;
+      const w = src.offsetWidth;
+      if (!w) return false;
+
+      const inner = document.createElement("div");
+      inner.className = "add-widget-preview-inner";
+      /* Wrapped in a bare .col so the board's descendant selectors still
+         match inside the copy, WITHOUT the data-col-id that is how anything
+         would find it. Its inline style is carried over because that is where
+         a widget's chosen colour lives. */
+      const shell = document.createElement("div");
+      shell.className = "col collapsible-col-wrap";
+      shell.setAttribute("style", (src.getAttribute("style") || "") + ";width:" + w + "px;");
+      shell.appendChild(scrubPreview(body, body.cloneNode(true)));
+      inner.appendChild(shell);
+
+      box.innerHTML = "";
+      box.appendChild(inner);
+      fitPreview(box, inner, w);
+      return true;
+    }
+
+    /* The routine feeds. Async because the frame has to be asked, so the card
+       keeps its mock until the answer lands and simply swaps then -- the box
+       is a fixed size, so nothing moves when it does. */
+    function paintFeedPreview(card, box) {
+      const type = addCardTypeOf(card);
+      const feed = ROUTINE_FEEDS[type];
+      const CW = window.__customWidgets;
+      if (!feed || !CW || !CW.inspect || !CW.read) return;
+      const wid = WIDGET_IDS.filter(function (id) {
+        if (widgetTypeOf(id) !== "custom" || isHidden(id)) return false;
+        const el = widgetEl(id);
+        if (!el || el.offsetWidth <= 40) return false;
+        const blob = CW.read(id);
+        return !!blob && blob.name === feed.name;
+      })[0];
+      if (!wid) return;
+      const host = widgetEl(wid);
+      const w = host.offsetWidth;
+      const bodyEl = host.querySelector(".widget-body") || host;
+      const h = Math.max(120, bodyEl.offsetHeight || 0);
+
+      CW.inspect(wid).then(function (r) {
+        // The popup may well have been closed and reopened by now, and this
+        // card may even have been deleted from the menu since.
+        if (!r || r.error || !r.rendered_html || addWidgetPopup.hidden) return;
+        if (box.dataset.token !== card.dataset.previewToken) return;
+        const frame = document.createElement("iframe");
+        // No allow-scripts: this is a still of a widget, not a second run of
+        // it, and there is no bridge behind it for a script to talk to.
+        frame.setAttribute("sandbox", "");
+        frame.setAttribute("referrerpolicy", "no-referrer");
+        frame.setAttribute("aria-hidden", "true");
+        frame.setAttribute("tabindex", "-1");
+        frame.style.width = w + "px";
+        frame.style.height = h + "px";
+        frame.srcdoc =
+          "<!doctype html><meta charset=\"utf-8\"><style>" +
+          "html,body{margin:0;background:transparent;}" +
+          (CW.read(wid) || {}).css +
+          "</style>" + r.rendered_html;
+
+        const inner = document.createElement("div");
+        inner.className = "add-widget-preview-inner";
+        inner.appendChild(frame);
+        box.innerHTML = "";
+        box.appendChild(inner);
+        fitPreview(box, inner, w);
+      }).catch(function () {});
+    }
+
+    /* ---------- the drawn stand-ins ----------
+       One per card, for the types with nothing on the board to photograph.
+       Each is a widget's silhouette rather than an illustration: the header
+       the real widget has, carrying the card's own icon and its own name, and
+       under it the shape that widget's body makes. Built from the card so a
+       renamed card's mock renames itself too. */
+    function bar(w, cls) {
+      return '<span class="amk-bar' + (cls ? " " + cls : "") + '" style="width:' + w + '%"></span>';
+    }
+    function row(inner) { return '<div class="amk-row">' + inner + "</div>"; }
+
+    function calCells() {
+      const ev = { 3: 1, 9: 1, 10: 1, 16: 1, 22: 1, 23: 1, 24: 1, 30: 1 };
+      let out = "";
+      for (let i = 0; i < 35; i++) out += '<div class="amk-cell' + (ev[i] ? " ev" : "") + '"></div>';
+      return out;
+    }
+
+    const MOCK_BODY = {
+      vocab:
+        '<div class="amk-word">ineffable</div>' +
+        '<div class="amk-def">too great to be put into words</div>' +
+        '<div class="amk-rule"></div>' +
+        '<div class="amk-word">sanguine</div>' +
+        '<div class="amk-def">optimistic in a bad situation</div>' +
+        '<div class="amk-rule"></div>' +
+        row(bar(58)) + row(bar(80, "lite")),
+      list:
+        row('<span class="amk-box"></span>' + bar(46) + '<span class="amk-pill" style="width:15px"></span>') +
+        row('<span class="amk-box"></span>' + bar(62)) +
+        row('<span class="amk-box"></span>' + bar(38) + '<span class="amk-pill" style="width:20px"></span>') +
+        row('<span class="amk-box"></span>' + bar(54, "lite")) +
+        row('<span class="amk-box"></span>' + bar(44) + '<span class="amk-pill" style="width:12px"></span>') +
+        row('<span class="amk-box"></span>' + bar(66, "lite")),
+      cal: '<div class="amk-cal">' + calCells() + "</div>",
+      tasks:
+        row('<span class="amk-dot"></span>' + bar(58)) +
+        row('<span class="amk-dot on"></span>' + bar(44, "lite")) +
+        row('<span class="amk-dot"></span>' + bar(70)) +
+        row('<span class="amk-dot"></span>' + bar(36)),
+      page:
+        row(bar(52, "dark")) + row(bar(96)) + row(bar(89)) +
+        row('<span class="amk-dot" style="width:3px;height:3px;border:0;background:rgba(10,10,10,.26)"></span>' + bar(64)) +
+        row('<span class="amk-dot" style="width:3px;height:3px;border:0;background:rgba(10,10,10,.26)"></span>' + bar(52, "lite")),
+      menu:
+        '<div class="amk-cap">Pinned</div>' +
+        row('<span class="amk-tile"></span><span class="amk-tile"></span>' +
+            '<span class="amk-tile"></span><span class="amk-tile"></span>') +
+        row(bar(26, "lite") + bar(22, "lite") + bar(24, "lite") + bar(20, "lite")) +
+        '<div class="amk-cap" style="margin-top:2px">School</div>' +
+        row('<span class="amk-tile"></span><span class="amk-tile"></span>' +
+            '<span class="amk-tile"></span>') +
+        row(bar(26, "lite") + bar(20, "lite") + bar(24, "lite")),
+      "feed-news":
+        row('<span class="amk-dot" style="border:0;background:rgba(10,10,10,.16)"></span>' + bar(70, "dark")) +
+        row(bar(92, "lite")) +
+        '<div class="amk-rule"></div>' +
+        row('<span class="amk-dot" style="border:0;background:rgba(10,10,10,.16)"></span>' + bar(56, "dark")) +
+        row(bar(84, "lite")) +
+        '<div class="amk-rule"></div>' +
+        row('<span class="amk-dot" style="border:0;background:rgba(10,10,10,.16)"></span>' + bar(64, "dark")) +
+        row(bar(74, "lite")),
+      "feed-stocks":
+        '<div class="amk-num">$48,210</div>' +
+        '<div class="amk-up">+1.24%  today</div>' +
+        row(bar(24, "lite") + bar(20, "lite") + bar(26, "lite")) +
+        '<div class="amk-cap" style="margin-top:2px">Movers</div>' +
+        row(bar(18, "dark") + bar(14) + bar(46, "lite")) +
+        row(bar(16, "dark") + bar(14) + bar(52, "lite")) +
+        row(bar(20, "dark") + bar(14) + bar(38, "lite")),
+      "feed-email":
+        '<div class="amk-cap">Needs a reply</div>' +
+        row('<div class="amk-num">12</div>' +
+            '<div class="amk-num" style="color:#b4553f">3</div>' +
+            '<div class="amk-num" style="opacity:.35">48</div>') +
+        '<div class="amk-rule"></div>' +
+        row(bar(24, "dark") + bar(58, "lite")) +
+        row(bar(20, "dark") + bar(66, "lite")) +
+        row(bar(26, "dark") + bar(48, "lite")),
+      "feed-automations":
+        row('<span class="amk-dot on"></span>' + bar(52) + bar(16, "lite")) +
+        row('<span class="amk-dot"></span>' + bar(44) + bar(16, "lite")) +
+        row('<span class="amk-dot on"></span>' + bar(60) + bar(14, "lite")) +
+        row('<span class="amk-dot"></span>' + bar(38) + bar(18, "lite")) +
+        row('<span class="amk-dot"></span>' + bar(56, "lite"))
+    };
+
+    function mockHtml(card) {
+      const iconEl = card.querySelector(".add-widget-icon svg");
+      const name = (addCardLabelEl(card) || {}).textContent || "";
+      const type = addCardTypeOf(card);
+      return '<div class="add-widget-mock">' +
+        '<div class="amk-head">' + (iconEl ? iconEl.outerHTML : "") +
+          "<span>" + name.replace(/[&<>]/g, function (c) {
+            return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c];
+          }) + "</span></div>" +
+        '<div class="amk-body">' + (MOCK_BODY[type] || row(bar(70)) + row(bar(50, "lite"))) + "</div>" +
+      "</div>";
+    }
+
+    function previewBoxOf(card) { return card.querySelector(".add-widget-preview"); }
+
+    function paintMock(card) {
+      const box = previewBoxOf(card);
+      if (box) box.innerHTML = mockHtml(card);
+    }
+
+    /* Repainted on every open rather than kept: the board changes under this
+       menu constantly, and a snapshot of a Page from four edits ago is worse
+       than no snapshot, because it looks current. Ten cards of cloned DOM is
+       cheap and it happens once, at the moment the panel appears. */
+    let previewToken = 0;
+    function paintAddPreviews() {
+      previewToken++;
+      addCardEls().forEach(function (card) {
+        if (card.hidden) return;
+        const box = previewBoxOf(card);
+        if (!box) return;
+        card.dataset.previewToken = String(previewToken);
+        box.dataset.token = String(previewToken);
+        // The mock goes down first either way, so the card is never empty
+        // while a live one is being measured or waited for.
+        box.innerHTML = mockHtml(card);
+        try {
+          if (ROUTINE_FEEDS[addCardTypeOf(card)]) paintFeedPreview(card, box);
+          else paintLivePreview(card, box);
+        } catch (e) {
+          // A widget whose DOM will not clone is not a reason for a broken
+          // menu; the card simply keeps the mock it already has.
+          box.innerHTML = mockHtml(card);
+        }
+      });
+    }
+
     addCardEls().forEach(function (el) {
       const lab = addCardLabelEl(el);
       if (lab) {
         ADD_CARD_BUILT_IN[addCardTypeOf(el)] = lab.textContent;
         if (!ADD_LOCKED_LABELS[addCardTypeOf(el)]) lab.title = "Hold to rename";
       }
+      /* The picture goes in FIRST, above the label. The original 36px icon
+         stays in the DOM and is hidden by CSS: the Deleted list reads its SVG
+         to draw a row, and the mock reads it to draw its header. */
+      const box = document.createElement("span");
+      box.className = "add-widget-preview";
+      box.setAttribute("aria-hidden", "true");
+      el.insertBefore(box, el.firstChild);
+      box.innerHTML = mockHtml(el);
+
       const grip = document.createElement("span");
       grip.className = "add-widget-grip";
       grip.setAttribute("aria-hidden", "true");
@@ -19261,7 +19866,11 @@
       input.className = "add-widget-rename";
       input.type = "text";
       input.value = old;
-      input.maxLength = 28;
+      /* No maxLength. The 28-character cap was protecting a 3-across grid of
+         88px cards from a long name; the card is wider now and its label
+         clamps to two lines and an ellipsis (see .add-widget-label), so a
+         name of any length is stored in full and simply shows as much of
+         itself as the card has room for. */
       input.setAttribute("aria-label", "Name for the " + old + " card");
       card.replaceChild(input, lab);
       input.focus();
@@ -19479,18 +20088,30 @@
         deleteAddCard(card);
       });
       menu.appendChild(b);
-      /* The popup is position:fixed, so it is the offset parent and the card's
-         own offsets place the menu without measuring the viewport. */
-      menu.style.top = (card.offsetTop + 16) + "px";
+      /* Measured rather than read off offsetTop/offsetLeft. The cards live in
+         a scroller now, so a card's offset within the popup stops matching
+         where it actually IS the moment the list is scrolled at all -- the
+         menu used to open against the card's un-scrolled position, which on a
+         scrolled list is some other card entirely. Rects are the only numbers
+         that are true in both states. It still hangs off the popup, which is
+         position:fixed and therefore the offset parent, so it is not clipped
+         by the scroller it points into. */
+      menu.style.top = "0px";
       menu.style.left = "0px";
       addWidgetPopup.appendChild(menu);
-      /* Opens to the right of the dots, unless that would run past the popup's
-         edge -- which it always would in the last column, where it flips to
-         end at the card instead. */
+      const pop = addWidgetPopup.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
       const pad = 10;
-      const want = card.offsetLeft + card.offsetWidth - pad;
+      /* Opens to the right of the dots, unless that would run past the
+         popup's edge -- which it always would in the last column, where it
+         flips to end at the card instead. */
+      const want = (cr.right - pop.left) - pad;
       const room = addWidgetPopup.clientWidth - pad;
       menu.style.left = Math.max(pad, Math.min(want, room - menu.offsetWidth)) + "px";
+      /* Clamped to the popup so a card scrolled half under the header does
+         not put its menu outside the panel it belongs to. */
+      const wantTop = (cr.top - pop.top) + 16;
+      menu.style.top = Math.max(pad, Math.min(wantTop, addWidgetPopup.clientHeight - menu.offsetHeight - pad)) + "px";
       menu.dataset.forType = addCardTypeOf(card) || "";
       addCardMenu = menu;
       b.focus();
@@ -38436,14 +39057,17 @@
     }
     if (boardView) {
       /* Delete lived only in the hover array this view now hides, so it has to
-         land here or a phone loses the ability entirely. Confirmed, because it
-         is the one command in this menu that does not come back: hide is a
-         toggle, delete is not. */
-      add("Delete widget", ICO.trash, function () {
-        if (window.confirm("Delete \u201c" + cur.title + "\u201d? This cannot be undone.")) {
-          B.remove(id); rebuild();
-        }
-      });
+         land here or a phone loses the ability entirely.
+
+         No confirmation. It used to raise a browser confirm(), which was the
+         only one on either delete path -- the desktop's own Delete button
+         (wireDeleteButton) has never asked -- so the same command behaved
+         differently depending on which control you reached it through. A
+         dialog that one route shows and the other does not is not a safety
+         net, it is an inconsistency, and a prompt you meet on every single
+         delete is one people learn to dismiss without reading. Getting here
+         is already two deliberate acts: open the menu, pick the last item. */
+      add("Delete widget", ICO.trash, function () { B.remove(id); rebuild(); });
     }
 
     /* Fit it on the screen. The menu grew past the eight items it was built
