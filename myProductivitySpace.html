@@ -25809,15 +25809,23 @@
     createPanel.appendChild(panelHeading(existing ? "Event" : "New event"));
     const title = field("Event title", "text", existing ? existing.title : "");
     const date = field("Date", "date", existing ? ymd(existing.start) : ymd(anchor));
-    /* The second date, shown only while All day is on -- Google's own
-       all-day row is "Monday, August 31 - Monday, August 31" and its timed
-       row is a single date with two times. Google's end.date is EXCLUSIVE
-       (a one-day event ends the following morning), but the day shown here
-       is the last day the event actually covers, the way Google shows it;
-       the save puts the extra day back on. */
+    /* The event's end date, in BOTH modes -- Google's all-day row and the
+       second date chip it draws in the timed row for anything running past
+       midnight.
+
+       all-day: Google's end.date is EXCLUSIVE (a one-day event ends the
+       following morning), but the day shown here is the last day the event
+       actually covers, the way Google shows it; the save puts the extra day
+       back on.
+
+       timed: this box holds the calendar day the event ends on -- the start's
+       own day for an ordinary event, the next one for 11:15pm-12:15am. It is
+       kept in step with the times by syncEndDateFromTimes below, so picking an
+       End at or before the Start rolls it forward exactly as Google's editor
+       does, and the save writes the end from it. */
     const endDate = field("End date", "date",
-      existing && existing.allDay ? ymd(addDays(existing.end, -1))
-        : (existing ? ymd(existing.start) : ymd(anchor)));
+      existing ? (existing.allDay ? ymd(addDays(existing.end, -1)) : ymd(existing.end))
+        : ymd(anchor));
     const dates = document.createElement("div");
     dates.className = "cal-field-row";
     dates.appendChild(date.wrap);
@@ -25845,6 +25853,42 @@
       const span = gtSpanFrom(lastStart, endT.input.value || lastStart);
       lastStart = next;
       endT.set(gtHhmm(gtMinutes(next) + span));
+    });
+
+    /* The End time and the End date are one answer stated twice, so they are
+       held in agreement. An End at or before the Start is how "runs past
+       midnight" is said -- it is what picking 1:00 AM from a 10:30 PM start
+       means, and the End list said so out loud ("14 hrs 30 min") when it was
+       picked -- so the date rolls onto the day after the start. Moving the End
+       back past the Start rolls it home again. A date the user has put
+       deliberately FURTHER out (a timed event spanning whole days) is left
+       alone: only a roll of exactly one day, which is the one this function
+       makes, is undone.
+
+       Deliberately not run when the panel opens: an event that genuinely ends
+       two days later must survive being opened. */
+    function syncEndDateFromTimes() {
+      if (isAllDay()) return;
+      const startD = date.input.value;
+      if (!startD) return;
+      const endD = endDate.input.value;
+      if (!endD || endD < startD) { endDate.input.value = startD; return; }
+      const st = startT.input.value, en = endT.input.value;
+      if (!st || !en) return;
+      if (gtMinutes(en) <= gtMinutes(st)) {
+        if (endD === startD) endDate.input.value = ymd(addDays(parseYmd(startD), 1));
+      } else if (endD === ymd(addDays(parseYmd(startD), 1))) {
+        endDate.input.value = startD;
+      }
+    }
+    endT.input.addEventListener("change", syncEndDateFromTimes);
+    // Typing an end date of its own is honoured, but never one before the day
+    // the event starts on.
+    endDate.input.addEventListener("change", function () {
+      if (isAllDay()) return;
+      if (!endDate.input.value || endDate.input.value < date.input.value) {
+        endDate.input.value = date.input.value;
+      }
     });
 
     // An all-day event has no meaningful start/end time, and showing the
@@ -25879,7 +25923,11 @@
     function syncAllDay() {
       const on = isAllDay();
       times.style.display = on ? "none" : "";
-      endDate.wrap.style.display = on ? "" : "none";
+      /* The end date stays on screen in both modes: an all-day event needs it
+         for its last day, a timed one for the day it ends on once the times
+         run past midnight. The TIMES are the only thing an all-day event has
+         no use for. */
+      endDate.wrap.style.display = "";
       tz.wrap.style.display = on ? "none" : "";
       repeat.setAllDay(on);
       if (on && (!endDate.input.value || endDate.input.value < date.input.value)) {
@@ -25889,11 +25937,22 @@
     allDay.input.addEventListener("change", syncAllDay);
     syncAllDay();
 
+    let lastDate = date.input.value;
     date.input.addEventListener("change", function () {
       repeat.setDate(date.input.value);
+      const next = date.input.value;
+      /* A timed event keeps the shape it had: an event that ran past midnight
+         is still an overnight one after its start day is moved, rather than
+         collapsing onto one day or being left with an end before its start.
+         The span is read BEFORE the clamp below pushes the old end along. */
+      if (!isAllDay() && next && lastDate && endDate.input.value) {
+        const span = Math.max(0, Math.round((parseYmd(endDate.input.value) - parseYmd(lastDate)) / 86400000));
+        endDate.input.value = ymd(addDays(parseYmd(next), span));
+      }
+      lastDate = next;
       // The end can never sit before the start; dragging the start past it
       // pushes it along rather than leaving a span that reads backwards.
-      if (endDate.input.value < date.input.value) endDate.input.value = date.input.value;
+      if (endDate.input.value < next) endDate.input.value = next;
     });
 
     const guests = field("Add guests", "text",
@@ -25985,8 +26044,13 @@
         if (!endDate.input.value) return showError("Pick an end date.");
         if (endDate.input.value < date.input.value) return showError("The end date can't be before the start date.");
       } else {
+        // The end is read from the End date box, which is the start's own day
+        // for an ordinary event and the next day for one running past
+        // midnight.
+        const endDay = endDate.input.value || date.input.value;
+        if (endDay < date.input.value) return showError("The end date can't be before the start date.");
         startAt = new Date(date.input.value + "T" + (startT.input.value || "09:00") + ":00");
-        endAt = new Date(date.input.value + "T" + (endT.input.value || "10:00") + ":00");
+        endAt = new Date(endDay + "T" + (endT.input.value || "10:00") + ":00");
         /* An end at or before the start is the ordinary way to say "runs past
            midnight" -- it is what picking 1:00 AM from a 10:30 AM start means,
            and the End list said so out loud ("14 hrs 30 min") when it was
@@ -27472,10 +27536,18 @@
       }
     } else if (f.date || f.start_time || f.end_time) {
       const st = f.start_time || (existing && !existing.allDay ? gcalLocalIso(existing.start).slice(11, 16) : "09:00");
-      let en = f.end_time || (existing && !existing.allDay && !f.start_time ? gcalLocalIso(existing.end).slice(11, 16) : null);
+      const en = f.end_time || (existing && !existing.allDay && !f.start_time ? gcalLocalIso(existing.end).slice(11, 16) : null);
+      /* A timed event may end on a LATER day than it starts on -- a flight, a
+         party past midnight -- and end_date is how that is said. Without one,
+         an End at or before the Start is read the way the event panel reads
+         it, as "runs past midnight", instead of being refused. end_date used
+         to be silently dropped here for any event with times on it. */
+      const endDate = f.end_date || (en && gtMinutes(en) <= gtMinutes(st) ? ymd(addDays(parseYmd(date), 1)) : date);
       const startAt = new Date(date + "T" + st + ":00");
-      let endAt = en ? new Date(date + "T" + en + ":00") : new Date(startAt.getTime() + 60 * 60000);
-      if (!(endAt > startAt)) return { error: "end_time must be after start_time." };
+      const endAt = en ? new Date(endDate + "T" + en + ":00") : new Date(startAt.getTime() + 60 * 60000);
+      if (!(endAt > startAt)) {
+        return { error: f.end_date ? "end_date must be on or after date." : "end_time must be after start_time." };
+      }
       body.start = { dateTime: gcalLocalIso(startAt), timeZone: gcalTimeZone() };
       body.end = { dateTime: gcalLocalIso(endAt), timeZone: gcalTimeZone() };
     }
