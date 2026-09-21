@@ -25934,7 +25934,19 @@
         endDate.input.value = date.input.value;
       }
     }
-    allDay.input.addEventListener("change", syncAllDay);
+    allDay.input.addEventListener("change", function () {
+      /* Ticking All day on an event that ran past midnight: that overnight
+         shape belongs to the times, which this tick is about to hide, so the
+         day the event covers collapses onto the day it starts on -- what
+         Google does with the same tick. An event that was ALREADY all-day
+         keeps the last day it covers, which is a different thing entirely. */
+      if (isAllDay() && date.input.value && endDate.input.value
+          && endDate.input.value === ymd(addDays(parseYmd(date.input.value), 1))
+          && gtMinutes(endT.input.value || "10:00") <= gtMinutes(startT.input.value || "09:00")) {
+        endDate.input.value = date.input.value;
+      }
+      syncAllDay();
+    });
     syncAllDay();
 
     let lastDate = date.input.value;
