@@ -21,7 +21,7 @@
 <!-- --mps-accent, matching the wordmark band that is now the top of the page,
      so the browser bar and the band read as one strip. The dark value
      belongs to dark mode, where it is actually true. -->
-<meta name="theme-color" content="#3A6EA5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)">
 
 <!-- Installable to the home screen. The manifest is a real file rather than a
@@ -249,13 +249,13 @@
        everything inside a created widget's frame. This is what the Appearance
        picker rewrites. Both start on the same blue, which is why nothing looks
        different until somebody chooses. */
-    --mps-brand: #3A6EA5;
-    --mps-brand-hover: #2F5A88;
-    --mps-accent: #3A6EA5;
-    --mps-accent-hover: #2F5A88;
+    --mps-brand: #000000;
+    --mps-brand-hover: #333333;
+    --mps-accent: #000000;
+    --mps-accent-hover: #333333;
     /* The accent at fill strength, for a quiet control's hover. Set alongside
        the accent so it always matches it. */
-    --mps-accent-wash: rgba(58, 110, 165, 0.10);
+    --mps-accent-wash: rgba(0, 0, 0, 0.08);
     --bg: #FFFFFF;
     --ink: #0A0A0A;
     --ink-soft: #6B6B6B;
@@ -353,7 +353,7 @@
      same "Menu" header treatment as every other widget (icon-less here,
      since individual links carry their own icons). */
   .links-row-wrap { position: relative; flex: 0 0 auto; }
-  /* Breathing room between the blue wordmark band and the Bookmarks bar under it. */
+  /* Breathing room between the wordmark band and the Bookmarks bar under it. */
   body > .links-row-wrap { margin-top: 16px; }
   /* The board at 75%. Chrome's own zoom at 75% was the size that read right
      on a laptop, so the app starts there instead of needing it set by hand.
@@ -628,9 +628,16 @@
   .links-bottom-dropzone.links-drop-target { border-color: #000000; background: rgba(0,0,0,0.05); }
 
   /* Wordmark lockup, after the classic Myspace logo: one rounded bold run,
-     white out of --mps-accent, every part the same size. The three spans stay
-     so the phone rules below can pin "my" and "Productivity" and let only
-     "space" truncate. */
+     one size, one weight, one colour, set in the face the brand/ lockups use.
+
+     ONE span now, not three. "my" / "Productivity" / "space" were three
+     elements so the phone could pin the first two and ellipsis the third,
+     which is the machinery that produced "myProductivitys..." -- and three
+     spans is also what let a treatment land on one part of the name and not
+     the others. The name is one word and is now one element, so there is no
+     seam for a size, a weight, a colour or an ellipsis to differ across.
+     The whole name shows at every width; the fit pass at the end of the file
+     steps the size down until it does. */
   /* Bottom padding absorbs the vertical rhythm the removed date header used
      to contribute (14px above + 8px below it), so the grid doesn't ride up
      against the wordmark now that nothing sits between them. */
@@ -641,18 +648,19 @@
      earlier in the DOM, silently captured the bar and rendered it inside the
      gate. One rule list, two elements, no drift, and only one .page-title. */
   .page-title, .ag-wordmark {
-    padding: 22px 28px 18px 28px; flex: 0 0 auto; color: #FFFFFF;
+    padding: 22px 28px 18px 28px; flex: 0 0 auto; color: #000000;
     display: flex; align-items: baseline; line-height: 0.92;
     font-family: 'MPS Nunito', 'Arial Rounded MT Bold', Arial, Helvetica, sans-serif;
     font-weight: 800; letter-spacing: -0.035em;
   }
-  /* The band. Full width, so it also sits behind the fixed corner buttons,
-     which turn white while it is under them (html.mps-on-band, set by the
-     script at the end of the file). */
-  .page-title { background: var(--mps-brand); }
-  .page-title .pt-prefix, .ag-wordmark .pt-prefix,
-  .page-title .pt-main, .ag-wordmark .pt-main,
-  .page-title .pt-accent, .ag-wordmark .pt-accent,
+  /* The band. Full width, so it also sits behind the fixed corner buttons.
+     White, like the page under it -- it is the page's own top edge rather
+     than a coloured strip laid across it, so the corner buttons keep their
+     ordinary dark treatment instead of inverting to white the moment they
+     cross it (see html.mps-on-band, now a no-op left in place because the
+     script that sets it also drives the phone's own layout reads). */
+  .page-title { background: #FFFFFF; }
+  .page-title .pt-word, .ag-wordmark .pt-word,
   .page-title .pt-mark, .ag-wordmark .pt-mark {
     font-size: 46px; margin-right: 0;
   }
@@ -663,7 +671,7 @@
      overrides to keep in sync.
 
      0.92em is the line-height declared above, so the square matches the text's
-     line box exactly and the blue band keeps the height it had.
+     line box exactly and the band keeps the height it had.
 
      align-self is load-bearing: the row is baseline-aligned, and a replaced
      element baselines on its bottom edge, which would stand a 42px square on
@@ -673,11 +681,11 @@
   .page-title .pt-mark, .ag-wordmark .pt-mark {
     width: 0.92em; height: 0.92em; flex: 0 0 auto;
     align-self: center; margin-right: 0.26em;
-    /* Both placements sit ON the blue -- the band, and the sign-in screen once
-       it turns blue to show the mark -- so both take the inverted cut. The
-       symbol's own defaults are the normal-weight version, ready for the first
-       placement on white. */
-    --mark-plate: #FFFFFF; --mark-ink: var(--mps-brand);
+    /* Both placements now sit on WHITE -- the band, and the sign-in screen --
+       so both take the normal cut: a black plate with the eyes and the
+       sparkle knocked out of it in white. This is the brand/ lockup with
+       black where the blue was. */
+    --mark-plate: #000000; --mark-ink: #FFFFFF;
   }
   /* Shown while dragging the Menu widget above the grid, indicating a
      release there sends it back to the full-width floating bar at the
@@ -1541,8 +1549,11 @@
     font-size: 13.5px; font-weight: 500; color: var(--ink);
   }
   #collapsedTabsBar .collapsible-strip { display: flex; }
+  /* The board's own hover fill, not a hardcoded blue wash. It was the brand
+     blue at 9%, which survived every accent change and so was the one hover
+     on the board that never matched the colour the user had picked. */
   .collapsible-strip:hover, .collapsible-strip:focus-visible {
-    background: rgba(58, 110, 165, 0.09); outline: none;
+    background: rgba(10, 10, 10, 0.05); outline: none;
   }
   /* Set by the shelf's search box. !important because the rule that shows a
      strip inside the bar is an id selector and would otherwise win. */
@@ -2892,15 +2903,15 @@
     background: var(--mps-brand); color: var(--bg); border-radius: 50%; opacity: 1;
   }
   #aiPanelBtn:hover { background: var(--mps-brand-hover); }
-  /* While the blue band is behind the row: white icons, and the AI disc
-     inverts to white with a blue star so it still reads as the anchor. */
-  html.mps-on-band #alwaysOnTopBtn, html.mps-on-band #connectionsBtn,
-  html.mps-on-band #addWidgetBtn { color: #FFFFFF; opacity: 1; }
-  html.mps-on-band #alwaysOnTopBtn:hover, html.mps-on-band #connectionsBtn:hover,
-  html.mps-on-band #addWidgetBtn:hover { background: rgba(255,255,255,0.16); }
-  html.mps-on-band #alwaysOnTopBtn.unsupported { color: #FFFFFF; opacity: 0.45; }
-  html.mps-on-band #aiPanelBtn { background: #FFFFFF; color: var(--mps-brand); }
-  html.mps-on-band #aiPanelBtn:hover { background: #E6ECF7; }
+  /* The whole inversion is gone. These eight rules existed for one reason:
+     the band was a saturated blue strip, so anything crossing it had to flip
+     to white to stay visible. The band is white now -- it is the page's own
+     top edge, not a coloured bar laid over it -- and a control that turned
+     white the moment it passed over white would simply vanish.
+
+     html.mps-on-band is still SET by the script at the end of the file, and
+     deliberately: the phone layout reads it. It just no longer repaints
+     anything, which is why there is nothing here but this note. */
 
   /* pip-active used to hide all of this, swept in with the two fullscreen
      modes. It does not belong with them: a fullscreen mode takes the page
@@ -3192,7 +3203,7 @@
   .amk-up { font-size: 7.5px; font-weight: 600; color: #1a7f4b; }
   .amk-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1 1 auto; }
   .amk-cell { border-radius: 1.5px; background: rgba(10,10,10,0.045); }
-  .amk-cell.ev { background: rgba(58,110,165,0.38); }
+  .amk-cell.ev { background: rgba(10,10,10,0.30); }
   .amk-word { font-size: 8.5px; font-weight: 600; color: var(--ink); letter-spacing: -0.005em; }
   .amk-def { font-size: 7px; line-height: 1.35; color: var(--ink-soft); }
   .amk-cap { font-size: 6.5px; font-weight: 600; letter-spacing: 0.07em;
@@ -4271,7 +4282,11 @@
     font-family: inherit; font-size: 14px; position: relative;
   }
   .nb-btn:hover { background: #f1f3f4; }
-  .nb-btn.is-on { background: #e8f0fe; color: #1a56c4; }
+  /* The pressed state of a formatting button. It was a blue chip from
+     Google's palette sitting in a toolbar with nothing else Google about it;
+     a pressed control should read as pressed, which a fill and the board's
+     own ink already say. */
+  .nb-btn.is-on { background: rgba(10,10,10,0.08); color: var(--ink); }
   .nb-btn svg { width: 15px; height: 15px; display: block; }
   .nb-btn[data-tip]:hover::after {
     content: attr(data-tip); position: absolute; bottom: calc(100% + 6px); left: 50%;
@@ -4340,7 +4355,7 @@
     padding: 7px 9px; font-family: inherit; font-size: 13px; outline: none; resize: vertical;
     min-height: 34px;
   }
-  .nb-cm-input:focus { border-color: #6b9cf5; }
+  .nb-cm-input:focus { border-color: var(--ink-soft); }
   .nb-cm-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 7px; }
   .nb-cm-btn {
     border: none; background: transparent; border-radius: 6px; padding: 5px 9px;
@@ -4406,7 +4421,7 @@
 
   /* Selection toolbar + tabs, on one row the way the reference has them. */
   .nl-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-  .nl-selcount { font-size: 13px; font-weight: 600; color: #1a73e8; padding: 4px 8px; }
+  .nl-selcount { font-size: 13px; font-weight: 600; color: var(--ink); padding: 4px 8px; }
   .nl-iconbtn {
     width: 30px; height: 30px; border: none; background: transparent; border-radius: 7px;
     color: var(--ink-soft); cursor: pointer; display: grid; place-items: center; position: relative;
@@ -4447,11 +4462,11 @@
     border-bottom: 1px solid #f4f4f4;
   }
   .nl-row:hover { background: #f7f8fa; }
-  .nl-row.is-selected { background: #e8f0fe; }
+  .nl-row.is-selected { background: rgba(10,10,10,0.06); }
   .nl-row.is-dragging { opacity: .4; }
   .nl-row.drop-above { box-shadow: inset 0 2px 0 0 var(--ink); }
   .nl-row.drop-below { box-shadow: inset 0 -2px 0 0 var(--ink); }
-  .nl-check { width: 16px; height: 16px; accent-color: #1a73e8; cursor: pointer; }
+  .nl-check { width: 16px; height: 16px; accent-color: var(--ink); cursor: pointer; }
   /* Six-dot grip: click opens the same menu, drag reorders. */
   .nl-grip {
     width: 18px; height: 22px; border: none; background: transparent; padding: 0;
@@ -4499,7 +4514,7 @@
     flex: 1 1 auto; min-width: 0; border: none; background: transparent; outline: none;
     font-family: inherit; font-size: 13.5px; color: var(--ink);
   }
-  .nl-rename input::selection { background: #cfe0ff; }
+  .nl-rename input::selection { background: rgba(10,10,10,0.14); }
 
   /* ---------- row context menu ---------- */
   #nlMenu {
@@ -4511,7 +4526,7 @@
   #nlMenu[hidden] { display: none; }
   .nl-menu-search {
     width: 100%; box-sizing: border-box; margin-bottom: 6px;
-    border: 1px solid #6b9cf5; border-radius: 7px; padding: 7px 9px;
+    border: 1px solid var(--ink-soft); border-radius: 7px; padding: 7px 9px;
     font-family: inherit; font-size: 13px; outline: none;
   }
   .nl-menu-label {
@@ -4538,7 +4553,7 @@
   #nlEmoji[hidden] { display: none; }
   .nl-emoji-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
   .nl-emoji-head input {
-    flex: 1 1 auto; min-width: 0; border: 1px solid #6b9cf5; border-radius: 7px;
+    flex: 1 1 auto; min-width: 0; border: 1px solid var(--ink-soft); border-radius: 7px;
     padding: 6px 9px; font-family: inherit; font-size: 13px; outline: none;
   }
   .nl-emoji-clear {
@@ -4574,10 +4589,10 @@
     font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
   }
   #authGate[hidden] { display: none; }
-  /* The wordmark is the app's own .page-title element, reused verbatim so the
-     outlined "Space" is the identical treatment rather than a second copy of
-     it that can drift. Only the block-level padding is dropped, since here it
-     is centred in a flex column instead of sitting in the page's top-left. */
+  /* The wordmark is the app's own element, reused verbatim so the sign-in
+     screen and the band cannot drift apart. Only the block-level padding is
+     dropped, since here it is centred in a flex column instead of sitting in
+     the page's top-left. */
   #authGate .ag-wordmark { padding: 0; }
   /* The one place the two placements are ALLOWED to diverge, and the reason is
      that every size above is a header-band size. In the band the wordmark
@@ -4585,7 +4600,7 @@
      toggle, which is why the phone rules squeeze it to 21px and then to 15px
      below 460px. The gate has none of those controls, so it was shrinking to
      clear obstacles that are not on the screen: a 15px wordmark alone on a
-     full blue field was the whole of the app's identity on an iPhone.
+     full-bleed field was the whole of the app's identity on an iPhone.
 
      One clamp replaces all three fixed sizes. 8vw is the ceiling that keeps
      the word inside the viewport: "myProductivityspace" measures about 10.9x
@@ -4596,32 +4611,34 @@
      step up from the band's 46px, since the gate has the room and the
      wordmark is the only thing on it. 26px is the floor.
 
-     .pt-mark is listed with the three spans for the same reason it is listed
-     in every other size rule: it is sized in em against its OWN font-size, so
+     .pt-mark is listed with the word for the same reason it is listed in
+     every other size rule: it is sized in em against its OWN font-size, so
      naming it here is what keeps the square tracking the word. */
-  #authGate .ag-wordmark .pt-prefix,
-  #authGate .ag-wordmark .pt-main,
-  #authGate .ag-wordmark .pt-accent,
+  #authGate .ag-wordmark .pt-word,
   #authGate .ag-wordmark .pt-mark { font-size: clamp(26px, 8vw, 54px); }
-  /* Blue only once there is something to show (sign-in or an error). The
-     blank loading state stays --bg, so a signed-in reload does not flash a
-     full blue screen before the board. */
-  #authGate:has(> #authGateMark:not([hidden])) { background: var(--mps-brand); }
+  /* The sign-in screen is white, like the board behind it. It used to turn
+     the brand blue the moment there was something to show, which meant the
+     first thing a new account ever saw was a full-bleed colour field the app
+     no longer uses anywhere else. Nothing to switch on now: --bg is both the
+     loading state and the signed-out one, so there is no flash between
+     them either. */
   #authGate .ag-wordmark[hidden] { display: none; }
   #authGate .ag-err {
-    font-size: 13px; color: #FFFFFF; max-width: 340px;
+    font-size: 13px; color: var(--ink); max-width: 340px;
     text-align: center; line-height: 1.5;
   }
   #authGate .ag-err[hidden] { display: none; }
-  /* Inverted for the blue screen: white button, blue label and G. */
+  /* Inverted, because the screen behind it inverted. It was white on blue,
+     which on a white screen is a button you cannot see. It is the only action
+     on the page, so it is the one place a filled black button is right. */
   #authGateBtn {
     display: inline-flex; align-items: center; gap: 10px;
     padding: 15px 24px; border: none; border-radius: 12px;
-    background: #FFFFFF; color: var(--mps-brand);
+    background: #000000; color: #FFFFFF;
     font-family: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
     transition: background 0.15s ease, transform 0.1s var(--ease-spring);
   }
-  #authGateBtn:hover { background: #E6ECF7; }
+  #authGateBtn:hover { background: #333333; }
   #authGateBtn:active { transform: scale(0.97); }
   #authGateBtn[hidden] { display: none; }
 
@@ -4691,11 +4708,10 @@
     }
     /* The band is tall enough to contain the control row instead of ending
        above it. The corner buttons are position:fixed at top 6px and 36px
-       tall, so they run to 42px; a 32px band left them hanging over the white
-       board underneath, which read as a broken header -- and it kept
-       html.mps-on-band off, so they never took their white-on-blue treatment
-       either. Centred rather than baseline-aligned, because with a min-height
-       the baseline sits at the top of the box. */
+       tall, so they run to 42px; a 32px band left them hanging over the board
+       underneath, which read as a broken header. Centred rather than
+       baseline-aligned, because with a min-height the baseline sits at the
+       top of the box. */
     html:not(.force-desktop) .page-title {
       min-height: calc(48px + env(safe-area-inset-top));
       align-items: center;
@@ -4703,13 +4719,9 @@
     /* The size is written by the fit pass at the end of the file, which steps
        it down until the whole name clears the controls. 21px is the ceiling
        and the fallback if that script never runs. */
-    html:not(.force-desktop) .page-title .pt-prefix,
-    html:not(.force-desktop) .page-title .pt-main,
-    html:not(.force-desktop) .page-title .pt-accent,
+    html:not(.force-desktop) .page-title .pt-word,
     html:not(.force-desktop) .page-title .pt-mark,
-    html:not(.force-desktop) .ag-wordmark .pt-prefix,
-    html:not(.force-desktop) .ag-wordmark .pt-main,
-    html:not(.force-desktop) .ag-wordmark .pt-accent,
+    html:not(.force-desktop) .ag-wordmark .pt-word,
     html:not(.force-desktop) .ag-wordmark .pt-mark { font-size: var(--mps-wm-fs, 21px); }
 
     /* Five 28px buttons 6px apart spanned 176px of a 375px screen, below both
@@ -4762,30 +4774,21 @@
        is what keeps this honest when a safe-area inset or a hidden control
        moves the wall.
 
-       The budget is padding rather than max-width so the blue band still
-       runs the full width behind the controls; only the text is bounded.
-       The sign-in screen's #authGate .ag-wordmark { padding: 0 } outranks
-       this, so its centred mark is unaffected.
-
-       The ellipsis on .pt-accent is now a floor rather than the normal case:
-       the fit pass shrinks the mark until it fits, and only a screen too
-       narrow for even the 11px minimum reaches this. It has to live on
-       .pt-accent, not here -- .page-title is a flex row of three spans, and
-       text-overflow on a flex CONTAINER does nothing, so it would clip
-       mid-glyph with no mark. */
+       The budget is padding rather than max-width so the band still runs the
+       full width behind the controls; only the text is bounded. The sign-in
+       screen's #authGate .ag-wordmark { padding: 0 } outranks this, so its
+       centred mark is unaffected. */
     html:not(.force-desktop) .page-title,
     html:not(.force-desktop) .ag-wordmark {
       padding-right: calc(216px + env(safe-area-inset-right));
       overflow: hidden; white-space: nowrap;
     }
-    html:not(.force-desktop) .page-title .pt-prefix,
-    html:not(.force-desktop) .page-title .pt-main,
-    html:not(.force-desktop) .ag-wordmark .pt-prefix,
-    html:not(.force-desktop) .ag-wordmark .pt-main { flex: 0 0 auto; }
-    html:not(.force-desktop) .page-title .pt-accent,
-    html:not(.force-desktop) .ag-wordmark .pt-accent {
-      flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-    }
+    /* No ellipsis rule any more. It let "space" shrink and trail off, which
+       is how the name ever came out as "myProductivitys...". One span cannot
+       be half-shown: the fit pass sizes the whole word to the room it has,
+       and the whole word is what appears. */
+    html:not(.force-desktop) .page-title .pt-word,
+    html:not(.force-desktop) .ag-wordmark .pt-word { flex: 0 0 auto; }
     /* There used to be a second, fixed step-down here at max-width 460px.
        It picked one size for every narrow phone and still picked it too
        large, so the name came out "myProductivitys...". The fit pass measures
@@ -5563,7 +5566,7 @@
      placed on blue sets --mark-plate and --mark-ink to invert it. -->
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <symbol id="mpsMark" viewBox="0 0 64 64">
-    <rect width="64" height="64" rx="14" fill="var(--mark-plate, #3A6EA5)"/>
+    <rect width="64" height="64" rx="14" fill="var(--mark-plate, #000000)"/>
     <rect x="14" y="15" width="13" height="13" rx="3" fill="var(--mark-ink, #FFFFFF)"/>
     <rect x="37" y="15" width="13" height="13" rx="3" fill="var(--mark-ink, #FFFFFF)"/>
     <path d="M32 31.5C32 36.75 27.54 42 21.5 42C27.54 42 32 47.25 32 52.5C32 47.25 36.46 42 42.5 42C36.46 42 32 36.75 32 31.5Z" fill="var(--mark-ink, #FFFFFF)"/>
@@ -5571,7 +5574,7 @@
 </svg>
 
 <div id="authGate">
-  <div class="ag-wordmark" id="authGateMark" hidden><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-prefix">my</span><span class="pt-main">Productivity</span><span class="pt-accent">space</span></div>
+  <div class="ag-wordmark" id="authGateMark" hidden><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-word">myProductivityspace</span></div>
   <button type="button" id="authGateBtn" hidden>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 11v2.9h4.1c-.2 1.1-1.4 3.2-4.1 3.2-2.5 0-4.5-2-4.5-4.6S9 7.9 11.5 7.9c1.4 0 2.3.6 2.9 1.1l2-1.9C15.1 5.9 13.5 5.2 11.5 5.2 7.6 5.2 4.4 8.4 4.4 12.3s3.2 7.1 7.1 7.1c4.1 0 6.8-2.9 6.8-6.9 0-.5 0-.9-.1-1.3H12z"/></svg>
     Continue with Google
@@ -5579,7 +5582,7 @@
   <div class="ag-err" id="authGateErr" hidden></div>
 </div>
 
-<div class="page-title"><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-prefix">my</span><span class="pt-main">Productivity</span><span class="pt-accent">space</span></div>
+<div class="page-title"><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-word">myProductivityspace</span></div>
 
 <!-- Owner-only, and so hidden in the markup rather than hidden later: a
      button that paints for one frame and then vanishes is worse than one
@@ -13746,14 +13749,16 @@
 
      The swatches are a fixed row rather than a colour picker, and they are not
      a set of colours somebody liked: each hue's lightness was solved backwards
-     from the current blue's relative luminance (0.1477), so every one of them
-     lands on the same contrast wherever the blue already passed -- 5.3:1 on
-     white, 4.2:1 on the palest widget tint. A free picker is how a board ends
-     up unreadable, and it would be our bug report, not the user's mistake.
+     from the blue's relative luminance (0.1477), which was the default when
+     they were chosen, so every one of them lands on the same contrast -- 5.3:1
+     on white, 4.2:1 on the palest widget tint. Black, now the default, is
+     darker than all of them, so it only ever improves on that (21:1 on white).
+     A free picker is how a board ends up unreadable, and it would be our bug
+     report, not the user's mistake.
 
      Stored per account through storageSet, so it follows you to another
      device, and mirrored into localStorage so a reload paints the chosen
-     colour on the first frame instead of flashing blue while the real read
+     colour on the first frame instead of flashing black while the real read
      comes back. */
   const ACCENT_KEY = "board-accent";
   const ACCENT_SWATCHES = [
@@ -13762,18 +13767,17 @@
        graphite; Notion offers blue, purple, pink, red, orange, yellow, green,
        brown and gray. Olive was the one neither of them has -- a drab
        yellow-green is nobody's accent -- so it went. */
-    { name: "Blue",   accent: "#3A6EA5", hover: "#2F5A88", isDefault: true },
+    /* Black first, and the default. The app's own chrome is black and white
+       now, so a board that has never been touched should match it rather
+       than arrive wearing a colour nobody chose. */
+    { name: "Black",  accent: "#000000", hover: "#333333", isDefault: true },
+    { name: "Blue",   accent: "#3A6EA5", hover: "#2F5A88" },
     { name: "Teal",   accent: "#297580", hover: "#215F69" },
     { name: "Green",  accent: "#2D7850", hover: "#246342" },
     { name: "Amber",  accent: "#8E6229", hover: "#745122" },
     { name: "Red",    accent: "#B5483C", hover: "#953B31" },
     { name: "Pink",   accent: "#AF447A", hover: "#913864" },
-    { name: "Purple", accent: "#8853B5", hover: "#704299" },
-    /* The exception to the equal-lightness rule above, and a safe one: black is
-       darker than every swatch here rather than lighter, so contrast only ever
-       improves (21:1 on white, 15:1 on the palest widget tint). It is also what
-       these buttons were before they had a token, so it is the way back. */
-    { name: "Black",  accent: "#000000", hover: "#333333" }
+    { name: "Purple", accent: "#8853B5", hover: "#704299" }
   ];
 
   function accentDefOf(hex) {
@@ -32712,10 +32716,10 @@
      the picker has not painted yet, which is only true on the very first
      frames of a cold load. */
   function accentHex() {
-    try { return window.__mpsAccent().accent; } catch (e) { return "#3A6EA5"; }
+    try { return window.__mpsAccent().accent; } catch (e) { return "#000000"; }
   }
   function accentHoverHex() {
-    try { return window.__mpsAccent().hover; } catch (e) { return "#2F5A88"; }
+    try { return window.__mpsAccent().hover; } catch (e) { return "#333333"; }
   }
   // The accent at fill strength, for a hover inside a widget.
   function accentWashRgba() {
@@ -34634,6 +34638,14 @@
     "- Radius: 4px for rows, buttons, inputs and tags; 6px for an inner card or callout. Never round inner elements more than that.",
     "- Separate groups with space first, a hairline second, a background fill last.",
     "",
+    "EMOJI (Notion uses them, and so should you)",
+    "- Notion puts a small emoji wherever a thing needs identifying at a glance, and this board should read the same way. Use one when it tells the reader what a row, a section or a state IS faster than a word does.",
+    "- Where they belong: at the start of a callout; on a section heading that names a category; on a list row whose items are of different kinds; on an empty state; on a status or result line (done, blocked, overdue, up, down).",
+    "- One per line at most, always leading the line, never in the middle of a sentence and never after it. Pick the obvious one -- a calendar for a date, a chart for a number, a warning for an error. If you have to think about what it means, it is the wrong emoji and plain text is better.",
+    "- Do NOT put one on every row of a uniform list. A list of ten tasks is ten identical emoji, which is decoration and stops reading as information.",
+    "- Size it with the text (about 1em) and give it 6 to 8px of space before the label. Never scale it up as an illustration.",
+    "- This is separate from the widget's HEADER icon, which is the emoji placeholder in the widget's own title row. That one is the user's to set and you leave it alone unless they ask; these live in the widget's CONTENT.",
+    "",
     "COMPONENTS",
     "- List row: full-width, 4px radius, hover fill rgba(0,0,0,0.04), optional 16px icon or emoji on the left, metadata right-aligned in var(--ink-soft).",
     "- Checkbox: 14px square, 1.5px border var(--ink-soft), 3px radius; checked fills var(--ink) with a white tick, and the row text turns var(--ink-soft) with a line-through.",
@@ -34648,7 +34660,8 @@
     "- Hover and press transitions 120ms, easing var(--ease-spring). Nothing bounces, slides in from off-screen or animates on load.",
     "",
     "AVOID",
-    "- Drop shadows, gradients, saturated fills, borders around every row, centred body text, more than two text sizes in one row, emoji used as bullets in every line, and any Notion logo or brand mark."
+    "- Drop shadows, gradients, saturated fills, borders around every row, centred body text, more than two text sizes in one row, and any Notion logo or brand mark.",
+    "- Emoji on every line of a uniform list, emoji standing in for a label rather than leading it, and more than one emoji on a line. See EMOJI above: they identify, they do not decorate."
   ].join("\n");
 
   /* The tools plan mode lets through: everything that only looks. Kept as an
@@ -36807,6 +36820,7 @@
     return [
       "You are myProductivityspace AI, the assistant built into a single-page personal dashboard.",
       "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
+      "When you build or fill a widget, give its content emoji the way Notion does: one leading a callout, a section heading, an empty state or a status line, wherever it identifies something faster than a word would. Not on every row of a uniform list, and never on the widget's header icon -- that placeholder is the user's to set. read_design_guide has the rules.",
       "Nothing about a widget is fixed. Its contents, its settings and its appearance (fonts, weights, colours, spacing, what is shown or hidden) can all be changed with your tools, built-in widgets included, so never reply that a widget's rendering or styling cannot be changed. To change how something looks: read_widget gives a dom_outline of the elements and class names, inspect_widget with a selector shows the rules currently applied to them, and set_widget_style writes CSS scoped to that widget. Before the first visual change in a chat (building or restyling a custom widget, set_widget_style, a styling patch), call read_design_guide and follow it.",
       "The date, the local time, the connector status and the current contents of the board are given to you in a " + BOARD_STATE_OPEN + " block attached to the user's message. Read it there rather than asking for it. It is a snapshot taken when they hit send, so once you have changed the board yourself, trust your own tool results over it, and call list_widgets when you need to be certain. Earlier messages in the chat keep their own older snapshots; only the one on the latest message describes the board now.",
       "",
@@ -40456,7 +40470,7 @@
 </script>
 
 <script>
-/* The corner buttons are position:fixed but the blue band scrolls with the
+/* The corner buttons are position:fixed but the wordmark band scrolls with the
    page, and full-screen modes hide it. So whether the buttons sit on blue is
    measured, not assumed: html.mps-on-band is on exactly while the band covers
    the vertical middle of the profile button. */
@@ -40570,7 +40584,7 @@
       return range.getBoundingClientRect().width;
     }
     function naturalWidth() {
-      var total = spanWidth(".pt-prefix") + spanWidth(".pt-main") + spanWidth(".pt-accent");
+      var total = spanWidth(".pt-word");
       var mark = band.querySelector(".pt-mark");
       if (mark) {
         total += mark.getBoundingClientRect().width;
