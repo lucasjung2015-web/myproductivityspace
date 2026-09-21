@@ -219,9 +219,12 @@
     font-display: swap;
   }
 
-  /* The wordmark's face: Nunito 800, Latin subset from Google Fonts (SIL
-     Open Font License). Inlined for the same reason Neue Montreal is: the
-     file has to work opened straight off a disk. It is the free stand-in for
+  /* The wordmark's face, and now the only webfont the app actually uses:
+     Nunito 800, Latin subset from Google Fonts (SIL Open Font License).
+     Inlined because the file has to work opened straight off a disk. The
+     interface moved to the system stack (see --mps-font); this one stays
+     because a logo is an identity, not interface text. It is the free
+     stand-in for
      Arial Rounded MT Bold, the face the classic Myspace logo was set in,
      which needs a paid web licence to serve. */
   @font-face {
@@ -249,6 +252,22 @@
        everything inside a created widget's frame. This is what the Appearance
        picker rewrites. Both start on the same blue, which is why nothing looks
        different until somebody chooses. */
+    /* ---------- type ----------
+       The interface font, in one place. It is the system stack, which is what
+       BOTH references this board follows actually ship: Notion's UI font is
+       `ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", ...`, and
+       Apple's own guidance is to reach for the platform face before any custom
+       one, because it already carries optical sizing, per-size tracking tables
+       and legibility tuning that a webfont does not. It resolves to SF Pro on
+       Apple hardware, Segoe UI on Windows, Roboto on Android -- so the app
+       reads as native wherever it is opened, and costs nothing to download.
+
+       It replaced 51 copies of a hardcoded stack. A token, because a font is
+       exactly the kind of decision that should be changeable in one line
+       rather than found and replaced across a 2.5MB file. The wordmark is
+       deliberately NOT on this token: see .page-title. */
+    --mps-font: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
     --mps-brand: #000000;
     --mps-brand-hover: #333333;
     --mps-accent: #000000;
@@ -298,7 +317,7 @@
     margin: 0; padding: 0; height: 100vh; min-height: 100vh;
     height: 100dvh; min-height: 100dvh;
     background: var(--bg); color: var(--ink);
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     -webkit-font-smoothing: antialiased;
   }
   body { display: flex; flex-direction: column; overflow-y: auto; }
@@ -1007,7 +1026,7 @@
      inline <a> around just the first line. */
   .note-editor {
     outline: none; cursor: text; min-height: 20px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 15px; color: #000000; line-height: 1.4;
     white-space: pre-wrap; overflow-wrap: break-word;
   }
@@ -1127,7 +1146,7 @@
   }
   .note-editor [data-b="eq"]:hover { background: #f1f3f4; }
   .note-editor [data-b="eq"].nb-rendered {
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 16px; color: var(--ink);
+    font-family: var(--mps-font); font-size: 16px; color: var(--ink);
   }
   .note-editor [data-b="eq"]:empty::before {
     content: "Add an equation, e.g. e^{i\\pi}+1=0"; color: #b0b0b0;
@@ -1263,7 +1282,7 @@
     align-self: stretch; width: 100%; margin-top: 8px; padding: 8px 12px;
     border: 1px solid #000000; border-radius: 4px;
     background: #ffffff; color: #000000; font-size: 13px;
-    cursor: pointer; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; flex: 0 0 auto;
+    cursor: pointer; font-family: var(--mps-font); flex: 0 0 auto;
     transition: background 0.15s ease, transform 0.1s var(--ease-spring);
   }
   .add-btn:hover { background: #f2f2f2; }
@@ -1696,7 +1715,7 @@
   .add-task-btn {
     align-self: flex-start; margin-bottom: 10px; padding: 8px 13px;
     border: none; border-radius: 9px; background: var(--mps-accent); color: #ffffff;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
+    font-family: var(--mps-font); font-weight: 600; font-size: 13px;
     cursor: pointer; transition: background 0.15s ease, transform 0.1s var(--ease-spring);
   }
   .add-task-btn:hover { background: #222222; }
@@ -1797,7 +1816,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 10px 6px 14px; flex: 0 0 auto;
     border: 1px solid #d7dbe0; border-radius: 999px; background: #ffffff; color: #000000;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px; font-weight: 500;
+    font-family: var(--mps-font); font-size: 13px; font-weight: 500;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s var(--ease-spring);
   }
@@ -1823,7 +1842,7 @@
     display: flex; align-items: center; justify-content: space-between;
     width: 100%; padding: 10px 12px; border: none; border-radius: 9px;
     background: transparent; cursor: pointer; text-align: left;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px; color: #1a1a1a;
+    font-family: var(--mps-font); font-size: 14px; color: #1a1a1a;
     transition: background 0.12s ease;
   }
   .cal-viewtoggle-menu button:hover { background: rgba(10,10,10,0.06); }
@@ -1832,7 +1851,7 @@
   .cal-create-btn {
     flex: 0 0 auto; padding: 5px 11px;
     border: none; border-radius: 9px; background: var(--mps-accent); color: #ffffff;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-weight: 600; font-size: 13px;
+    font-family: var(--mps-font); font-weight: 600; font-size: 13px;
     cursor: pointer;
   }
   /* Scoped to the id, not .cal-create-btn, so any future toolbar reusing the
@@ -1851,7 +1870,7 @@
   .cal-todaybtn {
     flex: 0 0 auto; padding: 3px 8px;
     border: 1px solid #000000; border-radius: 4px; background: transparent;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px; color: #000000;
+    font-family: var(--mps-font); font-size: 13px; color: #000000;
     cursor: pointer;
   }
 
@@ -1900,7 +1919,7 @@
   .cal-choice-row button {
     width: 100%; text-align: left; padding: 10px 12px;
     border: none; border-radius: 6px; background: transparent;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px; color: var(--ink);
+    font-family: var(--mps-font); font-size: 14px; color: var(--ink);
     cursor: pointer;
   }
   .cal-choice-row button:hover { background: var(--panel); }
@@ -1936,7 +1955,7 @@
   .cal-field label { font-size: 13px; font-weight: bold; color: #000000; }
   .cal-field input, .cal-field select, .cal-field textarea {
     padding: 5px 7px; border: 1px solid #000000; border-radius: 4px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px;
+    font-family: var(--mps-font); font-size: 13px;
     color: #000000; background: #ffffff; min-width: 0;
   }
   .cal-field textarea { resize: none; min-height: 40px; }
@@ -1949,7 +1968,7 @@
      than "09:00" sidesteps that entirely. */
   .cal-time-btn {
     padding: 5px 7px; border: 1px solid #000000; border-radius: 4px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px;
+    font-family: var(--mps-font); font-size: 13px;
     color: #000000; background: #ffffff; min-width: 0; text-align: left; cursor: pointer;
   }
   .cal-time-btn:hover { background: #f5f5f5; }
@@ -1979,7 +1998,7 @@
   .cal-color-btn {
     display: flex; align-items: center; gap: 8px;
     padding: 5px 7px; border: 1px solid #000000; border-radius: 4px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px;
+    font-family: var(--mps-font); font-size: 13px;
     color: #000000; background: #ffffff; cursor: pointer; text-align: left;
   }
   .cal-color-btn:hover { background: #f5f5f5; }
@@ -2024,7 +2043,7 @@
   }
   .cal-tz-btn {
     border: none; background: transparent; padding: 0; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 13px; font-weight: bold; color: #000000; text-decoration: underline;
   }
   .cal-tz-btn:hover { opacity: 0.65; }
@@ -2060,11 +2079,11 @@
   .cal-recur-row { display: flex; align-items: center; gap: 8px; }
   .cal-recur-num {
     width: 56px; padding: 5px 7px; border: 1px solid #000000; border-radius: 4px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px; color: #000000;
+    font-family: var(--mps-font); font-size: 13px; color: #000000;
   }
   .cal-recur-unit, .cal-recur-date {
     padding: 5px 7px; border: 1px solid #000000; border-radius: 4px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px;
+    font-family: var(--mps-font); font-size: 13px;
     color: #000000; background: #ffffff; cursor: pointer;
   }
   .cal-recur-ends-label { font-size: 13px; font-weight: bold; color: #000000; margin-bottom: -6px; }
@@ -2074,7 +2093,7 @@
   .cal-recur-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
   .cal-recur-actions button {
     padding: 7px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   .cal-recur-cancel { border: 1px solid var(--hair); background: #ffffff; color: var(--ink); }
   .cal-recur-cancel:hover { background: var(--panel); }
@@ -2115,11 +2134,11 @@
   }
   .gt-empty-art { width: min(200px, 80%); height: auto; margin-bottom: 14px; }
   .gt-empty-title {
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 19px; color: #202124;
   }
   .gt-empty-sub {
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 14px; line-height: 1.45; color: #5f6368; max-width: 260px;
   }
 
@@ -2137,7 +2156,7 @@
   .gt-composer-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
   .gt-title-input, .gt-notes-input {
     border: none; outline: none; background: transparent; padding: 0;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; color: #000000;
+    font-family: var(--mps-font); color: #000000;
     width: 100%; min-width: 0;
   }
   .gt-title-input { font-size: 17px; }
@@ -2182,7 +2201,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     border: 1px solid #dadce0; border-radius: 999px; background: transparent;
     padding: 6px 14px; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 13px; color: #3c4043; white-space: nowrap;
   }
   .gt-chip:hover { background: #f1f3f4; }
@@ -2211,7 +2230,7 @@
   .gt-popover {
     position: fixed; z-index: 2100; background: #eef1f6; border-radius: 16px;
     box-shadow: 0 8px 30px rgba(0,0,0,.28); padding: 18px 16px 14px;
-    width: 300px; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    width: 300px; font-family: var(--mps-font);
     color: #202124;
   }
   .gt-cal-head { display: flex; align-items: center; margin-bottom: 12px; }
@@ -2288,7 +2307,7 @@
   .gt-time-search {
     display: block; width: 100%; box-sizing: border-box;
     border: 1px solid #dadce0; border-radius: 4px; padding: 7px 10px; background: #ffffff;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px; color: #202124;
+    font-family: var(--mps-font); font-size: 14px; color: #202124;
   }
   /* Black, like every other focused field here, rather than the browser's blue. */
   .gt-time-search:focus { outline: none; border-color: #000000; }
@@ -2303,7 +2322,7 @@
     flex: 1 1 auto; overflow-y: auto; max-height: 220px; padding: 4px 0; position: relative;
   }
   .gt-time-empty {
-    padding: 12px 16px; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    padding: 12px 16px; font-family: var(--mps-font);
     font-size: 13px; color: #70757a;
   }
   /* flex rather than block so an end-time row can carry its duration on the
@@ -2313,7 +2332,7 @@
     display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
     width: 100%; text-align: left; border: none; background: transparent;
     padding: 9px 16px; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 14px; color: #202124;
+    font-family: var(--mps-font); font-size: 14px; color: #202124;
   }
   .gt-time-dur { font-size: 12px; font-weight: 400; color: #70757a; flex: 0 0 auto; }
   .gt-time-option:hover { background: #f1f3f4; }
@@ -2344,7 +2363,7 @@
     width: 78px; padding: 8px 4px;
     border: 1px solid #000000; border-radius: 6px;
     background: #ffffff; color: #000000; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 11px; line-height: 1.2; text-align: center;
   }
   .cal-widget-btn:hover { border-color: #000000; background: #f5f5f5; }
@@ -2357,7 +2376,7 @@
   .cal-panel-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .cal-panel-actions button {
     padding: 5px 11px; border-radius: 9px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 13px; cursor: pointer;
+    font-family: var(--mps-font); font-size: 13px; cursor: pointer;
   }
   .cal-panel-save { border: none; background: var(--mps-accent); color: #ffffff; font-weight: 600; }
   .cal-panel-save:hover { background: #222222; }
@@ -2391,7 +2410,7 @@
   }
   .cal-account-btn, .cal-account-reset {
     flex: 0 0 auto; padding: 5px 11px; border-radius: 999px; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; font-size: 12px; font-weight: 600;
+    font-family: var(--mps-font); font-size: 12px; font-weight: 600;
     border: 1px solid #000000; background: transparent; color: #000000;
   }
   .cal-account-btn:hover, .cal-account-reset:hover { background: #f2f2f2; }
@@ -2408,7 +2427,7 @@
   .cal-daycell {
     min-height: 46px; padding: 3px; cursor: pointer; text-align: left;
     border: 1px solid transparent; border-radius: 4px; background: transparent;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     display: flex; flex-direction: column; gap: 2px; overflow: hidden;
   }
   .cal-daycell:hover { border-color: #000000; }
@@ -2626,7 +2645,7 @@
   .cal-completed-header {
     display: flex; align-items: center; gap: 6px; width: 100%;
     padding: 6px 2px; border: none; background: transparent; cursor: pointer;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 12.5px; font-weight: 600; color: #000000; opacity: 0.75;
   }
   .cal-completed-header:hover { opacity: 1; }
@@ -2727,7 +2746,7 @@
   }
   .cal-tagbar .status-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
   .cal-tagbar .tag-add-btn, .cal-tagbar select, .cal-tagbar input {
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 10px; padding: 1px 5px; border-radius: 999px;
     border: 1px solid #b3bfcd; background: transparent; color: #777777;
     cursor: pointer; max-width: 110px;
@@ -2840,17 +2859,17 @@
   }
   .timer-notif-text {
     font-size: 32px; font-weight: 700; color: #0a0a0a; text-align: center;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   .timer-notif-task {
     font-size: 16px; font-weight: 500; color: #444444; text-align: center;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     max-width: min(520px, 80vw); overflow-wrap: break-word;
   }
   .timer-notif-stop {
     padding: 14px 40px; border: none; border-radius: 8px;
     background: #ff0000; color: #ffffff;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     font-size: 16px; font-weight: 700; cursor: pointer;
   }
   .timer-notif-stop:hover { background: #cc0000; }
@@ -2951,7 +2970,7 @@
     position: fixed; top: 46px; right: calc(12px + var(--ai-panel-w)); z-index: 4401;
     width: 336px; padding: 12px; border-radius: 26px;
     background: #eef1f6; box-shadow: 0 8px 30px rgba(0,0,0,.28);
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; color: var(--ink);
+    font-family: var(--mps-font); color: var(--ink);
     display: flex; flex-direction: column; gap: 8px;
   }
   /* In the tray's own top row, not floating above it: at -34px it landed at
@@ -3126,7 +3145,7 @@
     display: block; position: relative;
     padding: 6px 6px 8px; border: 1px solid transparent; border-radius: 11px;
     background: transparent; cursor: pointer; text-align: left;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
     transition: background-color 0.16s var(--ease-spring),
                 transform 0.12s var(--ease-spring);
   }
@@ -3179,7 +3198,7 @@
   .add-widget-mock {
     position: absolute; inset: 0; padding: 7px 8px; overflow: hidden;
     display: flex; flex-direction: column; gap: 5px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   .amk-head {
     display: flex; align-items: center; gap: 4px; flex: 0 0 auto;
@@ -3279,7 +3298,7 @@
     color: var(--ink); background: #ffffff;
     border: 1px solid var(--mps-brand); border-radius: 6px; padding: 2px 5px;
     outline: none; box-shadow: 0 0 0 3px var(--mps-accent-wash);
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
 
   /* The dots' menu. One item, so it is sized by that item rather than given a
@@ -3391,7 +3410,7 @@
     background: #ffffff; border: 1px solid #000000; border-radius: 8px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.16);
     padding: 14px; width: 260px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   .vocab-setup-popup[hidden], .vocab-setup-overlay[hidden] { display: none; }
   .vocab-setup-header {
@@ -4270,7 +4289,7 @@
     position: fixed; z-index: 4500; background: #fff; border-radius: 10px;
     border: 1px solid var(--hair); box-shadow: 0 6px 24px rgba(0,0,0,.18);
     padding: 5px; display: flex; flex-direction: column; gap: 2px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   #nbBar[hidden] { display: none; }
   .nb-bar-row { display: flex; align-items: center; gap: 1px; }
@@ -4304,7 +4323,7 @@
     position: fixed; z-index: 4501; background: #fff; border-radius: 10px;
     border: 1px solid var(--hair); box-shadow: 0 6px 24px rgba(0,0,0,.2);
     padding: 5px; width: 232px; max-height: min(70vh, 560px); overflow-y: auto;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   #nbSub { width: 244px; }
   #nbMenu[hidden], #nbSub[hidden] { display: none; }
@@ -4334,7 +4353,7 @@
   #nbComments {
     position: fixed; z-index: 4502; width: 288px; background: #fff; border-radius: 10px;
     border: 1px solid var(--hair); box-shadow: 0 6px 24px rgba(0,0,0,.2); padding: 10px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   #nbComments[hidden] { display: none; }
   .nb-cm-quote {
@@ -4375,7 +4394,7 @@
     background: #ffffff; border-radius: 14px; padding: 10px;
     box-shadow: 0 8px 30px rgba(0,0,0,.22);
     display: flex; flex-direction: column; gap: 10px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   .pk-cards { display: flex; gap: 10px; }
   /* Where the page will land, said before it exists rather than discovered
@@ -4413,7 +4432,7 @@
     background: #ffffff; border-radius: 14px; padding: 18px 20px 16px;
     box-shadow: 0 8px 30px rgba(0,0,0,.28);
     display: flex; flex-direction: column;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif; color: var(--ink);
+    font-family: var(--mps-font); color: var(--ink);
   }
   .nl-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .nl-title { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
@@ -4521,7 +4540,7 @@
     position: fixed; z-index: 4402; min-width: 232px;
     background: #ffffff; border-radius: 10px; padding: 6px;
     box-shadow: 0 6px 24px rgba(0,0,0,.22); border: 1px solid var(--hair);
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   #nlMenu[hidden] { display: none; }
   .nl-menu-search {
@@ -4548,7 +4567,7 @@
     position: fixed; z-index: 4403; width: 300px;
     background: #fff; border-radius: 10px; border: 1px solid var(--hair);
     box-shadow: 0 6px 24px rgba(0,0,0,.22); padding: 8px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   #nlEmoji[hidden] { display: none; }
   .nl-emoji-head { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
@@ -4586,7 +4605,7 @@
     background: var(--bg);
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 28px;
-    font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;
+    font-family: var(--mps-font);
   }
   #authGate[hidden] { display: none; }
   /* The wordmark is the app's own element, reused verbatim so the sign-in
@@ -6228,7 +6247,7 @@
     display: inline-flex; align-items: center; gap: 3px;
     background: #eef1f5; color: #6b6b6b; border-radius: 5px;
     padding: 2px 6px; font-size: 10.5px; font-weight: 600;
-    font-family: Arial, Helvetica, sans-serif; line-height: 1.4;
+    font-family: var(--mps-font); line-height: 1.4;
     max-width: 100%; white-space: normal;
     overflow-wrap: anywhere; word-break: break-word;
   }
@@ -6242,7 +6261,7 @@
   .tag-add-btn {
     border: 1px solid #cfd8e2; background: transparent; color: #7a8699;
     border-radius: 5px; padding: 2px 6px; font-size: 10.5px; font-weight: 600;
-    font-family: Arial, Helvetica, sans-serif; cursor: pointer; line-height: 1.4;
+    font-family: var(--mps-font); cursor: pointer; line-height: 1.4;
   }
   .tag-add-btn:hover { border-color: #000000; color: #000000; }
   .status-select-empty {
@@ -6255,7 +6274,7 @@
   }
   .duration-editor-empty:hover, .duration-editor-empty:focus-within { border-color: #000000 !important; }
   .inline-text-input {
-    width: 90px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; color: #000; font-weight: 600;
+    width: 90px; font-size: 10.5px; font-family: var(--mps-font); color: #000; font-weight: 600;
     border: 1px solid #cfd8e2; border-radius: 5px; padding: 2px 6px; outline: none;
     background: transparent;
   }
@@ -6263,11 +6282,11 @@
   .inline-text-input:hover, .inline-text-input:focus { border-color: #000000; }
   .tagbar-editor { display: inline-flex; }
   .tagbar-editor input {
-    width: 90px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; font-weight: 600;
+    width: 90px; font-size: 10.5px; font-family: var(--mps-font); font-weight: 600;
     border: 1px solid #000000; border-radius: 5px; padding: 2px 6px; outline: none;
   }
   .status-select {
-    font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; color: #000; font-weight: 600;
+    font-size: 10.5px; font-family: var(--mps-font); color: #000; font-weight: 600;
     border: 1px solid #000000; border-radius: 5px; padding: 2px 4px; outline: none;
     background: #fff;
   }
@@ -6276,7 +6295,7 @@
     padding: 2px 4px; background: #fff;
   }
   .duration-input {
-    width: 28px; font-size: 10.5px; font-family: Arial, Helvetica, sans-serif; font-weight: 600;
+    width: 28px; font-size: 10.5px; font-family: var(--mps-font); font-weight: 600;
     border: none; outline: none; text-align: right;
   }
   .duration-unit { font-size: 10.5px; color: #555; font-weight: 600; }
@@ -6289,6 +6308,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
+    /* Its own copy of the board's font stack. This is a separate document
+       fed in through srcdoc, so it inherits no variable from the page. */
+    --mps-font:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
     --canvas:#ffffff;
     --dot:#e2e2e2;
     --card:#ffffff;
@@ -6305,7 +6327,7 @@
   html,body{height:100%}
   body{
     margin:0;
-    font-family:Arial,Helvetica,sans-serif;
+    font-family:var(--mps-font);
     color:var(--ink);
     background:var(--canvas);
     display:flex;flex-direction:column;
@@ -6323,12 +6345,12 @@
   }
   .brand{display:flex;align-items:baseline;gap:10px}
   .brand h1{
-    font-family:Arial,Helvetica,sans-serif;
+    font-family:var(--mps-font);
     font-weight:700;font-size:32px;letter-spacing:-.01em;margin:0;
   }
   .tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .btn{
-    font-family:Arial,Helvetica,sans-serif;font-weight:600;font-size:13px;
+    font-family:var(--mps-font);font-weight:600;font-size:13px;
     border:1px solid #cfd8e2;background:#fff;color:var(--ink);
     padding:8px 13px;border-radius:9px;cursor:pointer;
     display:inline-flex;align-items:center;gap:7px;
@@ -6834,7 +6856,7 @@
     background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;
   }
   .empty .glyph svg{width:30px;height:30px}
-  .empty h2{font-family:Arial,Helvetica,sans-serif;font-size:18px;color:var(--ink);margin:0 0 6px}
+  .empty h2{font-family:var(--mps-font);font-size:18px;color:var(--ink);margin:0 0 6px}
   .empty p{font-size:14px;line-height:1.5;margin:0 0 18px}
 
   .stage.fade{animation:rise .4s ease both}
@@ -20477,7 +20499,7 @@
         "feed-news": {
             "name": "Morning News",
             "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
-            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n/* Faded whole-body treatment for a digest that is more than a day old: you\n   can still read it, and you cannot mistake it for this morning's. */\n.body.stale { opacity: 0.55; }\n.item { padding: 7px 0; border-bottom: 1px solid var(--hair, #ececec); }\n.item:last-child { border-bottom: none; }\n.hl { font-size: 12.5px; line-height: 1.35; font-weight: 600; }\n.hl a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(0,0,0,0.22); }\n.hl a:hover { border-bottom-color: currentColor; }\n.em { margin-right: 5px; }\n.sm { font-size: 11.5px; line-height: 1.4; color: var(--ink-soft, #565656); margin-top: 3px; }\n/* Inline at the end of the summary rather than a line of its own. As a\n   separate uppercase row it read as a section heading and took a third of\n   each item's height to say one word. */\n.src { color: var(--ink-soft, #8a8a8a); }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }\n.raw a { color: inherit; }",
+            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: var(--mps-font);\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n/* Faded whole-body treatment for a digest that is more than a day old: you\n   can still read it, and you cannot mistake it for this morning's. */\n.body.stale { opacity: 0.55; }\n.item { padding: 7px 0; border-bottom: 1px solid var(--hair, #ececec); }\n.item:last-child { border-bottom: none; }\n.hl { font-size: 12.5px; line-height: 1.35; font-weight: 600; }\n.hl a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(0,0,0,0.22); }\n.hl a:hover { border-bottom-color: currentColor; }\n.em { margin-right: 5px; }\n.sm { font-size: 11.5px; line-height: 1.4; color: var(--ink-soft, #565656); margin-top: 3px; }\n/* Inline at the end of the summary rather than a line of its own. As a\n   separate uppercase row it read as a section heading and took a third of\n   each item's height to say one word. */\n.src { color: var(--ink-soft, #8a8a8a); }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }\n.raw a { color: inherit; }",
             "js": "var TOPIC = \"morning-news\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\n/* Everything below renders text that arrived from a scheduled routine, which\n   composed it from web sources. It is not trusted markup: escape first,\n   then re-introduce only the two things a digest needs, links and bold. */\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\")\n    .replace(/\"/g, \"&quot;\");\n}\nfunction safeUrl(u) {\n  var s = String(u || \"\").trim();\n  return /^https?:\\/\\//i.test(s) ? s : \"\";\n}\nfunction mdLite(s) {\n  var out = esc(s);\n  // [label](url) -> anchor, but only for http(s); anything else stays as text.\n  out = out.replace(/\\[([^\\]]+)\\]\\(([^)\\s]+)\\)/g, function (m, label, url) {\n    var u = safeUrl(url);\n    return u ? '<a href=\"' + esc(u) + '\" target=\"_blank\" rel=\"noopener noreferrer\">' + label + \"</a>\" : label;\n  });\n  out = out.replace(/\\*\\*([^*]+)\\*\\*/g, \"<b>$1</b>\").replace(/\\*([^*\\n]+)\\*/g, \"<b>$1</b>\");\n  return out.replace(/\\n/g, \"<br>\");\n}\n\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\n/* The citation belongs inside the sentence, so the summary's own full stop\n   comes off and a new one goes after the closing bracket: \"... began\n   (Bloomberg).\" rather than \"... began. (Bloomberg)\". Only a period is\n   stripped; a summary ending in ? or ! keeps its mark. */\nfunction withSource(summary, source) {\n  var t = String(summary == null ? \"\" : summary).replace(/\\s+$/, \"\");\n  if (!source) return esc(t);\n  t = t.replace(/\\.$/, \"\");\n  // The full stop sits outside the span so it reads as body text rather than\n  // as part of the greyed-out source.\n  return (t ? esc(t) + \" \" : \"\") + '<span class=\"src\">(' + esc(source) + \")</span>.\";\n}\n\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No briefing yet. The 8:30am routine posts here once it has run.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  // A digest older than ~26 hours means the routine did not run this morning.\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 26 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var items = payload.data && payload.data.items;\n  if (Array.isArray(items) && items.length) {\n    bodyEl.innerHTML = items.map(function (it) {\n      var u = safeUrl(it.url);\n      var head = esc(it.headline || \"\");\n      return '<div class=\"item\">' +\n        '<div class=\"hl\"><span class=\"em\">' + esc(it.emoji || \"\") + \"</span>\" +\n        (u ? '<a href=\"' + esc(u) + '\" target=\"_blank\" rel=\"noopener noreferrer\">' + head + \"</a>\" : head) +\n        \"</div>\" +\n        (it.summary || it.source ? '<div class=\"sm\">' + withSource(it.summary, it.source) + \"</div>\" : \"\") +\n        \"</div>\";\n    }).join(\"\");\n    return;\n  }\n  // No structured items: fall back to whatever text the routine sent.\n  bodyEl.innerHTML = payload.text\n    ? '<div class=\"raw\">' + mdLite(payload.text) + \"</div>\"\n    : '<div class=\"msg\">The last run posted nothing readable.</div>';\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\n// Fires only if something republishes while this widget is open. The routine\n// writes server-side, so in practice the digest arrives on the next reload.\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
             "net": false,
             "data": [],
@@ -20489,7 +20511,7 @@
         "feed-stocks": {
             "name": "Portfolio",
             "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
-            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* The number you actually came for, sized so it reads at a glance from\n   across the desk. Everything else on this widget is support for it. */\n.total { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }\n.delta { font-size: 12.5px; font-weight: 600; margin-top: 3px; }\n.up { color: #1a7f4b; }\n.down { color: #b4553f; }\n.flat { color: var(--ink-soft, #6b6b6b); }\n.subs { display: flex; gap: 12px; margin-top: 7px; flex-wrap: wrap; }\n.sub { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.sub b { display: block; font-size: 12px; color: var(--ink, #1a1a1a); font-weight: 600; margin-top: 1px; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 5px; }\n.mv { display: flex; align-items: baseline; gap: 6px; padding: 4px 0;\n      border-bottom: 1px solid var(--hair, #ececec); }\n.mv:last-child { border-bottom: none; }\n.sym { font-size: 12px; font-weight: 600; min-width: 46px; }\n.pct { font-size: 11.5px; font-weight: 600; min-width: 52px; }\n.why { font-size: 11px; line-height: 1.35; color: var(--ink-soft, #565656); flex: 1; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
+            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: var(--mps-font);\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* The number you actually came for, sized so it reads at a glance from\n   across the desk. Everything else on this widget is support for it. */\n.total { font-size: 21px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }\n.delta { font-size: 12.5px; font-weight: 600; margin-top: 3px; }\n.up { color: #1a7f4b; }\n.down { color: #b4553f; }\n.flat { color: var(--ink-soft, #6b6b6b); }\n.subs { display: flex; gap: 12px; margin-top: 7px; flex-wrap: wrap; }\n.sub { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.sub b { display: block; font-size: 12px; color: var(--ink, #1a1a1a); font-weight: 600; margin-top: 1px; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 5px; }\n.mv { display: flex; align-items: baseline; gap: 6px; padding: 4px 0;\n      border-bottom: 1px solid var(--hair, #ececec); }\n.mv:last-child { border-bottom: none; }\n.sym { font-size: 12px; font-weight: 600; min-width: 46px; }\n.pct { font-size: 11.5px; font-weight: 600; min-width: 52px; }\n.why { font-size: 11px; line-height: 1.35; color: var(--ink-soft, #565656); flex: 1; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
             "js": "var TOPIC = \"stock-summary\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n}\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\n// Percentages arrive as numbers. Sign drives both the colour and the glyph,\n// so a red minus never reads as a gain on a screenshot or in greyscale.\nfunction pct(n) {\n  if (n == null || isNaN(Number(n))) return { cls: \"flat\", txt: \"—\" };\n  var v = Number(n);\n  return { cls: v > 0 ? \"up\" : v < 0 ? \"down\" : \"flat\",\n           txt: (v > 0 ? \"+\" : \"\") + v.toFixed(2) + \"%\" };\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No summary yet. The 4pm ET routine posts here after market close.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  /* 3 days, not 26 hours like the daily widgets: this routine deliberately\n     does not run on weekends or market holidays, so a Sunday reading of\n     Friday's close is current rather than stale. */\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 3 * 24 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var d = payload.data;\n  if (!d) {\n    bodyEl.innerHTML = payload.text\n      ? '<div class=\"raw\">' + esc(payload.text) + \"</div>\"\n      : '<div class=\"msg\">The last run posted nothing readable.</div>';\n    return;\n  }\n  if (d.closed) {\n    bodyEl.innerHTML = '<div class=\"msg\">Markets were closed ' + esc(d.as_of || \"\") + \".</div>\";\n    return;\n  }\n\n  var day = pct(d.day_pct), ytd = pct(d.ytd_pct);\n  var html =\n    '<div class=\"total\">' + esc(d.total || \"—\") + \"</div>\" +\n    '<div class=\"delta ' + day.cls + '\">' + day.txt +\n      (d.day_usd ? \"  \" + esc(d.day_usd) : \"\") + \" today</div>\" +\n    '<div class=\"subs\">' +\n      '<div class=\"sub\">YTD<b class=\"' + ytd.cls + '\">' + ytd.txt + \"</b></div>\" +\n      (d.cash_pct != null ? '<div class=\"sub\">Cash<b>' + esc(String(d.cash_pct)) + \"%</b></div>\" : \"\") +\n      (d.as_of ? '<div class=\"sub\">As of<b>' + esc(d.as_of) + \"</b></div>\" : \"\") +\n    \"</div>\";\n\n  if (Array.isArray(d.movers) && d.movers.length) {\n    html += '<div class=\"sect\">Movers</div>' + d.movers.map(function (m) {\n      var p = pct(m.pct);\n      return '<div class=\"mv\"><span class=\"sym\">' + esc(m.symbol || \"\") + \"</span>\" +\n        '<span class=\"pct ' + p.cls + '\">' + p.txt + \"</span>\" +\n        '<span class=\"why\">' + esc(m.why || \"\") + \"</span></div>\";\n    }).join(\"\");\n  }\n  bodyEl.innerHTML = html;\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
             "net": false,
             "data": [],
@@ -20501,7 +20523,7 @@
         "feed-email": {
             "name": "Email Digest",
             "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
-            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* Counts first. The routine's Telegram message is six sections of prose;\n   at this size the useful version is three numbers and the detail below. */\n.counts { display: flex; gap: 14px; }\n.ct { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.ct b { display: block; font-size: 19px; font-weight: 600; color: var(--ink, #1a1a1a); line-height: 1.1; }\n.ct.act b { color: #b4553f; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 4px; }\n.row { font-size: 11.5px; line-height: 1.35; padding: 3px 0;\n       border-bottom: 1px solid var(--hair, #ececec); }\n.row:last-child { border-bottom: none; }\n.who { color: var(--ink-soft, #6b6b6b); }\n.move { font-size: 10.5px; color: var(--ink-soft, #8a8a8a); }\n.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }\n.tag { font-size: 10px; padding: 1px 6px; border-radius: 999px;\n       background: rgba(0,0,0,0.055); color: var(--ink-soft, #565656); }\n.note { font-size: 11px; line-height: 1.4; margin-top: 10px; padding: 6px 8px;\n        border-radius: 8px; background: rgba(180,85,63,0.09); color: #8c4331; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
+            "css": "* { box-sizing: border-box; }\n/* No background at all, deliberately. The frame is transparent and so is\n   .cw-frame above it, so the widget's own colour on the board shows through\n   the whole tile and keeps showing through when it is changed later. Painting\n   var(--mps-bg) here looked equivalent and was not: that variable holds the\n   colour the frame was told at mount time, which is white until a custom\n   colour has been set, so it covered the tint with a white slab from the\n   header down. */\nbody { margin: 0; font-family: var(--mps-font);\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.age.stale { color: #b4553f; font-weight: 600; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 8px 2px 10px; }\n.body.stale { opacity: 0.55; }\n/* Counts first. The routine's Telegram message is six sections of prose;\n   at this size the useful version is three numbers and the detail below. */\n.counts { display: flex; gap: 14px; }\n.ct { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); }\n.ct b { display: block; font-size: 19px; font-weight: 600; color: var(--ink, #1a1a1a); line-height: 1.1; }\n.ct.act b { color: #b4553f; }\n.sect { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em;\n        color: var(--ink-soft, #8a8a8a); margin: 12px 0 4px; }\n.row { font-size: 11.5px; line-height: 1.35; padding: 3px 0;\n       border-bottom: 1px solid var(--hair, #ececec); }\n.row:last-child { border-bottom: none; }\n.who { color: var(--ink-soft, #6b6b6b); }\n.move { font-size: 10.5px; color: var(--ink-soft, #8a8a8a); }\n.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }\n.tag { font-size: 10px; padding: 1px 6px; border-radius: 999px;\n       background: rgba(0,0,0,0.055); color: var(--ink-soft, #565656); }\n.note { font-size: 11px; line-height: 1.4; margin-top: 10px; padding: 6px 8px;\n        border-radius: 8px; background: rgba(180,85,63,0.09); color: #8c4331; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n.raw { font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }",
             "js": "var TOPIC = \"email-digest\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n}\n/* The date the digest was written, spelled out. A relative age (\"4h ago\")\n   answers \"how fresh is this\", which is a question you only ask when you\n   suspect it is stale; a date answers \"which day is this\", which is the one\n   you actually have about a daily briefing. Staleness still shows, as the\n   whole body fading, so nothing is lost by dropping the clock. */\nfunction dateText(iso) {\n  if (!iso) return \"\";\n  var then = new Date(iso);\n  if (isNaN(then.getTime())) return \"\";\n  // \"en-US\" rather than the browser's locale: undefined gave \"6 September\n  // 2026\" on this machine, and the format asked for is \"September 6, 2026\".\n  return then.toLocaleDateString(\"en-US\", { month: \"long\", day: \"numeric\", year: \"numeric\" });\n}\nfunction list(rows, fmt) {\n  return (rows || []).slice(0, 8).map(fmt).join(\"\");\n}\n\nfunction render(entry) {\n  if (!entry || !entry.value) {\n    bodyEl.innerHTML = '<div class=\"msg\">No digest yet. The 8:30am routine posts here once it has run.</div>';\n    return;\n  }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = { text: entry.value }; }\n\n  var stale = entry.at && (Date.now() - new Date(entry.at).getTime()) > 26 * 3600 * 1000;\n  ageEl.textContent = dateText(entry.at);\n  ageEl.className = stale ? \"age stale\" : \"age\";\n  bodyEl.className = stale ? \"body stale\" : \"body\";\n\n  var d = payload.data;\n  if (!d) {\n    bodyEl.innerHTML = payload.text\n      ? '<div class=\"raw\">' + esc(payload.text) + \"</div>\"\n      : '<div class=\"msg\">The last run posted nothing readable.</div>';\n    return;\n  }\n\n  var drafted = d.drafted || [], awaiting = d.awaiting || [], reconciled = d.reconciled || [];\n  var html =\n    '<div class=\"counts\">' +\n      '<div class=\"ct act\">Needs you<b>' + drafted.length + \"</b></div>\" +\n      '<div class=\"ct\">Awaiting<b>' + awaiting.length + \"</b></div>\" +\n      '<div class=\"ct\">Activity<b>' + (d.activity == null ? \"—\" : d.activity) + \"</b></div>\" +\n    \"</div>\";\n\n  if (drafted.length) {\n    html += '<div class=\"sect\">Drafted, waiting on you</div>' + list(drafted, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") +\n        (r.from ? ' <span class=\"who\">— ' + esc(r.from) + \"</span>\" : \"\") + \"</div>\";\n    });\n  }\n  if (awaiting.length) {\n    html += '<div class=\"sect\">Awaiting their reply</div>' + list(awaiting, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") + \"</div>\";\n    });\n  }\n  if (reconciled.length) {\n    html += '<div class=\"sect\">Moved</div>' + list(reconciled, function (r) {\n      return '<div class=\"row\">' + esc(r.subject || \"(no subject)\") +\n        '<div class=\"move\">' + esc(r.move || \"\") + \"</div></div>\";\n    });\n  }\n  if (Array.isArray(d.labeled) && d.labeled.length) {\n    html += '<div class=\"sect\">Filed</div><div class=\"tags\">' + d.labeled.map(function (l) {\n      return '<span class=\"tag\">' + esc(l.label || \"\") + (l.count ? \" \" + l.count : \"\") + \"</span>\";\n    }).join(\"\") + \"</div>\";\n  }\n  if (d.suggested_label) {\n    html += '<div class=\"note\">Suggested new label: <b>' + esc(d.suggested_label) + \"</b></div>\";\n  }\n  if (!drafted.length && !awaiting.length && !reconciled.length && !d.activity) {\n    html += '<div class=\"msg\">Nothing new in Important, Action Needed or Awaiting Reply.</div>';\n  }\n  bodyEl.innerHTML = html;\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });",
             "net": false,
             "data": [],
@@ -20513,7 +20535,7 @@
         "feed-automations": {
             "name": "Automations",
             "html": "<div class=\"wrap\">\n  <div class=\"head\">\n    <span class=\"age\" id=\"age\"></span>\n  </div>\n  <div class=\"body\" id=\"body\"><div class=\"msg\">Loading…</div></div>\n</div>",
-            "css": "* { box-sizing: border-box; }\n/* Transparent, like the other routine-feed widgets, so the widget's own\n   colour on the board shows through. */\nbody { margin: 0; font-family: 'Neue Montreal', Arial, Helvetica, sans-serif;\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 4px 2px 10px; }\n.auto { padding: 8px 0; border-bottom: 1px solid var(--hair, #ececec); }\n.auto:last-child { border-bottom: none; }\n.top { display: flex; align-items: baseline; gap: 8px; }\n.name { font-size: 12.5px; font-weight: 600; flex: 1 1 auto; min-width: 0; }\n.st { font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;\n      background: rgba(0,0,0,0.055); color: var(--ink-soft, #565656); }\n.st-active { background: rgba(46,125,50,0.12); color: #2e6b32; }\n.st-over_cap { background: rgba(180,85,63,0.12); color: #8c4331; }\n.meta { font-size: 10.5px; color: var(--ink-soft, #8a8a8a); margin-top: 2px; }\n.err { font-size: 11px; line-height: 1.4; margin-top: 6px; padding: 5px 7px;\n       border-radius: 7px; background: rgba(180,85,63,0.09); color: #8c4331; }\n.res { font-size: 11.5px; line-height: 1.45; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n",
+            "css": "* { box-sizing: border-box; }\n/* Transparent, like the other routine-feed widgets, so the widget's own\n   colour on the board shows through. */\nbody { margin: 0; font-family: var(--mps-font);\n       color: var(--ink, #1a1a1a); }\n.wrap { display: flex; flex-direction: column; height: 100vh; padding: 2px 2px 0; }\n.head { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto;\n        padding-bottom: 6px; border-bottom: 1px solid var(--hair, #e2e2e2); }\n.age { font-size: 10.5px; color: var(--ink-soft, #6b6b6b); margin-left: auto; white-space: nowrap; }\n.body { flex: 1 1 auto; overflow-y: auto; padding: 4px 2px 10px; }\n.auto { padding: 8px 0; border-bottom: 1px solid var(--hair, #ececec); }\n.auto:last-child { border-bottom: none; }\n.top { display: flex; align-items: baseline; gap: 8px; }\n.name { font-size: 12.5px; font-weight: 600; flex: 1 1 auto; min-width: 0; }\n.st { font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;\n      background: rgba(0,0,0,0.055); color: var(--ink-soft, #565656); }\n.st-active { background: rgba(46,125,50,0.12); color: #2e6b32; }\n.st-over_cap { background: rgba(180,85,63,0.12); color: #8c4331; }\n.meta { font-size: 10.5px; color: var(--ink-soft, #8a8a8a); margin-top: 2px; }\n.err { font-size: 11px; line-height: 1.4; margin-top: 6px; padding: 5px 7px;\n       border-radius: 7px; background: rgba(180,85,63,0.09); color: #8c4331; }\n.res { font-size: 11.5px; line-height: 1.45; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }\n.msg { font-size: 11.5px; color: var(--ink-soft, #6b6b6b); padding: 10px 0; line-height: 1.5; }\n",
             "js": "var TOPIC = \"automations\";\nvar bodyEl = document.getElementById(\"body\");\nvar ageEl = document.getElementById(\"age\");\n\nfunction esc(s) {\n  return String(s == null ? \"\" : s)\n    .replace(/&/g, \"&amp;\").replace(/</g, \"&lt;\").replace(/>/g, \"&gt;\").replace(/\"/g, \"&quot;\");\n}\nfunction when(iso) {\n  if (!iso) return \"\";\n  var d = new Date(iso);\n  if (isNaN(d.getTime())) return \"\";\n  return d.toLocaleString(\"en-US\", { month: \"short\", day: \"numeric\", hour: \"numeric\", minute: \"2-digit\" });\n}\nfunction money(c) { return c == null ? \"\" : \"$\" + (Number(c) / 100).toFixed(2); }\nvar STATUS = { active: \"Active\", paused: \"Paused\", over_cap: \"Paused, monthly cap reached\" };\nvar EMPTY = '<div class=\"msg\">No automations yet. Ask the assistant for one, for example: every weekday at 7am, read my Deadlines list and add today’s plan to my Today page.</div>';\n\nfunction render(entry) {\n  if (!entry || !entry.value) { ageEl.textContent = \"\"; bodyEl.innerHTML = EMPTY; return; }\n  var payload = {};\n  try { payload = JSON.parse(entry.value) || {}; } catch (e) { payload = {}; }\n  var list = (payload.data && payload.data.automations) || [];\n  ageEl.textContent = list.length ? list.length + (list.length === 1 ? \" automation\" : \" automations\") : \"\";\n  if (!list.length) { bodyEl.innerHTML = EMPTY; return; }\n  bodyEl.innerHTML = list.map(function (a) {\n    var meta = [esc(a.schedule) + \" (\" + esc(a.timezone) + \")\"];\n    if (a.last_run_at) meta.push(\"last run \" + esc(when(a.last_run_at)));\n    if (a.last_cost_cents != null) meta.push(esc(money(a.last_cost_cents)));\n    return '<div class=\"auto\">' +\n      '<div class=\"top\"><span class=\"name\">' + esc(a.name) + '</span>' +\n      '<span class=\"st st-' + esc(a.status) + '\">' + esc(STATUS[a.status] || a.status) + \"</span></div>\" +\n      '<div class=\"meta\">' + meta.join(\" · \") + \"</div>\" +\n      (a.last_error ? '<div class=\"err\">' + esc(a.last_error) + \"</div>\" : \"\") +\n      (a.result_text\n        ? '<div class=\"res\">' + esc(a.result_text) + '</div><div class=\"meta\">Posted ' + esc(when(a.result_at)) + \"</div>\"\n        : '<div class=\"meta\">No result posted yet.</div>') +\n      \"</div>\";\n  }).join(\"\");\n}\n\nmps.on(\"ready\", function () {\n  mps.read(TOPIC).then(render).catch(function (e) {\n    bodyEl.innerHTML = '<div class=\"msg\">' + esc(String(e && e.message || e)) + \"</div>\";\n  });\n});\nmps.on(\"topic\", function (e) { if (e && e.topic === TOPIC) render(e); });\n",
             "net": false,
             "data": [],
@@ -32742,8 +32764,15 @@
       "<style>:root{color-scheme:light;--mps-bg:" + (themes[id] || "#FFFFFF") +
         ";--mps-accent:" + accentHex() + ";--mps-accent-hover:" + accentHoverHex() +
         ";--mps-accent-wash:" + accentWashRgba() +
-        ";--ink:#0a0a0a;--ink-soft:#6b6b6b;--hair:#e4e4e4;--panel:#fafafa}" +
-      "html,body{margin:0;min-height:100%;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0a0a0a;background:transparent}" +
+        ";--ink:#0a0a0a;--ink-soft:#6b6b6b;--hair:#e4e4e4;--panel:#fafafa" +
+        /* The interface font, so a widget's CSS can ask for var(--mps-font)
+           and get the same face the board is set in. The four routine feeds
+           do exactly that. Without it their font-family resolves to nothing
+           and each one silently falls back to the UA default -- which is what
+           already happened before this, since they asked for 'Neue Montreal'
+           and no font of that name is ever loaded inside a frame. */
+        ";--mps-font:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}" +
+      "html,body{margin:0;min-height:100%;font:13px/1.4 var(--mps-font);color:#0a0a0a;background:transparent}" +
       "*{box-sizing:border-box}button,input,select,textarea{font:inherit}</style>" +
       "<style>" + noScriptClose(blob.css) + "</style></head><body>" +
       noScriptClose(blob.html) +
@@ -34628,7 +34657,7 @@
     "- Inside a frame the widget background is var(--mps-bg); leave the body background transparent so the widget colour shows through.",
     "",
     "TYPE",
-    "- Do not set font-family. Custom widgets already use the system font (the same one Notion uses), and built-in widgets use the board's font.",
+    "- Do not set font-family. The whole board is set in the system font (ui-sans-serif / -apple-system / Segoe UI -- the same stack Notion uses), it is injected into every frame as var(--mps-font), and anything you build inherits it. Setting your own is how a widget stops looking like it belongs. For code or a column of figures, var(--mps-mono) is not defined -- use ui-monospace, SFMono-Regular, Menlo, Consolas, monospace.",
     "- Scale: body 13px, line-height 1.5. Metadata 12px in var(--ink-soft). Section heading 14px weight 600. A single big number or title may go to 20 to 24px weight 600. Nothing larger.",
     "- Weights: 400 for text, 500 for labels and tags, 600 for headings. Never 700+ except a hero number.",
     "- No uppercase headings, no letter-spaced labels, no italics for decoration.",
