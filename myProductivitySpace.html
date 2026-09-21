@@ -2920,14 +2920,18 @@
     display: grid; place-items: center;
   }
   #profileBtn .pb-avatar svg { width: 17px; height: 17px; display: block; }
-  /* The picture from the Google account, when there is one. It is added by
-     paintAvatar and removes itself if it fails to load, which is what makes
-     the fallback glyph beside it reappear on its own. */
+  /* The picture from the Google account, when there is one. Positioned rather
+     than placed in the grid: both slots are display:grid, so an image added
+     beside the fallback glyph opened a second row and the two stacked instead
+     of one replacing the other. Absolute takes it out of that flow entirely,
+     and paintAvatar hides the glyph itself rather than leaning on :has(), so
+     the two can never both be drawn. */
+  .pb-avatar, .pm-avatar { position: relative; overflow: hidden; }
   .pb-avatar img, .pm-avatar img {
+    position: absolute; inset: 0;
     width: 100%; height: 100%; border-radius: 50%;
     object-fit: cover; display: block;
   }
-  .pb-avatar:has(img) svg, .pm-avatar:has(img) svg { display: none; }
   #profileBackdrop { position: fixed; inset: 0; z-index: 4400; background: transparent; }
   #profileBackdrop[hidden], #profileMenu[hidden] { display: none; }
   #profileMenu {
@@ -12972,8 +12976,14 @@
         const host = gateEl(spec[0]);
         const slot = host && host.querySelector(spec[1]);
         if (!slot) return;
+        const glyph = slot.querySelector("svg");
         const existing = slot.querySelector("img");
-        if (!url) { if (existing) existing.remove(); return; }
+        // Signed out, or an account with no picture: the glyph comes back.
+        if (!url) {
+          if (existing) existing.remove();
+          if (glyph) glyph.style.display = "";
+          return;
+        }
         // Google sizes the file through the URL itself; ask for the one this
         // slot actually needs at 2x instead of scaling a 96px crop.
         const sized = url.replace(/=s\d+(-c)?$/, "=s" + spec[2] + "-c");
@@ -12982,7 +12992,13 @@
         img.alt = "";
         img.decoding = "async";
         img.referrerPolicy = "no-referrer";
-        img.addEventListener("error", function () { img.remove(); });
+        // Only once it has actually decoded, so a broken URL never leaves an
+        // empty disc where the glyph used to be.
+        img.addEventListener("load", function () { if (glyph) glyph.style.display = "none"; });
+        img.addEventListener("error", function () {
+          img.remove();
+          if (glyph) glyph.style.display = "";
+        });
         img.src = sized;
         slot.appendChild(img);
       });
@@ -13445,10 +13461,14 @@
      comes back. */
   const ACCENT_KEY = "board-accent";
   const ACCENT_SWATCHES = [
+    /* Eight, so the row never wraps, and eight that both references actually
+       ship: macOS offers blue, purple, pink, red, orange, yellow, green and
+       graphite; Notion offers blue, purple, pink, red, orange, yellow, green,
+       brown and gray. Olive was the one neither of them has -- a drab
+       yellow-green is nobody's accent -- so it went. */
     { name: "Blue",   accent: "#3A6EA5", hover: "#2F5A88", isDefault: true },
     { name: "Teal",   accent: "#297580", hover: "#215F69" },
     { name: "Green",  accent: "#2D7850", hover: "#246342" },
-    { name: "Olive",  accent: "#5D732B", hover: "#4C5E24" },
     { name: "Amber",  accent: "#8E6229", hover: "#745122" },
     { name: "Red",    accent: "#B5483C", hover: "#953B31" },
     { name: "Pink",   accent: "#AF447A", hover: "#913864" },
