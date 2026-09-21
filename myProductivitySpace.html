@@ -3753,13 +3753,16 @@
   }
   .ai-head-mark { display: flex; color: var(--ink); }
   .ai-head-title { flex: 1 1 auto; font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
-  /* The panel's header is a strip of the same --mps-accent band as the board's
-     wordmark, so the assistant reads as part of the brand. Everything on it
-     turns white; hovers lighten instead of greying, as on the board band. */
-  .ai-head { background: var(--mps-brand); border-bottom-color: var(--mps-brand); }
-  .ai-head .ai-head-mark, .ai-head .ai-head-title { color: #FFFFFF; }
-  .ai-head .ai-side-btn, .ai-head .mps-x-btn { color: rgba(255,255,255,0.85); }
-  .ai-head .ai-side-btn:hover, .ai-head .mps-x-btn:hover { background: rgba(255,255,255,0.16); color: #FFFFFF; }
+  /* The panel's header is a strip of the same band as the board's wordmark,
+     so the assistant reads as part of the app -- and that band is white now,
+     so this one is too. It was written to match a saturated --mps-brand and
+     inverted everything on it to white; when the token went black the strip
+     followed it there and became a black bar with white text, which is the
+     one thing on screen that did not look like the rest of the app.
+
+     Nothing to invert any more. The ink is the board's ink, the rule under it
+     is the board's hairline, and the two buttons take the ordinary dark-on-
+     light hover every other quiet control here uses. */
   .ai-log {
     flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
     display: flex; flex-direction: column; gap: 10px; padding: 14px;
@@ -3774,7 +3777,11 @@
   .ai-log:empty { justify-content: center; align-items: center; }
   .ai-log:empty::before {
     content: ""; width: 140px; height: 140px; flex: 0 0 auto;
-    background: var(--mps-brand);
+    /* Faint, because it is decoration at 140px. It used to be painted solid
+       --mps-brand, which was a mid blue and read as a watermark; the same
+       rule with a black token is a heavy black blot in the middle of an
+       empty panel. An empty state should say "nothing here yet" quietly. */
+    background: var(--ink); opacity: 0.06;
     -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
     mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'><path d='M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z'/><path d='M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z'/></svg>") center / contain no-repeat;
   }
