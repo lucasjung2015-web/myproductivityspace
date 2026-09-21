@@ -4,18 +4,20 @@
      letterboxes the page away from the notch and the insets all read as 0.
      No maximum-scale, deliberately: pinch-zoom stays available. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>myProductivitySpace</title>
+<title>myProductivityspace</title>
 
 <!-- Tab icon and link preview. The icons are base64 data URIs rather than
      files beside this one, for the same reason the brand font is: this file
      has to work when it is opened straight off a disk, with no server and no
      siblings, and an <link href="icon.png"> would simply 404 there. og:image
      is the one exception — a link preview only exists when the page is
-     hosted anyway, and no scraper reads a data URI. The mark is the full
-     wordmark itself, set in the same Neue Montreal three-tone treatment the
-     page and the auth gate show, squared off onto white. -->
-<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABe0lEQVR42u2VTYrCQBCFU7HNQkSIgkIWLl25EAOCJ/IQHskjCN7AhSuDIIYENBhRlGjov6pZZCZImBmcxcAw5C0aqgr6o3iPbiAi4zdlGr+sElACSsC/AxCR1vr5dSKivCQiRMzKvE8f+goAn86ICACyMy8LU8MwENE0zZc2yDBxHM9msyAIAEAIAQDb7fZ6vWbXJUmy2+2yvu/7p9PJNM0oilar1e12E0JoraWUnHMpZXEDpRRjbD6fT6fT8Xhs23Z26WazcRyn1+sdDodqtbpcLofDYb1e9zxPCOG6rmVZtVrNsizG2H6/dxynUqmEYTgajVzXRURARAA4Ho9SyiAI0jTtdDrr9TqOY6VUkiSccwBoNpvdbtfzPNu27/d7u91O03SxWEwmE8755XJpNBrn85kx1mq1oijq9/uDwQAR313SWj8eD/qJhBC+7xORlDIMQ6UUESmlsiDkKppciNCz1YX+p/6/mqIXlafoGwyUf3IJKAEl4A8A3gBI5Ezh1bvd+wAAAABJRU5ErkJggg==">
-<link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
+     hosted anyway, and no scraper reads a data URI. The icon is the square
+     brand mark. The full wordmark shrunk to 32px came out an illegible grey
+     smear in the tab, which only ever has room for a solid shape. The Apple
+     icon bleeds the accent to the edge because iOS flattens transparency
+     onto black and then applies its own corner mask. -->
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAEw0lEQVR42rWXX4jUVRTHP+feO7+Z2d1ZWTcLa1dpoxAfxB4yE0mhHhTzcYTWFZQiEsIIe8uerJdAorB6CoP8A7v4IkpQSZii5oOUD/aHshbLXnRld3Vn5/f73Xt6mD/bOrO6s64HBobfPfec77nnnO89VwCKxUE7NLTFr935eZ9mC29C2KTB9wIZQLg/UZBEjLkK5oSUxz8689krV2o+pfZnzRtfDkgm96Gx9qGQxmjwzKeIsRgXEXx6XZPyW2f3bztYLA5aAVi962B/lCsc8nGJ4BMvIgZE5hUBqqoajM1YG+VJJm73n9vff0Se231wqaTmkogpBJ9qxfmDkwoIJ6phXJOwwhDzts3kO4NPwoN2DiAiJvgk2Ey+Eye7nSCbQ1puGrmIYJokwgdtatw2UQ4KqtoIIo1VVDc7hccIXu4sdhGhnKRMltPKUtWGMUJHPmoKYPR2mVADV92TyzqyGXcHCBENKQo9TgTXLPJykvLko12sX9mLNaZu89+R25z44UpDiSqwZd0yFi9sr2HFh8B3P17l92s3m4AAEXGNzoEQlFzG8cFr6+hZVGga7eCpX1jQnq1HvmX9Mt7pX92gt3FVHy+/f5ygipk6yLo0Fp1ACIFCW0RXIYcPSuoVH5Q49YSg9CwqTB11FXBv9Vuc+ml7ugo5Otsigg9NKc3NVK1BFe8VawTVGisYjBGSNDToJ2nAGMFipu3xXgmqM3aFuxeLqkJtv2oFWDOKEqms1fSnfOpdPTQHUDWWjRwiU5zoKsSJyHSzWq0dI4KxU4AAspGrpEtmCUAVnLWMjE0ydOpXXlr9RAVEdf3G+CTfXhwmn3XUyiCfdXxzcZj1K5fQXcjVQanC8fN/MDI+SS5q7AIAWbPrkDanTIhTz8JCDlMlGAFuTSZMxinZjK0fswiUE08ucnTkMvXTCUEZGZ8kcnbGm8XNTJmQixxjE3EFTZVYjDH1nv5/mrMZh/fKzfHJKeISmTHyWRWhqlbzLtMSrlptsY4KD9y8VcYaMALGmQYbdxNz79vrjh/grGF8Imbdil6eX9HLeCnGWVPPe2MnMNc2bLLBGuLE05ZzbH1xOarK0dO/ESeeKGNJfWjJXkvXrw/KjbESiQ/s3b6W3kUFljzcyd7ta4lTz42x0jSGnFVArSh3dWTZ9GwfW19YTt/iBXWG27jqcZ7q6eLQycucvXyNsYl41oOkmcOE2Zzd5jjAzcgDM6XgVikmFzne27GWDc88DsBXF/5kz4HTlBNPIR/VeWPeU2CN0N2ZJ048ew6cYfnSbgDe/eIMkbN05KOWi7DlLkh9IMpYxiZiDp/8GQVKcUp7Z75l5wBOUS+IbRVEoS3i1KWrABTmEHmVY1IjyN9i7CxpY3o6Rm/HjE7ETYfRe7kW41TgH6NwzLisqGpofcSeW/GrajAuEhU9ZsjoPp+UxozNmLmAaL2N1RubMT4pjZGyz5zbNzAcNOy0UV6MdUY1+FbTMfunWfDGOGujvKj3r5/7dGDYFIuD9vzHA4fj0ugAYq67bLsV42S+3Ytx4rLtFjHX49LowLn9244Ui4PWXr48pMXioP36QP9Pjzy94ag1GQHtRumoMuX9P89FEhH5S4M/WC7fevXCJzu+r73K/wNCs2F6uFC1fQAAAABJRU5ErkJggg==">
+<link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
 <!-- --mps-accent, matching the wordmark band that is now the top of the page,
      so the browser bar and the band read as one strip. The dark value
      belongs to dark mode, where it is actually true. -->
@@ -33,15 +35,15 @@
 <meta name="apple-mobile-web-app-title" content="myPS">
 
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="myProductivitySpace">
-<meta property="og:title" content="myProductivitySpace">
+<meta property="og:site_name" content="myProductivityspace">
+<meta property="og:title" content="myProductivityspace">
 <meta property="og:description" content="One board for your calendar, tasks, pages and bookmarks.">
 <meta property="og:url" content="https://myproductivityspace.netlify.app/">
 <meta property="og:image" content="https://myproductivityspace.netlify.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="myProductivitySpace">
+<meta name="twitter:title" content="myProductivityspace">
 <meta name="twitter:description" content="One board for your calendar, tasks, pages and bookmarks.">
 <meta name="twitter:image" content="https://myproductivityspace.netlify.app/og.png">
 <!-- Widget settings registration, available before anything else runs.
@@ -230,7 +232,7 @@
     font-display: swap;
   }
 
-  /* Brand tokens — myProductivitySpace Brand Identity, Edition 01.
+  /* Brand tokens — myProductivityspace Brand Identity, Edition 01.
      Monochrome everywhere except one hue: --mps-accent, the classic Myspace
      header blue, which paints the wordmark band at the top of the board and
      the sign-in screen. Semantic tag colors (status/type/depth pills) are
@@ -3388,7 +3390,7 @@
   .mps-td { font-size: 13px; color: var(--ink); min-width: 0; }
   .mps-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
-  /* ---------- myProductivitySpace AI (docked sidebar) ---------- */
+  /* ---------- myProductivityspace AI (docked sidebar) ---------- */
   /* The 360px here must stay in step with body.ai-panel-open's --ai-panel-w.
      It's stated literally rather than read from the variable because the
      full-screen modes zero that variable — reading it would collapse the
@@ -4453,7 +4455,7 @@
       flex: 1 1 auto !important; width: 100% !important; min-height: 0;
     }
 
-    /* The wordmark is 46px, which makes "myProductivitySpace" about 500px
+    /* The wordmark is 46px, which makes "myProductivityspace" about 500px
        wide -- wider than the phone, so the whole page scrolled sideways.
        The sign-in screen reuses it, so this was the first thing anyone saw. */
     html:not(.force-desktop) .page-title,
@@ -5329,7 +5331,7 @@
 
 <button type="button" id="addWidgetBtn" title="Add a section"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
 
-<button type="button" id="aiPanelBtn" title="myProductivitySpace AI" aria-expanded="false"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></button>
+<button type="button" id="aiPanelBtn" title="myProductivityspace AI" aria-expanded="false"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></button>
 <button type="button" id="profileBtn" title="Account" aria-haspopup="true" aria-expanded="false"><span class="pb-avatar"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path d="M3.5 21a8.5 8.5 0 0 1 17 0 1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1Z"/></svg></span></button>
 <div id="profileBackdrop" hidden></div>
 <div id="profileMenu" hidden role="menu" aria-label="Account">
@@ -15045,7 +15047,7 @@
       widgetEl: widgetEl
     };
 
-    /* ---- layout control for myProductivitySpace AI ----
+    /* ---- layout control for myProductivityspace AI ----
        The same splice __menuGrid.insert does for Bookmarks, generalised to
        any widget, plus the two size knobs. Every move is expressed relative
        to another widget ("left of Calendar", "below Tasks") rather than as a
@@ -18336,7 +18338,7 @@
       }).filter(function (w) { return !!w.title; });
     };
 
-    /* ---- board control surface for myProductivitySpace AI ----
+    /* ---- board control surface for myProductivityspace AI ----
        The AI panel is its own script block and can see none of the state
        above, so every edit it is allowed to make is published here as one
        small, explicit object. Deliberately a closed verb list rather than a
@@ -22296,7 +22298,7 @@
       // smaller site-imposed cap anymore.
       try { pipWindow.resizeTo(availableWidth, availableHeight); } catch (e) {}
 
-      pipWindow.document.title = document.title || "unbleep LifeOS";
+      pipWindow.document.title = document.title || "myProductivityspace";
 
       const style = pipWindow.document.createElement("style");
       style.textContent =
@@ -28481,7 +28483,7 @@
     }
   }
 
-  /* ---------- Google Tasks + Calendar for myProductivitySpace AI ----------
+  /* ---------- Google Tasks + Calendar for myProductivityspace AI ----------
      The AI panel is another script block; this is the whole of what it may
      do here. Every write goes through the same api() the buttons use, and
      every failure comes back as { error } rather than an alert, so the
@@ -32534,7 +32536,7 @@
 
 <script>
 /* =====================================================================
-   Connections + myProductivitySpace AI
+   Connections + myProductivityspace AI
    ---------------------------------------------------------------------
    Both are UI shells: no OAuth is performed and no model is called. They
    live together in one IIFE because they share the .mps-* CSS foundation
@@ -33268,7 +33270,7 @@
   }, true);
 
   /* =================================================================
-     myProductivitySpace AI
+     myProductivityspace AI
      ================================================================= */
   const aiPanel = $("aiPanel");
   const aiLog = $("aiLog");
@@ -33373,7 +33375,7 @@
      or the repeat detector firing mean the model is not converging. */
   const AI_ESCALATE_TURNS = 12;
   const AI_MODES = [
-    { id: "auto",   name: "Auto",         desc: "myProductivitySpace handles permission decisions" },
+    { id: "auto",   name: "Auto",         desc: "myProductivityspace handles permission decisions" },
     { id: "accept", name: "Accept edits", desc: "Automatically accept every change" },
     { id: "plan",   name: "Plan",         desc: "Create a plan before making changes" }
   ];
@@ -35589,7 +35591,7 @@
      and text written as a diff against an older version of this prompt. */
   function systemPrompt() {
     return [
-      "You are myProductivitySpace AI, the assistant built into a single-page personal dashboard.",
+      "You are myProductivityspace AI, the assistant built into a single-page personal dashboard.",
       "The board is a grid of widgets. You change it by calling the tools you have been given. Never claim to have made a change you did not actually make with a tool.",
       "Nothing about a widget is fixed. Its contents, its settings and its appearance (fonts, weights, colours, spacing, what is shown or hidden) can all be changed with your tools, built-in widgets included, so never reply that a widget's rendering or styling cannot be changed. To change how something looks: read_widget gives a dom_outline of the elements and class names, inspect_widget with a selector shows the rules currently applied to them, and set_widget_style writes CSS scoped to that widget. Before the first visual change in a chat (building or restyling a custom widget, set_widget_style, a styling patch), call read_design_guide and follow it.",
       "The date, the local time, the connector status and the current contents of the board are given to you in a " + BOARD_STATE_OPEN + " block attached to the user's message. Read it there rather than asking for it. It is a snapshot taken when they hit send, so once you have changed the board yourself, trust your own tool results over it, and call list_widgets when you need to be certain. Earlier messages in the chat keep their own older snapshots; only the one on the latest message describes the board now.",
