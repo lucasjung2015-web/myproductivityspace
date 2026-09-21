@@ -347,14 +347,14 @@
      devices keep their fit-to-screen board. Code that turns pointer travel
      into a size divides by window.__mpsZoomOf. */
   @media not all and (hover: none) and (pointer: coarse) {
-    .page-title, body > .links-row-wrap, #widgetGrid, #collapsedTabsBar { zoom: 0.75; }
+    .page-title, body > .links-row-wrap, #widgetGrid, #hiddenDock { zoom: 0.75; }
     /* The few fixed popups that live inside the grid are placed in screen
        pixels too. Undoing the zoom on them puts them back at full size and
        their coordinates back in screen pixels. */
     #widgetGrid .cal-viewtoggle-menu, #widgetGrid .timer-popup { zoom: 1.333333; }
   }
   html.force-desktop .page-title, html.force-desktop body > .links-row-wrap,
-  html.force-desktop #widgetGrid, html.force-desktop #collapsedTabsBar { zoom: 0.75; }
+  html.force-desktop #widgetGrid, html.force-desktop #hiddenDock { zoom: 0.75; }
   html.force-desktop #widgetGrid .cal-viewtoggle-menu,
   html.force-desktop #widgetGrid .timer-popup { zoom: 1.333333; }
   /* A coloured bar is painted like a coloured widget: the tint gets corners. */
@@ -868,29 +868,72 @@
      rather than a separate header field. */
   .col.collapsible-col-wrap.note-widget .sticky-note > .widget-icon-btn { margin-top: 1px; }
 
+  /* ---------- the hidden-widget dock ----------
+     One chip, sized by its own label instead of by how much is hidden, with a
+     shelf that opens out of it. It replaces the bar of tabs that used to sit
+     here: that bar was permanent chrome that grew another row every few
+     widgets, so tidying the board cost board, and it came with a drag handle
+     to manage the space it was taking. The chip is absent entirely while
+     nothing is hidden. */
+  .hidden-dock {
+    position: relative; flex: 0 0 auto;
+    display: none; align-items: center;
+    padding: 6px 28px 10px;
+  }
+  .hidden-dock.has-tabs { display: flex; }
+
+  .hidden-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 30px; padding: 0 11px;
+    border: 1px solid var(--hair); border-radius: 999px;
+    background: var(--bg); color: var(--ink-soft);
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: color 0.16s var(--ease-spring), border-color 0.16s var(--ease-spring),
+                transform 0.1s var(--ease-spring);
+  }
+  .hidden-chip:hover { color: var(--ink); border-color: #b9b9b9; }
+  .hidden-chip:active { transform: scale(0.97); }
+  .hidden-chip svg { width: 13px; height: 13px; display: block; }
+  .hidden-chip-count { font-variant-numeric: tabular-nums; }
+
+  /* Anchored to the chip and grown out of it. That attachment is what lets the
+     panel go without a title: the control you just pressed said "3 hidden" and
+     the list is two pixels above it, so a header would only repeat it. */
+  .hidden-shelf {
+    position: absolute; left: 28px; bottom: calc(100% - 4px); z-index: 40;
+    width: 264px; max-width: calc(100vw - 56px);
+    padding: 6px; border-radius: 12px;
+    background: var(--bg); border: 1px solid var(--hair);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 14px 36px rgba(0,0,0,0.12);
+    transform-origin: 18px 100%;
+    animation: hidden-shelf-in 0.26s var(--ease-spring) both;
+  }
+  .hidden-shelf[hidden] { display: none; }
+  /* Blur and scale together, so the panel reads as a material arriving rather
+     than a rectangle fading up. */
+  @keyframes hidden-shelf-in {
+    from { opacity: 0; transform: scale(0.94) translateY(6px); filter: blur(5px); }
+    to   { opacity: 1; transform: none; filter: blur(0); }
+  }
+  .hidden-shelf-search {
+    width: 100%; box-sizing: border-box; margin-bottom: 2px;
+    padding: 8px 10px; border: 1px solid transparent; border-radius: 8px;
+    background: var(--panel); color: var(--ink);
+    font-family: inherit; font-size: 13px; outline: none;
+  }
+  .hidden-shelf-search::placeholder { color: var(--ink-soft); }
+  .hidden-shelf-search:focus { border-color: var(--mps-blue); background: var(--bg); }
+  .hidden-shelf-search[hidden] { display: none; }
+
+  /* The list. Same element, same id it has always had, so every place that
+     appends a tab, counts the children or sweeps them still works untouched;
+     only where it lives and which way it stacks have changed. */
   .collapsed-tabs-bar {
-    display: none; flex-direction: row; flex-wrap: wrap; gap: 8px;
-    padding: 8px 28px; flex: 0 0 auto; border-top: 1px solid #000000;
+    display: none; flex-direction: column; gap: 2px;
+    max-height: 244px; overflow-y: auto;
   }
   .collapsed-tabs-bar.has-tabs { display: flex; }
-  /* Once its top rule has been dragged, the bar holds that height: rows of
-     tabs past it scroll inside the bar, and the board gives up (or takes
-     back) the difference. Until then it is as tall as its tabs. */
-  .collapsed-tabs-bar.is-sized { overflow-y: auto; align-content: flex-start; }
-  /* The grab zone for that top rule. A sibling of the bar rather than a child,
-     because the bar's children are exactly its tabs and several places count
-     and walk them. Zero height, so it moves nothing; the strip it paints
-     straddles the rule, reaching up into the board's bottom padding. Shown
-     only while the bar is, and only on the desktop board (see the touch query,
-     where the bar is a single scrolling row). */
-  .tabs-bar-resizer { display: none; position: relative; flex: 0 0 0px; height: 0; }
-  body:has(> #collapsedTabsBar.has-tabs) > .tabs-bar-resizer { display: block; }
-  .tabs-bar-resizer::after {
-    content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 12px;
-    z-index: 5; cursor: row-resize; -webkit-tap-highlight-color: transparent;
-  }
-  /* Tab layout now lives on .collapsible-strip itself — a strip is only ever a
-     tab in this bar, so there's no in-row form left for this to override. */
 
   #gtaskSubpageHost iframe {
     flex: 1 1 auto; width: 100%; height: 100%; border: none; border-radius: 4px; display: block;
@@ -1467,21 +1510,29 @@
   .icon-emoji-btn:hover { background: #f2f2f2; }
   .icon-popover-empty { font-size: 12px; color: #999999; text-align: center; padding: 12px 0; grid-column: 1 / -1; }
 
-  /* A hidden widget's tab. Only ever rendered inside #collapsedTabsBar now —
-     hiding removes the widget from the grid outright rather than leaving a
-     narrow vertical strip in the row, so the old in-row, vertical-text form of
-     this element is gone and it's laid out purely as a horizontal tab. */
+  /* A hidden widget's tab. On a desktop board it is a row in the shelf: full
+     width, no box of its own, and the whole row is the button. On a phone the
+     touch query below puts it back to the bordered pill the scrolling strip
+     there is made of. */
   .collapsible-strip {
     display: none;
-    flex: 0 0 auto; height: 32px; padding: 0 8px 0 10px; gap: 7px;
-    flex-direction: row; align-items: center; justify-content: center;
+    flex: 0 0 auto; min-height: 34px; padding: 7px 8px; gap: 8px;
+    flex-direction: row; align-items: center;
     cursor: pointer; user-select: none;
-    border: 1px solid #000000; border-radius: 4px;
-    font-size: 15px; font-weight: bold; color: #000000;
+    border: none; border-radius: 8px; background: transparent;
+    font-size: 13.5px; font-weight: 500; color: var(--ink);
   }
   #collapsedTabsBar .collapsible-strip { display: flex; }
-  .collapsible-strip:hover { background: #f5f5f5; }
-  .collapsible-strip-label { letter-spacing: 0.5px; }
+  .collapsible-strip:hover, .collapsible-strip:focus-visible {
+    background: rgba(58, 110, 165, 0.09); outline: none;
+  }
+  /* Set by the shelf's search box. !important because the rule that shows a
+     strip inside the bar is an id selector and would otherwise win. */
+  .collapsible-strip[data-filtered="1"] { display: none !important; }
+  .collapsible-strip-label {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   /* The widget's own emoji, to the left of its label. Widgets with no icon set
      carry the [hidden] attribute instead of a placeholder glyph — spelled out
      explicitly because the display rule above would otherwise beat the
@@ -1495,6 +1546,11 @@
      label on the left, action icons clustered on the right. The accessible
      name lives on aria-label/title rather than as visible text, so a tab stays
      as narrow as its own widget name. */
+  /* Hidden on a desktop board: the row itself is the button, so a second
+     target inside it is just a smaller way to do the same thing. It stays in
+     the markup because ten different places emit a tab, and the phone's pill
+     still shows it. */
+  .hidden-shelf .collapsible-unhide { display: none; }
   .collapsible-unhide {
     flex: 0 0 auto; width: 22px; height: 22px; padding: 0;
     display: flex; align-items: center; justify-content: center;
@@ -2662,8 +2718,8 @@
   body.subpage-fullscreen-mode .page-title,
   body.subpage-fullscreen-mode .links-row,
   body.subpage-fullscreen-mode .widget,
+  body.subpage-fullscreen-mode .hidden-dock,
   body.subpage-fullscreen-mode .collapsed-tabs-bar,
-  body.subpage-fullscreen-mode .tabs-bar-resizer,
   /* These are position:fixed at z-index 3000 — above the subpage host (2000) —
      so unlike everything else on the dashboard they don't get covered by the
      overlay and have to be hidden explicitly. */
@@ -2711,8 +2767,8 @@
      / #addWidgetBtn are position:fixed at z-index 3000, above it. */
   body.widget-fullscreen-mode .page-title,
   body.widget-fullscreen-mode .links-row-wrap:not(.widget-maximized),
+  body.widget-fullscreen-mode .hidden-dock,
   body.widget-fullscreen-mode .collapsed-tabs-bar,
-  body.widget-fullscreen-mode .tabs-bar-resizer,
   body.widget-fullscreen-mode .col-resizer,
   body.widget-fullscreen-mode .row-resizer,
   body.widget-fullscreen-mode .section-controls,
@@ -4386,15 +4442,33 @@
        instead of the board's hard black rule, which stacked against the dots
        would read as two unrelated lines. It still shows only when something
        is hidden, so an untouched board pays nothing for it. */
+    /* The chip and its shelf answer a desktop problem (a bar that wrapped into
+       rows and had to be resized). A phone never had that bar: it has a single
+       scrolling strip, plus the widget strip that lists hidden widgets inline.
+       So both wrappers collapse to display:contents here and the list goes back
+       to being a direct child of the page, exactly as it was. */
+    html:not(.force-desktop) .hidden-dock,
+    html:not(.force-desktop) .hidden-dock.has-tabs { display: contents; }
+    html:not(.force-desktop) .hidden-chip { display: none; }
+    html:not(.force-desktop) .hidden-shelf,
+    html:not(.force-desktop) .hidden-shelf[hidden] {
+      display: contents; animation: none; border: 0; box-shadow: none; padding: 0;
+    }
+    html:not(.force-desktop) .hidden-shelf-search { display: none; }
     html:not(.force-desktop) .collapsed-tabs-bar.has-tabs {
+      flex-direction: row; max-height: none; overflow-y: visible;
       flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
       gap: 6px; padding: 6px 10px;
       border-top: 1px solid var(--hair); background: var(--bg);
     }
     html:not(.force-desktop) .collapsed-tabs-bar::-webkit-scrollbar { display: none; }
-    html:not(.force-desktop) body > .tabs-bar-resizer { display: none !important; }
-    html:not(.force-desktop) .collapsed-tabs-bar.is-sized { height: auto !important; overflow-y: visible; }
-    html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip { flex: 0 0 auto; min-height: 44px; }
+    html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip {
+      flex: 0 0 auto; min-height: 44px; padding: 0 8px 0 10px; gap: 7px;
+      justify-content: center; border: 1px solid #000000; border-radius: 4px;
+      font-size: 15px; font-weight: bold; letter-spacing: 0.5px;
+    }
+    html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip-label { flex: 0 0 auto; }
+    html:not(.force-desktop) .collapsible-unhide { display: flex; }
 
     /* ---------- 3. touch targets ----------
        The box grows to 44pt around the glyph; the glyph itself is untouched,
@@ -5576,12 +5650,21 @@
   </div>
 </div>
 
-<!-- Bottom chrome, in the order it is read from the content upward: the
-     hidden-widget tabs (only present when something is hidden), then the
-     page dots. The dots sit lowest because position is glanced at
-     constantly and recovery is touched rarely. -->
-<div class="tabs-bar-resizer" id="tabsBarResizer" aria-hidden="true" title="Drag to resize. Double-click to fit"></div>
-<div class="collapsed-tabs-bar" id="collapsedTabsBar"></div>
+<!-- Bottom chrome: one chip saying how much is hidden, and the shelf that
+     opens out of it. The tabs are unchanged .collapsible-strip elements,
+     moved into the list by applyHiddenState exactly as they were moved into
+     the bar this replaces. On a phone the two wrappers are display:contents,
+     so the list is a direct child of the page again and the touch layout is
+     the scrolling strip it has always been. -->
+<div class="hidden-dock" id="hiddenDock">
+  <button type="button" class="hidden-chip" id="hiddenChip" aria-haspopup="dialog" aria-expanded="false" aria-label="Hidden widgets">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path d="M3 21 21 3"/></svg><span class="hidden-chip-count" id="hiddenChipCount">0 hidden</span>
+  </button>
+  <div class="hidden-shelf" id="hiddenShelf" role="dialog" aria-label="Hidden widgets" hidden>
+    <input type="text" class="hidden-shelf-search" id="hiddenShelfSearch" placeholder="Search hidden widgets" autocomplete="off" hidden>
+    <div class="collapsed-tabs-bar" id="collapsedTabsBar"></div>
+  </div>
+</div>
 
 <!-- Phone chrome. Both are inert on a desktop: the stylesheet only shows them
      inside the touch media query, and the script only wires them there. The
@@ -13249,6 +13332,11 @@
       return z;
     };
     const collapsedTabsBar = document.getElementById("collapsedTabsBar");
+    const hiddenDock = document.getElementById("hiddenDock");
+    const hiddenChip = document.getElementById("hiddenChip");
+    const hiddenChipCount = document.getElementById("hiddenChipCount");
+    const hiddenShelf = document.getElementById("hiddenShelf");
+    const hiddenShelfSearch = document.getElementById("hiddenShelfSearch");
 
     /* Nothing in the app tracked "which widget am I working in" before this —
        maximizedId below is a UI-mode flag, not a focus record, and
@@ -13806,13 +13894,67 @@
     const HIDE_GROUPS_STORAGE_KEY = "section-hide-groups";
 
     function updateTabsBarVisibility() {
-      collapsedTabsBar.classList.toggle("has-tabs", collapsedTabsBar.children.length > 0);
-      /* On a phone the bar is filtered down to the section on screen, which
-         can leave it holding tabs but showing none of them. The mobile shell
-         owns that decision and corrects has-tabs itself; it is absent on a
-         desktop, where child count is the whole answer. */
+      const n = collapsedTabsBar.children.length;
+      collapsedTabsBar.classList.toggle("has-tabs", n > 0);
+      /* The chip carries the count and nothing else, so its width never moves
+         under a cursor already reaching for it. */
+      hiddenDock.classList.toggle("has-tabs", n > 0);
+      hiddenChipCount.textContent = n + " hidden";
+      hiddenChip.setAttribute("aria-label",
+        (n === 1 ? "1 hidden widget" : n + " hidden widgets") + ". Open the shelf");
+      if (!n) closeHiddenShelf();
+      else if (!hiddenShelf.hidden) filterHiddenShelf();
+      /* The mobile shell decides for itself whether the strip belongs on
+         screen (board view only), and corrects both classes; it is absent on a
+         desktop, where the child count is the whole answer. */
       if (window.__mpsFilterHiddenTabs) { try { window.__mpsFilterHiddenTabs(); } catch (e) {} }
     }
+
+    /* ---------- the shelf ----------
+       Rows before a search box earns its place. Under this a filter is
+       furniture: you can read four names faster than you can type one. */
+    const SHELF_SEARCH_MIN = 6;
+
+    function filterHiddenShelf() {
+      const q = (hiddenShelfSearch.value || "").trim().toLowerCase();
+      Array.prototype.forEach.call(collapsedTabsBar.children, function (tab) {
+        const label = tab.querySelector(".collapsible-strip-label");
+        const name = ((label && label.textContent) || "").toLowerCase();
+        if (q && name.indexOf(q) === -1) tab.setAttribute("data-filtered", "1");
+        else tab.removeAttribute("data-filtered");
+      });
+    }
+
+    function openHiddenShelf() {
+      if (!collapsedTabsBar.children.length) return;
+      const many = collapsedTabsBar.children.length >= SHELF_SEARCH_MIN;
+      hiddenShelfSearch.value = "";
+      hiddenShelfSearch.hidden = !many;
+      filterHiddenShelf();
+      hiddenShelf.hidden = false;
+      hiddenChip.setAttribute("aria-expanded", "true");
+      if (many) hiddenShelfSearch.focus();
+    }
+
+    function closeHiddenShelf() {
+      if (hiddenShelf.hidden) return;
+      hiddenShelf.hidden = true;
+      hiddenChip.setAttribute("aria-expanded", "false");
+    }
+
+    hiddenChip.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (hiddenShelf.hidden) openHiddenShelf(); else closeHiddenShelf();
+    });
+    hiddenShelfSearch.addEventListener("input", filterHiddenShelf);
+    document.addEventListener("click", function (e) {
+      if (hiddenShelf.hidden || !e.target || !e.target.closest) return;
+      if (e.target.closest("#hiddenShelf") || e.target.closest("#hiddenChip")) return;
+      closeHiddenShelf();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !hiddenShelf.hidden) { closeHiddenShelf(); hiddenChip.focus(); }
+    });
 
     // The tab shows the widget's own emoji to the left of its label; a widget
     // with no icon set shows the label alone rather than a placeholder glyph.
@@ -13823,6 +13965,12 @@
       const emoji = WIDGET_ICONS[id] || "";
       iconEl.textContent = emoji;
       iconEl.hidden = !emoji;
+      /* The row is the button, and the button inside it is hidden on a
+         desktop board, so the accessible name has to live on the row. Set
+         here rather than at wiring time because a widget can be renamed
+         while it is hidden. */
+      const label = tab.querySelector(".collapsible-strip-label");
+      tab.setAttribute("aria-label", "Show " + ((label && label.textContent) || id));
     }
 
     // Re-applies visibility across every widget, resizer and slot in one pass.
@@ -13967,9 +14115,18 @@
       } catch (e) {}
     }
 
+    /* The last widget hidden, and the only thing ⌘Z knows about. Overwritten
+       by the next hide and cleared once it is spent, so the shortcut either
+       reverses the hide you just made or does nothing. Nothing on screen
+       advertises it: the shelf is the answer we want people to learn, and a
+       second control in the corner would be a smaller way to reach it. */
+    let lastHiddenId = null;
+
     function setHidden(id, value) {
       // Showing a widget by any route (tab, AI, the "+" popup) puts it back.
       if (!value && offBoard[id]) { delete offBoard[id]; persistOffBoard(); }
+      if (value) lastHiddenId = id;
+      else if (lastHiddenId === id) lastHiddenId = null;
       hidden[id] = !!value;
       storageSet(hideStorageKey(id), value ? "true" : "false");
       if (value && maximizedId === id) setMaximized(null);
@@ -14007,6 +14164,9 @@
         if (maximizedId === id) setMaximized(null);
         hideGroups[id] = ids;
       });
+      // Unhiding any one of a group brings the whole group back, so one id is
+      // enough for ⌘Z to reverse the whole section.
+      lastHiddenId = ids[0] || null;
       persistHideGroups();
       applyHiddenState();
     }
@@ -14038,7 +14198,16 @@
     function wireTab(id) {
       const tab = tabFor(id);
       if (!tab) return;
+      /* A div doing a button's job, so it has to say so and answer the keys a
+         button answers. The name is set in applyTabIcon, which runs whenever
+         the tab is parked. */
+      tab.setAttribute("role", "button");
+      tab.setAttribute("tabindex", "0");
+      tab.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tab.click(); }
+      });
       tab.addEventListener("click", function () {
+        closeHiddenShelf();
         setHidden(id, false);
         /* On a phone each slot is a whole page, and the tabs bar lists every
            hidden widget on the board rather than the ones belonging to the
@@ -14106,6 +14275,20 @@
 
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && maximizedId) setMaximized(null);
+    });
+
+    // ⌘Z / Ctrl+Z reverses the last hide. Never inside a field or an editor:
+    // there it belongs to whatever the user is typing in.
+    document.addEventListener("keydown", function (e) {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
+      if ((e.key || "").toLowerCase() !== "z" || !lastHiddenId) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""))) return;
+      if (!isHidden(lastHiddenId)) { lastHiddenId = null; return; }
+      e.preventDefault();
+      const id = lastHiddenId;
+      lastHiddenId = null;
+      setHidden(id, false);
     });
 
     // The Bookmarks widget is built by its own script module, which can't
@@ -14239,75 +14422,6 @@
       resizer.addEventListener("mousedown", onDown);
       resizer.addEventListener("touchstart", onDown, { passive: false });
     }
-
-    // ---- height of the hidden-widget tabs bar (drag its top rule) ----
-    // Dragging up makes the bar taller and the board shorter. The height is
-    // stored in the bar's own unzoomed px, like the widget heights above, so
-    // it survives the 75% board zoom. A double-click forgets it and the bar
-    // goes back to fitting its tabs.
-    (function wireTabsBarResizer() {
-      const resizer = document.getElementById("tabsBarResizer");
-      const bar = collapsedTabsBar;
-      if (!resizer || !bar) return;
-      const KEY = "collapsed-tabs-height";
-      // One row of tabs: 32px tab + 8px padding each side + the 1px rule.
-      const MIN_H = 49;
-
-      function maxH() { return (window.innerHeight * 0.6) / window.__mpsZoomOf(bar); }
-      function apply(h) {
-        if (h == null) {
-          bar.style.height = "";
-          bar.classList.remove("is-sized");
-          return;
-        }
-        bar.style.height = Math.round(clamp(h, MIN_H, maxH())) + "px";
-        bar.classList.add("is-sized");
-      }
-
-      storageGet(KEY).then(function (v) {
-        const h = parseInt(v, 10);
-        if (h > 0) apply(h);
-      });
-
-      function onDown(e) {
-        if (e.button != null && e.button !== 0) return;
-        const z = window.__mpsZoomOf(bar);
-        const startY = clientY(e);
-        const startH = bar.getBoundingClientRect().height / z;
-        let h = startH;
-        document.documentElement.style.cursor = "row-resize";
-
-        function onMove(ev) {
-          if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
-          h = startH - (clientY(ev) - startY) / z;
-          apply(h);
-          ev.preventDefault();
-        }
-        function onUp() {
-          document.documentElement.style.cursor = "";
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
-          document.removeEventListener("touchmove", onMove);
-          document.removeEventListener("touchend", onUp);
-          if (Math.abs(h - startH) >= 1) {
-            storageSet(KEY, String(Math.round(clamp(h, MIN_H, maxH()))));
-          }
-        }
-
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
-        document.addEventListener("touchmove", onMove, { passive: false });
-        document.addEventListener("touchend", onUp);
-        e.preventDefault();
-      }
-
-      resizer.addEventListener("mousedown", onDown);
-      resizer.addEventListener("touchstart", onDown, { passive: false });
-      resizer.addEventListener("dblclick", function () {
-        apply(null);
-        storageSet(KEY, "");
-      });
-    })();
 
     // ---- drag-to-reorder / re-split (the grip icon in each widget's own
     // header) ----
@@ -32642,12 +32756,13 @@
   const AI_EFFORT_KEY = "ai-effort";   // suffixed with ":" + model id
   const AI_MODELS = [
     { id: "claude-sonnet-5", name: "Sonnet 5", desc: "Strongest on the board's tools", defaultEffort: "high",
+      ownerOnly: true,
       efforts: [
         { id: "auto",   name: "Auto",   badge: "Medium, raised if stuck" },
         { id: "medium", name: "Medium" },
         { id: "high",   name: "High" }
       ] },
-    { id: "deepseek-flash", name: "DeepSeek-V4.1-Flash (US)", desc: "About 20\u00d7 cheaper, hosted by Fireworks, under test", defaultEffort: "high",
+    { id: "deepseek-flash", name: "DeepSeek-V4.1-Flash (US)", desc: "Hosted on Fireworks servers in the United States.", defaultEffort: "high",
       efforts: [
         { id: "none", name: "Off",  badge: "No thinking" },
         { id: "low",  name: "Low" },
@@ -32657,9 +32772,24 @@
   ];
   let aiModel = AI_MODELS[0].id;
   const aiEffortByModel = {};
+
+  /* Sonnet is the owner's model while the beta runs on subsidised credits: it
+     costs several times a DeepSeek message, and a tester who picks it spends
+     that money without ever seeing a bill. It HIDES, it does not LOCK, exactly
+     like the owner-only buttons (see revealOwnerControls): the proxy's
+     allow-list still holds both ids, so this keeps an honest tester on the
+     cheap route rather than stopping a determined one. Fails closed -- a board
+     that cannot yet tell who is signed in shows the tester's list, and
+     enforceModelAccess corrects it once the session lands. */
+  function availableModels() {
+    let owner = false;
+    try { owner = !!(window.__mpsIsOwner && window.__mpsIsOwner()); } catch (e) {}
+    const list = AI_MODELS.filter(function (m) { return owner || !m.ownerOnly; });
+    return list.length ? list : AI_MODELS.slice(-1);
+  }
   function modelDefOf(id) {
     for (let i = 0; i < AI_MODELS.length; i++) if (AI_MODELS[i].id === id) return AI_MODELS[i];
-    return AI_MODELS[0];
+    return availableModels()[0];
   }
   function currentEffort() {
     const m = modelDefOf(aiModel);
@@ -36540,7 +36670,7 @@
     const m = modelDefOf(aiModel);
     const e = currentEffort();
     aiModelMenu.innerHTML = "";
-    AI_MODELS.forEach(function (md) {
+    availableModels().forEach(function (md) {
       aiModelMenu.appendChild(pickItem(md.name, md.desc, md.id === aiModel, function () {
         setAiModel(md.id, true); setPickOpen(false);
       }).button);
@@ -36597,6 +36727,15 @@
     aiEffortByModel[m.id] = effortDef(m, id) ? id : m.defaultEffort;
     refreshPickers();
     if (persist) window.storageSet(AI_EFFORT_KEY + ":" + m.id, aiEffortByModel[m.id]);
+  }
+  /* Run once the session is known: a saved model the current user is not
+     allowed to pick (their own earlier choice, or the default this file ships
+     with) is swapped for their first allowed one and stored, so the swap
+     happens once rather than on every boot. */
+  function enforceModelAccess() {
+    const allowed = availableModels();
+    if (allowed.some(function (m) { return m.id === aiModel; })) { refreshPickers(); return; }
+    setAiModel(allowed[0].id, true);
   }
   /* Locked during a run: see the note on AI_MODELS. */
   function setPickersLocked(on) {
@@ -36801,6 +36940,10 @@
       if (savedEffort && m.efforts.some(function (x) { return x.id === savedEffort; })) aiEffortByModel[m.id] = savedEffort;
     }
     if (savedModel) setAiModel(savedModel, false); else refreshPickers();
+    // Deciding needs the signed-in user, so wait for the session rather than
+    // guessing early and correcting in front of the user.
+    try { await window.__mpsSync.ready; } catch (e) {}
+    enforceModelAccess();
     let savedWidth = null;
     try { savedWidth = await window.storageGet(AI_WIDTH_KEY); } catch (e) {}
     if (savedWidth) {
@@ -37271,7 +37414,12 @@
       tab.hidden = false; shown++;
     });
     const boardView = document.documentElement.classList.contains("mob-board");
-    bar.classList.toggle("has-tabs", shown > 0 && (!isMobile() || boardView));
+    const on = shown > 0 && (!isMobile() || boardView);
+    bar.classList.toggle("has-tabs", on);
+    /* On a desktop the same class drives the chip, which is the only part of
+       this that is on screen there. */
+    const dock = document.getElementById("hiddenDock");
+    if (dock) dock.classList.toggle("has-tabs", on);
   }
   window.__mpsFilterHiddenTabs = filterTabs;
 
