@@ -14916,10 +14916,17 @@
       lines.forEach(function (line) {
         const b = nbMakeBlock("p", 0);
         if (line === LINK) {
+          /* Two nodes in one block, not one: the underline belongs on the
+             thing you click and nowhere else. Running "for ur inspiration"
+             inside the anchor would underline the whole line and make the
+             destination look like a page about inspiration rather than a
+             board. The trailing text is a sibling text node, so it reads as
+             part of the sentence and is plainly not part of the link. */
           const a = document.createElement("a");
           a.setAttribute("href", welcomeBoardHref());
           a.textContent = "my board";
           b.appendChild(a);
+          b.appendChild(document.createTextNode(" for ur inspiration"));
         } else if (line) {
           b.textContent = line;
         }
@@ -14937,7 +14944,13 @@
       try {
         const pageId = createDynamicWidgetInstance("page");
         writePageHtml(pageId, welcomeNoteHtml(hi));
-        setWidgetIcon(pageId, "\ud83d\udcdd");
+        /* No icon, deliberately. This widget used to carry a memo emoji.
+           Its title is a greeting addressed to one person by name, and an
+           emoji in front of that turns a note from somebody into a labelled
+           product surface -- the two things either side of it are called
+           "Google Calendar" and "Google Tasks" and need their emoji to be
+           told apart at a glance, which is exactly what a name does not.
+           Leaving it off is what keeps the greeting reading as a greeting. */
         STARTER_OFF_BOARD.forEach(function (id) {
           if (WIDGET_IDS.indexOf(id) !== -1) takeOffBoard(id);
         });
