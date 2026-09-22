@@ -15,8 +15,27 @@
      brand mark. The full wordmark shrunk to 32px came out an illegible grey
      smear in the tab, which only ever has room for a solid shape. The Apple
      icon bleeds the accent to the edge because iOS flattens transparency
-     onto black and then applies its own corner mask. -->
-<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAB/UlEQVR4AeyXsU4CQRCG5+yhJ6FQS3sKOuh9DJT4ANhylBp6iPgYEEJBoCXUUirvwAPgfGcWdsW7cHvHVZL9b2dnZ/7/ZyGb3JW4n2tdvig+FPucASfcaCj1z7ANtDT1pXhW3CnyHnDC/anEaOkkYgyQGEWZyz8ClUALzcgAR/KmyaIHJq45gSdVxpVOhY8nDNwXLnsUvMcAf45jqtjoDgOxkrVaTcIwdNBut2PrW62WUxtqb71ej61nI9HAfD6XbrfrYDgcCkI028DYaDRyaumdzWZ22UmcaKBUKp00kKhWq0wOKpWKszaLOA6zn2jAFF1y/jeQeAL9fv/k9He7nUwmk5P8dDoV9n5v/MVh1yQa6HQ6EgSBg3K5LOv12uaI4tVqJewFgVsPR1QQ80g0ENOTazqTgUajIQ1FFkeZDWQRpzeTAW46AJEvvA1wzyPKT2Bi1mmRygBiYLFYRHe+EeMU9vu9YIR9kz9nTmUAQgQAsY3lcilLhZ07J05lAIEwDKN7odfrHfiJm81mZICaw8YZQSoDNh9GjBixvZcm9jaACN8cEPsikwFEzSkQ+wADG59GehAHxJ7YYGDs2ZxH2xgDgzyYPDh49xxgYKvND4qix6MKbjGgs7zrAxO40vDiAy00o3dDo0biVhevCu8/pvY6w1rACfeN5tDSSeQbAAD//zkxrioAAAAGSURBVAMAMZKhKfXMjfAAAAAASUVORK5CYII=">
+     onto black and then applies its own corner mask.
+
+     THE TAB ICON IS THE OUTLINED MARK and it is the only surface that is:
+     white face, black eyes, black mouth, black rounded-square outline.
+     Apple, the manifest and brand/ keep the solid black mark.
+
+     The outline is the load-bearing part, not decoration. A plain inversion
+     was tried first and does not survive a light tab strip: with a white
+     face and no border there is nothing to separate the mark from the strip
+     behind it, so all that shows is two eyes and a mouth floating free and
+     the silhouette that carries the mark everywhere else disappears. The
+     outline puts that silhouette back, so the face reads as a face on a
+     light strip AND on a dark one, which is what neither the solid black
+     mark nor the plain inversion manages on its own.
+
+     Generated rather than drawn by hand: the geometry is the same 100-unit
+     mark (eyes at 21/58, sparkle at 50,65, radius 24) with an 8-unit stroke
+     inset by half its width so it is not clipped, supersampled 16x and
+     resampled down, because a 2.5px border at 32px goes to mush otherwise.
+     See the corresponding block in Scripts/ if it needs rebuilding. -->
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAET0lEQVR42sVXMU8jRxT+ZnYwK5CRArJLcyYWsiwaJLtx5YqCAiFdokQUNBaiNCi5P5BLroQe+QckJClAyFggZKhjV4iOIAGNsRywwBx4vTsvzc5qbe9iCHeXJ4202v123ps33zfzHtBrGj6f9czNPJ4JwNcA5jVNSxHRV1245xoBAGPsH8uyygC2APzd5afDOQPAAXzgnH/knJMNevXgnBPn/COAn12+WLdjAPiNc/5WSgkAZiQSYaFQCIyx/5RvIkKtVsPl5SUBEJxzSCn/APC9DZHufflgr7o1NTUld3d36f7+nl5rzWaTdnZ2KJFISAAt28cv3Zx4wzk3GGNmIpGQNzc3REQkpSTDMDpGu90mKaXnaLfbPXgpJRER1et1isfjkjFmcs4NAG/c2XpnR9be398nIqLHx0ffValJ+71Tpuba29sjAG3b1zuH+Zzz36WUbyORiDw9PdU459A0DScnJ9jY2MDd3R0AQAiB+fl5zM7Ogogcbqjng4MDbG5uot1uAwCGhoaQzWYxPT0Ny7IgpUQsFrMuLi445/xPKeW3sAPYB0CpVMpUq6nVahQOhz1ZfXh4SEREpmmSZVlERFQulz2xIyMjdH5+7mQolUqZtjL24WI/qZXY2sXx8TFqtRoCgQCEEBBCQNd1Z6UKbysGR0dHAABd1x384OAgbm9vUS6XO7Ll9in8JMQYA2MMpmk6TtQEQvT+pmmagzdNs2NrOOe+UvX9YlmWE4Q7IE3THAduM00TnHPPf7zwynwzMDY21rNyRaRQKNSDD4fDsCwLROSkWTn2wnemgfM9AJRMJk1FLiklrayskK7rpGmaM2ZmZqjRaPScAc1mk+bm5kgI4WADgQAtLy93kDWZTCoS7vlmQKVyfX0dq6ureHh4cPY5Fot1kwmMMQwPD2NrawtnZ2eODHVdx/j4eA/+WVsAAFJKRCIRzzPe634gIkxMTPTM8RQJRZ+t6eCBeqfs+voaADA6OuoE9RT+RSpwT+AeSiFEhGKxiGKx6BDUD/+UiZdesaZpOppfW1sDACwsLDjy9DojXpWBnoiFAGMMuVwOlUoFlUoFuVwOjLEXO/eVYffNpqTWaDQon89TNBolAI7cAFA0GqV8Pt8hUa/bsluGz8qAYryu60in08hmswgGg5BSQkqJYDCIbDaLdDoNXdc7/vkkGfCyUqlEQggSQlCpVOqL98uAcFfEz4maiGAYBjKZDBYXFwEAmUwGrVYLgUCg7xyu78wJgDF2DYCq1SoMw8DAwIDvYaPIJqXE0tKSc9gocvoFDQCGYaBarQIA2T4d+1GVZMVikYiIWq1W361QdV+/1LdaLSIiKhQK7pLsB3cATlEaj8dlvV7vUYDXeAnm6uqKJicn3UXpeHe79F6V5YlEQhYKhU9Wlm9vb1M8HneX5T8p392Nya+c82++QGPyne1Xdrdm7DO3Zu+9WrMv0Zz+ZTenZ37N6f/Wnv8LIXzYUG4v8KQAAAAASUVORK5CYII=">
 <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
 <!-- --mps-accent, matching the wordmark band that is now the top of the page,
      so the browser bar and the band read as one strip. The dark value
@@ -659,11 +678,21 @@
   .page-title .pt-mark, .ag-wordmark .pt-mark {
     width: 0.92em; height: 0.92em; flex: 0 0 auto;
     align-self: center; margin-right: 0.26em;
-    /* Both placements now sit on WHITE -- the band, and the sign-in screen --
-       so both take the normal cut: a black plate with the eyes and the
-       sparkle knocked out of it in white. This is the brand/ lockup with
-       black where the blue was. */
-    --mark-plate: #000000; --mark-ink: #FFFFFF;
+    /* Both placements sit on WHITE -- the band, and the sign-in screen --
+       and both now take the OUTLINED cut, matching the tab icon: a white
+       plate carrying a black edge, with the eyes and the sparkle drawn in
+       black rather than knocked out of a solid.
+
+       Matching the tab is the whole point. The mark in this band and the
+       mark in the browser tab are two views of one thing, a few pixels
+       apart on screen, and a solid black square above an outlined one read
+       as two different logos rather than one at two sizes.
+
+       It also survives what the solid cut does not. A solid plate is a
+       black slab at wordmark size, heavy enough to out-weigh the word it
+       sits beside; the outlined cut carries the same silhouette at a
+       fraction of the ink, so the word leads and the mark accompanies it. */
+    --mark-plate: #FFFFFF; --mark-ink: #000000; --mark-edge: #000000;
   }
   /* Shown while dragging the Menu widget above the grid, indicating a
      release there sends it back to the full-width floating bar at the
@@ -5578,12 +5607,21 @@
      is what gives it the concave waist; it sits on the same vertical axis as
      the gap between the eyes, and that symmetry is what makes the face land.
 
-     Fills come from custom properties so one symbol serves both cuts. The
-     fallbacks are the normal-weight mark (blue plate, white shapes); anything
-     placed on blue sets --mark-plate and --mark-ink to invert it. -->
+     Fills come from custom properties so one symbol serves every cut, and
+     --mark-edge adds a third: a stroke on the plate, which is what makes the
+     outlined cut possible without a second symbol. It defaults to
+     transparent, so a caller that sets only plate and ink gets exactly the
+     solid mark this symbol has always drawn.
+
+     The plate is inset by half the stroke width and its radius pulled in to
+     match, because SVG centres a stroke on the path: drawn at 0,0,64,64 the
+     outer half of the border would fall outside the viewBox and be clipped
+     flat on all four sides. -->
 <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
   <symbol id="mpsMark" viewBox="0 0 64 64">
-    <rect width="64" height="64" rx="14" fill="var(--mark-plate, #000000)"/>
+    <rect x="2.5" y="2.5" width="59" height="59" rx="12"
+          fill="var(--mark-plate, #000000)"
+          stroke="var(--mark-edge, transparent)" stroke-width="5"/>
     <rect x="14" y="15" width="13" height="13" rx="3" fill="var(--mark-ink, #FFFFFF)"/>
     <rect x="37" y="15" width="13" height="13" rx="3" fill="var(--mark-ink, #FFFFFF)"/>
     <path d="M32 31.5C32 36.75 27.54 42 21.5 42C27.54 42 32 47.25 32 52.5C32 47.25 36.46 42 42.5 42C36.46 42 32 36.75 32 31.5Z" fill="var(--mark-ink, #FFFFFF)"/>
@@ -10831,6 +10869,43 @@
   const CURSOR_KEY = "daily-widget:__mpsCursor";
   const WRITER_KEY = "daily-widget:__mpsWriter";
 
+  /* ---------- the frozen demo board ----------
+     "?demo" opens a read-through copy of a board somebody exported, with no
+     sign-in and no account behind it. It exists so the welcome note can link
+     the words "my board" at something a first-time reader can click around
+     in, instead of describing a board they cannot see.
+
+     Two properties carry it, and both are about not contaminating whoever
+     opens it:
+
+     (1) NOTHING TOUCHES DISK. The storage tiers route to a Map for the life
+         of the tab, so a demo writes no localStorage key and no IndexedDB
+         row. That is not tidiness. wipeLocalBoard() states the hazard right
+         above itself: keys live under one flat "daily-widget:" prefix with
+         no user component, so a demo that wrote to that prefix would be
+         found by the next sign-in's hydrate() as "local, not on server" and
+         pushed up -- handing the visitor's own account a copy of somebody
+         else's board. In memory there is nothing for hydrate to find, and a
+         refresh is a clean slate.
+
+     (2) NO SESSION, EVER. boot() returns before it creates one, so queue()
+         has nothing to push to and the Supabase client is never asked for a
+         token. The demo is a dead end by construction rather than by a flag
+         somebody has to remember to check.
+
+     Stale on purpose. The snapshot is a FILE, written once by
+     Scripts/export-demo-board.js and redeployed when its author wants it to
+     change. A live mirror would need a public read path into kv, which is
+     the exact thing RLS is there to prevent -- and everything in the file is
+     public to anyone who opens the link, so what goes in it is named one key
+     at a time rather than filtered down from everything. */
+  const DEMO_MODE = (function () {
+    try { return new URLSearchParams(window.location.search).has("demo"); }
+    catch (e) { return false; }
+  })();
+  const DEMO_SNAPSHOT_URL = "demo-board.json";
+  window.__mpsDemo = DEMO_MODE;
+
   const FLUSH_IDLE_MS = 1500;              // quiet period after the last write
   const FLUSH_MAX_MS  = 8000;              // no key waits longer than this
   const MAX_VALUE_BYTES = 4 * 1024 * 1024; // refuse before PostgREST does
@@ -10838,6 +10913,12 @@
   /* This browser's identity, so the warm re-pull can skip rows it wrote
      itself rather than round-tripping its own work back in. */
   const WRITER_ID = (function () {
+    /* The demo gets one that is never written down. This identifies a
+       browser to the sync layer, and the demo has no sync layer to identify
+       itself to -- persisting it would be the one mark a demo left behind,
+       and "nothing touches disk" is easier to keep true than to keep
+       qualified. */
+    if (DEMO_MODE) return "demo";
     try {
       let w = localStorage.getItem(WRITER_KEY);
       if (!w) {
@@ -10955,6 +11036,12 @@
 
   function queue(key, value) {
     if (!isSyncable(key)) return;
+    /* Before markDirty, not after. The dirty set is written straight to
+       localStorage (see readDirtySet), so a demo that reached this line
+       would leave the visitor's browser holding a list of somebody else's
+       keys as work owed to a server -- the one piece of the demo that would
+       otherwise survive the tab. */
+    if (DEMO_MODE) return;
     /* Marked dirty BEFORE either bail-out below, and this ordering is the
        whole point.
 
@@ -11551,20 +11638,70 @@
   let ownerIsResolved = false;
   window.__mpsIsOwner = function () { return ownerIsResolved; };
 
+  /* Lifted out of resolveOwner because the preferred-name override below
+     needs the same digest of the same address, and hashing it twice in two
+     places is how the two drift apart. Returns "" when there is nothing to
+     hash or no SubtleCrypto, which every caller reads as "no match". */
+  async function signedInEmailSha256() {
+    try {
+      const u = window.__mpsSync && window.__mpsSync.user && window.__mpsSync.user();
+      const email = String((u && u.email) || "").trim().toLowerCase();
+      if (!email || !window.crypto || !crypto.subtle) return "";
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return b.toString(16).padStart(2, "0");
+      }).join("");
+    } catch (e) { return ""; }
+  }
+
   async function resolveOwner() {
     try {
       const u = window.__mpsSync && window.__mpsSync.user && window.__mpsSync.user();
       if (!u) return false;
       if (OWNER_UIDS.length && u.id && OWNER_UIDS.indexOf(u.id) !== -1) return true;
-      const email = String(u.email || "").trim().toLowerCase();
-      if (!email || !window.crypto || !crypto.subtle) return false;
-      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(email));
-      const hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
-        return b.toString(16).padStart(2, "0");
-      }).join("");
-      return OWNER_EMAIL_SHA256.indexOf(hex) !== -1;
+      const hex = await signedInEmailSha256();
+      return !!hex && OWNER_EMAIL_SHA256.indexOf(hex) !== -1;
     } catch (e) { return false; }
   }
+
+  /* ---------- the preferred name ----------
+     The welcome note greets people by the first word of the name Google
+     hands back. That is right for most profiles and wrong for some: a
+     profile reading "Chan Chhichhi" greets its owner by the wrong half of
+     their own name, and nothing in the OAuth response says which half a
+     person actually goes by.
+
+     So: an override, keyed by a SHA-256 of the address, for the same reason
+     OWNER_EMAIL_SHA256 is hashed. A digest publishes nothing, cannot be
+     turned back into an address, and grants nothing even if it could. This
+     file is public; a list of testers' email addresses should not be.
+
+     EMPTY IS THE NORMAL STATE and means "nobody is overridden" -- everyone
+     keeps the name Google gave them, which is the behaviour this had before
+     the map existed. It is not a gate, so empty failing open costs nothing.
+
+     To add one, signed in on the live board, in the console:
+
+       crypto.subtle.digest("SHA-256", new TextEncoder().encode("them@gmail.com"))
+         .then(b => console.log([...new Uint8Array(b)]
+           .map(x => x.toString(16).padStart(2, "0")).join("")))
+
+     then paste that digest as a key here with the name to greet them by.
+     Capitalisation is written as the person writes it: lowercasing somebody
+     name to match the house voice is not a trade worth making. */
+  const PREFERRED_NAME_SHA256 = {
+    // "<sha256 of the address>": "Chhichhi",
+  };
+
+  // The widget engine parses in a later block and needs the same digest for
+  // the board reset below; one implementation, one place.
+  window.__mpsEmailSha256 = signedInEmailSha256;
+
+  let preferredNameResolved = "";
+  let resolvePreferredName;
+  const preferredNameReady = new Promise(function (r) { resolvePreferredName = r; });
+  window.__mpsPreferredName = function () { return preferredNameResolved; };
+  window.__mpsPreferredNameReady = preferredNameReady;
 
   /* Waits for the session before deciding, so the answer is made once with
      the real user rather than guessed early and corrected. Both buttons are
@@ -11573,6 +11710,15 @@
   (async function revealOwnerControls() {
     try { await window.__mpsSync.ready; } catch (e) {}
     ownerIsResolved = await resolveOwner();
+    /* Same pass, same session, one digest. seedStarterBoard awaits the
+       promise this assignment settles (see welcomeGreeting) rather than
+       racing it, so a first-run note can never be written with the name
+       this was about to replace. */
+    try {
+      const hex = await signedInEmailSha256();
+      if (hex && PREFERRED_NAME_SHA256[hex]) preferredNameResolved = PREFERRED_NAME_SHA256[hex];
+    } catch (e) {}
+    resolvePreferredName();
     /* Told, not polled. The "+" menu decides which cards exist the moment it
        is built, which is before the session has landed, so it draws the
        tester's set and then has to hear that the answer changed. */
@@ -11617,6 +11763,43 @@
      "Macro Indicator Tracker" there), written into blob.name rather than
      into a card label, so the card and the tile it mints agree. A label
      would have shown one name in the menu and titled the widget another. */
+  /* ---------- the board reset ----------
+     Two accounts are put back to the view a first-time account gets, once,
+     on their next load.
+
+     Same shape and same reason as the gift below: nothing here reaches
+     across an account boundary, because nothing can. kv is keyed
+     (user_id, key) and RLS returns only rows belonging to whoever is
+     asking. This ships to everyone, recognises two accounts when THEY sign
+     in, and rewrites their own rows in their own browser under their own
+     token.
+
+     IT OVERWRITES, IT DOES NOT DELETE. The structural keys -- what widgets
+     exist, how they are arranged, their colours, names and emoji -- are set
+     back to empty, and seedStarterBoard then draws the starter board over
+     the top. Page content is left where it is. Two reasons: there is no
+     storageRemove in this file to delete a key properly through both tiers
+     and the cloud mirror, and more importantly a reset that destroyed
+     somebody's writing would be unrecoverable, while orphaned content in
+     their own account harms nothing and can be dug back out.
+
+     ONCE. The flag is the contract. Without it every load would wipe the
+     board again and the account could never be used, which is not a reset,
+     it is a trap. The flag goes through storageSet, so it syncs, and a
+     second device does not repeat it. */
+  const RESET_FLAG = "board-reset-v1";
+  const RESET_FOR_SHA256 = [
+    "da657ded3593244d68b9c4cc449d4542498d68ed2e744938de77a88d267ade25",
+    "d4e814077e97292c2d6df167061ab4304d15f55130c00b36f583bdc0cafc3111"
+  ];
+  window.__mpsWantsBoardReset = async function () {
+    try {
+      const hex = await signedInEmailSha256();
+      return !!hex && RESET_FOR_SHA256.indexOf(hex) !== -1;
+    } catch (e) { return false; }
+  };
+  window.__mpsResetFlagKey = RESET_FLAG;
+
   const GIFT_FLAG = "gift-finance-v1";
   const GIFT_FOR_SHA256 = [
     "da657ded3593244d68b9c4cc449d4542498d68ed2e744938de77a88d267ade25",
@@ -13526,6 +13709,33 @@
     const btn = gateEl("authGateBtn");
     if (btn) btn.addEventListener("click", signIn);
 
+    /* Decided before Supabase is loaded, let alone configured: the demo has
+       no account, and every line below this one is about a session it must
+       never be given. Returning here is what guarantees that -- not a later
+       check that could be missed.
+
+       The snapshot is parked on window for the storage block, which parses
+       after this one and seeds its Map from it on first read. That ordering
+       is a fact rather than a race: every read in the app is behind
+       __mpsSync.ready, and resolveReady() below fires only once the fetch
+       has landed. */
+    if (DEMO_MODE) {
+      try {
+        const r = await fetch(DEMO_SNAPSHOT_URL, { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const snap = await r.json();
+        window.__mpsDemoSnapshot = (snap && snap.keys) || {};
+      } catch (e) {
+        showGateError("Couldn't load the demo board.");
+        return;
+      }
+      // Honest: there is no cloud behind this board and nothing will sync.
+      setStatus("offline");
+      resolveReady();
+      hideGate();
+      return;
+    }
+
     // Both, not just the URL: these get filled in one at a time, and a real
     // URL paired with a placeholder key would sail past this check and fail
     // later as an opaque 401 instead of saying what's actually missing.
@@ -13722,7 +13932,23 @@
   const IDB_STORE = "keyval";
   let idbPromise = null;
 
+  /* The demo's tier, and the only one it has. See DEMO_MODE in the sync
+     layer above for why this is a Map rather than the two real tiers.
+     Seeded lazily from the snapshot boot() fetched; every caller is already
+     behind __mpsSync.ready, which boot() resolves only after that fetch. */
+  const demoMem = new Map();
+  let demoSeeded = false;
+  function demoSeed() {
+    if (demoSeeded) return;
+    demoSeeded = true;
+    const snap = window.__mpsDemoSnapshot || {};
+    Object.keys(snap).forEach(function (k) { demoMem.set(k, String(snap[k])); });
+  }
+
   function openPersistentDb() {
+    // One guard covers idbGet, idbSet and idbKeys: all three bail on a null
+    // db already, so the demo needs no branch of its own in any of them.
+    if (window.__mpsDemo) return Promise.resolve(null);
     if (!('indexedDB' in window)) return Promise.resolve(null);
     if (idbPromise) return idbPromise;
     idbPromise = new Promise(function (resolve) {
@@ -13780,6 +14006,7 @@
      runtime (note-content:<id>, list-items:<id>, <id>-hidden, and the rest),
      and no registry of those exists anywhere. */
   function localKeys() {
+    if (window.__mpsDemo) { demoSeed(); return Array.from(demoMem.keys()); }
     const out = [];
     try {
       for (let i = 0; i < window.localStorage.length; i++) {
@@ -13808,10 +14035,12 @@
   }
 
   function localGet(key) {
+    if (window.__mpsDemo) { demoSeed(); const v = demoMem.get(key); return v == null ? null : v; }
     try { return window.localStorage.getItem(STORE_PREFIX + key); }
     catch (e) { return null; }
   }
   function localSet(key, value) {
+    if (window.__mpsDemo) { demoSeed(); demoMem.set(key, String(value)); return; }
     try { window.localStorage.setItem(STORE_PREFIX + key, String(value)); }
     catch (e) {}
   }
@@ -14430,8 +14659,28 @@
       registerDynamicWidget("readingList", "readingList", { skipPersist: true, alreadyWired: true });
       registerDynamicWidget("vocab", "vocab", { skipPersist: true, alreadyWired: true });
 
+      /* Before a single board key is read, so the reset cannot race the
+         registry it is resetting. Returns true only on the one load that
+         actually performs it; every later load sees the flag and skips. */
+      let forcedReset = false;
+      try {
+        const flagKey = window.__mpsResetFlagKey;
+        const already = flagKey ? await storageGet(flagKey) : "1";
+        if (!already && window.__mpsWantsBoardReset && await window.__mpsWantsBoardReset()) {
+          storageSet("dynamic-widgets", "[]");
+          storageSet("widget-layout", "[]");
+          storageSet("widget-colors", "{}");
+          storageSet("widget-icons", "{}");
+          storageSet("widget-titles", "{}");
+          storageSet("widgets-off-board", "[]");
+          storageSet("links-menu-items", "[]");   // no bookmarks on the default view
+          storageSet(flagKey, new Date().toISOString());
+          forcedReset = true;
+        }
+      } catch (e) { console.warn("[mps] board reset:", e); }
+
       let dynamicList = null;
-      const dynamicRaw = await storageGet("dynamic-widgets");
+      const dynamicRaw = forcedReset ? null : await storageGet("dynamic-widgets");
       if (dynamicRaw) {
         try {
           const parsed = JSON.parse(dynamicRaw);
@@ -14461,8 +14710,12 @@
          once-only test: every boot saves "dynamic-widgets", so only a board
          that has never booted lacks it. The sync side's word is required as
          well, so a board whose cloud pull failed is never taken for new. */
-      const brandNewBoard = !dynamicList &&
-        !!(window.__mpsSync && window.__mpsSync.isFreshAccount && window.__mpsSync.isFreshAccount());
+      /* isFreshAccount() is false for an account that has signed in before,
+         which is exactly the case a reset exists for -- so the reset is its
+         own sufficient reason to seed, rather than another condition the
+         freshness test has to pass. */
+      const brandNewBoard = forcedReset || (!dynamicList &&
+        !!(window.__mpsSync && window.__mpsSync.isFreshAccount && window.__mpsSync.isFreshAccount()));
       persistDynamicWidgets();
 
       layout = defaultLayout();
@@ -14581,65 +14834,144 @@
        carry links to the owner's own Notion pages and are not offered. */
     const STARTER_OFF_BOARD = ["readingList", "vocab", "atomicHabits", "affirmations"];
 
-    /* The first thing a new account reads, on the one widget that is not a
-       Connect button.
+    /* Where "my board" points: a PICTURE of the author's board, served
+       beside this file.
 
-       Written as blocks rather than as markdown on purpose: every line in
-       the middle starts with "- ", and markdownToNoteHtml reads that as a
-       bulleted list (see the /^[-*+]\s+/ branch). These are meant to stay
-       literal dashes in ordinary paragraphs, so they are built here and
-       their text set directly, which no markdown rule ever sees.
+       It used to point at "?demo", a live frozen copy of the real board.
+       That is gone as the destination because building the copy meant
+       publishing a file of board data, and a board's data is not only the
+       widgets you can see -- it is hidden widgets, pages that were deleted
+       from the layout but not from storage, and the entire AI sidebar
+       history, all under one flat key prefix. Every one of those had to be
+       excluded by a rule somebody remembered to write. A screenshot has
+       exactly one thing in it: what was on the screen. The demo route still
+       exists (see DEMO_MODE) and nothing links to it.
 
-       The empty strings are real empty blocks, the same thing pressing
-       Enter twice produces, because a paragraph's margin is 1px and
-       consecutive lines would otherwise run together.
+       ABSOLUTE, and that is not a style choice. writePageHtml sanitises
+       what it is handed, and its rule for an anchor is that the href must
+       start with http:, https:, mailto: or # -- anything else has the
+       attribute stripped, which is the right rule (a link that can run
+       script is worse than a link that is lost) and which a relative path
+       loses to. Built from location.origin, it starts with the page's own
+       scheme and survives.
 
-       The greeting takes the name Google gave us, first word only. It is
-       left capitalised as the person writes it; lowercasing somebody's name
-       to match the house voice is not a trade worth making. */
-    function welcomeNoteHtml() {
-      let hi = "hi there";
+       Computed per call rather than once at parse, because a constant would
+       freeze whatever URL the file first parsed under. */
+    const BOARD_PREVIEW_FILE = "board-preview.png";
+    function welcomeBoardHref() {
       try {
+        return window.location.origin + "/" + BOARD_PREVIEW_FILE;
+      } catch (e) { return "#"; }
+    }
+
+    /* The greeting, settled before the note is built.
+       __mpsPreferredNameReady is the whole reason this is async: the
+       override is keyed by a hash of the address, the digest is async, and a
+       first-run note written before it settled would greet somebody by the
+       name the override exists to replace. Awaiting costs a first-time
+       account nothing -- the note is written once, behind the gate, on a
+       board that has not drawn yet.
+
+       Falls back to the first word of the name Google gave us. Left
+       capitalised as the person writes it; lowercasing somebody's name to
+       match the house voice is not a trade worth making. */
+    async function welcomeGreeting() {
+      try { await window.__mpsPreferredNameReady; } catch (e) {}
+      try {
+        const preferred = window.__mpsPreferredName && window.__mpsPreferredName();
+        if (preferred) return "hi " + preferred;
         const u = window.__mpsSync && window.__mpsSync.user && window.__mpsSync.user();
         const meta = (u && u.user_metadata) || {};
         const full = String(meta.full_name || meta.name || "").trim();
         const first = full ? full.split(/\s+/)[0] : "";
-        if (first) hi = "hi " + first;
+        if (first) return "hi " + first;
       } catch (e) {}
+      return "hi there";
+    }
+
+    /* The first thing a new account reads, on the one widget that is not a
+       Connect button.
+
+       Built as blocks rather than run through markdownToNoteHtml for two
+       reasons that outlive any one wording. The empty strings are real empty
+       blocks, the same thing pressing Enter twice produces, because a
+       paragraph's margin is 1px and consecutive lines would otherwise run
+       together -- markdown collapses them. And "my board" is an element, not
+       text: markdown would need the URL written inline in the copy, where
+       the next person to edit the sentence would break it. */
+    function welcomeNoteHtml(hi) {
+      const LINK = {};   // sentinel: this block is the link, not a string
       const lines = [
         hi,
         "",
-        "few tips for using my thing",
+        "myproductivityspace makes you more productive and helps you stop gooning",
         "",
-        "- add widgets by clicking the top right + button",
-        "- create and customize existing widgets with the AI chatbot feature in the top right corner of the screen",
-        "- move widgets around by dragging the six-dotted button on the top right corner of each widget",
-        "- edit the widget's settings, colour, and hide and delete the widget with the three-dotted button on the top right corner of each widget",
+        "create and manage widgets with the ai chatbot in the top right corner",
+        "",
+        LINK,
         "",
         "lucas jung"
       ];
       const wrap = document.createElement("div");
       lines.forEach(function (line) {
         const b = nbMakeBlock("p", 0);
-        if (line) b.textContent = line;
+        if (line === LINK) {
+          const a = document.createElement("a");
+          a.setAttribute("href", welcomeBoardHref());
+          a.textContent = "my board";
+          b.appendChild(a);
+        } else if (line) {
+          b.textContent = line;
+        }
         wrap.appendChild(b);
       });
       return wrap.innerHTML;
     }
 
-    function seedStarterBoard() {
+    async function seedStarterBoard() {
+      /* The one await, and it is at the top on purpose: everything below is
+         synchronous and order-dependent (create, write, take off board, then
+         lay out), so a suspension point in the middle of it would let the
+         board render between two halves of one setup. */
+      const hi = await welcomeGreeting();
       try {
         const pageId = createDynamicWidgetInstance("page");
-        writePageHtml(pageId, welcomeNoteHtml());
+        writePageHtml(pageId, welcomeNoteHtml(hi));
         setWidgetIcon(pageId, "\ud83d\udcdd");
         STARTER_OFF_BOARD.forEach(function (id) {
           if (WIDGET_IDS.indexOf(id) !== -1) takeOffBoard(id);
         });
 
-        // Three columns; anything else on the board (the hidden widgets
-        // above included) follows as its own slot, since a stored layout
-        // must name every widget to be accepted on the next load.
-        const want = [["cal"], ["unschedTasks"], [pageId]];
+        /* Icon and colour set here rather than left to DEFAULT_WIDGET_ICONS
+           and the colour defaults, because those only apply when their
+           stored map is ABSENT -- an empty object counts as "stored" and
+           suppresses them (see the haveIcons / haveColors reads in init).
+           A reset writes "{}", so a board that relied on the defaults would
+           come up with no emoji and no colour at all. Saying it outright
+           costs four lines and cannot drift.
+
+           Red on Tasks, nothing on Calendar. The two sit side by side and
+           both open as a Connect button; colour on one of them is what
+           stops the pair reading as one undifferentiated block, and putting
+           it on Tasks rather than Calendar leaves the wider, busier widget
+           as the calm one. */
+        setWidgetIcon("cal", "\ud83d\udcc5");            // calendar
+        setWidgetIcon("unschedTasks", "\u2705");          // green check
+        setWidgetColor("unschedTasks", "#FADBD9");        // the "Red" preset
+        setWidgetColor("cal", "#FFFFFF");                 // white, i.e. no colour
+
+        /* Reading order, left to right: read this, then your time, then your
+           work. The note leads because on a board this new it is the only
+           thing with anything in it -- Calendar and Tasks are both a button
+           until somebody connects them -- so it is both the most important
+           element and the one that explains the other two. Calendar and
+           Tasks then sit adjacent because they are the same connection, and
+           proximity is what says so without a label.
+
+           Anything else on the board (the hidden widgets above included)
+           follows as its own slot, since a stored layout must name every
+           widget to be accepted on the next load. */
+        const want = [[pageId], ["cal"], ["unschedTasks"]];
         const placed = new Set();
         const next = [];
         want.forEach(function (slot) {
@@ -30774,6 +31106,18 @@
     if (viewToggleLabel) viewToggleLabel.textContent = VIEW_LABELS[view] || view;
     rangeLabel.textContent = rangeText();
 
+    /* The demo has no account of any kind, and this module's sign-in is a
+       SECOND one: Supabase auth is what boot() in the sync layer declined to
+       start, while Google Identity Services is its own grant, minted here.
+       Without this the demo loaded GIS and ensureToken() went looking for a
+       silent mint, which sends a stranger who clicked "my board" to Google's
+       consent screen for somebody else's calendar scopes.
+
+       Returning lands on exactly the same state a failure to load GIS does:
+       the Connect button, which is the honest signed-out reading of a
+       calendar the demo genuinely cannot show. */
+    if (window.__mpsDemo) { setAuthHint(""); return; }
+
     try {
       await loadGis();
       initTokenClient();
@@ -31302,15 +31646,19 @@
   var LINKS_KEY = "links-menu-items";
   var POSITION_KEY = "links-menu-position";
 
-  /* A new board's bar: generic tools every student has, nothing personal.
-     Boards that have saved their own bookmarks keep them (see LINKS_KEY). */
-  var DEFAULT_LINKS = [
-    { id: "gmail", url: "https://mail.google.com/mail/u/0/", label: "Gmail", iconSvg: '<svg role="img" viewBox="0 0 256 193" xmlns="http://www.w3.org/2000/svg"><title>Gmail</title><path fill="#4285f4" d="M58.182 192.05V93.14L27.507 65.077L0 49.504v125.091c0 9.658 7.825 17.455 17.455 17.455z"/><path fill="#34a853" d="M197.818 192.05h40.727c9.659 0 17.455-7.826 17.455-17.455V49.505l-31.156 17.837l-27.026 25.798z"/><path fill="#ea4335" d="m58.182 93.14l-4.174-38.647l4.174-36.989L128 69.868l69.818-52.364l4.669 34.992l-4.669 40.644L128 145.504z"/><path fill="#fbbc04" d="M197.818 17.504V93.14L256 49.504V26.231c0-21.585-24.64-33.89-41.89-20.945z"/><path fill="#c5221f" d="m0 49.504l26.759 20.07L58.182 93.14V17.504L41.89 5.286C24.61-7.66 0 4.646 0 26.23z"/></svg>' },
-    { id: "gcal", url: "https://calendar.google.com/calendar/u/0/r", label: "Google Calendar", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Google Calendar</title><path fill="#4285F4" d="M18.316 5.684H24v12.632h-5.684V5.684zM5.684 24h12.632v-5.684H5.684V24zM18.316 5.684V0H1.895A1.894 1.894 0 0 0 0 1.895v16.421h5.684V5.684h12.632zm-7.207 6.25v-.065c.272-.144.5-.349.687-.617s.279-.595.279-.982c0-.379-.099-.72-.3-1.025a2.05 2.05 0 0 0-.832-.714 2.703 2.703 0 0 0-1.197-.257c-.6 0-1.094.156-1.481.467-.386.311-.65.671-.793 1.078l1.085.452c.086-.249.224-.461.413-.633.189-.172.445-.257.767-.257.33 0 .602.088.816.264a.86.86 0 0 1 .322.703c0 .33-.12.589-.36.778-.24.19-.535.284-.886.284h-.567v1.085h.633c.407 0 .748.109 1.02.327.272.218.407.499.407.843 0 .336-.129.614-.387.832s-.565.327-.924.327c-.351 0-.651-.103-.897-.311-.248-.208-.422-.502-.521-.881l-1.096.452c.178.616.505 1.082.977 1.401.472.319.984.478 1.538.477a2.84 2.84 0 0 0 1.293-.291c.382-.193.684-.458.902-.794.218-.336.327-.72.327-1.149 0-.429-.115-.797-.344-1.105a2.067 2.067 0 0 0-.881-.689zm2.093-1.931l.602.913L15 10.045v5.744h1.187V8.446h-.827l-2.158 1.557zM22.105 0h-3.289v5.184H24V1.895A1.894 1.894 0 0 0 22.105 0zm-3.289 23.5l4.684-4.684h-4.684V23.5zM0 22.105C0 23.152.848 24 1.895 24h3.289v-5.184H0v3.289z"/></svg>' },
-    { id: "gtasks", url: "https://tasks.google.com/", label: "Google Tasks", iconImg: "https://www.google.com/s2/favicons?sz=64&domain=tasks.google.com" },
-    { id: "notion", url: "https://www.notion.so/", label: "Notion", iconSvg: '<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Notion</title><path fill="#000000" d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg>' },
-    { id: "chatgpt", url: "https://chatgpt.com/", label: "ChatGPT", iconImg: "https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com" }
-  ];
+  /* EMPTY, deliberately. This used to seed five generic tools (Gmail,
+     Calendar, Tasks, Notion, ChatGPT) into every new board's bar.
+
+     They were removed because a bar of links the person did not choose is
+     not their bar, it is a row of adverts for other products sitting above
+     their own work, and every one of them is a click away in the browser
+     anyway. A first-time board now opens with nothing above the grid, and
+     the bar fills up only with what its owner puts there -- which is also
+     the only state in which the bar means anything when you glance at it.
+
+     Boards that have already saved bookmarks keep them: the read below
+     falls back to this list only when LINKS_KEY is absent. */
+  var DEFAULT_LINKS = [];
 
   var FALLBACK_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l1.93-1.93a5 5 0 0 0-7.07-7.07L10.5 5.5"/><path d="M14 11a5 5 0 0 0-7.07 0L5 12.93a5 5 0 0 0 7.07 7.07L13.5 18.5"/></svg>';
 
@@ -32260,6 +32608,21 @@
     }
 
     wrapEl.appendChild(built.row);
+
+    /* An empty bar shows nothing at all, rather than the word "Bookmarks"
+       over a blank strip. DEFAULT_LINKS is empty now, so that dangling
+       heading is what every new board would otherwise open with, and a
+       heading with nothing under it is a label for an absence.
+
+       Hidden rather than skipped: the node still exists, so render(),
+       placeFloating() and the drag handling all keep finding it, and the
+       moment a link is added the bar is simply not hidden any more. Edit
+       mode is excluded because that is the one time an empty bar has to be
+       visible -- it is the surface you are adding the first link to. A board
+       with no bar reaches one through the "+" menu's own Bookmarks card
+       (data-add-type="menu"), the same way Reading List and Vocabulary come
+       back. */
+    wrapEl.hidden = isPrimary && !editMode && !links.length;
 
     placeFloating();
 
