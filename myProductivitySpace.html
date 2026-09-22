@@ -11690,7 +11690,11 @@
      Capitalisation is written as the person writes it: lowercasing somebody
      name to match the house voice is not a trade worth making. */
   const PREFERRED_NAME_SHA256 = {
-    // "<sha256 of the address>": "Chhichhi",
+    // Both of one person's accounts. Google returns a full name whose first
+    // word is not the name she goes by, and the first word is all the
+    // greeting has to go on.
+    "da657ded3593244d68b9c4cc449d4542498d68ed2e744938de77a88d267ade25": "chhichhi",
+    "d4e814077e97292c2d6df167061ab4304d15f55130c00b36f583bdc0cafc3111": "chhichhi"
   };
 
   // The widget engine parses in a later block and needs the same digest for
@@ -14910,7 +14914,7 @@
         "",
         LINK,
         "",
-        "lucas jung"
+        "- lucas jung"
       ];
       const wrap = document.createElement("div");
       lines.forEach(function (line) {
@@ -14968,6 +14972,16 @@
            stops the pair reading as one undifferentiated block, and putting
            it on Tasks rather than Calendar leaves the wider, busier widget
            as the calm one. */
+        /* Unhide them explicitly. The reset blanks widget-layout and the
+           colour/icon maps but cannot blank the per-widget "<id>-hidden"
+           keys, because there is no storageRemove here and no way to
+           enumerate them. An account being reset has almost certainly hidden
+           something at some point -- on the board this was written against,
+           22 widgets were hidden -- and a stale cal-hidden would have handed
+           them a starter board with no Calendar on it and no clue why. */
+        setHidden("cal", false);
+        setHidden("unschedTasks", false);
+
         setWidgetIcon("cal", "\ud83d\udcc5");            // calendar
         setWidgetIcon("unschedTasks", "\u2705");          // green check
         setWidgetColor("unschedTasks", "#FADBD9");        // the "Red" preset
@@ -16951,6 +16965,28 @@
             return;
           }
           if (type === "eq") { nbRenderEquations(editorEl); }
+        }
+        /* A Page is contenteditable, so the browser does not follow an
+           anchor inside it -- a click places the caret instead. Nothing else
+           here opens one either: `opts.href` below is the PAGE's own URL (the
+           Notion page it is synced to), not the href of whatever was
+           clicked. So every link written into a Page has been inert, on a
+           plain click and on a modified one alike, while still being
+           underlined and still looking exactly like a link.
+
+           That is fixed here only for the welcome note's own link, matched by
+           where it points rather than by a marker attribute, because the
+           sanitiser keeps nothing on an anchor but href (see NB_KEEP_ATTR).
+           Deliberately narrow: making every link in every Page follow on a
+           plain click is probably the right end state -- it is what Notion
+           does, and clicking a link to read it is what anyone expects -- but
+           it also takes away clicking into a link to edit its text, and that
+           is a change to every note that already exists, not a fix. */
+        const clickedLink = e.target && e.target.closest && e.target.closest("a[href]");
+        if (clickedLink && /\/board-preview\.png$/.test(clickedLink.getAttribute("href") || "")) {
+          e.preventDefault();
+          window.open(clickedLink.getAttribute("href"), "_blank", "noopener");
+          return;
         }
         if (opts.href && (e.metaKey || e.ctrlKey)) window.open(opts.href, "_blank");
       });
