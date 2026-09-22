@@ -14967,11 +14967,14 @@
            come up with no emoji and no colour at all. Saying it outright
            costs four lines and cannot drift.
 
-           Red on Tasks, nothing on Calendar. The two sit side by side and
-           both open as a Connect button; colour on one of them is what
-           stops the pair reading as one undifferentiated block, and putting
-           it on Tasks rather than Calendar leaves the wider, busier widget
-           as the calm one. */
+           Yellow on the note, red on Tasks, nothing on Calendar. The note
+           is the one thing on this board with anything in it, so it gets the
+           warm colour and reads as a message rather than a panel. Tasks and
+           Calendar both open as the same black Connect button on a plain
+           field, so colouring one of the two is what stops the pair reading
+           as a single undifferentiated block; it goes on Tasks so the wider,
+           busier Calendar stays the calm one. Three widgets, three different
+           weights, no two of them competing. */
         /* Unhide them explicitly. The reset blanks widget-layout and the
            colour/icon maps but cannot blank the per-widget "<id>-hidden"
            keys, because there is no storageRemove here and no way to
@@ -14984,6 +14987,7 @@
 
         setWidgetIcon("cal", "\ud83d\udcc5");            // calendar
         setWidgetIcon("unschedTasks", "\u2705");          // green check
+        setWidgetColor(pageId, "#FDF3D0");                // the "Yellow" preset
         setWidgetColor("unschedTasks", "#FADBD9");        // the "Red" preset
         setWidgetColor("cal", "#FFFFFF");                 // white, i.e. no colour
 
