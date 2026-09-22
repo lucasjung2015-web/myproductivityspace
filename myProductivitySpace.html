@@ -15026,9 +15026,48 @@
         persistLayout();
         render();
         applyHiddenState();
+        fitStarterWidths([pageId, "cal", "unschedTasks"]);
       } catch (e) {
         console.warn("[mps] starter board:", e);
       }
+    }
+
+    /* Widen the three starter widgets so they fill the board instead of
+       leaving a field of white to the right of them.
+
+       The default widths (300 / 240 / 240) were picked for a board with
+       eight widgets on it, where three columns are a third of what is there.
+       On a starter board they are the whole board, and three narrow columns
+       hugging the left edge read as a page that failed to load rather than
+       as a board with three things on it.
+
+       The arithmetic is reservedWidth's, inverted: that function reserves
+       `width + 20` for every slot, so a row of n slots fits when each is
+       (available / n) - 20. Read after render() and applyHiddenState(),
+       because the number the grid reports before its children exist is not
+       the number we want.
+
+       MEASURED ONCE, and that is the honest limit of it. Widths in this app
+       are pixels a widget remembers, not fractions it recomputes -- that is
+       what makes a column you dragged stay where you put it -- so these fit
+       the board as it stands on the load that seeds it. Open or close the AI
+       sidebar afterwards, or resize the window, and they keep their pixels
+       like every other widget on every other board. Making the starter three
+       alone re-flow would be a second, invisible sizing rule living
+       underneath the one the rest of the app uses. */
+    function fitStarterWidths(ids) {
+      try {
+        const grid = document.getElementById("widgetGrid");
+        const avail = grid ? grid.clientWidth : 0;
+        if (!avail || !ids.length) return;
+        const each = Math.max(MIN_COL, Math.floor(avail / ids.length) - 20);
+        ids.forEach(function (id) {
+          if (WIDGET_IDS.indexOf(id) === -1) return;
+          widths[id] = each;
+          if (WIDTH_STORAGE_KEY[id]) storageSet(WIDTH_STORAGE_KEY[id], String(each));
+          applyWidth(id);
+        });
+      } catch (e) { console.warn("[mps] starter widths:", e); }
     }
 
     /* ---------- hide / unhide ----------
