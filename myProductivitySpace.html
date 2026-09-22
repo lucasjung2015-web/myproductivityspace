@@ -14132,16 +14132,27 @@
      comes back. */
   const ACCENT_KEY = "board-accent";
   const ACCENT_SWATCHES = [
-    /* Eight, so the row never wraps, and eight that both references actually
-       ship: macOS offers blue, purple, pink, red, orange, yellow, green and
-       graphite; Notion offers blue, purple, pink, red, orange, yellow, green,
-       brown and gray. Olive was the one neither of them has -- a drab
-       yellow-green is nobody's accent -- so it went. */
+    /* Seven. It was eight, chosen so the row never wraps, and it still does
+       not -- seven is under that ceiling, not over it.
+
+       Blue (#3A6EA5) is gone. It was the app's old brand colour, and it sat
+       in this list as a leftover from that: the chrome, the mark and the
+       wordmark are all black and white now, so the one swatch that used to
+       mean "the house colour" no longer means anything, while still reading
+       as the most official-looking choice on the row. A palette should offer
+       colours, not a retired brand.
+
+       A board that had blue selected falls back to Black, because
+       accentDefOf returns ACCENT_SWATCHES[0] for any hex it no longer
+       recognises. That is the right failure: the stored value stops matching
+       and the board lands on the default rather than on nothing. The CSS
+       fallback token further up the file keeps #3A6EA5 as its pre-hydration
+       value, which is only ever visible for the frame before paintAccent
+       runs. */
     /* Black first, and the default. The app's own chrome is black and white
        now, so a board that has never been touched should match it rather
        than arrive wearing a colour nobody chose. */
     { name: "Black",  accent: "#000000", hover: "#333333", isDefault: true },
-    { name: "Blue",   accent: "#3A6EA5", hover: "#2F5A88" },
     { name: "Teal",   accent: "#297580", hover: "#215F69" },
     { name: "Green",  accent: "#2D7850", hover: "#246342" },
     { name: "Amber",  accent: "#8E6229", hover: "#745122" },
