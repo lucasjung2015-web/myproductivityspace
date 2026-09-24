@@ -756,6 +756,12 @@
   .col-slot.section-drop-right::after { box-shadow: inset -4px 0 0 0 #9099a8; }
   .col.collapsible-col-wrap { flex: 1 1 auto; min-height: 0; transition: flex 0.15s var(--ease-spring); }
   .widget.dragging-col .col.collapsible-col-wrap { transition: none; }
+  /* A custom widget is an iframe, and an iframe takes the mouse for itself:
+     once the pointer crossed into one mid-drag, the page stopped hearing
+     mousemove and the seam froze until it came back out, and a mouseup let
+     go over the frame never arrived at all. Seams sit right against these
+     frames, so any drag longer than a few pixels ran into one. */
+  .widget.dragging-col iframe { pointer-events: none; }
   .col-resizer.disabled { pointer-events: none; cursor: default; }
   .col-resizer.disabled::after { opacity: 0; }
 
@@ -15241,13 +15247,19 @@
         function visibleWidget(el) {
           return el.classList.contains("collapsible-col-wrap") && el.style.display !== "none";
         }
-        let seenVisible = false;
+        /* One seam per pair of visible neighbours. With a hidden widget
+           between two visible ones there are two resizers in that gap, and
+           both used to show: two lines a few pixels apart. */
+        let seenVisible = false, sinceSeam = false;
         kids.forEach(function (kid, i) {
           if (kid.classList.contains("row-resizer")) {
             const laterVisible = kids.slice(i + 1).some(visibleWidget);
-            kid.style.display = (seenVisible && laterVisible) ? "" : "none";
+            const show = seenVisible && sinceSeam && laterVisible;
+            kid.style.display = show ? "" : "none";
+            if (show) sinceSeam = false;
           } else if (visibleWidget(kid)) {
             seenVisible = true;
+            sinceSeam = true;
           }
         });
         slotEl.style.display = seenVisible ? "" : "none";
@@ -15544,27 +15556,63 @@
     }
 
     // ---- height resize (drag the wall between two stacked widgets) ----
+    /* The seam trades height between the two widgets it separates and nothing
+       else: what one gains the other gives up, so the seam stays under the
+       pointer. It used to grow only the widget above, from its REMEMBERED
+       height rather than the one on screen. Every row carries shrink 1, so
+       the stack went over the slot's height and the browser clawed the excess
+       back from all of them in proportion -- the seam fell behind the pointer
+       the further it went, and the next drag started from a number that was
+       no longer what you were looking at. */
     function wireRowResizer(resizer) {
+      function visibleNeighbour(step) {
+        let el = resizer[step];
+        while (el && !(el.classList.contains("collapsible-col-wrap") && el.style.display !== "none")) el = el[step];
+        return el;
+      }
       function onDown(e) {
-        const aboveEl = resizer.previousElementSibling;
-        if (!aboveEl || !aboveEl.classList.contains("collapsible-col-wrap")) return;
+        if (e.button != null && e.button !== 0) return;
+        const aboveEl = visibleNeighbour("previousElementSibling");
+        const belowEl = visibleNeighbour("nextElementSibling");
+        if (!aboveEl || !belowEl) return;
         const aboveId = aboveEl.getAttribute("data-col-id");
+        const belowId = belowEl.getAttribute("data-col-id");
         const slotEl = aboveEl.parentElement;
         const startY = clientY(e);
-        const startH = heights[aboveId] || aboveEl.getBoundingClientRect().height / window.__mpsZoomOf(aboveEl);
+        const z0 = window.__mpsZoomOf(slotEl);
+        function measured(el) { return el.getBoundingClientRect().height / z0; }
+        const startA = measured(aboveEl), startB = measured(belowEl);
+        const pair = startA + startB;
+
+        /* Freeze every visible row at the height it is drawn at, so the only
+           heights that move for the length of the gesture are the two being
+           traded. The real flex values come back in onUp. */
+        Array.prototype.forEach.call(slotEl.children, function (el) {
+          if (el.classList.contains("collapsible-col-wrap") && el.style.display !== "none") {
+            el.style.flex = "0 0 " + measured(el) + "px";
+          }
+        });
+        let a = startA, b = startB;
 
         widget.classList.add("dragging-col");
         resizer.classList.add("dragging");
 
         function onMoveInner(ev) {
           if (!ev.touches && typeof ev.buttons === "number" && ev.buttons === 0) { onUp(); return; }
-          const z = window.__mpsZoomOf(slotEl);
-          const dy = (clientY(ev) - startY) / z;
-          const slotHeight = slotEl.getBoundingClientRect().height / z;
-          const maxH = Math.max(MIN_ROW, slotHeight - MIN_ROW - 14);
-          heights[aboveId] = clamp(startH + dy, MIN_ROW, maxH);
-          aboveEl.style.flex = "0 1 " + heights[aboveId] + "px";
+          const dy = (clientY(ev) - startY) / z0;
+          a = clamp(startA + dy, MIN_ROW, Math.max(MIN_ROW, pair - MIN_ROW));
+          b = pair - a;
+          aboveEl.style.flex = "0 0 " + a + "px";
+          belowEl.style.flex = "0 0 " + b + "px";
           ev.preventDefault();
+        }
+        function commitHeight(id, h) {
+          heights[id] = h;
+          storageSet(HEIGHT_STORAGE_KEY[id], String(Math.round(h)));
+          if (NOTE_WIDGETS[id]) {
+            MANUALLY_RESIZED[id] = true;
+            storageSet("manuallyResized-" + id, "1");
+          }
         }
         function onUp() {
           widget.classList.remove("dragging-col");
@@ -15573,11 +15621,13 @@
           document.removeEventListener("mouseup", onUp);
           document.removeEventListener("touchmove", onMoveInner);
           document.removeEventListener("touchend", onUp);
-          storageSet(HEIGHT_STORAGE_KEY[aboveId], String(Math.round(heights[aboveId])));
-          if (NOTE_WIDGETS[aboveId]) {
-            MANUALLY_RESIZED[aboveId] = true;
-            storageSet("manuallyResized-" + aboveId, "1");
-          }
+          commitHeight(aboveId, a);
+          /* The widget below keeps what it was given too, unless it is the
+             last in the stack: that one fills whatever is left, so a stored
+             height would never be read for it. */
+          const visibleIds = (slotOf(aboveId) || []).filter(function (mid) { return !isHidden(mid); });
+          if (visibleIds.indexOf(belowId) !== visibleIds.length - 1) commitHeight(belowId, b);
+          visibleIds.forEach(applyHeightInSlot);
         }
 
         document.addEventListener("mousemove", onMoveInner);
@@ -33231,25 +33281,41 @@
   const LIB_INDEX_KEY = "mine-widget-index";
   const LIB_MAX = 24;
   let libIndex = [];          // [{ lid, name, at }], newest last
-  let libLoaded = null;
+  let libChain = Promise.resolve();
 
   function newLid() {
     return "w" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
-  function loadLibrary() {
-    if (libLoaded) return libLoaded;
-    libLoaded = (async function () {
-      try {
-        const raw = await window.storageGet(LIB_INDEX_KEY);
-        const parsed = raw ? JSON.parse(raw) : null;
-        if (Array.isArray(parsed)) {
-          libIndex = parsed.filter(function (e) { return e && e.lid; });
-        }
-      } catch (e) { libIndex = []; }
-      return libIndex;
-    })();
-    return libLoaded;
+  /* Read from storage EVERY time, not once per page load. The index used to
+     be read at boot and then only ever written from memory, so a widget built
+     in another tab or on another device (which the sync pulls into storage
+     when this tab is shown again) never reached "My widgets" until a reload.
+     Worse, the next widget built HERE saved that stale list over the stored
+     one and dropped the other tab's rows from the index.
+
+     This tab's own writes land in local storage synchronously, so the stored
+     copy is never behind the in-memory one. A failed read keeps what is in
+     memory rather than emptying it: an empty list saved back would wipe the
+     shelf. */
+  async function readLibraryIndex() {
+    try {
+      const raw = await window.storageGet(LIB_INDEX_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed)) {
+        libIndex = parsed.filter(function (e) { return e && e.lid; });
+      }
+    } catch (e) {}
+    return libIndex;
   }
+  /* Reads and read-modify-writes run one at a time, in call order. Two
+     creates in the same tick would otherwise both read the list before
+     either saved, and the second save would drop the first one's row. */
+  function withLibrary(fn) {
+    const run = libChain.then(readLibraryIndex).then(fn || function () { return libIndex; });
+    libChain = run.catch(function () {});
+    return run;
+  }
+  function loadLibrary() { return withLibrary(); }
   function saveLibraryIndex() {
     window.storageSet(LIB_INDEX_KEY, JSON.stringify(libIndex));
   }
@@ -33262,7 +33328,7 @@
      would arrive by deleting the rest of the shelf. */
   function libraryPut(blob) {
     if (!blob || !blob.lid) return;
-    loadLibrary().then(function () { libraryPutNow(blob); });
+    withLibrary(function () { libraryPutNow(blob); });
   }
   function libraryPutNow(blob) {
     const at = new Date().toISOString();
@@ -33278,14 +33344,15 @@
     window.storageSet(LIB_KEY(blob.lid), JSON.stringify(blob));
     saveLibraryIndex();
   }
-  async function libraryForget(lid) {
-    await loadLibrary();
-    const i = libIndex.findIndex(function (e) { return e.lid === lid; });
-    if (i === -1) return false;
-    libIndex.splice(i, 1);
-    window.storageSet(LIB_KEY(lid), "");
-    saveLibraryIndex();
-    return true;
+  function libraryForget(lid) {
+    return withLibrary(function () {
+      const i = libIndex.findIndex(function (e) { return e.lid === lid; });
+      if (i === -1) return false;
+      libIndex.splice(i, 1);
+      window.storageSet(LIB_KEY(lid), "");
+      saveLibraryIndex();
+      return true;
+    });
   }
   async function libraryRead(lid) {
     try {
@@ -34378,16 +34445,17 @@
        and save that over every row the account already had. And it skips a
        lid that is already present rather than overwriting it, because a row
        the user has since edited is theirs and a re-run must not undo that. */
-    libraryProvision: async function (blobs) {
-      await loadLibrary();
-      let added = 0;
-      (blobs || []).forEach(function (b) {
-        if (!b || !b.lid) return;
-        if (libIndex.some(function (e) { return e.lid === b.lid; })) return;
-        libraryPutNow(normalizeBlob(b));
-        added++;
+    libraryProvision: function (blobs) {
+      return withLibrary(function () {
+        let added = 0;
+        (blobs || []).forEach(function (b) {
+          if (!b || !b.lid) return;
+          if (libIndex.some(function (e) { return e.lid === b.lid; })) return;
+          libraryPutNow(normalizeBlob(b));
+          added++;
+        });
+        return added;
       });
-      return added;
     },
     /* Build a fresh tile from a saved row. The new instance carries the same
        lid, so editing it updates that row instead of adding a second one. */
