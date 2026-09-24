@@ -946,14 +946,18 @@
     background: var(--bg); border: 1px solid var(--hair);
     box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 14px 36px rgba(0,0,0,0.12);
     transform-origin: 18px 100%;
-    animation: hidden-shelf-in 0.26s var(--ease-spring) both;
+    /* backwards, not both: nothing is held once the entrance ends. With
+       "both" the last frame stayed applied, and its zero blur is still a
+       filter. iOS Safari stops touch-scrolling overflow content inside a
+       filtered element, which left the list below unscrollable on a phone. */
+    animation: hidden-shelf-in 0.26s var(--ease-spring) backwards;
   }
   .hidden-shelf[hidden] { display: none; }
   /* Blur and scale together, so the panel reads as a material arriving rather
      than a rectangle fading up. */
   @keyframes hidden-shelf-in {
     from { opacity: 0; transform: scale(0.94) translateY(6px); filter: blur(5px); }
-    to   { opacity: 1; transform: none; filter: blur(0); }
+    to   { opacity: 1; transform: none; filter: none; }
   }
   .hidden-shelf-search {
     width: 100%; box-sizing: border-box; margin-bottom: 2px;
@@ -3327,7 +3331,7 @@
     font-family: var(--mps-font);
   }
 
-  /* The dots' menu. One item, so it is sized by that item rather than given a
+  /* The dots' menu. Two items, so it is sized by them rather than given a
      panel's padding, and it opens against the card it belongs to. */
   .add-card-menu {
     position: absolute; z-index: 4002;
@@ -3350,6 +3354,8 @@
     cursor: pointer; white-space: nowrap;
   }
   .add-card-menu button:hover { background: rgba(232,89,90,0.10); }
+  .add-card-menu button.add-card-menu-rename { color: var(--ink); }
+  .add-card-menu button.add-card-menu-rename:hover { background: rgba(10,10,10,0.06); }
   .add-card-menu svg { width: 14px; height: 14px; display: block; flex: 0 0 auto; }
 
   /* ---------- deleted cards ----------
@@ -3700,7 +3706,17 @@
     transition: background 0.12s ease, color 0.12s ease;
   }
   .ai-side-btn:hover { background: #ededed; color: var(--ink); }
+  /* Pressed feedback on touch-down, the one thing these lacked. */
+  .ai-side-btn:active { background: #e4e4e4; transform: scale(0.94); }
   .ai-head-side-btn { margin: 0 2px 0 -4px; }
+  /* The close button was a separate control (.mps-x-btn: 26px, heavier line,
+     darker grey) next to icon buttons drawn one way everywhere else in this
+     panel. It is one of them now, and it hangs past the header's padding by
+     the same 4px the sidebar toggle does on the left, so the two ends of the
+     header mirror each other. The X glyph is drawn at 18 so its strokes
+     come out the same visual size as the 16px sidebar and search glyphs,
+     whose shapes fill more of their box. */
+  .ai-head-close { margin: 0 -4px 0 0; }
   .ai-side-search {
     flex: 0 0 auto; margin: 2px 10px 6px; padding: 7px 10px; border: 1px solid var(--hair); border-radius: 8px;
     font-family: inherit; font-size: 13px; color: var(--ink); background: var(--bg); outline: none;
@@ -4908,7 +4924,12 @@
       left: 14px; right: 14px; width: auto; max-width: none;
       padding: 7px; border-radius: 14px;
     }
-    html:not(.force-desktop) .collapsed-tabs-bar { max-height: 46vh; }
+    /* Scrolls on its own and keeps the scroll to itself: the same three
+       declarations the board's other touch scrollers carry. */
+    html:not(.force-desktop) .collapsed-tabs-bar {
+      max-height: 46vh;
+      overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+    }
     /* 44pt rows. The shelf is a list you scroll, so unlike the corner
        controls there IS something within 8px of every target here. */
     html:not(.force-desktop) .collapsed-tabs-bar .collapsible-strip {
@@ -5783,17 +5804,13 @@
          built-in Reading List already on the board, and its own widget
          type/code, are untouched — this only removes the menu entry that
          would create a new, permanently-fixed one. -->
-    <button type="button" class="add-widget-card" data-add-type="list">
-      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
-      <span class="add-widget-label">List</span>
-    </button>
     <button type="button" class="add-widget-card" data-add-type="menu">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12a1 1 0 0 1 1 1v15l-7-4-7 4V5a1 1 0 0 1 1-1Z"/></svg></span>
       <span class="add-widget-label">Bookmarks</span>
     </button>
-    <button type="button" class="add-widget-card" data-add-type="feed-email">
-      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 7.6 5.4a1.5 1.5 0 0 0 1.8 0L20.5 7"/></svg></span>
-      <span class="add-widget-label">Gmail Summary</span>
+    <button type="button" class="add-widget-card" data-add-type="list">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></span>
+      <span class="add-widget-label">List</span>
     </button>
     <button type="button" class="add-widget-card" data-add-type="vocab">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><text x="12" y="15.5" font-size="9" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial, sans-serif">Aa</text></svg></span>
@@ -5804,13 +5821,18 @@
          itself. Listed individually rather than behind one "Routine feed"
          chooser because they are four different things you add, not four
          settings of one thing. -->
-    <button type="button" class="add-widget-card" data-add-type="feed-news">
-      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1Z"/><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M7 9h7"/><path d="M7 13h7"/><path d="M7 17h4"/></svg></span>
-      <span class="add-widget-label">Morning News</span>
+
+    <button type="button" class="add-widget-card" data-add-type="feed-email">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 7.6 5.4a1.5 1.5 0 0 0 1.8 0L20.5 7"/></svg></span>
+      <span class="add-widget-label">Gmail Summary</span>
     </button>
     <button type="button" class="add-widget-card" data-add-type="feed-stocks">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20V9"/><path d="M11 20V4"/><path d="M16 20v-7"/><path d="M21 20v-11"/></svg></span>
       <span class="add-widget-label">Stock Portfolio</span>
+    </button>
+    <button type="button" class="add-widget-card" data-add-type="feed-news">
+      <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13a1 1 0 0 1 1 1v12a2 2 0 0 0 2 2H5a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1Z"/><path d="M18 8h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M7 9h7"/><path d="M7 13h7"/><path d="M7 17h4"/></svg></span>
+      <span class="add-widget-label">Morning News</span>
     </button>
     <button type="button" class="add-widget-card" data-add-type="feed-automations">
       <span class="add-widget-icon"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg></span>
@@ -5867,7 +5889,7 @@
     <button type="button" class="ai-side-btn ai-head-side-btn" id="aiHeadSideToggle" title="Show sidebar" aria-label="Show sidebar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/></svg></button>
     <span class="ai-head-mark"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 2.6l1.55 5.3 5.3 1.55-5.3 1.55L12 16.3l-1.55-5.3L5.15 9.45l5.3-1.55L12 2.6z"/><path d="M18.4 14.2l.78 2.62 2.62.78-2.62.78-.78 2.62-.78-2.62-2.62-.78 2.62-.78.78-2.62z"/></svg></span>
     <span class="ai-head-title">myProductivityspace</span>
-    <button type="button" class="mps-x-btn" id="aiCloseBtn" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <button type="button" class="ai-side-btn ai-head-close" id="aiCloseBtn" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="ai-log" id="aiLog"></div>
   <div class="ai-drop" id="aiDrop" hidden>
@@ -15133,7 +15155,11 @@
          lands on top of it. The class is set on both devices and only the
          touch stylesheet reads it. */
       document.documentElement.classList.add("hidden-shelf-open");
-      if (many) hiddenShelfSearch.focus();
+      /* Not on a phone. Focusing the field there raises the keyboard nobody
+         asked for, the viewport shrinks under it, the shelf is shoved up, and
+         a swipe over the list moves the page instead of the list. The field
+         is still there to tap. */
+      if (many && !window.matchMedia("(hover: none) and (pointer: coarse)").matches) hiddenShelfSearch.focus();
     }
 
     function closeHiddenShelf() {
@@ -19968,8 +19994,13 @@
 
        Gestures are split so none of them can be mistaken for another: the
        card's own click still adds a widget instantly, with no threshold to
-       wait out; the six dots drag; and the rename is on the dots' click and
-       on a hold of the name, neither of which the add path can consume. */
+       wait out; the six dots drag; and the rename is in the dots' menu (or F2
+       on a focused card), neither of which the add path can consume.
+
+       Only "My widgets" cards have dots at all. The Suggested and Built-in
+       cards ship with this file, so they cannot be deleted, dragged or moved
+       between groups: they sit in ADD_FIXED_ORDER, and only the cards you
+       built are yours to arrange. */
     const ADD_ORDER_KEY = "add-card-order";
     // The arrangement this board last loaded, replayed when a "My widgets"
     // card turns up after boot and needs to find its saved slot.
@@ -19985,6 +20016,16 @@
     const ADD_REMOVED_KEY = "add-card-removed";
     let addRemoved = {};
     const ADD_LOCKED_LABELS = { cal: true, tasks: true };
+    /* The shipped half of the menu, in the order it always shows. Morning
+       News and Automations trail the rest: they can still sit in the Deleted
+       folder from before shipped cards stopped being deletable, and a
+       recovered one lands at the end of its group. */
+    const ADD_FIXED_ORDER = [
+      "#suggested", "page", "cal", "tasks",
+      "#builtin", "menu", "list", "vocab", "feed-email", "feed-stocks", "feed-news", "feed-automations",
+      "#mine"
+    ];
+    function isMineCardType(type) { return String(type || "").indexOf("mine:") === 0; }
     const ADD_GRIP_SVG =
       '<svg viewBox="0 0 12 16" width="10" height="13" aria-hidden="true"><g fill="currentColor">' +
       '<circle cx="4" cy="3.5" r="1.25"/><circle cx="8" cy="3.5" r="1.25"/>' +
@@ -20086,7 +20127,6 @@
       // A card renamed by hand keeps that name even after the widget it stands
       // for is edited, the same rule the shipped cards follow.
       lab.textContent = addCardLabels[type] || name;
-      lab.title = "Hold to rename";
       el.appendChild(lab);
 
       const grip = document.createElement("span");
@@ -20130,7 +20170,7 @@
         addCardGrid.insertBefore(buildMineCard(e), ref);
         added = true;
       });
-      if (added && lastAddOrder) applyAddCardOrder(lastAddOrder);
+      if (added) applyAddCardOrder(lastAddOrder);
       applyAddCardRemoved();
     }
 
@@ -20503,42 +20543,24 @@
       showDeletedView(false);
     });
 
+    /* Shipped cards and the three headings go in ADD_FIXED_ORDER, whatever
+       the stored order says; the stored order only arranges "My widgets".
+       A card the stored order never heard of goes last in that group, so a
+       widget built after the last drag does not jump ahead of the ones you
+       placed. Array sort is stable, so those keep the order they arrived in. */
     function applyAddCardOrder(order) {
-      if (!Array.isArray(order)) return;
       const byKey = {};
       addGridNodes().forEach(function (n) { byKey[addNodeKey(n)] = n; });
-
-      /* An order saved before the headings existed is a flat list of types.
-         Replaying it as-is would stack all ten cards and then trail the three
-         headings off the end, so it is re-slotted instead: the groups come back
-         in the order this file ships them, and inside each group the cards keep
-         whatever order the board had already dragged them into. The arrangement
-         is preserved, which is the part that was the user's. */
-      if (!order.some(function (k) { return String(k).charAt(0) === "#"; })) {
-        const rank = {};
-        order.forEach(function (t, i) { rank[t] = i; });
-        addHeadEls().forEach(function (head) {
-          addCardGrid.appendChild(head);
-          addCardEls()
-            .filter(function (el) {
-              return ADD_DEFAULT_GROUP[addCardTypeOf(el)] === head.getAttribute("data-add-head");
-            })
-            .sort(function (a, b) {
-              const ra = rank[addCardTypeOf(a)], rb = rank[addCardTypeOf(b)];
-              return (ra == null ? Infinity : ra) - (rb == null ? Infinity : rb);
-            })
-            .forEach(function (el) { addCardGrid.appendChild(el); });
-        });
-        persistAddCardOrder();
-        return;
-      }
-
-      /* Keys the stored order never heard of go last rather than first: a card
-         added in a later version of this file should turn up at the end of a
-         board that has already been rearranged, not jump to the front of it. */
-      const named = order.filter(function (k) { return byKey[k]; });
-      const rest = addGridNodes().map(addNodeKey).filter(function (k) { return named.indexOf(k) === -1; });
-      named.concat(rest).forEach(function (k) { addCardGrid.appendChild(byKey[k]); });
+      const rank = {};
+      (Array.isArray(order) ? order : []).forEach(function (k, i) { rank[k] = i; });
+      ADD_FIXED_ORDER.forEach(function (k) { if (byKey[k]) addCardGrid.appendChild(byKey[k]); });
+      addCardEls()
+        .filter(function (el) { return isMineCardType(addCardTypeOf(el)); })
+        .sort(function (a, b) {
+          const ra = rank[addCardTypeOf(a)], rb = rank[addCardTypeOf(b)];
+          return (ra == null ? Infinity : ra) - (rb == null ? Infinity : rb);
+        })
+        .forEach(function (el) { addCardGrid.appendChild(el); });
     }
 
     /* ---------- a card shows the widget, not a symbol ----------
@@ -20914,7 +20936,6 @@
       const lab = addCardLabelEl(el);
       if (lab) {
         ADD_CARD_BUILT_IN[addCardTypeOf(el)] = lab.textContent;
-        if (!ADD_LOCKED_LABELS[addCardTypeOf(el)]) lab.title = "Hold to rename";
       }
       /* The picture goes in FIRST, above the label. The original 36px icon
          stays in the DOM and is hidden by CSS: the Deleted list reads its SVG
@@ -20925,12 +20946,6 @@
       el.insertBefore(box, el.firstChild);
       box.innerHTML = mockHtml(el);
       markPaper(el, box);
-
-      const grip = document.createElement("span");
-      grip.className = "add-widget-grip";
-      grip.setAttribute("aria-hidden", "true");
-      grip.innerHTML = ADD_GRIP_SVG;
-      el.appendChild(grip);
     });
 
     (async function loadAddCardPrefs() {
@@ -20945,11 +20960,9 @@
       });
       try {
         const raw = await storageGet(ADD_ORDER_KEY);
-        if (raw) {
-          lastAddOrder = JSON.parse(raw);
-          applyAddCardOrder(lastAddOrder);
-        }
+        if (raw) lastAddOrder = JSON.parse(raw);
       } catch (e) {}
+      applyAddCardOrder(lastAddOrder);
       try {
         const raw = await storageGet(ADD_REMOVED_KEY);
         (JSON.parse(raw || "[]") || []).forEach(function (t) { addRemoved[t] = true; });
@@ -21007,35 +21020,6 @@
       });
     }
 
-    /* Holding the name renames it, on a mouse and on a thumb alike. A plain
-       click is the add, so the rename cannot live on one; a double click is
-       worse than useless here, since its first click would have already
-       added a widget and closed the popup. */
-    let addHoldTimer = 0, addHoldFrom = null;
-    function cancelAddHold() {
-      if (addHoldTimer) { clearTimeout(addHoldTimer); addHoldTimer = 0; }
-      addHoldFrom = null;
-    }
-    addCardGrid.addEventListener("pointerdown", function (e) {
-      const lab = e.target.closest(".add-widget-label");
-      if (!lab) return;
-      const card = lab.closest(".add-widget-card");
-      if (!card || ADD_LOCKED_LABELS[addCardTypeOf(card)]) return;
-      addHoldFrom = { x: e.clientX, y: e.clientY };
-      addHoldTimer = setTimeout(function () {
-        addHoldTimer = 0;
-        card.dataset.swallowClick = "1";
-        startAddCardRename(card);
-      }, 460);
-    });
-    addCardGrid.addEventListener("pointermove", function (e) {
-      if (!addHoldFrom) return;
-      if (Math.abs(e.clientX - addHoldFrom.x) > 6 || Math.abs(e.clientY - addHoldFrom.y) > 6) cancelAddHold();
-    });
-    ["pointerup", "pointercancel", "pointerleave"].forEach(function (evt) {
-      addCardGrid.addEventListener(evt, cancelAddHold);
-    });
-
     /* ---- drag to reorder, from the dots only ----
        The dots are the one part of a card that is not the add button, which
        is what lets the drag start on the first pixel of movement instead of
@@ -21075,8 +21059,12 @@
          is how it joins the tail of the group above. Hidden nodes are skipped
          -- a deleted card and a heading with no members are both invisible, and
          nothing should be droppable onto something that is not on screen. */
+      /* Only "My widgets" takes a drop: its heading (landing just after it is
+         the top of the group) and its cards. The shipped groups are fixed. */
       addGridNodes().forEach(function (c) {
         if (c === card || c.hidden) return;
+        const k = addNodeKey(c);
+        if (k !== "#mine" && !isMineCardType(k)) return;
         const b = c.getBoundingClientRect();
         const dx = (b.left + b.width / 2) - cx, dy = (b.top + b.height / 2) - cy;
         const d = dx * dx + dy * dy;
@@ -21085,7 +21073,8 @@
       if (!best) return null;
       const b = best.getBoundingClientRect();
       const bx = b.left + b.width / 2, by = b.top + b.height / 2;
-      const after = Math.abs(cy - by) < b.height / 2 ? cx > bx : cy > by;
+      const after = addNodeKey(best) === "#mine" ||
+        (Math.abs(cy - by) < b.height / 2 ? cx > bx : cy > by);
       let ref = after ? best.nextElementSibling : best;
       if (ref === card) ref = card.nextElementSibling;
       return ref;
@@ -21095,7 +21084,6 @@
       const grip = e.target.closest(".add-widget-grip");
       if (!grip || e.button !== 0) return;
       e.preventDefault();
-      cancelAddHold();
       const card = grip.closest(".add-widget-card");
       const r = card.getBoundingClientRect();
       card.style.transition = "none";
@@ -21154,10 +21142,10 @@
     addCardGrid.addEventListener("pointercancel", endAddDrag);
 
     /* ---- the dots' menu ----
-       The dots' own click, which no other gesture wants, opens one item:
-       Delete. Rename keeps both paths it already had (hold the name, or F2 on
-       a focused card), so nothing was taken away by giving this click a
-       different job.
+       The dots' own click, which no other gesture wants, opens two items:
+       Delete, then Rename. Rename lives here rather than on a hold of the
+       name, which nobody found; F2 on a focused card still works for the
+       keyboard. Only "My widgets" cards have dots, so only they have this.
 
        Deleting is two deliberate acts, open the menu and pick the item, which
        is the friction this needs. There is no second confirmation on top: the
@@ -21169,6 +21157,10 @@
       '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/>' +
       '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>' +
       '<path d="M10 11v6"/><path d="M14 11v6"/></svg>';
+    const PENCIL_SVG =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
     let addCardMenu = null;
 
     function closeAddCardMenu() {
@@ -21178,7 +21170,7 @@
 
     function deleteAddCard(card) {
       const type = addCardTypeOf(card);
-      if (!type) return;
+      if (!type || !isMineCardType(type)) return;
       addRemoved[type] = true;
       persistAddCardRemoved();
       closeAddCardMenu();
@@ -21204,6 +21196,18 @@
         deleteAddCard(card);
       });
       menu.appendChild(b);
+      const rn = document.createElement("button");
+      rn.type = "button";
+      rn.className = "add-card-menu-rename";
+      rn.setAttribute("role", "menuitem");
+      rn.setAttribute("aria-label", "Rename the " + name + " card");
+      rn.innerHTML = PENCIL_SVG + "<span>Rename</span>";
+      rn.addEventListener("click", function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        closeAddCardMenu();
+        startAddCardRename(card);
+      });
+      menu.appendChild(rn);
       /* Measured rather than read off offsetTop/offsetLeft. The cards live in
          a scroller now, so a card's offset within the popup stops matching
          where it actually IS the moment the list is scrolled at all -- the
@@ -21267,7 +21271,8 @@
       const step = { ArrowLeft: -1, ArrowUp: -3, ArrowRight: 1, ArrowDown: 3 }[e.key];
       if (!step) return;
       e.preventDefault();
-      const cards = addCardEls();
+      if (!isMineCardType(addCardTypeOf(card))) return;
+      const cards = addCardEls().filter(function (el) { return isMineCardType(addCardTypeOf(el)); });
       const i = cards.indexOf(card);
       const j = Math.max(0, Math.min(cards.length - 1, i + step));
       if (i === j) return;
