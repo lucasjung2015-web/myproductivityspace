@@ -6,36 +6,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>myProductivityspace</title>
 
-<!-- Tab icon and link preview. The icons are base64 data URIs rather than
-     files beside this one, for the same reason the brand font is: this file
-     has to work when it is opened straight off a disk, with no server and no
-     siblings, and an <link href="icon.png"> would simply 404 there. og:image
-     is the one exception — a link preview only exists when the page is
-     hosted anyway, and no scraper reads a data URI. The icon is the square
-     brand mark. The full wordmark shrunk to 32px came out an illegible grey
-     smear in the tab, which only ever has room for a solid shape. The Apple
-     icon bleeds the accent to the edge because iOS flattens transparency
-     onto black and then applies its own corner mask.
-
-     THE TAB ICON IS THE OUTLINED MARK and it is the only surface that is:
-     white face, black eyes, black mouth, black rounded-square outline.
-     Apple, the manifest and brand/ keep the solid black mark.
-
-     The outline is the load-bearing part, not decoration. A plain inversion
-     was tried first and does not survive a light tab strip: with a white
-     face and no border there is nothing to separate the mark from the strip
-     behind it, so all that shows is two eyes and a mouth floating free and
-     the silhouette that carries the mark everywhere else disappears. The
-     outline puts that silhouette back, so the face reads as a face on a
-     light strip AND on a dark one, which is what neither the solid black
-     mark nor the plain inversion manages on its own.
-
-     Generated rather than drawn by hand: the geometry is the same 100-unit
-     mark (eyes at 21/58, sparkle at 50,65, radius 24) with an 8-unit stroke
-     inset by half its width so it is not clipped, supersampled 16x and
-     resampled down, because a 2.5px border at 32px goes to mush otherwise.
-     See the corresponding block in Scripts/ if it needs rebuilding. -->
-<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAET0lEQVR42sVXMU8jRxT+ZnYwK5CRArJLcyYWsiwaJLtx5YqCAiFdokQUNBaiNCi5P5BLroQe+QckJClAyFggZKhjV4iOIAGNsRywwBx4vTsvzc5qbe9iCHeXJ4202v123ps33zfzHtBrGj6f9czNPJ4JwNcA5jVNSxHRV1245xoBAGPsH8uyygC2APzd5afDOQPAAXzgnH/knJMNevXgnBPn/COAn12+WLdjAPiNc/5WSgkAZiQSYaFQCIyx/5RvIkKtVsPl5SUBEJxzSCn/APC9DZHufflgr7o1NTUld3d36f7+nl5rzWaTdnZ2KJFISAAt28cv3Zx4wzk3GGNmIpGQNzc3REQkpSTDMDpGu90mKaXnaLfbPXgpJRER1et1isfjkjFmcs4NAG/c2XpnR9be398nIqLHx0ffValJ+71Tpuba29sjAG3b1zuH+Zzz36WUbyORiDw9PdU459A0DScnJ9jY2MDd3R0AQAiB+fl5zM7Ogogcbqjng4MDbG5uot1uAwCGhoaQzWYxPT0Ny7IgpUQsFrMuLi445/xPKeW3sAPYB0CpVMpUq6nVahQOhz1ZfXh4SEREpmmSZVlERFQulz2xIyMjdH5+7mQolUqZtjL24WI/qZXY2sXx8TFqtRoCgQCEEBBCQNd1Z6UKbysGR0dHAABd1x384OAgbm9vUS6XO7Ll9in8JMQYA2MMpmk6TtQEQvT+pmmagzdNs2NrOOe+UvX9YlmWE4Q7IE3THAduM00TnHPPf7zwynwzMDY21rNyRaRQKNSDD4fDsCwLROSkWTn2wnemgfM9AJRMJk1FLiklrayskK7rpGmaM2ZmZqjRaPScAc1mk+bm5kgI4WADgQAtLy93kDWZTCoS7vlmQKVyfX0dq6ureHh4cPY5Fot1kwmMMQwPD2NrawtnZ2eODHVdx/j4eA/+WVsAAFJKRCIRzzPe634gIkxMTPTM8RQJRZ+t6eCBeqfs+voaADA6OuoE9RT+RSpwT+AeSiFEhGKxiGKx6BDUD/+UiZdesaZpOppfW1sDACwsLDjy9DojXpWBnoiFAGMMuVwOlUoFlUoFuVwOjLEXO/eVYffNpqTWaDQon89TNBolAI7cAFA0GqV8Pt8hUa/bsluGz8qAYryu60in08hmswgGg5BSQkqJYDCIbDaLdDoNXdc7/vkkGfCyUqlEQggSQlCpVOqL98uAcFfEz4maiGAYBjKZDBYXFwEAmUwGrVYLgUCg7xyu78wJgDF2DYCq1SoMw8DAwIDvYaPIJqXE0tKSc9gocvoFDQCGYaBarQIA2T4d+1GVZMVikYiIWq1W361QdV+/1LdaLSIiKhQK7pLsB3cATlEaj8dlvV7vUYDXeAnm6uqKJicn3UXpeHe79F6V5YlEQhYKhU9Wlm9vb1M8HneX5T8p392Nya+c82++QGPyne1Xdrdm7DO3Zu+9WrMv0Zz+ZTenZ37N6f/Wnv8LIXzYUG4v8KQAAAAASUVORK5CYII=">
+<!-- Tab icon: deliberately blank. The tab shows the title text alone, so the
+     icon is a transparent 1x1 PNG. Leaving the <link> out entirely would not
+     do that: the browser would fetch /favicon.ico, miss, and draw its own
+     grey globe in the slot instead. The Apple icon and the manifest icons are
+     untouched, since a home-screen shortcut has no text-only option. -->
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=">
 <link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
 <!-- --mps-accent, matching the wordmark band that is now the top of the page,
      so the browser bar and the band read as one strip. The dark value
@@ -657,42 +633,8 @@
      cross it (see html.mps-on-band, now a no-op left in place because the
      script that sets it also drives the phone's own layout reads). */
   .page-title { background: #FFFFFF; }
-  .page-title .pt-word, .ag-wordmark .pt-word,
-  .page-title .pt-mark, .ag-wordmark .pt-mark {
+  .page-title .pt-word, .ag-wordmark .pt-word {
     font-size: 46px; margin-right: 0;
-  }
-  /* The mark, left of the word. It is sized in em against its OWN font-size,
-     and .pt-mark is listed alongside the three spans in every rule that sets
-     that size (here, and the three phone overrides further down), so the
-     square tracks the wordmark at every breakpoint without a fourth set of
-     overrides to keep in sync.
-
-     0.92em is the line-height declared above, so the square matches the text's
-     line box exactly and the band keeps the height it had.
-
-     align-self is load-bearing: the row is baseline-aligned, and a replaced
-     element baselines on its bottom edge, which would stand a 42px square on
-     the text baseline against a 33px cap height and leave it towering over
-     the word. margin-right restates what the rule above just zeroed, which is
-     why it sits here rather than in that shared declaration. */
-  .page-title .pt-mark, .ag-wordmark .pt-mark {
-    width: 0.92em; height: 0.92em; flex: 0 0 auto;
-    align-self: center; margin-right: 0.26em;
-    /* Both placements sit on WHITE -- the band, and the sign-in screen --
-       and both now take the OUTLINED cut, matching the tab icon: a white
-       plate carrying a black edge, with the eyes and the sparkle drawn in
-       black rather than knocked out of a solid.
-
-       Matching the tab is the whole point. The mark in this band and the
-       mark in the browser tab are two views of one thing, a few pixels
-       apart on screen, and a solid black square above an outlined one read
-       as two different logos rather than one at two sizes.
-
-       It also survives what the solid cut does not. A solid plate is a
-       black slab at wordmark size, heavy enough to out-weigh the word it
-       sits beside; the outlined cut carries the same silhouette at a
-       fraction of the ink, so the word leads and the mark accompanies it. */
-    --mark-plate: #FFFFFF; --mark-ink: #000000; --mark-edge: #000000;
   }
   /* Shown while dragging the Menu widget above the grid, indicating a
      release there sends it back to the full-width floating bar at the
@@ -4677,13 +4619,8 @@
      even though they still apply to this element. 54px caps it once the
      window is wide enough that vw would overshoot; that is the deliberate
      step up from the band's 46px, since the gate has the room and the
-     wordmark is the only thing on it. 26px is the floor.
-
-     .pt-mark is listed with the word for the same reason it is listed in
-     every other size rule: it is sized in em against its OWN font-size, so
-     naming it here is what keeps the square tracking the word. */
-  #authGate .ag-wordmark .pt-word,
-  #authGate .ag-wordmark .pt-mark { font-size: clamp(26px, 8vw, 54px); }
+     wordmark is the only thing on it. 26px is the floor. */
+  #authGate .ag-wordmark .pt-word { font-size: clamp(26px, 8vw, 54px); }
   /* The sign-in screen is white, like the board behind it. It used to turn
      the brand blue the moment there was something to show, which meant the
      first thing a new account ever saw was a full-bleed colour field the app
@@ -4788,9 +4725,7 @@
        it down until the whole name clears the controls. 21px is the ceiling
        and the fallback if that script never runs. */
     html:not(.force-desktop) .page-title .pt-word,
-    html:not(.force-desktop) .page-title .pt-mark,
-    html:not(.force-desktop) .ag-wordmark .pt-word,
-    html:not(.force-desktop) .ag-wordmark .pt-mark { font-size: var(--mps-wm-fs, 21px); }
+    html:not(.force-desktop) .ag-wordmark .pt-word { font-size: var(--mps-wm-fs, 21px); }
 
     /* Five 28px buttons 6px apart spanned 176px of a 375px screen, below both
        the size and the spacing minimum, and sat at z-index 3000 -- ON TOP of
@@ -5622,41 +5557,9 @@
      it read as an interstitial rather than as a page still loading. The
      covering itself is load-bearing and stays: without it the board paints
      pre-hydration values, or on a shared browser the previous account's. -->
-<!-- The myProductivityspace mark. Two cards for eyes, the AI spark centred
-     beneath them, on a rounded plate. Drawn once as a <symbol> and stamped by
-     <use> everywhere it appears, for the same reason the wordmark is one rule
-     list serving two elements: two hand-copied SVGs drift, one symbol cannot.
-
-     Geometry is on a 64-unit square. Eyes are 13 wide with a 10 gap, which is
-     roughly one eye width and the ratio at which two shapes reliably read as
-     a pair of eyes rather than two squares. The spark is a four-point star of
-     four cubic curves with the control points pulled toward the centre, which
-     is what gives it the concave waist; it sits on the same vertical axis as
-     the gap between the eyes, and that symmetry is what makes the face land.
-
-     Fills come from custom properties so one symbol serves every cut, and
-     --mark-edge adds a third: a stroke on the plate, which is what makes the
-     outlined cut possible without a second symbol. It defaults to
-     transparent, so a caller that sets only plate and ink gets exactly the
-     solid mark this symbol has always drawn.
-
-     The plate is inset by half the stroke width and its radius pulled in to
-     match, because SVG centres a stroke on the path: drawn at 0,0,64,64 the
-     outer half of the border would fall outside the viewBox and be clipped
-     flat on all four sides. -->
-<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
-  <symbol id="mpsMark" viewBox="0 0 64 64">
-    <rect x="2.5" y="2.5" width="59" height="59" rx="12"
-          fill="var(--mark-plate, #000000)"
-          stroke="var(--mark-edge, transparent)" stroke-width="5"/>
-    <rect x="14" y="15" width="13" height="13" rx="3" fill="var(--mark-ink, #FFFFFF)"/>
-    <rect x="37" y="15" width="13" height="13" rx="3" fill="var(--mark-ink, #FFFFFF)"/>
-    <path d="M32 31.5C32 36.75 27.54 42 21.5 42C27.54 42 32 47.25 32 52.5C32 47.25 36.46 42 42.5 42C36.46 42 32 36.75 32 31.5Z" fill="var(--mark-ink, #FFFFFF)"/>
-  </symbol>
-</svg>
 
 <div id="authGate">
-  <div class="ag-wordmark" id="authGateMark" hidden><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-word">myProductivityspace</span></div>
+  <div class="ag-wordmark" id="authGateMark" hidden><span class="pt-word">myProductivityspace</span></div>
   <button type="button" id="authGateBtn" hidden>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 11v2.9h4.1c-.2 1.1-1.4 3.2-4.1 3.2-2.5 0-4.5-2-4.5-4.6S9 7.9 11.5 7.9c1.4 0 2.3.6 2.9 1.1l2-1.9C15.1 5.9 13.5 5.2 11.5 5.2 7.6 5.2 4.4 8.4 4.4 12.3s3.2 7.1 7.1 7.1c4.1 0 6.8-2.9 6.8-6.9 0-.5 0-.9-.1-1.3H12z"/></svg>
     Continue with Google
@@ -5664,7 +5567,7 @@
   <div class="ag-err" id="authGateErr" hidden></div>
 </div>
 
-<div class="page-title"><svg class="pt-mark" aria-hidden="true" focusable="false"><use href="#mpsMark"/></svg><span class="pt-word">myProductivityspace</span></div>
+<div class="page-title"><span class="pt-word">myProductivityspace</span></div>
 
 <!-- Owner-only, and so hidden in the markup rather than hidden later: a
      button that paints for one frame and then vanishes is worse than one
@@ -41429,10 +41332,7 @@
        which those two report as 39 and 38 and 39 > 38 + 1 reads as fitting.
        It rendered "myProductivityspa...". A Range over each span measures
        the text itself, which is laid out at full width whether or not the
-       box around it has been shrunk, so the comparison is the real one.
-
-       The mark is a replaced element with a margin, so it is measured from
-       its box rather than through a Range. */
+       box around it has been shrunk, so the comparison is the real one. */
     var range = document.createRange();
     function spanWidth(cls) {
       var el = band.querySelector(cls);
@@ -41441,13 +41341,7 @@
       return range.getBoundingClientRect().width;
     }
     function naturalWidth() {
-      var total = spanWidth(".pt-word");
-      var mark = band.querySelector(".pt-mark");
-      if (mark) {
-        total += mark.getBoundingClientRect().width;
-        total += parseFloat(window.getComputedStyle(mark).marginRight) || 0;
-      }
-      return total;
+      return spanWidth(".pt-word");
     }
     function room() {
       var cs = window.getComputedStyle(band);
