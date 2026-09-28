@@ -25439,7 +25439,9 @@
         box.style.top = (curStart / 60) * HOUR_H + "px";
         box.style.height = Math.max(12, ((curEnd - curStart) / 60) * HOUR_H - 2) + "px";
         const t = box.querySelector(".cal-tg-event-title");
-        if (t) t.textContent = gtFmtTime(minToHhmm(curStart)) + " " + ev.title;
+        // Repainted mid-drag, so it has to match the drawn title above:
+        // name only, no clock time.
+        if (t) t.textContent = ev.title;
       }
 
       function onMove(me) {
@@ -25697,7 +25699,13 @@
 
         const line = document.createElement("div");
         line.className = "cal-tg-event-title";
-        line.textContent = fmtTime(e.start) + " " + e.title;
+        // The name alone. The block's own position on the grid already says
+        // when the event starts, and printing the clock time in front of the
+        // title spent most of a narrow column on a number the grid is drawing
+        // anyway -- a 30-minute block in a week column read as "12:30 pm" and
+        // nothing else. The exact start-to-end times still ride in box.title
+        // below, so hovering the block still names them.
+        line.textContent = e.title;
         box.appendChild(line);
 
         // A normal 30-60 minute block is short but still has room for a row of
