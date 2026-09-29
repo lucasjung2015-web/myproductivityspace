@@ -763,6 +763,11 @@
      clear the section chip above it, and that chip is gone (move and hide
      section live in the ••• now). No glass behind it either: small grey
      glyphs on the widget's own surface, revealed on hover. */
+  /* The grip and the ••• get their own strip above the title. Pinned over the
+     header, they sat inside the title's rename box once a long title wrapped
+     to the full width. 20px is the controls' 3px inset plus their 18px height,
+     less the 1px the title's own negative margin already lifts it. */
+  .col.collapsible-col-wrap > .collapsible-body { padding-top: 20px; }
   .col.collapsible-col-wrap .widget-header-controls {
     position: absolute; top: 3px; right: 3px; z-index: 5; gap: 0;
     opacity: 0; transform: scale(0.92); transform-origin: top right;
@@ -5212,6 +5217,8 @@
        The title group's icon button was already hidden here; this finishes
        the job for the other side of the header. */
     html:not(.force-desktop) .widget-header-controls { display: none !important; }
+    /* No hover controls here, so no strip to reserve for them. */
+    html:not(.force-desktop) .col.collapsible-col-wrap > .collapsible-body { padding-top: 0; }
 
     /* --- per-widget controls, on the surface because there is no hover ---
        The ••• carries every command that used to live in a hover control.
