@@ -686,16 +686,23 @@
      widget, or several stacked vertically (with a row-resizer between
      each) once widgets have been dropped on top of one another. */
   .col-slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; transition: flex 0.15s var(--ease-spring); position: relative; }
+  /* A section picked up from the ••• menu ("Move section") follows the
+     cursor until a click places it; the grabbing cursor says a drop is armed. */
+  html.section-picking, html.section-picking * { cursor: grabbing !important; }
   .widget.dragging-col .col-slot { transition: none; }
   /* Drawn while a widget is dragged to the outer edge of a slot, where it
-     would become a new column beside that one. Left and right only: the
-     top/bottom pair belonged to the section pick-up, which is gone, and
-     stacking onto one widget draws on that widget (col-drop-*) instead. */
-  .col-slot.section-drop-left::after, .col-slot.section-drop-right::after {
+     would become a new column beside that one, and while a picked-up section
+     is over a slot: left/right reorders beside it, top/bottom merges into it
+     (see commitSectionDrop). */
+  .col-slot.section-drop-left::after, .col-slot.section-drop-right::after,
+  .col-slot.section-drop-top::after, .col-slot.section-drop-bottom::after {
     content: ""; position: absolute; inset: 0; z-index: 20; pointer-events: none; border-radius: 6px;
   }
   .col-slot.section-drop-left::after { box-shadow: inset 4px 0 0 0 #9099a8; }
   .col-slot.section-drop-right::after { box-shadow: inset -4px 0 0 0 #9099a8; }
+  .col-slot.section-drop-top::after { box-shadow: inset 0 4px 0 0 #9099a8; }
+  .col-slot.section-drop-bottom::after { box-shadow: inset 0 -4px 0 0 #9099a8; }
+  .col-slot.section-dragging { opacity: 0.5; }
   .col.collapsible-col-wrap { flex: 1 1 auto; min-height: 0; transition: flex 0.15s var(--ease-spring); }
   .widget.dragging-col .col.collapsible-col-wrap { transition: none; }
   /* A custom widget is an iframe, and an iframe takes the mouse for itself:
@@ -3163,10 +3170,18 @@
     display: block; flex: none; max-width: none; height: auto; margin: 0;
   }
   .add-widget-preview iframe { display: block; border: 0; background: transparent; }
-  /* The card's original 36px icon. Still in the DOM -- the Deleted list reads
-     its SVG to draw a row -- and no longer shown on the card itself, whose
-     identifying mark is now the preview. */
-  .add-widget-card > .add-widget-icon { display: none; }
+  /* The card shows its generic 36px icon again, not the snapshot. The
+     preview box is still built (the mock reads the icon for its header and
+     nothing downstream has to change), it is simply not shown, and
+     paintAddPreviews skips the cloning work while it is hidden. The two-
+     column grid, groups, rename and search all stay as they are. */
+  .add-widget-card > .add-widget-preview { display: none; }
+  .add-widget-card { text-align: center; padding: 12px 6px 10px; }
+  .add-widget-card > .add-widget-icon {
+    width: 36px; height: 36px; border-radius: 8px; background: #ffffff;
+    border: 1px solid #e5e5e5; display: flex; align-items: center; justify-content: center;
+    color: #000000; margin: 0 auto;
+  }
 
   /* ---------- the drawn stand-in ----------
      What a card wears before a snapshot is painted, and what it keeps when
@@ -15299,6 +15314,128 @@
       }
     }
 
+    /* Where a picked-up section would land if dropped at `p`. The outer
+       quarters of another section reorder (beside it); the middle half merges
+       into it, above or below by which half. Off the end of the row it snaps
+       to whichever section is outermost on that side, so dropping past either
+       edge still does something sensible. */
+    function sectionDropAt(p, slotEl, slotEls) {
+      const others = slotEls.filter(function (s) { return s !== slotEl; });
+      if (!others.length) return null;
+      let match = null;
+      for (const s of others) {
+        const r = s.getBoundingClientRect();
+        if (p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) { match = s; break; }
+      }
+      if (!match) {
+        let leftMost = others[0], rightMost = others[0];
+        others.forEach(function (s) {
+          if (s.getBoundingClientRect().left < leftMost.getBoundingClientRect().left) leftMost = s;
+          if (s.getBoundingClientRect().right > rightMost.getBoundingClientRect().right) rightMost = s;
+        });
+        if (p.x <= leftMost.getBoundingClientRect().left) match = leftMost;
+        else if (p.x >= rightMost.getBoundingClientRect().right) match = rightMost;
+      }
+      if (!match) return null;
+      const r = match.getBoundingClientRect();
+      const relX = (p.x - r.left) / r.width;
+      const edge = 0.25;
+      let zone;
+      if (relX < edge) zone = "left";
+      else if (relX > 1 - edge) zone = "right";
+      else zone = (p.y - r.top) / r.height < 0.5 ? "top" : "bottom";
+      return { el: match, zone: zone };
+    }
+
+    // `slot` is the live array from `layout`, so reordering or merging it in
+    // place keeps anything else holding the same array in step.
+    function commitSectionDrop(slot, slotEls, targetSlotEl, zone) {
+      const targetIdx = slotEls.indexOf(targetSlotEl);
+      const targetSlot = targetIdx !== -1 ? layout[targetIdx] : null;
+      if (!targetSlot || targetSlot === slot) return;
+      if (zone === "left" || zone === "right") {
+        const fromIdx = layout.indexOf(slot);
+        layout.splice(fromIdx, 1);
+        const newTargetIdx = layout.indexOf(targetSlot);
+        layout.splice(zone === "right" ? newTargetIdx + 1 : newTargetIdx, 0, slot);
+      } else {
+        // Merge: width lives on whichever widget leads a slot (see
+        // applyWidth), so the dragged section takes the target's width
+        // rather than jumping the column to its own old one.
+        widths[slot[0]] = widths[targetSlot[0]];
+        if (zone === "top") targetSlot.unshift.apply(targetSlot, slot);
+        else targetSlot.push.apply(targetSlot, slot);
+        const fromIdx = layout.indexOf(slot);
+        if (fromIdx !== -1) layout.splice(fromIdx, 1);
+      }
+      render();
+      persistLayout();
+    }
+
+    /* "Move section" in the ••• menu. A menu item cannot be dragged, so the
+       section is picked up instead: it dims, the same drop lines a drag shows
+       follow the cursor, a click places it and Escape puts it back. */
+    let sectionPickup = null;
+    function pickUpSection(id) {
+      if (sectionPickup) sectionPickup.cancel();
+      const slot = slotOf(id);
+      const el = widgetEl(id);
+      const slotEl = el && el.closest(".col-slot");
+      if (!slot || !slotEl) return false;
+      const slotEls = Array.prototype.slice.call(widget.querySelectorAll(".col-slot"));
+      let target = null;
+      function clear() {
+        if (target) target.el.classList.remove("section-drop-left", "section-drop-right", "section-drop-top", "section-drop-bottom");
+        target = null;
+      }
+      function onMove(ev) {
+        clear();
+        target = sectionDropAt({ x: ev.clientX, y: ev.clientY }, slotEl, slotEls);
+        if (target) target.el.classList.add("section-drop-" + target.zone);
+      }
+      // The press that places the section must not also start a widget drag,
+      // edit a title or tick a task underneath it.
+      function swallow(ev) { ev.preventDefault(); ev.stopPropagation(); }
+      function onClick(ev) {
+        swallow(ev);
+        const t = target;
+        finish();
+        if (t) commitSectionDrop(slot, slotEls, t.el, t.zone);
+      }
+      function onKey(ev) { if (ev.key === "Escape") { ev.preventDefault(); finish(); } }
+      function finish() {
+        clear();
+        slotEl.classList.remove("section-dragging");
+        widget.classList.remove("dragging-col");
+        document.documentElement.classList.remove("section-picking");
+        window.removeEventListener("mousemove", onMove, true);
+        window.removeEventListener("pointerdown", swallow, true);
+        window.removeEventListener("mousedown", swallow, true);
+        window.removeEventListener("click", onClick, true);
+        window.removeEventListener("keydown", onKey, true);
+        if (sectionPickup === handle) sectionPickup = null;
+      }
+      const handle = { cancel: finish };
+      sectionPickup = handle;
+      slotEl.classList.add("section-dragging");
+      widget.classList.add("dragging-col");
+      document.documentElement.classList.add("section-picking");
+      // Armed on the next tick: the menu click that started this is still
+      // travelling, and would otherwise land as the drop.
+      setTimeout(function () {
+        if (sectionPickup !== handle) return;
+        window.addEventListener("mousemove", onMove, true);
+        window.addEventListener("pointerdown", swallow, true);
+        window.addEventListener("mousedown", swallow, true);
+        window.addEventListener("click", onClick, true);
+        window.addEventListener("keydown", onKey, true);
+      }, 0);
+      return true;
+    }
+
+    // For the ••• menu, which lives in another module.
+    window.__mpsSection = { pickUp: pickUpSection };
+
 
     function wireHideButton(btn) {
       if (!btn) return;
@@ -20798,6 +20935,9 @@
        cheap and it happens once, at the moment the panel appears. */
     let previewToken = 0;
     function paintAddPreviews() {
+      // Cards show their generic icon, and the preview box is hidden (see
+      // .add-widget-preview), so there is nothing to paint.
+      return;
       previewToken++;
       addCardEls().forEach(function (card) {
         if (card.hidden) return;
@@ -40426,11 +40566,18 @@
     if (maxed) add("Exit full screen", ICO.expand, function () { B.setMaximized(null); });
     else add("Full screen", ICO.expand, function () { B.setMaximized(id); });
 
-    /* One scope, so there is nothing to decide before the drag. Move section
-       used to sit beside this: a whole column picked up from the menu and
-       placed with a second click. It is gone. A desktop drags a widget by
-       its grip; a phone moves one from here. */
-    if (!desktop) add("Move widget", ICO.grip, function () { enterMove(id); });
+    /* Two scopes, two menu items, so what you are about to move is decided
+       before the move rather than by which of two adjacent handles your thumb
+       found. Move section only when there is a section to move. A desktop
+       drags a widget by its grip, and picks a section up from here. */
+    if (!desktop) {
+      add("Move widget", ICO.grip, function () { enterMove(id, "widget"); });
+      if (boardView && matesOf(id).length > 1) {
+        add("Move section", ICO.grip, function () { enterMove(id, "section"); });
+      }
+    } else if (matesOf(id).length > 1 && window.__mpsSection) {
+      add("Move section", ICO.grip, function () { window.__mpsSection.pickUp(id); });
+    }
 
     /* No divider. It was fencing the destructive items off from the rest, but
        with the section commands landing beside them the menu ended up cut into
@@ -40687,6 +40834,35 @@
   grid.addEventListener("pointerup", endSize);
   grid.addEventListener("pointercancel", endSize);
 
+  /* Everything sharing a slot with `id`, itself included. One widget means a
+     section of one, where "move section" and "move widget" are the same act.
+     Read from __aiLayout.describe(), the authority on what shares a section;
+     the DOM walk is a fallback that compares attributes rather than building
+     a selector out of an id. */
+  function matesOf(id) {
+    try {
+      const layout = window.__aiLayout && window.__aiLayout.describe();
+      if (layout && layout.length) {
+        for (let i = 0; i < layout.length; i++) {
+          const w = layout[i] && layout[i].widgets;
+          if (w && w.indexOf(id) !== -1) return w.slice();
+        }
+      }
+    } catch (e) {}
+    try {
+      let el = null;
+      Array.prototype.forEach.call(grid.querySelectorAll(".col.collapsible-col-wrap"), function (n) {
+        if (n.getAttribute("data-col-id") === id) el = n;
+      });
+      const own = el && el.closest ? el.closest(".col-slot") : null;
+      if (!own) return [id];
+      const out = Array.prototype.map.call(own.querySelectorAll("[data-col-id]"), function (n) {
+        return n.getAttribute("data-col-id");
+      }).filter(Boolean);
+      return out.length ? out : [id];
+    } catch (e) { return [id]; }
+  }
+
   /* The widget element for an id, by comparing attributes over a node list
      rather than by splicing the id into a CSS selector -- an id that does not
      survive being put in a selector throws, and generated ids (custom and Page
@@ -40709,13 +40885,13 @@
 
   let moveState = null;
 
-  function enterMove(id) {
+  function enterMove(id, scope) {
     closeMenu();
     // You cannot place a thing you cannot see the board for, so widget view
     // hands over to board view rather than offering a move with one widget
     // on screen and nowhere to drop it.
     if (currentView() !== "board") setView("board", true);
-    moveState = { id: id, drag: null };
+    moveState = { id: id, scope: scope === "section" ? "section" : "widget", drag: null };
     document.documentElement.classList.add("mob-moving");
     const el = elFor(id);
     if (el) el.classList.add("mob-picked");
@@ -40813,9 +40989,20 @@
     const targetId = d.over.getAttribute("data-col-id");
     if (!targetId || targetId === moveState.id) return;
     const zone = d.zone || "right";
-    const verb = (zone === "top" || zone === "bottom")
-      ? (zone === "top" ? "stack_above" : "stack_below")
-      : (zone === "right" ? "move_right_of" : "move_left_of");
+    let verb;
+    if (zone === "top" || zone === "bottom") {
+      /* Stacking is a widget-level act: a whole section cannot be folded into
+         another column without deciding what happens to the widths and the
+         order of both, so a section dropped into the middle moves beside
+         instead of silently doing something else. */
+      verb = moveState.scope === "section"
+        ? "move_section_right_of"
+        : (zone === "top" ? "stack_above" : "stack_below");
+    } else {
+      verb = moveState.scope === "section"
+        ? (zone === "right" ? "move_section_right_of" : "move_section_left_of")
+        : (zone === "right" ? "move_right_of" : "move_left_of");
+    }
     try { window.__aiLayout.arrange(moveState.id, verb, targetId); } catch (err) {}
     // render() rebuilt the slots, so the picked element is gone; re-mark the
     // widget by id and stay in the mode for the next move.
@@ -40840,12 +41027,10 @@
     });
   }
 
-  /* `scope` is still accepted and ignored, so an older caller asking for a
-     section move gets a widget move rather than an exception. */
-  window.__mpsMoveMode = function (id) {
+  window.__mpsMoveMode = function (id, scope) {
     if (!id) { exitMove(); return null; }
-    enterMove(id);
-    return "widget";
+    enterMove(id, scope === "section" ? "section" : "widget");
+    return scope === "section" ? "section" : "widget";
   };
 
   /* The six-dot grip and the drag handler that went with it are gone. Move
