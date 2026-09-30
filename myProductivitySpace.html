@@ -2849,7 +2849,9 @@
      ids, which has the same specificity as the UA stylesheet's
      `[hidden] { display: none }` and, being later, would win. */
   #alwaysOnTopBtn[hidden], #connectionsBtn[hidden] { display: none; }
-  #alwaysOnTopBtn { right: calc(148px + var(--ai-panel-w)); }
+  /* 114px while Connections is shelved (see revealOwnerControls), so
+     always-on-top closes up into its slot instead of leaving a gap. */
+  #alwaysOnTopBtn { right: calc(114px + var(--ai-panel-w)); }
   #connectionsBtn { right: calc(114px + var(--ai-panel-w)); }
   #addWidgetBtn   { right: calc(80px  + var(--ai-panel-w)); }
   #aiPanelBtn     { right: calc(46px  + var(--ai-panel-w)); }
@@ -11686,7 +11688,10 @@
        tester's set and then has to hear that the answer changed. */
     try { if (window.__mpsRefreshAddCards) window.__mpsRefreshAddCards(); } catch (e) {}
     if (!ownerIsResolved) return;
-    ["alwaysOnTopBtn", "connectionsBtn"].forEach(function (id) {
+    /* connectionsBtn is shelved: it stays in the markup, hidden, with its
+       click handler intact. Adding it back to this list (and moving
+       #alwaysOnTopBtn back to 148px) brings it back. */
+    ["alwaysOnTopBtn"].forEach(function (id) {
       const el = document.getElementById(id);
       if (el) el.hidden = false;
     });
