@@ -1122,6 +1122,29 @@
   .note-editor [data-b="page"] .nb-page-t { text-decoration: underline; text-underline-offset: 2px; }
   .note-editor [data-b="page"].is-pending { opacity: .5; }
 
+  /* An image block: a stored path, drawn as a picture. Inert to the caret
+     for the same reason a page block is. The x removes it; so does
+     Backspace from the start of the block below it. */
+  .note-editor [data-b="img"] {
+    position: relative; margin: 6px 0; user-select: none; line-height: 0;
+  }
+  .note-editor [data-b="img"] img {
+    display: block; max-width: 100%; height: auto; border-radius: 6px;
+  }
+  .note-editor [data-b="img"].is-pending { opacity: .5; }
+  .note-editor [data-b="img"] .nb-img-miss {
+    display: block; line-height: 1.4; padding: 10px 12px; border-radius: 6px;
+    background: rgba(0,0,0,0.04); color: #8a8a8a; font-size: 12px;
+  }
+  .note-editor [data-b="img"] .nb-img-x {
+    position: absolute; top: 6px; right: 6px; width: 22px; height: 22px;
+    border: 0; border-radius: 5px; padding: 0; cursor: pointer;
+    background: rgba(0,0,0,0.55); color: #ffffff; font-size: 14px; line-height: 22px;
+    opacity: 0; transition: opacity 0.12s ease;
+  }
+  .note-editor [data-b="img"]:hover .nb-img-x { opacity: 1; }
+  .note-editor.nb-drop-over { outline: 2px dashed #9099a8; outline-offset: 2px; border-radius: 6px; }
+
   /* Indentation. A flat list of blocks each carrying a depth, rather than
      real nesting: it keeps Enter/Backspace/Tab arithmetic on one array, and
      the tree Notion wants is rebuilt from the depths at push time. */
@@ -3003,15 +3026,15 @@
      answer on pointer-DOWN rather than on release, a scroll edge that fades
      where content passes under the chrome instead of a hard rule.
 
-     428px rather than the 280px it used to be. A card used to be a 36px icon
-     and a word; a card is now a picture of the widget it makes, and a picture
-     you cannot read is not worth the space it takes. */
+     Back to roughly its old width now that a card is a 36px icon and a word
+     again. It went to 428px only to fit a picture of each widget; with the
+     pictures hidden that width was empty space between two icons. */
   .add-widget-overlay { position: fixed; inset: 0; z-index: 4000; background: transparent; }
 
   /* Tracks the sidebar for the same reason its trigger button does. */
   .add-widget-popup {
     position: fixed; top: 44px; right: calc(12px + var(--ai-panel-w)); z-index: 4001;
-    width: 428px;
+    width: 312px;
     /* The panel is a column with one scrolling row in the middle, so the
        section label and the Deleted bar stay put while the cards move. It is
        pinned 44px from the top, so the most it can ever be is what is below
@@ -3107,7 +3130,7 @@
      widget in it; at three across on a 428px panel it would be a thumbnail of
      a thumbnail. */
   .add-widget-grid {
-    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
     padding: 4px 0 10px;
   }
   .add-widget-grid[hidden] { display: none; }
@@ -10908,6 +10931,35 @@
   };
 
   let sb = null, session = null, userId = null;
+  /* Page images live in the private "page-images" Storage bucket, one folder
+     per user (the bucket's policies only let you touch your own folder). A
+     Page stores just the object's path; the picture is fetched through a
+     short-lived signed URL at display time, so the Page text stays small and
+     nothing public ever points at a file. Closes over sb/userId, which are
+     filled in once sign-in lands. */
+  window.__mpsFiles = {
+    ready: function () { return !!(sb && userId); },
+    upload: async function (blob, ext) {
+      if (!sb || !userId) throw new Error("Not signed in");
+      const path = userId + "/" + Date.now().toString(36) + "-" +
+        Math.random().toString(36).slice(2, 8) + "." + ext;
+      const r = await sb.storage.from("page-images").upload(path, blob, {
+        contentType: blob.type || "application/octet-stream", upsert: false
+      });
+      if (r.error) throw r.error;
+      return path;
+    },
+    signedUrl: async function (path) {
+      if (!sb) throw new Error("Not signed in");
+      const r = await sb.storage.from("page-images").createSignedUrl(path, 60 * 60 * 24);
+      if (r.error) throw r.error;
+      return r.data.signedUrl;
+    },
+    remove: function (path) {
+      if (!sb || !path) return;
+      sb.storage.from("page-images").remove([path]).catch(function () {});
+    }
+  };
   let status = "offline";
   const statusListeners = [];
 
@@ -16524,6 +16576,12 @@
         if (b.getAttribute("data-b") === "page") {
           b.textContent = (b.textContent || "").trim();
         }
+        // The picture and its x are display; the path in data-url is the
+        // content. One still uploading has no path yet and is not stored.
+        if (b.getAttribute("data-b") === "img") {
+          if (b.getAttribute("data-url")) b.textContent = "";
+          else b.parentNode.removeChild(b);
+        }
       });
       /* KaTeX renders into a thicket of styled spans. Storing that would mean
          storing presentation, and sanitising it on the way back in would
@@ -16594,7 +16652,7 @@
        text, and stripped wholesale on the way to storage. */
     function nbCaretPlaceholders(editorEl) {
       nbBlocks(editorEl).forEach(function (b) {
-        if (nbType(b) === "page") return;
+        if (nbType(b) === "page" || nbType(b) === "img") return;
         const brs = b.getElementsByTagName("br");
         if ((b.textContent || "").length) {
           // Removing the placeholder from under the caret would move it, so
@@ -16860,7 +16918,8 @@
 
       // A page block is deleted whole rather than merged into -- its text is
       // a page's name, not this Page's content.
-      if (nbType(prev) === "page") {
+      if (nbType(prev) === "page" || nbType(prev) === "img") {
+        if (nbType(prev) === "img" && window.__mpsFiles) window.__mpsFiles.remove(prev.getAttribute("data-url"));
         prev.parentNode.removeChild(prev);
         nbRefresh(editorEl);
         return true;
@@ -16944,6 +17003,192 @@
     /* Renders the chrome a block needs that is not plain text: the title span
        inside a page block. Kept out of storage (see nbSerialize) so what is
        synced stays the block's own content. */
+    /* ---------- images ----------
+       Dropped or pasted image files upload to Storage (see __mpsFiles) and
+       become an img block holding only the object path. Signed URLs are
+       cached per path for the life of the tab; they last a day. */
+    const nbImgUrls = {};
+    // A line of text in place of the picture, with the same x to dismiss it.
+    function nbImageNote(editorEl, b, text) {
+      b.setAttribute("contenteditable", "false");
+      b.__mpsDrawn = null;
+      b.textContent = "";
+      const m = document.createElement("span");
+      m.className = "nb-img-miss";
+      m.textContent = text;
+      b.appendChild(m);
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "nb-img-x";
+      x.title = "Remove";
+      x.textContent = "\u00d7";
+      x.style.opacity = "1";
+      x.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      x.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.__mpsFiles) window.__mpsFiles.remove(b.getAttribute("data-url"));
+        b.parentNode.removeChild(b);
+        editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      b.appendChild(x);
+    }
+    function nbDrawImage(editorEl, b, localUrl) {
+      b.setAttribute("contenteditable", "false");
+      const path = b.getAttribute("data-url");
+      if (b.__mpsDrawn === (path || localUrl)) return;
+      b.__mpsDrawn = path || localUrl;
+      b.textContent = "";
+      const img = document.createElement("img");
+      img.alt = "";
+      img.draggable = false;
+      b.appendChild(img);
+      const x = document.createElement("button");
+      x.type = "button";
+      x.className = "nb-img-x";
+      x.title = "Remove image";
+      x.textContent = "\u00d7";
+      x.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      x.addEventListener("click", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.__mpsFiles) window.__mpsFiles.remove(b.getAttribute("data-url"));
+        b.parentNode.removeChild(b);
+        editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      b.appendChild(x);
+      if (localUrl) { img.src = localUrl; return; }
+      if (!path) return;
+      function miss() { nbImageNote(editorEl, b, "Image unavailable"); }
+      img.onerror = miss;
+      if (nbImgUrls[path]) { img.src = nbImgUrls[path]; return; }
+      const tryLoad = function (left) {
+        if (!window.__mpsFiles || !window.__mpsFiles.ready()) {
+          // Pages can render before sign-in finishes; wait for it briefly.
+          if (left > 0) setTimeout(function () { tryLoad(left - 1); }, 500);
+          else miss();
+          return;
+        }
+        window.__mpsFiles.signedUrl(path).then(function (u) {
+          nbImgUrls[path] = u;
+          img.src = u;
+        }, miss);
+      };
+      tryLoad(40);
+    }
+
+    /* Shrinks anything wider or taller than 2000px before upload, re-encoded
+       as WebP; smaller images and GIFs (which would lose their animation) go
+       up untouched. */
+    function nbPrepareImage(file) {
+      return new Promise(function (resolve) {
+        const extOf = function (t) { return (String(t).split("/")[1] || "png").replace("jpeg", "jpg").replace("svg+xml", "svg"); };
+        if (/gif|svg/.test(file.type)) return resolve({ blob: file, ext: extOf(file.type) });
+        const url = URL.createObjectURL(file);
+        const im = new Image();
+        im.onload = function () {
+          const MAX = 2000;
+          const k = Math.min(1, MAX / Math.max(im.naturalWidth, im.naturalHeight));
+          if (k >= 1 && file.size < 1.5 * 1024 * 1024) {
+            URL.revokeObjectURL(url);
+            return resolve({ blob: file, ext: extOf(file.type) });
+          }
+          const c = document.createElement("canvas");
+          c.width = Math.round(im.naturalWidth * k);
+          c.height = Math.round(im.naturalHeight * k);
+          c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          c.toBlob(function (b) {
+            resolve(b ? { blob: b, ext: "webp" } : { blob: file, ext: extOf(file.type) });
+          }, "image/webp", 0.86);
+        };
+        im.onerror = function () { URL.revokeObjectURL(url); resolve({ blob: file, ext: extOf(file.type) }); };
+        im.src = url;
+      });
+    }
+
+    // Chrome often hands a .heic/.heif over with an empty type, so those are
+    // recognised by name as well.
+    function nbIsHeic(f) {
+      return /image\/hei[cf]/i.test(f.type || "") || /\.hei[cf]$/i.test(f.name || "");
+    }
+    function nbImageFiles(list) {
+      return Array.prototype.filter.call(list || [], function (f) {
+        return f && (/^image\//.test(f.type) || nbIsHeic(f));
+      });
+    }
+
+    /* HEIC/HEIF is the iPhone's photo format and only Safari can draw it, so
+       it is converted to JPEG before upload. The converter is ~1.3MB and is
+       fetched the first time one is dropped, never on a normal load. */
+    let nbHeicLib = null;
+    function nbLoadHeic() {
+      if (!nbHeicLib) {
+        nbHeicLib = new Promise(function (resolve, reject) {
+          if (window.heic2any) return resolve(window.heic2any);
+          const js = document.createElement("script");
+          js.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
+          js.onload = function () { window.heic2any ? resolve(window.heic2any) : reject(new Error("HEIC converter failed to load")); };
+          js.onerror = function () { nbHeicLib = null; reject(new Error("HEIC converter failed to load")); };
+          document.head.appendChild(js);
+        });
+      }
+      return nbHeicLib;
+    }
+    function nbDecodable(file) {
+      if (!nbIsHeic(file)) return Promise.resolve(file);
+      return nbLoadHeic().then(function (heic2any) {
+        return heic2any({ blob: file, toType: "image/jpeg", quality: 0.88 });
+      }).then(function (out) {
+        const blob = Array.isArray(out) ? out[0] : out;
+        return new File([blob], String(file.name || "photo").replace(/\.hei[cf]$/i, "") + ".jpg", { type: "image/jpeg" });
+      });
+    }
+
+    /* Inserts one block per file after `after` (or at the end), shows each
+       from a local preview at once, and swaps in the stored path when its
+       upload lands. The Page is saved only then, so a half-uploaded image
+       never reaches storage. */
+    function nbInsertImages(editorEl, files, after) {
+      if (!window.__mpsFiles || !window.__mpsFiles.ready()) {
+        window.alert("Sign in to add images to a Page.");
+        return;
+      }
+      let at = after || nbBlocks(editorEl).slice(-1)[0];
+      files.forEach(function (file) {
+        const b = nbMakeBlock("img", 0);
+        b.classList.add("is-pending");
+        at.parentNode.insertBefore(b, at.nextSibling);
+        at = b;
+        // A HEIC has nothing to preview until it is converted, so it shows a
+        // placeholder line meanwhile.
+        if (!nbIsHeic(file)) nbDrawImage(editorEl, b, URL.createObjectURL(file));
+        else nbImageNote(editorEl, b, "Converting photo…");
+        nbDecodable(file).then(function (usable) {
+          if (usable !== file) nbDrawImage(editorEl, b, URL.createObjectURL(usable));
+          return nbPrepareImage(usable);
+        }).then(function (prep) {
+          return window.__mpsFiles.upload(prep.blob, prep.ext);
+        }).then(function (path) {
+          b.setAttribute("data-url", path);
+          b.classList.remove("is-pending");
+          b.__mpsDrawn = path;   // keep the local preview on screen; it is the same picture
+          editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+        }, function (err) {
+          /* Stays on the Page, saying why, until it is dismissed with its x.
+             It has no path, so it is never written to storage (nbSerialize
+             drops it) and is gone on the next load either way. */
+          b.classList.remove("is-pending");
+          nbImageNote(editorEl, b, "Couldn't upload this image" +
+            (err && err.message ? ": " + err.message : "."));
+        });
+      });
+      // Something to type into below the picture.
+      if (!at.nextElementSibling) {
+        const p = nbMakeBlock("p", 0);
+        p.appendChild(document.createElement("br"));
+        at.parentNode.insertBefore(p, at.nextSibling);
+      }
+    }
+
     function nbHydrate(editorEl) {
       const tex = editorEl.querySelectorAll("span[data-tex]");
       if (tex.length) {
@@ -16958,6 +17203,9 @@
           });
         });
       }
+      nbBlocks(editorEl).forEach(function (b) {
+        if (nbType(b) === "img") nbDrawImage(editorEl, b);
+      });
       nbBlocks(editorEl).forEach(function (b) {
         if (nbType(b) !== "page") return;
         if (b.querySelector(".nb-page-t")) return;
@@ -17117,6 +17365,11 @@
          give a list, not a paragraph that merely looks like one. */
       editorEl.addEventListener("paste", function (e) {
         e.preventDefault();
+        const pastedImages = nbImageFiles((e.clipboardData || {}).files);
+        if (pastedImages.length) {
+          nbInsertImages(editorEl, pastedImages, nbCaretBlock(editorEl));
+          return;
+        }
         const text = ((e.clipboardData || window.clipboardData).getData("text/plain") || "");
         const lines = text.split(/\r?\n/);
         const block = nbCaretBlock(editorEl);
@@ -17145,6 +17398,43 @@
         if (frag) at.appendChild(frag);
         nbFocusBlock(at, false);
         editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+
+      /* Image files dropped anywhere on the Page land after the block under
+         the pointer. Only file drags are claimed; dragging text within the
+         Page keeps the browser's own behaviour. */
+      function dragHasImageFiles(e) {
+        const dt = e.dataTransfer;
+        return !!dt && Array.prototype.indexOf.call(dt.types || [], "Files") !== -1;
+      }
+      let dropDepth = 0;
+      editorEl.addEventListener("dragenter", function (e) {
+        if (!dragHasImageFiles(e)) return;
+        dropDepth++;
+        editorEl.classList.add("nb-drop-over");
+      });
+      editorEl.addEventListener("dragleave", function (e) {
+        if (!dragHasImageFiles(e)) return;
+        dropDepth = Math.max(0, dropDepth - 1);
+        if (!dropDepth) editorEl.classList.remove("nb-drop-over");
+      });
+      editorEl.addEventListener("dragover", function (e) {
+        if (!dragHasImageFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      });
+      editorEl.addEventListener("drop", function (e) {
+        if (!dragHasImageFiles(e)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        dropDepth = 0;
+        editorEl.classList.remove("nb-drop-over");
+        const files = nbImageFiles(e.dataTransfer.files);
+        if (!files.length) return;
+        let target = null;
+        const hit = document.elementFromPoint(e.clientX, e.clientY);
+        if (hit) target = nbBlockOf(editorEl, hit);
+        nbInsertImages(editorEl, files, target);
       });
 
       /* One click handler for everything a Page's body can be clicked on:

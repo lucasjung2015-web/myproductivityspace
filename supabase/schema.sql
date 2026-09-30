@@ -510,3 +510,29 @@ end $$;
 
 revoke all on function public.marketplace_record_install(uuid) from public;
 grant execute on function public.marketplace_record_install(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Page images. Private bucket; each user's files sit under a folder named by
+-- their user id, and these policies only let a signed-in user touch that
+-- folder. The app reads them through short-lived signed URLs, so nothing is
+-- ever public. 10 MB cap per file (the client shrinks big photos first).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('page-images', 'page-images', false, 10485760,
+        array['image/png','image/jpeg','image/webp','image/gif','image/svg+xml','image/heic','image/avif'])
+on conflict (id) do nothing;
+
+drop policy if exists "page images: own folder read"   on storage.objects;
+drop policy if exists "page images: own folder insert" on storage.objects;
+drop policy if exists "page images: own folder delete" on storage.objects;
+
+create policy "page images: own folder read" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'page-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "page images: own folder insert" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'page-images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "page images: own folder delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'page-images' and (storage.foldername(name))[1] = auth.uid()::text);
