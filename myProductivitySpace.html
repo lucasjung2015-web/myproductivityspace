@@ -1143,6 +1143,20 @@
     opacity: 0; transition: opacity 0.12s ease;
   }
   .note-editor [data-b="img"]:hover .nb-img-x { opacity: 1; }
+  /* Drag handle on the right edge. The block's width is the image's width
+     (the img fills it), stored as data-w, a percentage of the Page. */
+  .note-editor [data-b="img"] { max-width: 100%; }
+  .note-editor [data-b="img"] .nb-img-grip {
+    position: absolute; top: 50%; right: -5px; width: 10px; height: 44px; margin-top: -22px;
+    cursor: ew-resize; opacity: 0; transition: opacity 0.12s ease; touch-action: none;
+  }
+  .note-editor [data-b="img"] .nb-img-grip::after {
+    content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 4px;
+    border-radius: 2px; background: rgba(0,0,0,0.55); box-shadow: 0 0 0 1px rgba(255,255,255,0.8);
+  }
+  .note-editor [data-b="img"]:hover .nb-img-grip,
+  .note-editor [data-b="img"].is-resizing .nb-img-grip { opacity: 1; }
+  html.nb-img-resizing, html.nb-img-resizing * { cursor: ew-resize !important; user-select: none !important; }
   .note-editor.nb-drop-over { outline: 2px dashed #9099a8; outline-offset: 2px; border-radius: 6px; }
 
   /* Indentation. A flat list of blocks each carrying a depth, rather than
@@ -14553,7 +14567,10 @@
            Once this widget stops being last again -- a hidden sibling comes
            back, say -- its remembered height re-applies on its own, since
            nothing here forgets it; only priority while it IS last changes. */
-        if (isLast) { el.style.flex = "1 1 auto"; return; }
+        // Basis 0, not auto: an auto basis is the content's height, and a
+        // tall last widget then made every row above it shrink to make room,
+        // which is what sprang a dragged row back after release.
+        if (isLast) { el.style.flex = "1 1 0px"; return; }
         // For pages in a multi-page slot, check if manually resized
         const isManuallySet = MANUALLY_RESIZED[id];
         if (isManuallySet) {
@@ -14567,7 +14584,7 @@
       }
 
       // Fallback: old behavior for non-page widgets or mixed slots
-      el.style.flex = isLast ? "1 1 auto" : "0 1 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
+      el.style.flex = isLast ? "1 1 0px" : "0 1 " + (heights[id] || DEFAULT_HEIGHT[id] || 200) + "px";
     }
 
     // Hide is per widget now, so — unlike the old per-slot collapse control —
@@ -15779,12 +15796,21 @@
           document.removeEventListener("mouseup", onUp);
           document.removeEventListener("touchmove", onMoveInner);
           document.removeEventListener("touchend", onUp);
-          commitHeight(aboveId, a);
-          /* The widget below keeps what it was given too, unless it is the
-             last in the stack: that one fills whatever is left, so a stored
-             height would never be read for it. */
+          /* Every visible row except the last keeps the height it is drawn
+             at now, not just the two either side of the handle. Stored
+             heights from earlier layouts could add up to more than the column
+             holds; flex-shrink then squeezed every row proportionally, and
+             the one just dragged sprang most of the way back. Committing
+             what is on screen makes the stored heights fit the column. The
+             last row fills whatever is left, so it needs no stored height. */
           const visibleIds = (slotOf(aboveId) || []).filter(function (mid) { return !isHidden(mid); });
-          if (visibleIds.indexOf(belowId) !== visibleIds.length - 1) commitHeight(belowId, b);
+          visibleIds.forEach(function (mid, i) {
+            if (i === visibleIds.length - 1) return;
+            if (mid === aboveId) { commitHeight(mid, a); return; }
+            if (mid === belowId) { commitHeight(mid, b); return; }
+            const rowEl = widgetEl(mid);
+            if (rowEl) commitHeight(mid, measured(rowEl));
+          });
           visibleIds.forEach(applyHeightInSlot);
         }
 
@@ -16204,7 +16230,7 @@
     // Attributes each surviving tag may keep. Everything else is dropped, so
     // a stored Page is still always safe to re-inject through innerHTML.
     const NB_KEEP_ATTR = {
-      div:  ["data-b", "data-i", "data-c", "data-o", "data-e", "data-lang", "data-pid", "data-url"],
+      div:  ["data-b", "data-i", "data-c", "data-o", "data-e", "data-lang", "data-pid", "data-url", "data-w"],
       a:    ["href"],
       span: ["data-color", "data-bg", "data-tex", "data-cm", "data-sug", "data-react"]
     };
@@ -17011,6 +17037,7 @@
     // A line of text in place of the picture, with the same x to dismiss it.
     function nbImageNote(editorEl, b, text) {
       b.setAttribute("contenteditable", "false");
+      b.style.width = "";
       b.__mpsDrawn = null;
       b.textContent = "";
       const m = document.createElement("span");
@@ -17031,6 +17058,52 @@
         editorEl.dispatchEvent(new Event("input", { bubbles: true }));
       });
       b.appendChild(x);
+    }
+    function nbApplyImgWidth(b) {
+      const w = parseFloat(b.getAttribute("data-w"));
+      b.style.width = (w > 0 && w < 100) ? w + "%" : "";
+    }
+    /* Dragging the right-edge handle sets the width live; the Page is saved
+       once, on release. Clamped between 60px and the Page's full width, and
+       snapped back to "full" (no data-w) within 2% of it. */
+    function nbImgGrip(editorEl, b) {
+      const g = document.createElement("span");
+      g.className = "nb-img-grip";
+      g.title = "Drag to resize";
+      g.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      g.addEventListener("pointerdown", function (e) {
+        e.preventDefault(); e.stopPropagation();
+        // The width a 100% block gets, worked back from this block's own
+        // width and percentage rather than read off the Page, whose padding
+        // and margins vary by widget.
+        const startX = e.clientX, startW = b.getBoundingClientRect().width;
+        const nowPct = parseFloat(b.getAttribute("data-w")) || 100;
+        const full = startW * 100 / nowPct;
+        let pct = null;
+        try { g.setPointerCapture(e.pointerId); } catch (err) {}
+        b.classList.add("is-resizing");
+        document.documentElement.classList.add("nb-img-resizing");
+        function move(ev) {
+          const px = Math.max(60, Math.min(full, startW + (ev.clientX - startX)));
+          pct = Math.round(px / full * 1000) / 10;
+          b.style.width = pct >= 98 ? "" : pct + "%";
+        }
+        function up() {
+          g.removeEventListener("pointermove", move);
+          g.removeEventListener("pointerup", up);
+          g.removeEventListener("pointercancel", up);
+          b.classList.remove("is-resizing");
+          document.documentElement.classList.remove("nb-img-resizing");
+          if (pct == null) return;
+          if (pct >= 98) b.removeAttribute("data-w");
+          else b.setAttribute("data-w", String(pct));
+          editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        g.addEventListener("pointermove", move);
+        g.addEventListener("pointerup", up);
+        g.addEventListener("pointercancel", up);
+      });
+      return g;
     }
     function nbDrawImage(editorEl, b, localUrl) {
       b.setAttribute("contenteditable", "false");
@@ -17055,6 +17128,8 @@
         editorEl.dispatchEvent(new Event("input", { bubbles: true }));
       });
       b.appendChild(x);
+      nbApplyImgWidth(b);
+      b.appendChild(nbImgGrip(editorEl, b));
       if (localUrl) { img.src = localUrl; return; }
       if (!path) return;
       function miss() { nbImageNote(editorEl, b, "Image unavailable"); }
@@ -17087,7 +17162,9 @@
         im.onload = function () {
           const MAX = 2000;
           const k = Math.min(1, MAX / Math.max(im.naturalWidth, im.naturalHeight));
-          if (k >= 1 && file.size < 1.5 * 1024 * 1024) {
+          // A HEIC that the browser drew natively (Safari) is always
+          // re-encoded, since other browsers could not draw it back.
+          if (k >= 1 && file.size < 1.5 * 1024 * 1024 && !nbIsHeic(file)) {
             URL.revokeObjectURL(url);
             return resolve({ blob: file, ext: extOf(file.type) });
           }
@@ -17097,7 +17174,9 @@
           c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
           URL.revokeObjectURL(url);
           c.toBlob(function (b) {
-            resolve(b ? { blob: b, ext: "webp" } : { blob: file, ext: extOf(file.type) });
+            // Safari has no WebP encoder and hands back a PNG instead, so the
+            // extension follows what was actually produced.
+            resolve(b ? { blob: b, ext: extOf(b.type) } : { blob: file, ext: extOf(file.type) });
           }, "image/webp", 0.86);
         };
         im.onerror = function () { URL.revokeObjectURL(url); resolve({ blob: file, ext: extOf(file.type) }); };
@@ -17116,30 +17195,43 @@
       });
     }
 
-    /* HEIC/HEIF is the iPhone's photo format and only Safari can draw it, so
-       it is converted to JPEG before upload. The converter is ~1.3MB and is
-       fetched the first time one is dropped, never on a normal load. */
+    /* HEIC/HEIF is the iPhone's photo format. Safari draws it natively, so
+       the browser is asked first; Chrome and Firefox cannot, so there it is
+       converted to JPEG with heic-to, which tracks current libheif releases.
+       (heic2any was tried first and is frozen on a libheif too old for
+       current iPhone photos: "ERR_LIBHEIF format not supported".) The
+       converter is ~3MB and is fetched the first time it is needed, never
+       on a normal load. */
     let nbHeicLib = null;
     function nbLoadHeic() {
       if (!nbHeicLib) {
         nbHeicLib = new Promise(function (resolve, reject) {
-          if (window.heic2any) return resolve(window.heic2any);
+          if (window.HeicTo) return resolve(window.HeicTo);
           const js = document.createElement("script");
-          js.src = "https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js";
-          js.onload = function () { window.heic2any ? resolve(window.heic2any) : reject(new Error("HEIC converter failed to load")); };
+          js.src = "https://cdn.jsdelivr.net/npm/heic-to@1.5.2/dist/iife/heic-to.js";
+          js.onload = function () { window.HeicTo ? resolve(window.HeicTo) : reject(new Error("HEIC converter failed to load")); };
           js.onerror = function () { nbHeicLib = null; reject(new Error("HEIC converter failed to load")); };
           document.head.appendChild(js);
         });
       }
       return nbHeicLib;
     }
+    function nbBrowserDecodes(file) {
+      if (!window.createImageBitmap) return Promise.resolve(false);
+      return createImageBitmap(file).then(function (bmp) {
+        try { bmp.close(); } catch (e) {}
+        return true;
+      }, function () { return false; });
+    }
     function nbDecodable(file) {
       if (!nbIsHeic(file)) return Promise.resolve(file);
-      return nbLoadHeic().then(function (heic2any) {
-        return heic2any({ blob: file, toType: "image/jpeg", quality: 0.88 });
-      }).then(function (out) {
-        const blob = Array.isArray(out) ? out[0] : out;
-        return new File([blob], String(file.name || "photo").replace(/\.hei[cf]$/i, "") + ".jpg", { type: "image/jpeg" });
+      return nbBrowserDecodes(file).then(function (native) {
+        if (native) return file;
+        return nbLoadHeic().then(function (heicTo) {
+          return heicTo({ blob: file, type: "image/jpeg", quality: 0.88 });
+        }).then(function (jpeg) {
+          return new File([jpeg], String(file.name || "photo").replace(/\.hei[cf]$/i, "") + ".jpg", { type: "image/jpeg" });
+        });
       });
     }
 
