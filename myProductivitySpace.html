@@ -11438,7 +11438,7 @@
       // needs to read "Database error saving new user" — the only way to
       // reach it is an account that isn't on the allowlist.
       err.textContent = /Database error|not_invited/i.test(String(msg || ""))
-        ? "You haven't been invited to this board."
+        ? "You haven't been invited to this platform."
         : (msg || "Something went wrong signing in.");
     }
     const btn = gateEl("authGateBtn");
