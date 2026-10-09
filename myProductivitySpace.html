@@ -24484,6 +24484,30 @@
     return base;
   }
 
+  /* The floating window's iframe loads this same URL, and Chrome keeps a
+     separate HTTP cache for it that a reload of the main tab never touches.
+     A server that sends no Cache-Control (python -m http.server, locally)
+     let that cache keep serving a days-old copy of the app inside the
+     floating window. A one-off ?pip= tag gives every floating window a URL
+     no cache entry can match. This strips the tag on arrival so it never
+     sticks around for a reload or a bookmark. */
+  function pipHref() {
+    try {
+      const u = new URL(popoutHref());
+      u.searchParams.set("pip", Date.now().toString(36));
+      return u.toString();
+    } catch (e) { return popoutHref(); }
+  }
+
+  (function stripPipTag() {
+    try {
+      const u = new URL(location.href);
+      if (!u.searchParams.has("pip")) return;
+      u.searchParams.delete("pip");
+      history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+    } catch (e) {}
+  })();
+
   (function consumeTaskFragment() {
     const m = /^#task=(.+)$/.exec(location.hash || "");
     if (!m) return;
@@ -24646,7 +24670,7 @@
       pipWindow.document.head.appendChild(style);
 
       const iframe = pipWindow.document.createElement("iframe");
-      iframe.src = popoutHref();
+      iframe.src = pipHref();
       pipWindow.document.body.appendChild(iframe);
 
       // No separate "maximize" chrome floated over the iframe any more --
