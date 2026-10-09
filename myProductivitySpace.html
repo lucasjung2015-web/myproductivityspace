@@ -637,8 +637,10 @@
   }
   /* The logo mark sits inside .pt-word, so it is sized in em and follows the
      wordmark through every size the phone fit pass picks, and the pass's
-     Range measurement counts it as part of the name's width. */
-  .page-title .pt-logo {
+     Range measurement counts it as part of the name's width. The sign-in
+     screen carries the same mark, so it scales with the gate's clamp too. */
+  .page-title .pt-logo,
+  #authGate .pt-logo {
     width: 0.92em; height: 0.92em; margin-right: 0.24em;
     vertical-align: -0.1em; display: inline-block;
   }
@@ -4682,15 +4684,15 @@
      clear obstacles that are not on the screen: a 15px wordmark alone on a
      full-bleed field was the whole of the app's identity on an iPhone.
 
-     One clamp replaces all three fixed sizes. 8vw is the ceiling that keeps
-     the word inside the viewport: "myProductivityspace" measures about 10.9x
-     its own font-size, so 8vw lands it at roughly 87% of the width at every
-     size, which is why the mobile truncation rules below never engage here
+     One clamp replaces all three fixed sizes. 7.2vw is the ceiling that keeps
+     the word inside the viewport: "myProductivityspace" plus the logo mark in
+     front of it measures about 12.1x its own font-size, so 7.2vw lands it at
+     roughly 87% of the width at every size, which is why the mobile truncation rules below never engage here
      even though they still apply to this element. 54px caps it once the
      window is wide enough that vw would overshoot; that is the deliberate
      step up from the band's 46px, since the gate has the room and the
      wordmark is the only thing on it. 26px is the floor. */
-  #authGate .ag-wordmark .pt-word { font-size: clamp(26px, 8vw, 54px); }
+  #authGate .ag-wordmark .pt-word { font-size: clamp(26px, 7.2vw, 54px); }
   /* The sign-in screen is white, like the board behind it. It used to turn
      the brand blue the moment there was something to show, which meant the
      first thing a new account ever saw was a full-bleed colour field the app
@@ -5631,7 +5633,7 @@
      pre-hydration values, or on a shared browser the previous account's. -->
 
 <div id="authGate">
-  <div class="ag-wordmark" id="authGateMark" hidden><span class="pt-word">myProductivityspace</span></div>
+  <div class="ag-wordmark" id="authGateMark" hidden><span class="pt-word"><svg class="pt-logo" viewBox="0 0 160 160" aria-hidden="true"><rect x="1.5" y="1.5" width="157" height="157" rx="36" fill="#fff" stroke="#111" stroke-width="3"/><g transform="translate(26 26) scale(0.9)" fill="#111"><rect x="0" y="4" width="56" height="56" rx="10"/><rect x="64" y="4" width="56" height="56" rx="10"/><path d="M60,66 Q65,87 86,92 Q65,97 60,118 Q55,97 34,92 Q55,87 60,66Z"/></g></svg>myProductivityspace</span></div>
   <button type="button" id="authGateBtn" hidden>
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 11v2.9h4.1c-.2 1.1-1.4 3.2-4.1 3.2-2.5 0-4.5-2-4.5-4.6S9 7.9 11.5 7.9c1.4 0 2.3.6 2.9 1.1l2-1.9C15.1 5.9 13.5 5.2 11.5 5.2 7.6 5.2 4.4 8.4 4.4 12.3s3.2 7.1 7.1 7.1c4.1 0 6.8-2.9 6.8-6.9 0-.5 0-.9-.1-1.3H12z"/></svg>
     Continue with Google
