@@ -11805,13 +11805,13 @@
      into a card label, so the card and the tile it mints agree. A label
      would have shown one name in the menu and titled the widget another. */
   /* ---------- the board reset ----------
-     Two accounts are put back to the view a first-time account gets, once,
+     Three accounts are put back to the view a first-time account gets, once,
      on their next load.
 
      Same shape and same reason as the gift below: nothing here reaches
      across an account boundary, because nothing can. kv is keyed
      (user_id, key) and RLS returns only rows belonging to whoever is
-     asking. This ships to everyone, recognises two accounts when THEY sign
+     asking. This ships to everyone, recognises those accounts when THEY sign
      in, and rewrites their own rows in their own browser under their own
      token.
 
@@ -11831,7 +11831,8 @@
   const RESET_FLAG = "board-reset-v1";
   const RESET_FOR_SHA256 = [
     "da657ded3593244d68b9c4cc449d4542498d68ed2e744938de77a88d267ade25",
-    "d4e814077e97292c2d6df167061ab4304d15f55130c00b36f583bdc0cafc3111"
+    "d4e814077e97292c2d6df167061ab4304d15f55130c00b36f583bdc0cafc3111",
+    "3f0a02ec83e7fba4d8a7a5caa5d40bb1bd098ec70a80723f3c7edd27dd41487c"
   ];
   window.__mpsWantsBoardReset = async function () {
     try {
