@@ -24524,8 +24524,8 @@
   // means this copy of the app IS that floating window's contents -- and
   // "pop this out" (the button's normal meaning) makes no sense from in
   // here, since we're already floating. Wire it to the opposite instead:
-  // one click promotes this view to a normal full-size resizable browser
-  // window and closes the small floating one. This replaces the separate
+  // one click closes the floating window (see the handler below for why
+  // that is all it needs to do). This replaces the separate
   // maximize button that used to float over the iframe from outside (see
   // the PiP-launch script above) -- one "make this big again" control, not
   // two doing the same job from either side of the iframe boundary.
@@ -24536,41 +24536,13 @@
     btn.title = "Back to full screen";
     btn.setAttribute("aria-label", "Back to full screen");
     btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5"/></svg>';
+    /* The floating window can only be opened from a normal tab, and that tab
+       stays open behind it. So "back to full screen" just closes the floating
+       window, which drops you back on the tab you came from. It used to open a
+       second full-size window instead, leaving two copies of the board open.
+       window.parent from inside the iframe IS the floating PiP window. */
     btn.addEventListener("click", function () {
-      const sw = Math.max(320, (window.screen && window.screen.availWidth) || window.innerWidth);
-      const sh = Math.max(240, (window.screen && window.screen.availHeight) || window.innerHeight);
-      const features = [
-        "popup=yes",
-        "resizable=yes",
-        "scrollbars=yes",
-        "left=0",
-        "top=0",
-        "width=" + sw,
-        "height=" + sh
-      ].join(",");
-      /* A fixed window name meant window.open reused the same window every
-         time, so a second popout replaced the first instead of opening beside
-         it. Every click now gets its own name, so every click is its own
-         window and they stack up as long as you keep clicking. Named rather
-         than blank ("_blank" is also unique per call) so each one is
-         addressable afterwards. */
-      const href = popoutHref();
-      const winName = "mpsPopout_" + Date.now().toString(36) + "_"
-        + Math.random().toString(36).slice(2, 7);
-      const fullWindow = window.open(href, winName, features);
-      if (fullWindow) {
-        try { fullWindow.moveTo(0, 0); } catch (e2) {}
-        try { fullWindow.resizeTo(sw, sh); } catch (e2) {}
-        try { fullWindow.focus(); } catch (e2) {}
-        // window.parent from inside the iframe IS the floating PiP window
-        // itself -- closing it is what actually ends the floating mode.
-        try { window.parent.close(); } catch (e2) {}
-      } else {
-        // Popup blocked: fall back to asking the PiP window itself for its
-        // largest allowed size, same fallback the old outside button had.
-        try { window.parent.moveTo(0, 0); } catch (e2) {}
-        try { window.parent.resizeTo(sw, sh); } catch (e2) {}
-      }
+      try { window.parent.close(); } catch (e) {}
     });
     return;
   }
